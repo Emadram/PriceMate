@@ -1,0 +1,11 @@
+# User requested ignores
+*.docx
+*.md
+
+# Exceptions
+!README.md
+
+# Other extensions
+*.txt
+*.pub
+.env
