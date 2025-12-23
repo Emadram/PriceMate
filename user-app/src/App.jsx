@@ -14,8 +14,6 @@ import Favorites from './pages/Favorites';
 import FeedbackPage from './pages/FeedbackPage';
 import PriceComparison from './pages/PriceComparison';
 import SupermarketProfile from './pages/SupermarketProfile';
-import ShoppingLists from './pages/ShoppingLists';
-import ShoppingLists from './pages/ShoppingLists';
 
 const ProtectedRoute = ({ children }) => {
   const user = useAuthStore((state) => state.user);
@@ -116,14 +114,6 @@ function App() {
           element={
             <ProtectedRoute>
               <FeedbackPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/lists"
-          element={
-            <ProtectedRoute>
-              <ShoppingLists />
             </ProtectedRoute>
           }
         />
