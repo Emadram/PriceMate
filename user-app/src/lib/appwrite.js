@@ -15,23 +15,12 @@ export const APPWRITE_CONFIG = {
     PROJECT_ID: import.meta.env.VITE_APPWRITE_PROJECT_ID,
     DATABASE_ID: import.meta.env.VITE_APPWRITE_DATABASE_ID,
     COLLECTIONS: {
-<<<<<<< HEAD
-        CATEGORIES: import.meta.env.VITE_APPWRITE_COLLECTION_CATEGORIES,
-        PRODUCTS: import.meta.env.VITE_APPWRITE_COLLECTION_PRODUCTS,
-        SUPERMARKETS: import.meta.env.VITE_APPWRITE_COLLECTION_SUPERMARKETS,
-        PRICES: import.meta.env.VITE_APPWRITE_COLLECTION_PRICES,
-        FEEDBACK: import.meta.env.VITE_APPWRITE_COLLECTION_FEEDBACK,
-        USER_PROFILES: import.meta.env.VITE_APPWRITE_COLLECTION_USER_PROFILES
-=======
         CATEGORIES: 'category',
         PRODUCTS: 'products',
         SUPERMARKETS: 'supermarkets',
         PRICES: 'prices_collection',
         FEEDBACK: 'feedback',
-        USER_PROFILES: 'user_profiles',
-        LISTS: 'lists',
-        LIST_ITEMS: 'list_items'
->>>>>>> c30651a (Clean up and modifications)
+        USER_PROFILES: 'user_profiles'
     }
 };
 
