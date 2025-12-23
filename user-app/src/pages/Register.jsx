@@ -6,13 +6,13 @@ const Register = () => {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const register = useAuthStore((state) => state.register);
+    const signup = useAuthStore((state) => state.signup);
     const error = useAuthStore((state) => state.error);
     const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        const success = await register(email, password, name);
+        const success = await signup(email, password, name);
         if (success) {
             navigate('/');
         }

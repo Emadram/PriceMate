@@ -2,20 +2,15 @@ import { Link } from 'react-router-dom';
 import { FiPackage, FiShoppingBag, FiTag } from 'react-icons/fi';
 
 const ProductCard = ({ product, prices = [] }) => {
-    // Debug logging
-    console.log('ProductCard - Product:', product.name);
-    console.log('ProductCard - Prices received:', prices);
-    console.log('ProductCard - Prices count:', prices.length);
-
     // Get the lowest price for this product
     const lowestPrice = prices.length > 0
         ? prices.reduce((min, p) => p.price < min.price ? p : min, prices[0])
         : null;
 
-    console.log('ProductCard - Lowest price:', lowestPrice);
-
     // Get category name
-    const categoryName = product.categoryId?.categoryName || 'Uncategorized';
+    const categoryName = Array.isArray(product.categoryId)
+        ? product.categoryId[0]?.categoryName
+        : product.categoryId?.categoryName || 'Uncategorized';
 
     return (
         <Link

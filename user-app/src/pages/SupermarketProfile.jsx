@@ -65,7 +65,7 @@ const SupermarketProfile = () => {
                         className="w-full h-full object-cover"
                     />
                 ) : (
-                    <div className="w-full h-full bg-gradient-to-r from-blue-600 to-purple-600"></div>
+                    <div className="w-full h-full bg-blue-600"></div>
                 )}
                 <div className="absolute inset-0 bg-black/30"></div>
                 <div className="absolute top-4 left-4 flex gap-3 z-10">
@@ -181,7 +181,7 @@ const SupermarketProfile = () => {
                                             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                                         />
                                         <div className="absolute top-2 right-2 bg-white/90 dark:bg-gray-900/90 backdrop-blur px-2 py-1 rounded-lg text-xs font-medium text-gray-700 dark:text-gray-300 shadow-sm">
-                                            {product.categoryId?.categoryName}
+                                            {Array.isArray(product.categoryId) ? product.categoryId[0]?.categoryName : product.categoryId?.categoryName}
                                         </div>
                                         {product.isLowest && (
                                             <div className="absolute bottom-2 left-2 bg-green-500 text-white px-2 py-1 rounded text-xs font-bold shadow-sm">

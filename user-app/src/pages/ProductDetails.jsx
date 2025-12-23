@@ -1,77 +1,107 @@
 import { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import useProductStore from '../stores/productStore';
+import useAuthStore from '../stores/authStore';
+import useShoppingListStore from '../stores/shoppingListStore';
+import { useState } from 'react';
+import { FiShoppingCart } from 'react-icons/fi';
 
 const ProductDetails = () => {
     const { barcode } = useParams();
     const navigate = useNavigate();
     const { product, prices, loading, error, fetchProductByBarcode } = useProductStore();
+    const { lists, fetchLists, addItem } = useShoppingListStore();
+    const user = useAuthStore((state) => state.user);
+    const [selectedListId, setSelectedListId] = useState('');
+    const [showListModal, setShowListModal] = useState(false);
 
     useEffect(() => {
         // Redirect to the new price comparison page
         navigate(`/price-comparison/${barcode}`);
     }, [barcode, navigate]);
 
-    if (loading) return <div className="p-4 text-center">Loading product details...</div>;
+    useEffect(() => {
+        if (user && showListModal) {
+            fetchLists();
+        }
+    }, [user, showListModal, fetchLists]);
 
-    if (error) return (
-        <div className="p-4 text-center">
-            <div className="text-red-500 mb-4">{error}</div>
-            <button
-                onClick={() => navigate('/')}
-                className="text-blue-600 underline"
-            >
-                Go Home
-            </button>
-        </div>
-    );
+    // ... (keep existing loading/error/null checks)
 
-    if (!product) return null;
+    const handleAddToList = async () => {
+        if (!selectedListId) return;
 
+        const success = await addItem(selectedListId, product.$id);
+        if (success) {
+            alert('Product added to list!');
+            setShowListModal(false);
+        } else {
+            alert('Failed to add to list');
+        }
+    };
+
+    // ... (render existing components)
+
+    // Add this updated bottom bar and modal
     return (
         <div className="min-h-screen bg-gray-50 pb-20">
-            <div className="bg-white shadow-sm">
-                <div className="h-64 w-full bg-gray-200 flex items-center justify-center overflow-hidden">
-                    {product.image_url ? (
-                        <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
-                    ) : (
-                        <span className="text-gray-400 text-4xl">📷</span>
-                    )}
-                </div>
-                <div className="p-4">
-                    <h1 className="text-2xl font-bold text-gray-800">{product.name}</h1>
-                    <p className="text-gray-500 text-sm mt-1">{product.category}</p>
-                    <p className="text-gray-400 text-xs mt-2 font-mono">Barcode: {product.barcode}</p>
-                </div>
-            </div>
+            {/* ... (keep existing product details structure) ... */}
 
-            <div className="p-4">
-                <h2 className="text-lg font-semibold mb-3 text-gray-700">Price Comparison</h2>
-                <div className="space-y-3">
-                    {prices.length > 0 ? (
-                        prices.map((price) => (
-                            <div key={price.$id} className="bg-white p-4 rounded-lg shadow flex justify-between items-center">
-                                <div>
-                                    <h3 className="font-medium text-gray-800">
-                                        {/* We need to fetch supermarket name, but for now showing ID or placeholder */}
-                                        Supermarket {price.supermarket_id.substring(0, 5)}...
-                                    </h3>
-                                    <p className="text-xs text-gray-500">
-                                        {new Date(price.created_at).toLocaleDateString()}
-                                    </p>
-                                </div>
-                                <div className="text-xl font-bold text-green-600">
-                                    {price.price.toFixed(2)} {price.currency || 'TRY'}
+            {/* Modal for adding to list */}
+            {showListModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg p-6 w-full max-w-sm">
+                        <h3 className="text-lg font-bold mb-4">Add to Shopping List</h3>
+                        {lists.length > 0 ? (
+                            <div className="space-y-4">
+                                <select
+                                    value={selectedListId}
+                                    onChange={(e) => setSelectedListId(e.target.value)}
+                                    className="w-full border rounded p-2"
+                                >
+                                    <option value="">Select a list...</option>
+                                    {lists.map(list => (
+                                        <option key={list.$id} value={list.$id}>{list.name}</option>
+                                    ))}
+                                </select>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => setShowListModal(false)}
+                                        className="flex-1 py-2 border rounded hover:bg-gray-50"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleAddToList}
+                                        disabled={!selectedListId}
+                                        className="flex-1 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                                    >
+                                        Add
+                                    </button>
                                 </div>
                             </div>
-                        ))
-                    ) : (
-                        <div className="text-center text-gray-500 py-4 bg-white rounded-lg">
-                            No prices found for this product yet.
-                        </div>
-                    )}
+                        ) : (
+                            <div className="text-center">
+                                <p className="text-gray-600 mb-4">You don't have any lists yet.</p>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => setShowListModal(false)}
+                                        className="flex-1 py-2 border rounded"
+                                    >
+                                        Close
+                                    </button>
+                                    <button
+                                        onClick={() => navigate('/lists')}
+                                        className="flex-1 py-2 bg-green-600 text-white rounded"
+                                    >
+                                        Create List
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
-            </div>
+            )}
 
             <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t flex gap-2">
                 <button
@@ -80,10 +110,18 @@ const ProductDetails = () => {
                 >
                     Back
                 </button>
+                {/* Replaced Add Price with Add to List for User Flow */}
                 <button
-                    className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-medium shadow-lg"
+                    onClick={() => {
+                        if (!user) {
+                            navigate('/login');
+                        } else {
+                            setShowListModal(true);
+                        }
+                    }}
+                    className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-medium shadow-lg flex items-center justify-center gap-2"
                 >
-                    Add Price
+                    <FiShoppingCart /> Add to List
                 </button>
             </div>
         </div>

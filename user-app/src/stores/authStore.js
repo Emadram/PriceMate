@@ -4,15 +4,17 @@ import { ID } from 'appwrite';
 
 const useAuthStore = create((set, get) => ({
     user: null,
-    session: null,
     loading: true,
     error: null,
 
-    init: async () => {
+    // Initialize session
+    checkSession: async () => {
+        set({ loading: true, error: null });
         try {
             const user = await account.get();
             set({ user, loading: false });
         } catch (error) {
+            // No session found - clean state but don't error loudly
             set({ user: null, loading: false });
         }
     },
@@ -20,9 +22,9 @@ const useAuthStore = create((set, get) => ({
     login: async (email, password) => {
         set({ loading: true, error: null });
         try {
-            const session = await account.createEmailPasswordSession(email, password);
+            await account.createEmailPasswordSession(email, password);
             const user = await account.get();
-            set({ user, session, loading: false });
+            set({ user, loading: false });
             return true;
         } catch (error) {
             set({ error: error.message, loading: false });
@@ -30,11 +32,15 @@ const useAuthStore = create((set, get) => ({
         }
     },
 
-    register: async (email, password, name) => {
+    signup: async (email, password, name) => {
         set({ loading: true, error: null });
         try {
+            // Create account
             await account.create(ID.unique(), email, password, name);
-            await get().login(email, password);
+            // Auto login
+            await account.createEmailPasswordSession(email, password);
+            const user = await account.get();
+            set({ user, loading: false });
             return true;
         } catch (error) {
             set({ error: error.message, loading: false });
@@ -43,11 +49,12 @@ const useAuthStore = create((set, get) => ({
     },
 
     logout: async () => {
+        set({ loading: true, error: null });
         try {
             await account.deleteSession('current');
-            set({ user: null, session: null });
+            set({ user: null, loading: false });
         } catch (error) {
-            console.error('Logout failed:', error);
+            set({ error: error.message, loading: false });
         }
     }
 }));

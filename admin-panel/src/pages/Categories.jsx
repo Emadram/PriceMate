@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FiTag, FiEdit2, FiTrash2, FiPlus } from 'react-icons/fi';
+import { FiTag, FiEdit2, FiTrash2, FiPlus, FiChevronUp, FiChevronDown } from 'react-icons/fi';
 import useCategoriesStore from '../stores/categoriesStore';
 
 const Categories = () => {
@@ -12,13 +12,14 @@ const Categories = () => {
         icon: ''
     });
 
+    const [sortConfig, setSortConfig] = useState({ key: null, direction: 'ascending' });
+
     useEffect(() => {
         fetchCategories();
     }, [fetchCategories]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        console.log('Submitting category:', formData);
         const store = useCategoriesStore.getState();
 
         try {
@@ -57,6 +58,35 @@ const Categories = () => {
         }
     };
 
+    const sortedCategories = [...categories];
+    if (sortConfig.key) {
+        sortedCategories.sort((a, b) => {
+            let aValue = a[sortConfig.key];
+            let bValue = b[sortConfig.key];
+
+            if (aValue < bValue) {
+                return sortConfig.direction === 'ascending' ? -1 : 1;
+            }
+            if (aValue > bValue) {
+                return sortConfig.direction === 'ascending' ? 1 : -1;
+            }
+            return 0;
+        });
+    }
+
+    const requestSort = (key) => {
+        let direction = 'ascending';
+        if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+            direction = 'descending';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const SortIcon = ({ columnKey }) => {
+        if (sortConfig.key !== columnKey) return null;
+        return sortConfig.direction === 'ascending' ? <FiChevronUp className="inline ml-1" /> : <FiChevronDown className="inline ml-1" />;
+    };
+
     return (
         <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
             <header className="bg-white dark:bg-gray-800 shadow">
@@ -80,41 +110,63 @@ const Categories = () => {
                 {loading ? (
                     <div className="text-center py-8 text-gray-600 dark:text-gray-400">Loading...</div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {categories.map((category) => (
-                            <div
-                                key={category.$id}
-                                className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 hover:shadow-lg transition"
-                            >
-                                <div className="flex items-start justify-between mb-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
-                                            <FiTag className="text-blue-600 dark:text-blue-400 text-xl" />
-                                        </div>
-                                        <div>
-                                            <h3 className="font-semibold text-gray-800 dark:text-white">{category.categoryName}</h3>
-                                            {category.icon && (
-                                                <span className="text-xs text-gray-500 dark:text-gray-400">{category.icon}</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => handleEdit(category)}
-                                        className="flex-1 flex items-center justify-center gap-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 px-3 py-2 rounded transition"
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                            <thead className="bg-gray-50 dark:bg-gray-700">
+                                <tr>
+                                    <th
+                                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                                        onClick={() => requestSort('categoryName')}
                                     >
-                                        <FiEdit2 /> Edit
-                                    </button>
-                                    <button
-                                        onClick={() => handleDelete(category.$id)}
-                                        className="flex-1 flex items-center justify-center gap-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 px-3 py-2 rounded transition"
-                                    >
-                                        <FiTrash2 /> Delete
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
+                                        Name <SortIcon columnKey="categoryName" />
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Icon</th>
+                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                                {sortedCategories.map((category) => (
+                                    <tr key={category.$id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="flex items-center">
+                                                <div className="flex-shrink-0 h-10 w-10 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                                                    <FiTag className="text-blue-600 dark:text-blue-400" />
+                                                </div>
+                                                <div className="ml-4">
+                                                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                                        {category.categoryName}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                            {category.icon || '-'}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                            <button
+                                                onClick={() => handleEdit(category)}
+                                                className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 mr-4 inline-flex items-center gap-1"
+                                            >
+                                                <FiEdit2 /> Edit
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(category.$id)}
+                                                className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300 inline-flex items-center gap-1"
+                                            >
+                                                <FiTrash2 /> Delete
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {categories.length === 0 && (
+                                    <tr>
+                                        <td colSpan="3" className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                                            No categories found.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
                     </div>
                 )}
             </main>

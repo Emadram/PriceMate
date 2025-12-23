@@ -12,10 +12,10 @@ import ProductDetails from './pages/ProductDetails';
 import Profile from './pages/Profile';
 import Favorites from './pages/Favorites';
 import FeedbackPage from './pages/FeedbackPage';
-import DebugPage from './pages/DebugPage';
-import DataInspector from './pages/DataInspector';
 import PriceComparison from './pages/PriceComparison';
 import SupermarketProfile from './pages/SupermarketProfile';
+import ShoppingLists from './pages/ShoppingLists';
+import ShoppingLists from './pages/ShoppingLists';
 
 const ProtectedRoute = ({ children }) => {
   const user = useAuthStore((state) => state.user);
@@ -33,14 +33,14 @@ const ProtectedRoute = ({ children }) => {
 };
 
 function App() {
-  const init = useAuthStore((state) => state.init);
+  const checkSession = useAuthStore((state) => state.checkSession);
   const setTheme = useThemeStore((state) => state.setTheme);
   const theme = useThemeStore((state) => state.theme);
 
   useEffect(() => {
-    init();
+    checkSession();
     setTheme(theme); // Initialize theme on mount
-  }, [init, setTheme, theme]);
+  }, [checkSession, setTheme, theme]);
 
   return (
     <Router>
@@ -120,21 +120,14 @@ function App() {
           }
         />
         <Route
-          path="/debug"
+          path="/lists"
           element={
             <ProtectedRoute>
-              <DebugPage />
+              <ShoppingLists />
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/data-inspector"
-          element={
-            <ProtectedRoute>
-              <DataInspector />
-            </ProtectedRoute>
-          }
-        />
+
       </Routes>
     </Router>
   );

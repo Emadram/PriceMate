@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FiPackage, FiEdit2, FiTrash2, FiPlus } from 'react-icons/fi';
+import { FiPackage, FiEdit2, FiTrash2, FiPlus, FiChevronUp, FiChevronDown } from 'react-icons/fi';
 import useProductsStore from '../stores/productsStore';
 import useCategoriesStore from '../stores/categoriesStore';
 import useSupermarketsStore from '../stores/supermarketsStore';
+import { storage } from '../lib/appwrite';
+import { ID } from 'appwrite';
 
 const Products = () => {
     const { products, loading, fetchProducts, deleteProduct } = useProductsStore();
@@ -12,6 +14,7 @@ const Products = () => {
 
     const [showModal, setShowModal] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
+    const [uploading, setUploading] = useState(false);
     const [formData, setFormData] = useState({
         name: '',
         barcode: '',
@@ -22,12 +25,40 @@ const Products = () => {
         supermarkets: ''
     });
 
+    const [filterCategory, setFilterCategory] = useState('');
+    const [sortConfig, setSortConfig] = useState({ key: null, direction: 'ascending' });
+
     useEffect(() => {
         fetchProducts();
         fetchCategories();
         fetchSupermarkets();
     }, [fetchProducts, fetchCategories, fetchSupermarkets]);
 
+    const handleImageUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setUploading(true);
+        try {
+            // Upload to Appwrite Storage (Assuming bucket ID 'product-images' or use a default)
+            // You might need to create this bucket in Appwrite Console if it doesn't exist.
+            const BUCKET_ID = 'product-images'; // Ensure this exists!
+            const response = await storage.createFile(BUCKET_ID, ID.unique(), file);
+
+            // Construct View URL
+            // https://cloud.appwrite.io/v1/storage/buckets/[BUCKET_ID]/files/[FILE_ID]/view?project=[PROJECT_ID]
+            const endpoint = 'https://cloud.appwrite.io/v1';
+            const projectId = '68f5e984002817f132e2'; // From appwrite.js
+
+            const imageUrl = `${endpoint}/storage/buckets/${BUCKET_ID}/files/${response.$id}/view?project=${projectId}`;
+
+            setFormData(prev => ({ ...prev, imageUrl }));
+        } catch (error) {
+            console.error('Image upload failed:', error);
+            alert('Image upload failed. Please check if the "product-images" Storage Bucket exists and verify permissions.');
+        }
+        setUploading(false);
+    };
     const handleSubmit = async (e) => {
         e.preventDefault();
         const store = useProductsStore.getState();
@@ -53,13 +84,18 @@ const Products = () => {
 
     const handleEdit = (product) => {
         setEditingProduct(product);
+        // categoryId might be an object (if expanded) or a string (if not)
+        const catId = product.categoryId && typeof product.categoryId === 'object'
+            ? product.categoryId.$id
+            : product.categoryId;
+
         setFormData({
             name: product.name,
             barcode: product.barcode,
             imageUrl: product.imageUrl || '',
             description: product.description || '',
             stockQuantity: product.stockQuantity || 0,
-            categoryId: product.categoryId?.$id || '',
+            categoryId: catId || '',
             supermarkets: product.supermarkets?.$id || ''
         });
         setShowModal(true);
@@ -72,10 +108,61 @@ const Products = () => {
     };
 
     const getCategoryName = (product) => {
+        // If it's an object with categoryName, returns it
         if (product.categoryId && typeof product.categoryId === 'object') {
             return product.categoryId.categoryName || 'N/A';
         }
+        // If it's a string ID, find it in the categories list
+        if (product.categoryId && typeof product.categoryId === 'string') {
+            const cat = categories.find(c => c.$id === product.categoryId);
+            return cat ? cat.categoryName : 'N/A';
+        }
         return 'N/A';
+    };
+
+    const filteredProducts = products.filter(product => {
+        if (!filterCategory) return true;
+
+        const prodCatId = product.categoryId && typeof product.categoryId === 'object'
+            ? product.categoryId.$id
+            : product.categoryId;
+
+        return prodCatId === filterCategory;
+    });
+
+    const sortedProducts = [...filteredProducts];
+    if (sortConfig.key) {
+        sortedProducts.sort((a, b) => {
+            let aValue = a[sortConfig.key];
+            let bValue = b[sortConfig.key];
+
+            // Handle special cases
+            if (sortConfig.key === 'category') {
+                aValue = getCategoryName(a);
+                bValue = getCategoryName(b);
+            }
+
+            if (aValue < bValue) {
+                return sortConfig.direction === 'ascending' ? -1 : 1;
+            }
+            if (aValue > bValue) {
+                return sortConfig.direction === 'ascending' ? 1 : -1;
+            }
+            return 0;
+        });
+    }
+
+    const requestSort = (key) => {
+        let direction = 'ascending';
+        if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+            direction = 'descending';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const SortIcon = ({ columnKey }) => {
+        if (sortConfig.key !== columnKey) return null;
+        return sortConfig.direction === 'ascending' ? <FiChevronUp className="inline ml-1" /> : <FiChevronDown className="inline ml-1" />;
     };
 
     return (
@@ -98,6 +185,23 @@ const Products = () => {
             </header>
 
             <main className="max-w-7xl mx-auto px-4 py-8">
+                {/* Filters */}
+                <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-6">
+                    <div className="max-w-md">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Filter by Category</label>
+                        <select
+                            value={filterCategory}
+                            onChange={(e) => setFilterCategory(e.target.value)}
+                            className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white"
+                        >
+                            <option value="">All Categories</option>
+                            {categories.map(c => (
+                                <option key={c.$id} value={c.$id}>{c.categoryName}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+
                 {loading ? (
                     <div className="text-center py-8 text-gray-600 dark:text-gray-400">Loading...</div>
                 ) : (
@@ -106,15 +210,35 @@ const Products = () => {
                             <thead className="bg-gray-50 dark:bg-gray-700">
                                 <tr>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Image</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Name</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Barcode</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Category</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Stock</th>
+                                    <th
+                                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                                        onClick={() => requestSort('name')}
+                                    >
+                                        Name <SortIcon columnKey="name" />
+                                    </th>
+                                    <th
+                                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                                        onClick={() => requestSort('barcode')}
+                                    >
+                                        Barcode <SortIcon columnKey="barcode" />
+                                    </th>
+                                    <th
+                                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                                        onClick={() => requestSort('category')}
+                                    >
+                                        Category <SortIcon columnKey="category" />
+                                    </th>
+                                    <th
+                                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                                        onClick={() => requestSort('stockQuantity')}
+                                    >
+                                        Stock <SortIcon columnKey="stockQuantity" />
+                                    </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                {products.map((product) => (
+                                {sortedProducts.map((product) => (
                                     <tr key={product.$id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                                         <td className="px-6 py-4">
                                             <div className="w-12 h-12 bg-gray-200 dark:bg-gray-600 rounded flex items-center justify-center">
@@ -147,9 +271,15 @@ const Products = () => {
                                 ))}
                             </tbody>
                         </table>
+                        {filteredProducts.length === 0 && (
+                            <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                                No products found matching filters.
+                            </div>
+                        )}
                     </div>
-                )}
-            </main>
+                )
+                }
+            </main >
 
             {showModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
@@ -187,15 +317,43 @@ const Products = () => {
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Image URL *
+                                    Product Image
                                 </label>
-                                <input
-                                    type="url"
-                                    value={formData.imageUrl}
-                                    onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                                    className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                    required
-                                />
+                                <div className="flex gap-4 items-center">
+                                    <div className="w-20 h-20 bg-gray-100 dark:bg-gray-700 rounded overflow-hidden flex-shrink-0 border border-gray-200 dark:border-gray-600">
+                                        {formData.imageUrl ? (
+                                            <img src={formData.imageUrl} alt="Preview" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                                <FiPackage size={24} />
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex-1">
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleImageUpload}
+                                            disabled={uploading}
+                                            className="block w-full text-sm text-gray-500
+                                                file:mr-4 file:py-2 file:px-4
+                                                file:rounded-full file:border-0
+                                                file:text-sm file:font-semibold
+                                                file:bg-blue-50 file:text-blue-700
+                                                hover:file:bg-blue-100
+                                                dark:file:bg-blue-900 dark:file:text-blue-300
+                                            "
+                                        />
+                                        {uploading && <p className="text-sm text-blue-600 mt-1">Uploading...</p>}
+                                        <input
+                                            type="text"
+                                            placeholder="Or enter URL manually"
+                                            value={formData.imageUrl}
+                                            onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+                                            className="mt-2 w-full text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700"
+                                        />
+                                    </div>
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
@@ -214,35 +372,19 @@ const Products = () => {
                                         ))}
                                     </select>
                                 </div>
+                                {/* Removed Supermarket select as Products are global, Prices link to Supermarkets */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                        Supermarket
+                                        Stock Quantity
                                     </label>
-                                    <select
-                                        value={formData.supermarkets}
-                                        onChange={(e) => setFormData({ ...formData, supermarkets: e.target.value })}
+                                    <input
+                                        type="number"
+                                        value={formData.stockQuantity}
+                                        onChange={(e) => setFormData({ ...formData, stockQuantity: parseInt(e.target.value) })}
                                         className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                    >
-                                        <option value="">Select Supermarket</option>
-                                        {supermarkets.map((sm) => (
-                                            <option key={sm.$id} value={sm.$id}>{sm.name}</option>
-                                        ))}
-                                    </select>
+                                        min="0"
+                                    />
                                 </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Stock Quantity *
-                                </label>
-                                <input
-                                    type="number"
-                                    value={formData.stockQuantity}
-                                    onChange={(e) => setFormData({ ...formData, stockQuantity: e.target.value })}
-                                    className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                    min="0"
-                                    required
-                                />
                             </div>
 
                             <div>
@@ -257,7 +399,7 @@ const Products = () => {
                                 />
                             </div>
 
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 pt-2">
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -270,7 +412,6 @@ const Products = () => {
                                             description: '',
                                             stockQuantity: 0,
                                             categoryId: '',
-                                            supermarkets: ''
                                         });
                                     }}
                                     className="flex-1 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 px-4 py-2 rounded hover:bg-gray-50 dark:hover:bg-gray-700"
@@ -279,9 +420,10 @@ const Products = () => {
                                 </button>
                                 <button
                                     type="submit"
-                                    className="flex-1 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                                    disabled={uploading}
+                                    className="flex-1 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
                                 >
-                                    {editingProduct ? 'Update' : 'Create'}
+                                    {editingProduct ? 'Update Product' : 'Create Product'}
                                 </button>
                             </div>
                         </form>

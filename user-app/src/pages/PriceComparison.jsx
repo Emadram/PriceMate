@@ -22,7 +22,7 @@ const PriceComparison = () => {
         try {
             console.log('Fetching product with barcode:', barcode);
 
-            // Use mock data utility
+            // Fetch product by barcode
             const productData = await fetchProductByBarcode(barcode);
 
             if (!productData) {
@@ -34,7 +34,7 @@ const PriceComparison = () => {
             console.log('Product data:', productData);
             setProduct(productData);
 
-            // Fetch ALL prices (mock)
+            // Fetch ALL prices
             const allPrices = await fetchAllPrices();
 
             // Filter prices for this product
@@ -53,10 +53,13 @@ const PriceComparison = () => {
     };
 
     const getCategoryName = () => {
-        if (product?.categoryId && typeof product.categoryId === 'object') {
-            return product.categoryId.categoryName || 'Uncategorized';
+        const cat = product?.categoryId;
+        if (!cat) return 'Uncategorized';
+
+        if (Array.isArray(cat)) {
+            return cat[0]?.categoryName || 'Uncategorized';
         }
-        return 'Uncategorized';
+        return cat.categoryName || 'Uncategorized';
     };
 
     const getLowestPrice = () => {
@@ -151,7 +154,7 @@ const PriceComparison = () => {
 
                         {/* Best Price Banner */}
                         {lowestPrice && (
-                            <div className="mt-6 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 rounded-lg p-4 border-2 border-green-500 dark:border-green-600">
+                            <div className="mt-6 bg-green-50 dark:bg-green-900/20 rounded-lg p-4 border-2 border-green-500 dark:border-green-600">
                                 <div className="flex items-center gap-3">
                                     <FiTrendingDown className="text-green-600 dark:text-green-400 text-2xl" />
                                     <div>
@@ -182,8 +185,9 @@ const PriceComparison = () => {
                     ) : (
                         <div className="space-y-3">
                             {prices.map((priceEntry, index) => {
-                                const supermarket = priceEntry.supermarkets;
+                                const supermarket = Array.isArray(priceEntry.supermarkets) ? priceEntry.supermarkets[0] : priceEntry.supermarkets;
                                 const isLowest = index === 0;
+                                const priceDiff = index > 0 ? (priceEntry.price - prices[0].price).toFixed(2) : 0;
 
                                 return (
                                     <div
@@ -205,7 +209,15 @@ const PriceComparison = () => {
                                                         <h4 className="font-bold text-gray-800 dark:text-white text-lg group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">
                                                             {supermarket?.name || 'Unknown Store'}
                                                         </h4>
-                                                        {supermarket?.address && (
+                                                        {isLowest && (
+                                                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-600 dark:text-green-400 mt-1">
+                                                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                                                </svg>
+                                                                BEST PRICE
+                                                            </span>
+                                                        )}
+                                                        {supermarket?.address && !isLowest && (
                                                             <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1">
                                                                 <FiMapPin className="text-xs" />
                                                                 {supermarket.address}
@@ -214,20 +226,20 @@ const PriceComparison = () => {
                                                     </div>
                                                 </Link>
 
-                                                {/* Price */}
+                                                {/* Price Info */}
                                                 <div className="text-right">
-                                                    <div className="flex items-baseline gap-1">
-                                                        <span className="text-3xl font-bold text-gray-800 dark:text-white">
+                                                    <div className="flex items-baseline gap-2">
+                                                        <span className={`text-3xl font-bold ${isLowest ? 'text-green-600 dark:text-green-400' : 'text-gray-800 dark:text-white'}`}>
                                                             {priceEntry.price}
                                                         </span>
-                                                        <span className="text-lg text-gray-600 dark:text-gray-400">
-                                                            {priceEntry.currency || 'EGP'}
+                                                        <span className="text-gray-500 dark:text-gray-400 text-sm">
+                                                            {priceEntry.currency || 'TRY'}
                                                         </span>
                                                     </div>
-                                                    {isLowest && (
-                                                        <span className="inline-block mt-1 text-xs font-semibold text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded">
-                                                            Lowest Price
-                                                        </span>
+                                                    {priceDiff > 0 && (
+                                                        <div className="text-xs text-red-600 dark:text-red-400 mt-1">
+                                                            +{priceDiff} TRY more
+                                                        </div>
                                                     )}
                                                 </div>
                                             </div>

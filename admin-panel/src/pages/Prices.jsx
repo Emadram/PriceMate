@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FiDollarSign, FiPlus, FiTrash2 } from 'react-icons/fi';
+import { FiDollarSign, FiPlus, FiTrash2, FiChevronUp, FiChevronDown } from 'react-icons/fi';
 import usePricesStore from '../stores/pricesStore';
 import useProductsStore from '../stores/productsStore';
 import useSupermarketsStore from '../stores/supermarketsStore';
@@ -20,6 +20,10 @@ const Prices = () => {
         supermarkets: '',
         userId: ''
     });
+
+    const [filterProduct, setFilterProduct] = useState('');
+    const [filterSupermarket, setFilterSupermarket] = useState('');
+    const [sortConfig, setSortConfig] = useState({ key: null, direction: 'ascending' });
 
     useEffect(() => {
         fetchPrices();
@@ -71,6 +75,51 @@ const Prices = () => {
         return 'Unknown Store';
     };
 
+    const filteredPrices = prices.filter(price => {
+        const matchesProduct = filterProduct ? (price.products?.$id === filterProduct) : true;
+        const matchesSupermarket = filterSupermarket ? (price.supermarkets?.$id === filterSupermarket) : true;
+        return matchesProduct && matchesSupermarket;
+        return matchesProduct && matchesSupermarket;
+    });
+
+    const sortedPrices = [...filteredPrices];
+    if (sortConfig.key) {
+        sortedPrices.sort((a, b) => {
+            let aValue = a[sortConfig.key];
+            let bValue = b[sortConfig.key];
+
+            // Handle special cases
+            if (sortConfig.key === 'product') {
+                aValue = getProductName(a);
+                bValue = getProductName(b);
+            } else if (sortConfig.key === 'supermarket') {
+                aValue = getSupermarketName(a);
+                bValue = getSupermarketName(b);
+            }
+
+            if (aValue < bValue) {
+                return sortConfig.direction === 'ascending' ? -1 : 1;
+            }
+            if (aValue > bValue) {
+                return sortConfig.direction === 'ascending' ? 1 : -1;
+            }
+            return 0;
+        });
+    }
+
+    const requestSort = (key) => {
+        let direction = 'ascending';
+        if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+            direction = 'descending';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const SortIcon = ({ columnKey }) => {
+        if (sortConfig.key !== columnKey) return null;
+        return sortConfig.direction === 'ascending' ? <FiChevronUp className="inline ml-1" /> : <FiChevronDown className="inline ml-1" />;
+    };
+
     return (
         <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
             <header className="bg-white dark:bg-gray-800 shadow">
@@ -91,6 +140,36 @@ const Prices = () => {
             </header>
 
             <main className="max-w-7xl mx-auto px-4 py-8">
+                {/* Filters */}
+                <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Filter by Product</label>
+                        <select
+                            value={filterProduct}
+                            onChange={(e) => setFilterProduct(e.target.value)}
+                            className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white"
+                        >
+                            <option value="">All Products</option>
+                            {products.map(p => (
+                                <option key={p.$id} value={p.$id}>{p.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Filter by Supermarket</label>
+                        <select
+                            value={filterSupermarket}
+                            onChange={(e) => setFilterSupermarket(e.target.value)}
+                            className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white"
+                        >
+                            <option value="">All Supermarkets</option>
+                            {supermarkets.map(s => (
+                                <option key={s.$id} value={s.$id}>{s.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+
                 {loading ? (
                     <div className="text-center py-8 text-gray-600 dark:text-gray-400">Loading...</div>
                 ) : (
@@ -98,15 +177,35 @@ const Prices = () => {
                         <table className="w-full">
                             <thead className="bg-gray-50 dark:bg-gray-700">
                                 <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Product</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Supermarket</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Price</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Currency</th>
+                                    <th
+                                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                                        onClick={() => requestSort('product')}
+                                    >
+                                        Product <SortIcon columnKey="product" />
+                                    </th>
+                                    <th
+                                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                                        onClick={() => requestSort('supermarket')}
+                                    >
+                                        Supermarket <SortIcon columnKey="supermarket" />
+                                    </th>
+                                    <th
+                                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                                        onClick={() => requestSort('price')}
+                                    >
+                                        Price <SortIcon columnKey="price" />
+                                    </th>
+                                    <th
+                                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                                        onClick={() => requestSort('currency')}
+                                    >
+                                        Currency <SortIcon columnKey="currency" />
+                                    </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                {prices.map((price) => (
+                                {sortedPrices.map((price) => (
                                     <tr key={price.$id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                                         <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">{getProductName(price)}</td>
                                         <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{getSupermarketName(price)}</td>
@@ -126,9 +225,9 @@ const Prices = () => {
                                 ))}
                             </tbody>
                         </table>
-                        {prices.length === 0 && (
+                        {filteredPrices.length === 0 && (
                             <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                                No prices found. Add some prices to get started!
+                                No prices found matching filters.
                             </div>
                         )}
                     </div>

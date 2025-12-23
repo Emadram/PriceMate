@@ -24,5 +24,7 @@ export const APPWRITE_CONFIG = {
     }
 };
 
+export const { DATABASE_ID, COLLECTIONS } = APPWRITE_CONFIG;
+
 
 

@@ -1,16 +1,89 @@
-# React + Vite
+# PriceMate - User Application
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A modern React application for comparing product prices across different supermarkets in Turkey.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- 🔍 **Product Search**: Search products by name or scan barcodes
+- 💰 **Price Comparison**: Compare prices across multiple supermarkets
+- 🏪 **Supermarket Profiles**: View all products available at each store
+- ⭐ **Favorites**: Save your frequently purchased items
+- 🌙 **Dark Mode**: Comfortable viewing in any lighting
+- 📱 **Responsive Design**: Works on desktop and mobile
 
-## React Compiler
+## Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Frontend**: React 18 + Vite
+- **Styling**: TailwindCSS
+- **Backend**: Appwrite (BaaS)
+- **State Management**: Zustand
+- **Routing**: React Router v6
+- **Icons**: React Icons
 
-## Expanding the ESLint configuration
+## Getting Started
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### Prerequisites
+- Node.js 18+ 
+- npm or yarn
+- Appwrite account and project
+
+### Installation
+
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Configure Appwrite:
+   - Create `.env` file with your Appwrite credentials
+   - Update `src/lib/appwrite.js` with your project details
+
+4. Run development server:
+   ```bash
+   npm run dev
+   ```
+
+## Project Structure
+
+```
+user-app/
+├── src/
+│   ├── components/      # Reusable UI components
+│   ├── pages/          # Page components (routes)
+│   ├── lib/            # Appwrite configuration
+│   ├── stores/         # Zustand state management
+│   └── utils/          # Helper functions
+├── TEST/               # Testing & database scripts
+│   ├── README.md       # Test documentation
+│   ├── seedDatabase.js
+│   ├── fullSiteTest.js
+│   └── ...
+└── public/             # Static assets
+```
+
+## Testing & Database
+
+See [TEST/README.md](TEST/README.md) for comprehensive testing and database seeding documentation.
+
+**Quick Start:**
+```bash
+export APPWRITE_API_KEY="your_api_key"
+node TEST/seedDatabase.js     # Populate database
+node TEST/fullSiteTest.js     # Run tests
+```
+
+## Available Scripts
+
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run preview` - Preview production build
+- `npm run lint` - Run ESLint
+
+## Contributing
+
+This is a graduation project for the Computer Engineering department.
+
+## License
+
+Private academic project - All rights reserved

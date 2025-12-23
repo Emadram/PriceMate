@@ -8,26 +8,29 @@ const SearchResults = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const query = searchParams.get('q') || '';
-    const categoryId = searchParams.get('category');
 
     const [products, setProducts] = useState([]);
     const [prices, setPrices] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        performSearch();
-    }, [query, categoryId]);
+        if (query) {
+            performSearch();
+        }
+    }, [query]);
 
     const performSearch = async () => {
         setLoading(true);
         try {
-            console.log('Searching for:', query, 'Category:', categoryId);
+            console.log('Searching for:', query);
 
+            // Use server-side search utility and fetch prices
             const [searchResults, allPrices] = await Promise.all([
-                searchProducts(query, categoryId),
+                searchProducts(query),
                 fetchAllPrices()
             ]);
 
+            console.log('Products found:', searchResults.length);
             setProducts(searchResults);
             setPrices(allPrices);
 
@@ -37,12 +40,6 @@ const SearchResults = () => {
         setLoading(false);
     };
 
-    // Get prices for a specific product
-    const getPricesForProduct = (productId) => {
-        return prices.filter(price =>
-            price.products?.$id === productId
-        );
-    };
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -100,7 +97,7 @@ const SearchResults = () => {
                                 <ProductCard
                                     key={product.$id}
                                     product={product}
-                                    prices={getPricesForProduct(product.$id)}
+                                    prices={getPricesForProduct(prices, product.$id)}
                                 />
                             ))}
                         </div>

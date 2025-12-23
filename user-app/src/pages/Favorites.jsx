@@ -1,30 +1,47 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { FiStar, FiPackage, FiArrowLeft } from 'react-icons/fi';
-import { databases, APPWRITE_CONFIG } from '../lib/appwrite';
-import { Query } from 'appwrite';
-import useAuthStore from '../stores/authStore';
+import { FiStar, FiArrowLeft } from 'react-icons/fi';
+import { databases, DATABASE_ID, COLLECTIONS, Query } from '../lib/appwrite';
+import { fetchAllPrices, getPricesForProduct } from '../utils/productUtils';
+import ProductCard from '../components/ProductCard';
+import useFavoritesStore from '../stores/favoritesStore';
 
 const Favorites = () => {
-    const user = useAuthStore((state) => state.user);
     const navigate = useNavigate();
-    const [favorites, setFavorites] = useState([]);
+    const [products, setProducts] = useState([]);
+    const [prices, setPrices] = useState([]);
     const [loading, setLoading] = useState(true);
+    const favorites = useFavoritesStore((state) => state.favorites);
 
     useEffect(() => {
         fetchFavorites();
-    }, []);
+    }, [favorites]);
 
     const fetchFavorites = async () => {
         setLoading(true);
         try {
-            // Fetch user's favorite products
-            const response = await databases.listDocuments(
-                APPWRITE_CONFIG.DATABASE_ID,
-                APPWRITE_CONFIG.COLLECTIONS.PRODUCTS,
-                [Query.limit(10)] // Adjust based on your favorites logic
-            );
-            setFavorites(response.documents);
+            if (favorites.length === 0) {
+                setProducts([]);
+                setPrices([]);
+                setLoading(false);
+                return;
+            }
+
+            // Fetch favorite products AND their prices
+            const [productsResponse, allPrices] = await Promise.all([
+                databases.listDocuments(
+                    DATABASE_ID,
+                    COLLECTIONS.PRODUCTS,
+                    [
+                        Query.equal('$id', favorites),
+                        Query.select(['*', 'categoryId.*'])
+                    ]
+                ),
+                fetchAllPrices()
+            ]);
+
+            setProducts(productsResponse.documents);
+            setPrices(allPrices);
         } catch (error) {
             console.error('Error fetching favorites:', error);
         }
@@ -48,27 +65,14 @@ const Favorites = () => {
             <main className="max-w-2xl mx-auto p-4">
                 {loading ? (
                     <div className="text-center py-8 text-gray-600 dark:text-gray-400">Loading...</div>
-                ) : favorites.length > 0 ? (
+                ) : products.length > 0 ? (
                     <div className="space-y-3">
-                        {favorites.map((product) => (
-                            <Link
+                        {products.map((product) => (
+                            <ProductCard
                                 key={product.$id}
-                                to={`/price-comparison/${product.barcode}`}
-                                className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow flex items-center gap-4 hover:shadow-lg transition"
-                            >
-                                <div className="w-16 h-16 bg-gray-200 dark:bg-gray-700 rounded flex items-center justify-center flex-shrink-0">
-                                    {product.imageUrl ? (
-                                        <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover rounded" />
-                                    ) : (
-                                        <FiPackage className="text-gray-400 text-2xl" />
-                                    )}
-                                </div>
-                                <div className="flex-1">
-                                    <h3 className="font-semibold text-gray-800 dark:text-white">{product.name}</h3>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">{product.category}</p>
-                                </div>
-                                <FiStar className="text-yellow-500 text-2xl" />
-                            </Link>
+                                product={product}
+                                prices={getPricesForProduct(prices, product.$id)}
+                            />
                         ))}
                     </div>
                 ) : (

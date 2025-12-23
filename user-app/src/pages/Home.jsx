@@ -3,60 +3,53 @@ import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { FiSearch, FiCamera, FiTrendingUp } from 'react-icons/fi';
 import useAuthStore from '../stores/authStore';
-import { fetchProducts, fetchAllPrices, getPricesForProduct, fetchCategories } from '../utils/productUtils';
+import { fetchProducts, fetchAllPrices, getPricesForProduct } from '../utils/productUtils';
 import ProductCard from '../components/ProductCard';
 
 const Home = () => {
     const user = useAuthStore((state) => state.user);
     const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
-    const [categories, setCategories] = useState([]);
-    const [selectedCategory, setSelectedCategory] = useState(null);
     const [featuredProducts, setFeaturedProducts] = useState([]);
     const [prices, setPrices] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        loadData();
+        loadFeaturedProducts();
     }, []);
 
-    const loadData = async () => {
+    const loadFeaturedProducts = async () => {
         setLoading(true);
         try {
-            const [products, allPrices, allCategories] = await Promise.all([
-                fetchProducts(6),
-                fetchAllPrices(),
-                fetchCategories()
+            // Fetch products and prices
+            const [products, allPrices] = await Promise.all([
+                fetchProducts(6), // Get 6 featured products
+                fetchAllPrices()
             ]);
 
             setFeaturedProducts(products);
             setPrices(allPrices);
-            setCategories(allCategories);
         } catch (error) {
-            console.error('Error loading data:', error);
+            console.error('Error loading featured products:', error);
         }
         setLoading(false);
     };
 
     const handleSearch = (e) => {
         e.preventDefault();
-        if (searchQuery.trim() || selectedCategory) {
-            let url = `/search?q=${encodeURIComponent(searchQuery.trim())}`;
-            if (selectedCategory) {
-                url += `&category=${selectedCategory}`;
-            }
-            navigate(url);
+        if (searchQuery.trim()) {
+            navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
         }
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
             <Navbar />
 
             <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
                 {/* Search Bar */}
                 <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
-                    <form onSubmit={handleSearch} className="relative mb-4">
+                    <form onSubmit={handleSearch} className="relative">
                         <input
                             type="text"
                             value={searchQuery}
@@ -72,33 +65,6 @@ const Home = () => {
                             <FiSearch size={20} />
                         </button>
                     </form>
-
-                    {/* Category Filter */}
-                    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                        <button
-                            type="button"
-                            onClick={() => setSelectedCategory(null)}
-                            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${!selectedCategory
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                                }`}
-                        >
-                            All Categories
-                        </button>
-                        {categories.map((cat) => (
-                            <button
-                                key={cat.$id}
-                                type="button"
-                                onClick={() => setSelectedCategory(cat.$id === selectedCategory ? null : cat.$id)}
-                                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${selectedCategory === cat.$id
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                                    }`}
-                            >
-                                {cat.categoryName}
-                            </button>
-                        ))}
-                    </div>
                 </div>
 
                 {/* Quick Actions */}

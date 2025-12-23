@@ -44,10 +44,10 @@ const Navbar = () => {
                     {/* Logo */}
                     <div className="flex items-center">
                         <Link to="/" className="flex-shrink-0 flex items-center gap-2">
-                            <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-lg">
+                            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-lg">
                                 P
                             </div>
-                            <span className="font-bold text-xl bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent hidden sm:block">
+                            <span className="font-bold text-xl text-blue-600 hidden sm:block">
                                 PriceMate
                             </span>
                         </Link>
@@ -137,6 +137,13 @@ const Navbar = () => {
                                 onClick={() => setIsMenuOpen(false)}
                             >
                                 Favorites
+                            </Link>
+                            <Link
+                                to="/lists"
+                                className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                onClick={() => setIsMenuOpen(false)}
+                            >
+                                Shopping Lists
                             </Link>
                             <button
                                 onClick={() => {
