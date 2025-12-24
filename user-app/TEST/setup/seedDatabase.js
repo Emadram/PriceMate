@@ -7,7 +7,7 @@ const CONFIG = {
     DATABASE_ID: '6924bf52002dda6b6eff',
     // API Key is required for admin actions (creating documents without being logged in)
     // The user must provide this when running the script
-    API_KEY: process.env.APPWRITE_API_KEY
+    API_KEY: process.env.APPWRITE_API_KEY || 'standard_a3546595e2c860047d6ecfd174373f2c26f3ef3109e896e838c16f93f17e06509b01ef9cc9427f12bfdf1dddbe4cea5def70bfb269ce62695fb26e09b53367e1262607d3c273e209cc2f2fa7515f80d95e12af54dcc061d906d889680da729731faaaab8df28940c17d0154eca8e4bb36380c5d89a2fe2741c5817636aaba1df'
 };
 
 const COLLECTIONS = {
@@ -95,80 +95,80 @@ const PRODUCTS = [
     {
         name: 'Coca-Cola 330ml',
         barcode: '5449000000996',
-        imageUrl: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3',
+        imageUrl: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?q=80&w=800',
         description: 'Refreshing carbonated soft drink',
         stockQuantity: 150,
         categoryName: 'Beverages'
     },
     {
-        name: 'Ulker Chocolate Bar',
+        name: 'Kinder Chocolate Bar',
         barcode: '8690555111222',
-        imageUrl: 'https://images.unsplash.com/photo-1511381971704-554472d42d31?w=500&auto=format&fit=crop&q=60',
-        description: 'Milk chocolate with pistachios',
+        imageUrl: 'https://images.unsplash.com/photo-1614088685112-0a760b71a3c8?q=80&w=800',
+        description: 'Premium milk chocolate bar',
         stockQuantity: 300,
         categoryName: 'Snacks'
     },
     {
-        name: 'Sutas Full Cream Milk 1L',
+        name: 'Fresh Full Cream Milk 1L',
         barcode: '6281007000000',
-        imageUrl: 'https://images.unsplash.com/photo-1563636619-e9143da7973b?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3',
-        description: 'Fresh full cream milk',
+        imageUrl: 'https://images.unsplash.com/photo-1550583724-125581cc25fb?q=80&w=800',
+        description: 'Fresh full cream milk from premium farms',
         stockQuantity: 80,
         categoryName: 'Dairy'
     },
     {
-        name: 'Nescafe Gold 200g',
+        name: 'Premium Instant Coffee 200g',
         barcode: '7613035220065',
-        imageUrl: 'https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3',
-        description: 'Premium freeze-dried instant coffee',
+        imageUrl: 'https://images.unsplash.com/photo-1559056199-641a0ac8b55e?q=80&w=800',
+        description: 'Premium freeze-dried instant coffee for a perfect start',
         stockQuantity: 30,
         categoryName: 'Beverages'
     },
     {
-        name: 'Nutella Hazelnut Spread',
+        name: 'Hazelnut Chocolate Spread',
         barcode: '8000500179864',
-        imageUrl: 'https://images.unsplash.com/photo-1617347454431-f49d7ff5c3b1?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3',
-        description: 'Creamy hazelnut spread with cocoa',
+        imageUrl: 'https://images.unsplash.com/photo-1617347454431-f49d7ff5c3b1?q=80&w=800',
+        description: 'Creamy hazelnut spread with cocoa and milk',
         stockQuantity: 60,
         categoryName: 'Breakfast'
     },
     {
-        name: 'Barilla Spaghetti No.5',
+        name: 'Italian Spaghetti No.5',
         barcode: '8076809513753',
-        imageUrl: 'https://images.unsplash.com/photo-1598965402089-897ce52e8355?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3',
-        description: 'Authentic Italian spaghetti',
+        imageUrl: 'https://images.unsplash.com/photo-1598965402089-897ce52e8355?q=80&w=800',
+        description: 'Authentic Italian spaghetti made from durum wheat',
         stockQuantity: 120,
         categoryName: 'Pantry'
     },
     {
-        name: 'Pantene Shampoo 500ml',
+        name: 'Herbal Shampoo 500ml',
         barcode: '5410076012345',
-        imageUrl: 'https://images.unsplash.com/photo-1631729371254-42c2a89ddf0d?w=500&auto=format&fit=crop&q=60',
-        description: 'Volume and body shampoo',
+        imageUrl: 'https://images.unsplash.com/photo-1535585209827-a15fefbc7688?q=80&w=800',
+        description: 'Nourishing herbal shampoo for healthy hair',
         stockQuantity: 70,
         categoryName: 'Personal Care'
     },
     {
-        name: 'Red Apples 1kg',
+        name: 'Fresh Red Apples 1kg',
         barcode: '2905556667778',
-        imageUrl: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=500&auto=format&fit=crop&q=60',
-        description: 'Fresh sweet red apples',
+        imageUrl: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?q=80&w=800',
+        description: 'Crispy and sweet fresh red apples',
         stockQuantity: 200,
         categoryName: 'Snacks'
     },
     {
-        name: 'Organic Eggs 15pcs',
+        name: 'Farm Fresh Eggs 15pcs',
         barcode: '8691234567890',
-        imageUrl: 'https://images.unsplash.com/photo-1519241047957-be31d7379a5d?w=500&auto=format&fit=crop&q=60',
-        description: 'Free-range organic eggs',
+        imageUrl: 'https://images.unsplash.com/photo-1506976785307-8732e854ad03?q=80&w=800',
+        description: 'Large farm-fresh organic eggs',
         stockQuantity: 60,
         categoryName: 'Dairy'
     },
     {
-        name: 'Fairy Dish Soap 750ml',
+        name: 'Liquid Dish Soap 750ml',
         barcode: '5413149023456',
-        imageUrl: 'https://images.unsplash.com/photo-1585238342024-78d387f4a707?w=500&auto=format&fit=crop&q=60',
-        description: 'Lemon scented dishwashing liquid',
+        imageUrl: 'https://images.unsplash.com/photo-1584622781564-1d987f7333c1?q=80&w=800',
+        description: 'Powerful liquid dish soap with fresh scent',
         stockQuantity: 95,
         categoryName: 'Pantry'
     }
@@ -181,15 +181,15 @@ const generatePrices = (supermarkets, products, userId = 'seed-script-user') => 
     // Base prices for products
     const basePrices = {
         'Coca-Cola 330ml': 25.00,
-        'Ulker Chocolate Bar': 15.00,
-        'Sutas Full Cream Milk 1L': 45.00,
-        'Nescafe Gold 200g': 250.00,
-        'Nutella Hazelnut Spread': 180.00,
-        'Barilla Spaghetti No.5': 40.00,
-        'Pantene Shampoo 500ml': 85.00,
-        'Red Apples 1kg': 25.00,
-        'Organic Eggs 15pcs': 65.00,
-        'Fairy Dish Soap 750ml': 45.00
+        'Kinder Chocolate Bar': 15.00,
+        'Fresh Full Cream Milk 1L': 45.00,
+        'Premium Instant Coffee 200g': 250.00,
+        'Hazelnut Chocolate Spread': 180.00,
+        'Italian Spaghetti No.5': 40.00,
+        'Herbal Shampoo 500ml': 85.00,
+        'Fresh Red Apples 1kg': 25.00,
+        'Farm Fresh Eggs 15pcs': 65.00,
+        'Liquid Dish Soap 750ml': 45.00
     };
 
     products.forEach(product => {

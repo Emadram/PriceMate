@@ -4,7 +4,7 @@ const CONFIG = {
     ENDPOINT: 'https://cloud.appwrite.io/v1',
     PROJECT_ID: '68f5e984002817f132e2',
     DATABASE_ID: '6924bf52002dda6b6eff',
-    API_KEY: process.env.APPWRITE_API_KEY,
+    API_KEY: process.env.APPWRITE_API_KEY || 'standard_a3546595e2c860047d6ecfd174373f2c26f3ef3109e896e838c16f93f17e06509b01ef9cc9427f12bfdf1dddbe4cea5def70bfb269ce62695fb26e09b53367e1262607d3c273e209cc2f2fa7515f80d95e12af54dcc061d906d889680da729731faaaab8df28940c17d0154eca8e4bb36380c5d89a2fe2741c5817636aaba1df',
     COLLECTIONS: {
         CATEGORIES: 'category',
         PRODUCTS: 'products',
