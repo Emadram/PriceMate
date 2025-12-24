@@ -10,10 +10,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@ericblade/quagga2": "^1.8.4",
     "appwrite": "^21.4.0",
     "axios": "^1.13.2",
     "node-appwrite": "^21.0.0",
-    "quagga": "^0.12.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-icons": "^5.5.0",

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import Quagga from 'quagga';
+import Quagga from '@ericblade/quagga2';
 
 const Scanner = ({ onDetected }) => {
     const scannerRef = useRef(null);
