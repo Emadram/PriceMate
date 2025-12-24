@@ -42,13 +42,13 @@ const Products = () => {
         try {
             // Upload to Appwrite Storage (Assuming bucket ID 'product-images' or use a default)
             // You might need to create this bucket in Appwrite Console if it doesn't exist.
-            const BUCKET_ID = 'product-images'; // Ensure this exists!
+            const BUCKET_ID = import.meta.env.VITE_APPWRITE_BUCKET_PRODUCT_IMAGES || 'product-images'; // Ensure this exists!
             const response = await storage.createFile(BUCKET_ID, ID.unique(), file);
 
             // Construct View URL
             // https://cloud.appwrite.io/v1/storage/buckets/[BUCKET_ID]/files/[FILE_ID]/view?project=[PROJECT_ID]
-            const endpoint = 'https://cloud.appwrite.io/v1';
-            const projectId = '68f5e984002817f132e2'; // From appwrite.js
+            const endpoint = import.meta.env.VITE_APPWRITE_ENDPOINT;
+            const projectId = import.meta.env.VITE_APPWRITE_PROJECT_ID;
 
             const imageUrl = `${endpoint}/storage/buckets/${BUCKET_ID}/files/${response.$id}/view?project=${projectId}`;
 

@@ -34,11 +34,11 @@ const Supermarkets = () => {
         setUploading(true);
         try {
             // Using 'product-images' bucket for all admin uploads for simplicity in Phase 1
-            const BUCKET_ID = 'product-images';
+            const BUCKET_ID = import.meta.env.VITE_APPWRITE_BUCKET_PRODUCT_IMAGES || 'product-images';
             const response = await storage.createFile(BUCKET_ID, ID.unique(), file);
 
-            const endpoint = 'https://cloud.appwrite.io/v1';
-            const projectId = '68f5e984002817f132e2';
+            const endpoint = import.meta.env.VITE_APPWRITE_ENDPOINT;
+            const projectId = import.meta.env.VITE_APPWRITE_PROJECT_ID;
 
             const imageUrl = `${endpoint}/storage/buckets/${BUCKET_ID}/files/${response.$id}/view?project=${projectId}`;
 
