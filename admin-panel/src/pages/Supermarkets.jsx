@@ -223,16 +223,36 @@ const Supermarkets = () => {
                                         </div>
                                     )}
                                 </div>
-                                <div className="flex-1">
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Logo</label>
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={handleImageUpload}
-                                        disabled={uploading}
-                                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-900 dark:file:text-blue-300"
-                                    />
-                                    {uploading && <p className="text-sm text-blue-600 mt-1">Uploading...</p>}
+                                <div className="flex-1 space-y-3">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Logo Upload</label>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleImageUpload}
+                                            disabled={uploading}
+                                            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-900 dark:file:text-blue-300"
+                                        />
+                                        {uploading && <p className="text-sm text-blue-600 mt-1">Uploading...</p>}
+                                    </div>
+                                    <div className="relative">
+                                        <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                                            <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
+                                        </div>
+                                        <div className="relative flex justify-center text-sm">
+                                            <span className="px-2 bg-white dark:bg-gray-800 text-gray-500">OR</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Icon URL</label>
+                                        <input
+                                            type="text"
+                                            placeholder="https://example.com/logo.png"
+                                            value={formData.icon}
+                                            onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
+                                            className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                                        />
+                                    </div>
                                 </div>
                             </div>
 

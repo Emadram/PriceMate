@@ -18,52 +18,50 @@ const AdminLogin = () => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 px-4">
-            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiMyMTIxMjEiIGZpbGwtb3BhY2l0eT0iMC4xIj48cGF0aCBkPSJNMzYgMzRjMC0yLjIxLTEuNzktNC00LTRzLTQgMS43OS00IDQgMS43OSA0IDQgNCA0LTEuNzkgNC00em0wLTEwYzAtMi4yMS0xLjc5LTQtNC00cy00IDEuNzktNCA0IDEuNzkgNCA0IDQgNC0xLjc5IDQtNHptMC0xMGMwLTIuMjEtMS43OS00LTQtNHMtNCAxLjc5LTQgNCAxLjc5IDQgNCA0IDQtMS43OSA0LTR6TTEyIDM0YzAtMi4yMS0xLjc5LTQtNC00cy00IDEuNzktNCA0IDEuNzkgNCA0IDQgNC0xLjc5IDQtNHptMC0xMGMwLTIuMjEtMS43OS00LTQtNHMtNCAxLjc5LTQgNCAxLjc5IDQgNCA0IDQtMS43OSA0LTR6bTAtMTBjMC0yLjIxLTEuNzktNC00LTRzLTQgMS43OS00IDQgMS43OSA0IDQgNCA0LTEuNzkgNC00ek0yNCAzNGMwLTIuMjEtMS43OS00LTQtNHMtNCAxLjc5LTQgNCAxLjc5IDQgNCA0IDQtMS43OSA0LTR6bTAtMTBjMC0yLjIxLTEuNzktNC00LTRzLTQgMS43OS00IDQgMS43OSA0IDQgNCA0LTEuNzkgNC00em0wLTEwYzAtMi4yMS0xLjc5LTQtNC00cy00IDEuNzktNCA0IDEuNzkgNCA0IDQgNC0xLjc5IDQtNHoiLz48L2c+PC9nPjwvc3ZnPg==')] opacity-20"></div>
-
+        <div className="min-h-screen flex items-center justify-center bg-gray-900 px-4">
             <div className="max-w-md w-full relative z-10">
-                <div className="bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 overflow-hidden">
+                <div className="bg-gray-800 rounded-lg shadow-xl border border-gray-700 overflow-hidden">
                     {/* Header */}
-                    <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-8 text-center">
-                        <div className="w-20 h-20 bg-white rounded-full mx-auto mb-4 flex items-center justify-center shadow-lg">
-                            <span className="text-4xl">🔐</span>
+                    <div className="bg-gray-700 p-8 text-center border-b border-gray-600">
+                        <div className="w-16 h-16 bg-blue-600 rounded-lg mx-auto mb-4 flex items-center justify-center shadow-md">
+                            <span className="text-2xl font-bold text-white">PM</span>
                         </div>
-                        <h1 className="text-3xl font-bold text-white mb-2">Admin Portal</h1>
-                        <p className="text-blue-100 text-sm">PriceMate Management System</p>
+                        <h1 className="text-2xl font-bold text-white mb-1">PriceMate Admin</h1>
+                        <p className="text-gray-400 text-sm">Management System</p>
                     </div>
 
                     {/* Form */}
                     <div className="p-8">
                         {error && (
-                            <div className="bg-red-900/50 border border-red-500 text-red-200 p-3 rounded-lg mb-6 text-sm">
+                            <div className="bg-red-900/30 border border-red-800 text-red-400 p-3 rounded mb-6 text-sm text-center">
                                 {error}
                             </div>
                         )}
 
-                        <form onSubmit={handleSubmit} className="space-y-5">
+                        <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
-                                <label className="block text-gray-300 mb-2 font-medium text-sm">
+                                <label className="block text-gray-400 mb-1 font-medium text-xs uppercase tracking-wider">
                                     Admin Email
                                 </label>
                                 <input
                                     type="email"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition"
+                                    className="w-full bg-gray-900 border border-gray-700 rounded-md px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition"
                                     placeholder="admin@pricemate.com"
                                     required
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-gray-300 mb-2 font-medium text-sm">
+                                <label className="block text-gray-400 mb-1 font-medium text-xs uppercase tracking-wider">
                                     Password
                                 </label>
                                 <input
                                     type="password"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition"
+                                    className="w-full bg-gray-900 border border-gray-700 rounded-md px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition"
                                     placeholder="••••••••"
                                     required
                                 />
@@ -71,15 +69,15 @@ const AdminLogin = () => {
 
                             <button
                                 type="submit"
-                                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg hover:from-blue-700 hover:to-purple-700 transition duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                                className="w-full bg-blue-600 text-white py-2.5 rounded-md hover:bg-blue-700 transition duration-200 font-medium mt-2"
                             >
-                                Access Admin Panel
+                                Login
                             </button>
                         </form>
 
-                        <div className="mt-6 pt-6 border-t border-gray-700">
-                            <p className="text-center text-gray-400 text-xs">
-                                🔒 Secure Admin Access Only
+                        <div className="mt-8 pt-4 border-t border-gray-700 text-center">
+                            <p className="text-gray-500 text-xs">
+                                Restricted access
                             </p>
                         </div>
                     </div>
