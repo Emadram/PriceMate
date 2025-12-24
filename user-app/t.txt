@@ -1,0 +1,104 @@
+🚨 COMPLETE DATABASE RESET
+This will DELETE ALL DATA and create fresh seed data
+
+Press Ctrl+C now to cancel, or wait 5 seconds to continue...
+
+Step 1: Clearing ALL database collections...
+🚨 WARNING: This will delete ALL data from the database!
+Starting database cleanup in 3 seconds...
+
+🚀 Starting database cleanup...
+
+🗑️  Clearing Prices...
+✅ Cleared 0 documents from Prices
+
+🗑️  Clearing Products...
+   Deleted 10 documents...
+✅ Cleared 10 documents from Products
+
+🗑️  Clearing Supermarkets...
+   Deleted 5 documents...
+✅ Cleared 5 documents from Supermarkets
+
+🗑️  Clearing Categories...
+   Deleted 6 documents...
+✅ Cleared 6 documents from Categories
+
+✅ Database cleanup complete!
+You can now run seedDatabase.js to repopulate with fresh data.
+
+Step 2: Seeding fresh data...
+🚀 Starting database seeding...
+
+📦 Seeding Categories...
+✅ Created Category: Beverages
+✅ Created Category: Snacks
+✅ Created Category: Dairy
+✅ Created Category: Pantry
+✅ Created Category: Breakfast
+✅ Created Category: Personal Care
+
+🏪 Seeding Supermarkets...
+✅ Created Supermarket: Carrefour
+✅ Created Supermarket: Migros
+✅ Created Supermarket: BIM
+✅ Created Supermarket: A101
+✅ Created Supermarket: Sok Market
+
+🍎 Seeding Products...
+✅ Created Product: Coca-Cola 330ml
+✅ Created Product: Ulker Chocolate Bar
+✅ Created Product: Sutas Full Cream Milk 1L
+✅ Created Product: Nescafe Gold 200g
+✅ Created Product: Nutella Hazelnut Spread
+✅ Created Product: Barilla Spaghetti No.5
+✅ Created Product: Pantene Shampoo 500ml
+✅ Created Product: Red Apples 1kg
+✅ Created Product: Organic Eggs 15pcs
+✅ Created Product: Fairy Dish Soap 750ml
+
+💰 Seeding Prices...
+📊 Generating prices for 10 products across 5 supermarkets...
+🔍 Validation: All prices use existing products and supermarkets:
+   - Products with prices: 10
+   - Supermarkets with prices: 5
+   - Total price combinations: 50 (10 × 5)
+✅ Successfully created 0 price entries.
+⚠️  Failed to create 6 price entries.
+
+🎉 Database seeding completed!
+
+Step 3: Running verification tests...
+[2025-12-17T13:36:33.792Z] 🚀 Starting Comprehensive Test Suite...
+[2025-12-17T13:36:33.795Z] 
+--- TEST 1: HOME PAGE (Featured Products) ---
+[2025-12-17T13:36:33.795Z] Testing: fetchProducts() with categoryId expansion
+[2025-12-17T13:36:34.222Z] ✅ Fetched 6 featured products (expected: up to 6 from 10 total)
+[2025-12-17T13:36:34.223Z]    ✅ Product: Fairy Dish Soap 750ml | Barcode: 5413149023456 | Category: Pantry
+[2025-12-17T13:36:34.223Z]    ✅ Product: Organic Eggs 15pcs | Barcode: 8691234567890 | Category: Dairy
+[2025-12-17T13:36:34.224Z]    ✅ Product: Red Apples 1kg | Barcode: 2905556667778 | Category: Snacks
+[2025-12-17T13:36:34.224Z]    ✅ Product: Pantene Shampoo 500ml | Barcode: 5410076012345 | Category: Personal Care
+[2025-12-17T13:36:34.224Z]    ✅ Product: Barilla Spaghetti No.5 | Barcode: 8076809513753 | Category: Pantry
+[2025-12-17T13:36:34.225Z]    ✅ Product: Nutella Hazelnut Spread | Barcode: 8000500179864 | Category: Breakfast
+[2025-12-17T13:36:34.225Z] 
+--- TEST 2: SEARCH PAGE (Query: "Chocolate") ---
+[2025-12-17T13:36:34.585Z] ✅ Search for "Chocolate" returned 1 results.
+[2025-12-17T13:36:34.586Z]    ✅ Search Result "Ulker Chocolate Bar" has category: Snacks
+[2025-12-17T13:36:34.587Z] 
+--- TEST 3: PRICE COMPARISON PAGE ---
+[2025-12-17T13:36:34.587Z] Testing: Product detail fetch + Price listings for all supermarkets
+[2025-12-17T13:36:34.892Z] Testing with: Coca-Cola 330ml (Barcode: 5449000000996)
+[2025-12-17T13:36:35.264Z] ✅ Product Details Retrieved: Coca-Cola 330ml
+[2025-12-17T13:36:35.265Z]    ✅ Category: Beverages
+[2025-12-17T13:36:35.265Z]    Fetching ALL prices with relationships...
+[2025-12-17T13:36:35.635Z]    ❌ No prices found for this product!
+[2025-12-17T13:36:35.636Z] 
+--- TEST 4: SUPERMARKET PROFILE ---
+[2025-12-17T13:36:35.942Z] Testing Supermarket ID: 6942b1d900388050a4ab (Carrefour)
+[2025-12-17T13:36:36.390Z]    ⚠️ No prices found for this supermarket.
+[2025-12-17T13:36:36.391Z] 
+-----------------------------------
+[2025-12-17T13:36:36.392Z] ❌ 1 ISSUES DETECTED. Check log above.
+[2025-12-17T13:36:36.392Z] 📄 Full report saved to: /Users/forlary/Desktop/CodeBase/GradProject/user-app/TEST/test_report.txt
+
+✅ Process complete! Check test_report.txt for results

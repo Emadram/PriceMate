@@ -1,0 +1,25 @@
+#Docs
+*.docx
+*.md
+
+# Exceptions
+!README.md
+
+# Other extensions
+*.txt
+*.pub
+.env
+
+# Dependencies
+node_modules/
+
+# Production
+dist/
+build/
+
+# Misc
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
