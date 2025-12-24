@@ -26,6 +26,7 @@ const Scanner = ({ onDetected, paused = false }) => {
     const videoRef = useRef(null);
     const readerRef = useRef(null);
     const lastCodeRef = useRef(null);
+    const startingRef = useRef(false);
     const [error, setError] = useState(null);
     const [starting, setStarting] = useState(false);
     const [armed, setArmed] = useState(false);
@@ -38,12 +39,15 @@ const Scanner = ({ onDetected, paused = false }) => {
     }, []);
 
     const startReader = useCallback(async () => {
-        if (paused || starting) return;
+        if (paused || startingRef.current) return;
+        startingRef.current = true;
         setStarting(true);
         setError(null);
+        setArmed(false);
 
         if (!navigator.mediaDevices?.getUserMedia) {
             setError('Camera not supported in this browser');
+            startingRef.current = false;
             setStarting(false);
             return;
         }
@@ -54,6 +58,7 @@ const Scanner = ({ onDetected, paused = false }) => {
             perm.getTracks().forEach(t => t.stop());
         } catch (err) {
             setError('Camera permission denied. Please allow camera access.');
+            startingRef.current = false;
             setStarting(false);
             return;
         }
@@ -102,18 +107,19 @@ const Scanner = ({ onDetected, paused = false }) => {
         } catch (err) {
             setError('Unable to start camera. Close other apps and retry.');
         } finally {
+            startingRef.current = false;
             setStarting(false);
         }
-    }, [onDetected, paused, starting, stopReader]);
+    }, [onDetected, paused, stopReader]);
 
     useEffect(() => {
-        if (!paused) startReader();
         return () => {
             stopReader();
             lastCodeRef.current = null;
+            startingRef.current = false;
             setArmed(false);
         };
-    }, [paused, startReader, stopReader]);
+    }, [stopReader]);
 
     return (
         <div className="relative w-full h-64 bg-black rounded-lg overflow-hidden">
