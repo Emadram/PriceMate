@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FiPlus, FiEdit2, FiTrash2, FiMapPin, FiPhone, FiMail, FiChevronUp, FiChevronDown } from 'react-icons/fi';
 import useSupermarketsStore from '../stores/supermarketsStore';
-import { storage } from '../lib/appwrite';
+import { storage, getAppwriteConfig } from '../lib/appwrite';
 import { ID } from 'appwrite';
+
+const { endpoint: APPWRITE_ENDPOINT, projectId: APPWRITE_PROJECT_ID } = getAppwriteConfig();
 
 const Supermarkets = () => {
     const { supermarkets, loading, fetchSupermarkets, deleteSupermarket } = useSupermarketsStore();
@@ -37,10 +39,7 @@ const Supermarkets = () => {
             const BUCKET_ID = import.meta.env.VITE_APPWRITE_BUCKET_PRODUCT_IMAGES || 'product-images';
             const response = await storage.createFile(BUCKET_ID, ID.unique(), file);
 
-            const endpoint = import.meta.env.VITE_APPWRITE_ENDPOINT;
-            const projectId = import.meta.env.VITE_APPWRITE_PROJECT_ID;
-
-            const imageUrl = `${endpoint}/storage/buckets/${BUCKET_ID}/files/${response.$id}/view?project=${projectId}`;
+            const imageUrl = `${APPWRITE_ENDPOINT}/storage/buckets/${BUCKET_ID}/files/${response.$id}/view?project=${APPWRITE_PROJECT_ID}`;
 
             setFormData(prev => ({ ...prev, icon: imageUrl }));
         } catch (error) {

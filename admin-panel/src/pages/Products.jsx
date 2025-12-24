@@ -4,8 +4,10 @@ import { FiPackage, FiEdit2, FiTrash2, FiPlus, FiChevronUp, FiChevronDown } from
 import useProductsStore from '../stores/productsStore';
 import useCategoriesStore from '../stores/categoriesStore';
 import useSupermarketsStore from '../stores/supermarketsStore';
-import { storage } from '../lib/appwrite';
+import { storage, getAppwriteConfig } from '../lib/appwrite';
 import { ID } from 'appwrite';
+
+const { endpoint: APPWRITE_ENDPOINT, projectId: APPWRITE_PROJECT_ID } = getAppwriteConfig();
 
 const Products = () => {
     const { products, loading, fetchProducts, deleteProduct } = useProductsStore();
@@ -47,10 +49,7 @@ const Products = () => {
 
             // Construct View URL
             // https://cloud.appwrite.io/v1/storage/buckets/[BUCKET_ID]/files/[FILE_ID]/view?project=[PROJECT_ID]
-            const endpoint = import.meta.env.VITE_APPWRITE_ENDPOINT;
-            const projectId = import.meta.env.VITE_APPWRITE_PROJECT_ID;
-
-            const imageUrl = `${endpoint}/storage/buckets/${BUCKET_ID}/files/${response.$id}/view?project=${projectId}`;
+            const imageUrl = `${APPWRITE_ENDPOINT}/storage/buckets/${BUCKET_ID}/files/${response.$id}/view?project=${APPWRITE_PROJECT_ID}`;
 
             setFormData(prev => ({ ...prev, imageUrl }));
         } catch (error) {

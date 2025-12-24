@@ -72,6 +72,40 @@ const usePricesStore = create((set) => ({
         }
     },
 
+    updatePrice: async (id, data) => {
+        set({ loading: true, error: null });
+        try {
+            const payload = {
+                price: parseFloat(data.price),
+                userId: data.userId
+            };
+
+            if (data.currency) {
+                payload.currency = data.currency;
+            }
+            if (data.products) {
+                payload.products = data.products;
+            }
+            if (data.supermarkets) {
+                payload.supermarkets = data.supermarkets;
+            }
+
+            await databases.updateDocument(
+                APPWRITE_CONFIG.DATABASE_ID,
+                APPWRITE_CONFIG.COLLECTIONS.PRICES,
+                id,
+                payload
+            );
+            await usePricesStore.getState().fetchPrices();
+            set({ loading: false });
+            return true;
+        } catch (error) {
+            console.error('Update price error:', error);
+            set({ error: error.message, loading: false });
+            return false;
+        }
+    },
+
     deletePrice: async (id) => {
         set({ loading: true, error: null });
         try {
