@@ -114,6 +114,9 @@ const Scanner = ({ onDetected, paused = false }) => {
                 try {
                     await reader.decodeFromVideoDevice(preferred.deviceId, videoRef.current, decodeCallback);
                     attachReadyHandlers();
+                    startingRef.current = false;
+                    setStarting(false);
+                    setArmed(true);
                     return;
                 } catch {
                     // fall through
@@ -121,15 +124,15 @@ const Scanner = ({ onDetected, paused = false }) => {
             }
             await reader.decodeFromConstraints(SCAN_CONSTRAINTS, videoRef.current, decodeCallback);
             attachReadyHandlers();
+            startingRef.current = false;
+            setStarting(false);
+            setArmed(true);
         } catch (err) {
             setError('Unable to start camera. Close other apps and retry.');
-        } finally {
-            if (error) {
-                startingRef.current = false;
-                setStarting(false);
-            }
+            startingRef.current = false;
+            setStarting(false);
         }
-    }, [onDetected, paused, stopReader, markReady, error]);
+    }, [onDetected, paused, stopReader, markReady]);
 
     useEffect(() => {
         return () => {
