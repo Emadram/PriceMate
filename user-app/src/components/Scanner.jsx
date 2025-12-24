@@ -28,6 +28,7 @@ const Scanner = ({ onDetected, paused = false }) => {
     const lastCodeRef = useRef(null);
     const [error, setError] = useState(null);
     const [starting, setStarting] = useState(false);
+    const [armed, setArmed] = useState(false);
 
     const stopReader = useCallback(() => {
         const r = readerRef.current;
@@ -71,12 +72,13 @@ const Scanner = ({ onDetected, paused = false }) => {
                 setError('Camera interrupted. Tap Start to retry.');
                 return;
             }
-            if (result) {
+            if (result && armed) {
                 const text = result.getText();
                 if (text && text !== lastCodeRef.current) {
                     lastCodeRef.current = text;
                     if (navigator.vibrate) navigator.vibrate(120);
                     onDetected(text);
+                    setArmed(false); // single-shot after tap
                 }
             }
         };
@@ -109,6 +111,7 @@ const Scanner = ({ onDetected, paused = false }) => {
         return () => {
             stopReader();
             lastCodeRef.current = null;
+            setArmed(false);
         };
     }, [paused, startReader, stopReader]);
 
@@ -126,16 +129,32 @@ const Scanner = ({ onDetected, paused = false }) => {
                 Align barcode within the frame
             </div>
 
-            {(error || paused || starting) && (
+            {(error || paused || starting || !armed) && (
                 <div className="absolute inset-0 bg-black/70 text-white text-center text-sm flex flex-col items-center justify-center px-4 gap-3">
-                    <div>{error || (starting ? 'Starting camera…' : paused ? 'Scanner paused' : '')}</div>
-                    <button
-                        onClick={startReader}
-                        className="px-3 py-2 bg-blue-600 text-white rounded-md text-xs font-semibold hover:bg-blue-700"
-                        disabled={starting}
-                    >
-                        {starting ? 'Starting…' : 'Start / Retry Camera'}
-                    </button>
+                    <div>
+                        {error || (starting ? 'Starting camera…' : paused ? 'Scanner paused' : 'Tap “Ready to Scan” then point at barcode')}
+                    </div>
+                    <div className="flex gap-2 flex-wrap justify-center">
+                        <button
+                            onClick={startReader}
+                            className="px-3 py-2 bg-blue-600 text-white rounded-md text-xs font-semibold hover:bg-blue-700"
+                            disabled={starting}
+                        >
+                            {starting ? 'Starting…' : 'Start / Retry Camera'}
+                        </button>
+                        {!starting && !paused && (
+                            <button
+                                onClick={() => {
+                                    setError(null);
+                                    setArmed(true);
+                                    lastCodeRef.current = null;
+                                }}
+                                className="px-3 py-2 bg-green-600 text-white rounded-md text-xs font-semibold hover:bg-green-700"
+                            >
+                                Ready to Scan (Tap once)
+                            </button>
+                        )}
+                    </div>
                 </div>
             )}
         </div>
