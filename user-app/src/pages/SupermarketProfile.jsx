@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { FiShoppingBag, FiPackage, FiMapPin, FiPhone, FiMail, FiMessageSquare, FiStar, FiArrowLeft, FiGlobe, FiClock, FiHome, FiAlertTriangle } from 'react-icons/fi';
 import { fetchSupermarketById, fetchPricesBySupermarket } from '../utils/productUtils';
 import ReportModal from '../components/ReportModal';
+import useFavoritesStore from '../stores/favoritesStore';
 
 const SupermarketProfile = () => {
     const { id } = useParams();
@@ -11,6 +12,7 @@ const SupermarketProfile = () => {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+    const { isSupermarketFavorite, toggleSupermarketFavorite } = useFavoritesStore();
 
     useEffect(() => {
         loadSupermarketData();
@@ -112,8 +114,15 @@ const SupermarketProfile = () => {
                                     </div>
                                 </div>
                                 <div className="flex gap-3">
-                                    <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-sm font-medium">
-                                        <FiStar /> Follow
+                                    <button
+                                        onClick={() => toggleSupermarketFavorite(supermarket.$id)}
+                                        className={`flex items-center gap-2 px-4 py-2 rounded-lg transition shadow-sm font-medium ${isSupermarketFavorite(supermarket.$id)
+                                            ? 'bg-yellow-500 text-white hover:bg-yellow-600'
+                                            : 'bg-blue-600 text-white hover:bg-blue-700'
+                                            }`}
+                                    >
+                                        <FiStar className={isSupermarketFavorite(supermarket.$id) ? 'fill-current' : ''} />
+                                        {isSupermarketFavorite(supermarket.$id) ? 'Favorited' : 'Favorite'}
                                     </button>
                                     <button
                                         onClick={() => setIsReportModalOpen(true)}
@@ -171,7 +180,7 @@ const SupermarketProfile = () => {
                             {products.map((product) => (
                                 <Link
                                     key={product.priceId}
-                                    to={`/price-comparison/${product.barcode}`}
+                                    to={`/price-comparison/${product.barcode}?supermarketId=${supermarket.$id}`}
                                     className="bg-white dark:bg-gray-800 rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 group overflow-hidden border border-gray-100 dark:border-gray-700 flex flex-col"
                                 >
                                     <div className="aspect-video bg-gray-100 dark:bg-gray-700 relative overflow-hidden">
@@ -183,11 +192,7 @@ const SupermarketProfile = () => {
                                         <div className="absolute top-2 right-2 bg-white/90 dark:bg-gray-900/90 backdrop-blur px-2 py-1 rounded-lg text-xs font-medium text-gray-700 dark:text-gray-300 shadow-sm">
                                             {Array.isArray(product.categoryId) ? product.categoryId[0]?.categoryName : product.categoryId?.categoryName}
                                         </div>
-                                        {product.isLowest && (
-                                            <div className="absolute bottom-2 left-2 bg-green-500 text-white px-2 py-1 rounded text-xs font-bold shadow-sm">
-                                                Best Price
-                                            </div>
-                                        )}
+                                        {/* REMOVED: isLowest indicator because in supermarket context we only care about THIS supermarket's price */}
                                     </div>
                                     <div className="p-4 flex-1 flex flex-col">
                                         <h3 className="font-bold text-gray-900 dark:text-white mb-1 truncate group-hover:text-blue-600 transition-colors">
@@ -200,24 +205,13 @@ const SupermarketProfile = () => {
                                         <div className="pt-3 border-t dark:border-gray-700">
                                             <div className="flex items-end justify-between">
                                                 <div className="flex flex-col">
-                                                    <span className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Current Price</span>
+                                                    <span className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Price at {supermarket.name}</span>
                                                     <span className="text-xl font-bold text-gray-900 dark:text-white leading-none">
                                                         {product.price.toFixed(2)} <span className="text-sm font-normal text-gray-500">{product.currency}</span>
                                                     </span>
                                                 </div>
 
-                                                {/* Price Difference Indicator */}
-                                                <div className="flex flex-col items-end">
-                                                    {product.isLowest ? (
-                                                        <span className="text-xs font-bold text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-full">
-                                                            Lowest Price
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-xs font-bold text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded-full">
-                                                            +{product.priceDiff.toFixed(2)} TL
-                                                        </span>
-                                                    )}
-                                                </div>
+                                                {/* Price Difference Indicator logic can stay or be removed based on preference, but for now we focus on the specific price */}
                                             </div>
                                         </div>
                                     </div>

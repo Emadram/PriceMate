@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { FiArrowLeft, FiMapPin, FiShoppingCart, FiShare2, FiHeart, FiPackage, FiShoppingBag, FiTrendingDown, FiBox } from 'react-icons/fi';
 import { fetchProductByBarcode, fetchAllPrices, getPricesForProduct } from '../utils/productUtils';
 import useAuthStore from '../stores/authStore';
@@ -11,6 +11,9 @@ const PriceComparison = () => {
     const [prices, setPrices] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+
+    const [searchParams] = useSearchParams();
+    const supermarketIdParam = searchParams.get('supermarketId');
 
     useEffect(() => {
         fetchProductAndPrices();
@@ -42,8 +45,23 @@ const PriceComparison = () => {
 
             console.log('Filtered prices for this product:', productPrices);
 
-            // Sort prices by value (lowest first)
-            const sortedPrices = productPrices.sort((a, b) => a.price - b.price);
+            let sortedPrices = productPrices;
+
+            // If query param exists, put that supermarket's price first
+            if (supermarketIdParam) {
+                sortedPrices = productPrices.sort((a, b) => {
+                    const aId = Array.isArray(a.supermarkets) ? a.supermarkets[0].$id : a.supermarkets.$id;
+                    const bId = Array.isArray(b.supermarkets) ? b.supermarkets[0].$id : b.supermarkets.$id;
+
+                    if (aId === supermarketIdParam) return -1;
+                    if (bId === supermarketIdParam) return 1;
+                    return a.price - b.price; // sort remainder by price
+                });
+            } else {
+                // Default: Sort prices by value (lowest first)
+                sortedPrices = productPrices.sort((a, b) => a.price - b.price);
+            }
+
             setPrices(sortedPrices);
         } catch (err) {
             console.error('Error fetching data:', err);
@@ -64,7 +82,9 @@ const PriceComparison = () => {
 
     const getLowestPrice = () => {
         if (prices.length === 0) return null;
-        return prices[0];
+        // If sorting logic puts specific supermarket first, checks against actual prices to verify if it is TRULY lowest
+        const lowest = [...prices].sort((a, b) => a.price - b.price)[0];
+        return lowest;
     };
 
     if (loading) {
@@ -186,14 +206,17 @@ const PriceComparison = () => {
                         <div className="space-y-3">
                             {prices.map((priceEntry, index) => {
                                 const supermarket = Array.isArray(priceEntry.supermarkets) ? priceEntry.supermarkets[0] : priceEntry.supermarkets;
-                                const isLowest = index === 0;
-                                const priceDiff = index > 0 ? (priceEntry.price - prices[0].price).toFixed(2) : 0;
+                                const isSelectedContext = supermarketIdParam && supermarket?.$id === supermarketIdParam;
+                                const isLowest = getLowestPrice().$id === priceEntry.$id; // Re-calculate simple lowest for badge
+                                const priceDiff = (priceEntry.price - getLowestPrice().price).toFixed(2);
 
                                 return (
                                     <div
                                         key={priceEntry.$id}
-                                        className={`bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-xl transition-all duration-200 overflow-hidden ${isLowest ? 'ring-2 ring-green-500 dark:ring-green-600' : ''
-                                            }`}
+                                        className={`bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-xl transition-all duration-200 overflow-hidden 
+                                            ${isSelectedContext ? 'ring-2 ring-blue-500 dark:ring-blue-400 bg-blue-50/50 dark:bg-blue-900/10' : ''}
+                                            ${isLowest && !isSelectedContext ? 'ring-2 ring-green-500 dark:ring-green-600' : ''}
+                                        `}
                                     >
                                         <div className="p-5">
                                             <div className="flex items-center justify-between gap-4">
@@ -202,12 +225,13 @@ const PriceComparison = () => {
                                                     to={`/supermarket/${supermarket?.$id}`}
                                                     className="flex items-center gap-4 flex-1 hover:opacity-80 transition group"
                                                 >
-                                                    <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition">
+                                                    <div className={`w-16 h-16 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition ${isSelectedContext ? 'bg-blue-200 dark:bg-blue-800' : 'bg-blue-100 dark:bg-blue-900'}`}>
                                                         <FiShoppingBag className="text-blue-600 dark:text-blue-400 text-2xl" />
                                                     </div>
                                                     <div className="flex-1">
                                                         <h4 className="font-bold text-gray-800 dark:text-white text-lg group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">
                                                             {supermarket?.name || 'Unknown Store'}
+                                                            {isSelectedContext && <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Viewing</span>}
                                                         </h4>
                                                         {isLowest && (
                                                             <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-600 dark:text-green-400 mt-1">
