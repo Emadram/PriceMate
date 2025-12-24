@@ -1,147 +1,126 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BrowserMultiFormatReader } from '@zxing/browser';
-import { DecodeHintType, BarcodeFormat } from '@zxing/library';
-
-const SCAN_HINTS = (() => {
-    const hints = new Map();
-    hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-        BarcodeFormat.EAN_13,
-        BarcodeFormat.EAN_8,
-        BarcodeFormat.UPC_A,
-        BarcodeFormat.UPC_E,
-        BarcodeFormat.CODE_128
-    ]);
-    return hints;
-})();
-
-const SCAN_CONSTRAINTS = {
-    video: {
-        facingMode: { ideal: 'environment' },
-        width: { ideal: 640 },
-        height: { ideal: 480 }
-    }
-};
 
 const Scanner = ({ onDetected, paused = false }) => {
     const videoRef = useRef(null);
-    const readerRef = useRef(null);
     const lastCodeRef = useRef(null);
-    const startingRef = useRef(false);
+    const readerRef = useRef(null);
+    const isStartingRef = useRef(false);
     const [error, setError] = useState(null);
-    const [starting, setStarting] = useState(false);
-    const [armed, setArmed] = useState(false);
-
-    const markReady = useCallback(() => {
-        if (startingRef.current) {
-            startingRef.current = false;
-            setStarting(false);
-        }
-    }, []);
-
-    const stopReader = useCallback(() => {
-        const r = readerRef.current;
-        if (r && typeof r.reset === 'function') {
-            try { r.reset(); } catch { }
-        }
-    }, []);
-
-    const startReader = useCallback(async () => {
-        if (paused || startingRef.current) return;
-        startingRef.current = true;
-        setStarting(true);
-        setError(null);
-        setArmed(false);
-
-        if (!navigator.mediaDevices?.getUserMedia) {
-            setError('Camera not supported in this browser');
-            startingRef.current = false;
-            setStarting(false);
-            return;
-        }
-
-        try {
-            // Explicit prompt
-            const perm = await navigator.mediaDevices.getUserMedia({ video: true });
-            perm.getTracks().forEach(t => t.stop());
-        } catch (err) {
-            setError('Camera permission denied. Please allow camera access.');
-            startingRef.current = false;
-            setStarting(false);
-            return;
-        }
-
-        const reader = new BrowserMultiFormatReader();
-        reader.hints = SCAN_HINTS;
-        readerRef.current = reader;
-
-        const decodeCallback = (result, err) => {
-            if (paused) return;
-            if (err?.name === 'NotAllowedError') {
-                setError('Camera permission denied. Please allow camera access.');
-                return;
-            }
-            if (err?.name === 'AbortError' || err?.name === 'NotReadableError') {
-                setError('Camera interrupted. Tap Start to retry.');
-                return;
-            }
-            if (result && armed) {
-                const text = result.getText();
-                if (text && text !== lastCodeRef.current) {
-                    lastCodeRef.current = text;
-                    if (navigator.vibrate) navigator.vibrate(120);
-                    onDetected(text);
-                    setArmed(false); // single-shot after tap
-                }
-            }
-            markReady();
-        };
-
-        try {
-            const devices = await BrowserMultiFormatReader.listVideoInputDevices();
-            const preferred = devices.find(d => /back|rear|environment/i.test(d.label)) || devices[0];
-
-            stopReader(); // ensure clean start
-
-            const attachReadyHandlers = () => {
-                const video = videoRef.current;
-                if (!video) return;
-                const ready = () => markReady();
-                video.onloadedmetadata = ready;
-                video.onplaying = ready;
-            };
-
-            if (preferred?.deviceId) {
-                try {
-                    await reader.decodeFromVideoDevice(preferred.deviceId, videoRef.current, decodeCallback);
-                    attachReadyHandlers();
-                    startingRef.current = false;
-                    setStarting(false);
-                    setArmed(true);
-                    return;
-                } catch {
-                    // fall through
-                }
-            }
-            await reader.decodeFromConstraints(SCAN_CONSTRAINTS, videoRef.current, decodeCallback);
-            attachReadyHandlers();
-            startingRef.current = false;
-            setStarting(false);
-            setArmed(true);
-        } catch (err) {
-            setError('Unable to start camera. Close other apps and retry.');
-            startingRef.current = false;
-            setStarting(false);
-        }
-    }, [onDetected, paused, stopReader, markReady]);
 
     useEffect(() => {
-        return () => {
-            stopReader();
-            lastCodeRef.current = null;
-            startingRef.current = false;
-            setArmed(false);
+        const reader = new BrowserMultiFormatReader();
+        readerRef.current = reader;
+        let isActive = true;
+
+        const startScanner = async () => {
+            if (paused || isStartingRef.current) return;
+            isStartingRef.current = true;
+            setError(null);
+
+            try {
+                if (!navigator.mediaDevices?.getUserMedia) {
+                    setError('Camera not supported in this browser');
+                    isStartingRef.current = false;
+                    return;
+                }
+
+                // Trigger permission prompt explicitly (Chrome desktop)
+                try {
+                    const permStream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: { ideal: 'environment' } }
+                    });
+                    permStream.getTracks().forEach((t) => t.stop());
+                } catch (permErr) {
+                    console.error('Camera permission error:', permErr);
+                    setError('Camera permission denied. Please allow camera access.');
+                    isStartingRef.current = false;
+                    return;
+                }
+
+                const devices = await BrowserMultiFormatReader.listVideoInputDevices();
+                const preferredDevice = devices.find((d) => /back|rear|environment/i.test(d.label)) || devices[0];
+                if (!preferredDevice) {
+                    setError('No camera device found');
+                    isStartingRef.current = false;
+                    return;
+                }
+
+                // Ensure any existing stream is stopped before starting a new decode
+                try {
+                    if (reader && typeof reader.reset === 'function') {
+                        reader.reset();
+                    }
+                } catch (resetErr) {
+                    console.warn('ZXing pre-start reset warn:', resetErr);
+                }
+
+                await reader.decodeFromVideoDevice(preferredDevice?.deviceId, videoRef.current, (result, err) => {
+                    if (!isActive || paused) return;
+                    if (err?.name === 'NotAllowedError') {
+                        setError('Camera permission denied. Please allow camera access and reload.');
+                        return;
+                    }
+                    if (err?.name === 'AbortError') {
+                        setError('Camera access was interrupted. Click “Scan Again” to retry.');
+                        return;
+                    }
+                    if (result) {
+                        const text = result.getText();
+                        if (text && text !== lastCodeRef.current) {
+                            lastCodeRef.current = text;
+                            if (navigator.vibrate) navigator.vibrate(120);
+                            onDetected(text);
+                        }
+                    }
+                });
+            } catch (error) {
+                if (error?.name === 'NotAllowedError') {
+                    setError('Camera permission denied. Please allow camera access and reload.');
+                } else if (error?.name === 'AbortError') {
+                    setError('Camera access was interrupted. Click “Scan Again” to retry.');
+                } else {
+                    console.error('ZXing init error:', error);
+                    setError('Unable to start camera. Check permissions or try a different browser.');
+                }
+            } finally {
+                isStartingRef.current = false;
+            }
         };
-    }, [stopReader]);
+
+        if (!paused) {
+            startScanner();
+        }
+
+        return () => {
+            isActive = false;
+            lastCodeRef.current = null;
+            try {
+                if (reader && typeof reader.reset === 'function') {
+                    reader.reset();
+                }
+            } catch (err) {
+                // Swallow cleanup errors
+            }
+            isStartingRef.current = false;
+        };
+    }, [onDetected, paused]);
+
+    // If paused changes to true, stop the reader; if false, it will restart via effect
+    useEffect(() => {
+        if (paused && readerRef.current) {
+            try {
+                if (typeof readerRef.current.reset === 'function') {
+                    readerRef.current.reset();
+                }
+            } catch (err) {
+                // ignore
+            }
+        }
+        if (!paused) {
+            lastCodeRef.current = null;
+        }
+    }, [paused]);
 
     return (
         <div className="relative w-full h-64 bg-black rounded-lg overflow-hidden">
@@ -156,33 +135,9 @@ const Scanner = ({ onDetected, paused = false }) => {
             <div className="absolute bottom-2 left-0 right-0 text-center text-white text-xs">
                 Align barcode within the frame
             </div>
-
-            {(error || paused || starting || !armed) && (
-                <div className="absolute inset-0 bg-black/70 text-white text-center text-sm flex flex-col items-center justify-center px-4 gap-3">
-                    <div>
-                        {error || (starting ? 'Starting camera…' : paused ? 'Scanner paused' : 'Tap “Ready to Scan” then point at barcode')}
-                    </div>
-                    <div className="flex gap-2 flex-wrap justify-center">
-                        <button
-                            onClick={startReader}
-                            className="px-3 py-2 bg-blue-600 text-white rounded-md text-xs font-semibold hover:bg-blue-700"
-                            disabled={starting}
-                        >
-                            {starting ? 'Starting…' : 'Start / Retry Camera'}
-                        </button>
-                        {!starting && !paused && (
-                            <button
-                                onClick={() => {
-                                    setError(null);
-                                    setArmed(true);
-                                    lastCodeRef.current = null;
-                                }}
-                                className="px-3 py-2 bg-green-600 text-white rounded-md text-xs font-semibold hover:bg-green-700"
-                            >
-                                Ready to Scan (Tap once)
-                            </button>
-                        )}
-                    </div>
+            {error && (
+                <div className="absolute inset-0 bg-black/70 text-white text-center text-sm flex items-center justify-center px-4">
+                    {error}
                 </div>
             )}
         </div>
