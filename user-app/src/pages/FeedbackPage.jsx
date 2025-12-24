@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { FiMessageSquare, FiSend, FiArrowLeft, FiCheckCircle } from 'react-icons/fi';
 import { databases, APPWRITE_CONFIG } from '../lib/appwrite';
 import useAuthStore from '../stores/authStore';
@@ -8,6 +8,8 @@ import { ID } from 'appwrite';
 const FeedbackPage = () => {
     const user = useAuthStore((state) => state.user);
     const navigate = useNavigate();
+
+    if (!user) return <Navigate to="/login" />;
     const [formData, setFormData] = useState({
         type: 'general',
         message: ''

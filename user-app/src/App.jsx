@@ -45,54 +45,17 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <Home />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/scan"
-          element={
-            <ProtectedRoute>
-              <ScanPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/search"
-          element={
-            <ProtectedRoute>
-              <SearchResults />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/product/:barcode"
-          element={
-            <ProtectedRoute>
-              <ProductDetails />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/price-comparison/:barcode"
-          element={
-            <ProtectedRoute>
-              <PriceComparison />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/supermarket/:id"
-          element={
-            <ProtectedRoute>
-              <SupermarketProfile />
-            </ProtectedRoute>
-          }
-        />
+
+        {/* Public Routes - accessible without login */}
+        <Route path="/" element={<Home />} />
+        <Route path="/scan" element={<ScanPage />} />
+        <Route path="/search" element={<SearchResults />} />
+        <Route path="/product/:barcode" element={<ProductDetails />} />
+        <Route path="/price-comparison/:barcode" element={<PriceComparison />} />
+        <Route path="/supermarket/:id" element={<SupermarketProfile />} />
+        <Route path="/feedback" element={<FeedbackPage />} />
+
+        {/* Protected Routes - require login */}
         <Route
           path="/profile"
           element={
@@ -109,15 +72,6 @@ function App() {
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/feedback"
-          element={
-            <ProtectedRoute>
-              <FeedbackPage />
-            </ProtectedRoute>
-          }
-        />
-
       </Routes>
     </Router>
   );

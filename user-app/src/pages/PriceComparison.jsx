@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { FiArrowLeft, FiMapPin, FiShoppingCart, FiShare2, FiHeart, FiPackage, FiShoppingBag, FiTrendingDown, FiBox } from 'react-icons/fi';
 import { fetchProductByBarcode, fetchAllPrices, getPricesForProduct } from '../utils/productUtils';
 import useAuthStore from '../stores/authStore';
+import useFavoritesStore from '../stores/favoritesStore';
 
 const PriceComparison = () => {
     const { barcode } = useParams();
@@ -11,6 +12,16 @@ const PriceComparison = () => {
     const [prices, setPrices] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const user = useAuthStore((state) => state.user);
+    const { isProductFavorite, toggleProductFavorite } = useFavoritesStore();
+
+    const handleFavoriteClick = () => {
+        if (!user) {
+            alert('Please login to favorite products');
+            return;
+        }
+        toggleProductFavorite(product.$id);
+    };
 
     const [searchParams] = useSearchParams();
     const supermarketIdParam = searchParams.get('supermarketId');
@@ -120,14 +131,26 @@ const PriceComparison = () => {
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
             {/* Header */}
             <header className="bg-white dark:bg-gray-800 shadow sticky top-0 z-10">
-                <div className="max-w-4xl mx-auto px-4 py-4">
+                <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+                    <div>
+                        <button
+                            onClick={() => navigate(-1)}
+                            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center gap-2 mb-1"
+                        >
+                            <FiArrowLeft /> Back
+                        </button>
+                        <h1 className="text-xl font-bold text-gray-800 dark:text-white">Price Comparison</h1>
+                    </div>
                     <button
-                        onClick={() => navigate(-1)}
-                        className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center gap-2 mb-3"
+                        onClick={handleFavoriteClick}
+                        className={`p-3 rounded-full transition-all ${isProductFavorite(product?.$id)
+                            ? 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400'
+                            : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+                            }`}
+                        title={isProductFavorite(product?.$id) ? 'Remove from favorites' : 'Add to favorites'}
                     >
-                        <FiArrowLeft /> Back
+                        <FiHeart className={isProductFavorite(product?.$id) ? 'fill-current' : ''} size={24} />
                     </button>
-                    <h1 className="text-xl font-bold text-gray-800 dark:text-white">Price Comparison</h1>
                 </div>
             </header>
 

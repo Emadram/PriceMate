@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { FiStar, FiArrowLeft } from 'react-icons/fi';
+import { FiStar, FiArrowLeft, FiShoppingBag, FiPackage } from 'react-icons/fi';
 import { databases, DATABASE_ID, COLLECTIONS, Query } from '../lib/appwrite';
 import { fetchAllPrices, getPricesForProduct } from '../utils/productUtils';
 import ProductCard from '../components/ProductCard';
@@ -10,7 +10,8 @@ const Favorites = () => {
     const navigate = useNavigate();
     const [products, setProducts] = useState([]);
     const [supermarkets, setSupermarkets] = useState([]);
-    const favorites = useFavoritesStore((state) => state.favorites); // Rename this if needed, or check store definition. Store has favoriteProducts and favoriteSupermarkets
+    const [prices, setPrices] = useState([]);
+    const [loading, setLoading] = useState(false);
     const { favoriteProducts, favoriteSupermarkets } = useFavoritesStore();
 
     useEffect(() => {
@@ -88,7 +89,7 @@ const Favorites = () => {
                         {supermarkets.length > 0 && (
                             <section>
                                 <h2 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
-                                    <span className="text-2xl">🏪</span> Favorite Supermarkets
+                                    <FiShoppingBag className="text-blue-600 dark:text-blue-400" /> Favorite Supermarkets
                                 </h2>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {supermarkets.map((market) => (
@@ -97,8 +98,12 @@ const Favorites = () => {
                                             to={`/supermarket/${market.$id}`}
                                             className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm hover:shadow-md transition flex items-center gap-4 border border-gray-100 dark:border-gray-700"
                                         >
-                                            <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center text-4xl">
-                                                {market.logoUrl ? <img src={market.logoUrl} className="w-full h-full object-contain" alt={market.name} /> : '🛒'}
+                                            <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+                                                {market.logoUrl ? (
+                                                    <img src={market.logoUrl} className="w-full h-full object-contain" alt={market.name} />
+                                                ) : (
+                                                    <FiShoppingBag className="text-gray-400 text-2xl" />
+                                                )}
                                             </div>
                                             <div>
                                                 <h3 className="font-bold text-gray-900 dark:text-white">{market.name}</h3>
@@ -114,7 +119,7 @@ const Favorites = () => {
                         {products.length > 0 && (
                             <section>
                                 <h2 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
-                                    <span className="text-2xl">📦</span> Favorite Products
+                                    <FiPackage className="text-blue-600 dark:text-blue-400" /> Favorite Products
                                 </h2>
                                 <div className="space-y-3">
                                     {products.map((product) => (

@@ -4,6 +4,7 @@ import { FiShoppingBag, FiPackage, FiMapPin, FiPhone, FiMail, FiMessageSquare, F
 import { fetchSupermarketById, fetchPricesBySupermarket } from '../utils/productUtils';
 import ReportModal from '../components/ReportModal';
 import useFavoritesStore from '../stores/favoritesStore';
+import useAuthStore from '../stores/authStore';
 
 const SupermarketProfile = () => {
     const { id } = useParams();
@@ -13,6 +14,23 @@ const SupermarketProfile = () => {
     const [loading, setLoading] = useState(true);
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
     const { isSupermarketFavorite, toggleSupermarketFavorite } = useFavoritesStore();
+    const user = useAuthStore((state) => state.user);
+
+    const handleFavoriteClick = () => {
+        if (!user) {
+            alert('Please login to favorite supermarkets');
+            return;
+        }
+        toggleSupermarketFavorite(supermarket.$id);
+    };
+
+    const handleReportClick = () => {
+        if (!user) {
+            alert('Please login to report issues');
+            return;
+        }
+        setIsReportModalOpen(true);
+    };
 
     useEffect(() => {
         loadSupermarketData();
@@ -115,7 +133,7 @@ const SupermarketProfile = () => {
                                 </div>
                                 <div className="flex gap-3">
                                     <button
-                                        onClick={() => toggleSupermarketFavorite(supermarket.$id)}
+                                        onClick={handleFavoriteClick}
                                         className={`flex items-center gap-2 px-4 py-2 rounded-lg transition shadow-sm font-medium ${isSupermarketFavorite(supermarket.$id)
                                             ? 'bg-yellow-500 text-white hover:bg-yellow-600'
                                             : 'bg-blue-600 text-white hover:bg-blue-700'
@@ -125,7 +143,7 @@ const SupermarketProfile = () => {
                                         {isSupermarketFavorite(supermarket.$id) ? 'Favorited' : 'Favorite'}
                                     </button>
                                     <button
-                                        onClick={() => setIsReportModalOpen(true)}
+                                        onClick={handleReportClick}
                                         className="flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 transition font-medium border border-red-200 dark:border-red-800"
                                     >
                                         <FiAlertTriangle /> Report
