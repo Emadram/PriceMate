@@ -31,6 +31,13 @@ const Scanner = ({ onDetected, paused = false }) => {
     const [starting, setStarting] = useState(false);
     const [armed, setArmed] = useState(false);
 
+    const markReady = useCallback(() => {
+        if (startingRef.current) {
+            startingRef.current = false;
+            setStarting(false);
+        }
+    }, []);
+
     const stopReader = useCallback(() => {
         const r = readerRef.current;
         if (r && typeof r.reset === 'function') {
@@ -86,6 +93,7 @@ const Scanner = ({ onDetected, paused = false }) => {
                     setArmed(false); // single-shot after tap
                 }
             }
+            markReady();
         };
 
         try {
@@ -94,23 +102,34 @@ const Scanner = ({ onDetected, paused = false }) => {
 
             stopReader(); // ensure clean start
 
+            const attachReadyHandlers = () => {
+                const video = videoRef.current;
+                if (!video) return;
+                const ready = () => markReady();
+                video.onloadedmetadata = ready;
+                video.onplaying = ready;
+            };
+
             if (preferred?.deviceId) {
                 try {
                     await reader.decodeFromVideoDevice(preferred.deviceId, videoRef.current, decodeCallback);
-                    setStarting(false);
+                    attachReadyHandlers();
                     return;
                 } catch {
                     // fall through
                 }
             }
             await reader.decodeFromConstraints(SCAN_CONSTRAINTS, videoRef.current, decodeCallback);
+            attachReadyHandlers();
         } catch (err) {
             setError('Unable to start camera. Close other apps and retry.');
         } finally {
-            startingRef.current = false;
-            setStarting(false);
+            if (error) {
+                startingRef.current = false;
+                setStarting(false);
+            }
         }
-    }, [onDetected, paused, stopReader]);
+    }, [onDetected, paused, stopReader, markReady, error]);
 
     useEffect(() => {
         return () => {
