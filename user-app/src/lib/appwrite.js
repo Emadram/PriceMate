@@ -20,7 +20,8 @@ export const APPWRITE_CONFIG = {
         SUPERMARKETS: 'supermarkets',
         PRICES: 'prices_collection',
         FEEDBACK: 'feedback',
-        USER_PROFILES: 'user_profiles'
+        USER_PROFILES: import.meta.env.VITE_APPWRITE_COLLECTION_USER_PROFILES || 'user_profiles',
+        FAVORITES: import.meta.env.VITE_APPWRITE_COLLECTION_FAVORITES || 'favorites'
     }
 };
 

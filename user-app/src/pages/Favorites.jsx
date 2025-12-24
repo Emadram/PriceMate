@@ -70,8 +70,12 @@ const Favorites = () => {
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
             <header className="bg-white dark:bg-gray-800 shadow p-4">
                 <div className="max-w-4xl mx-auto flex items-center justify-between">
-                    <button onClick={() => navigate('/profile')} className="text-blue-600 dark:text-blue-400 flex items-center gap-2">
-                        <FiArrowLeft /> Back
+                    <button
+                        onClick={() => navigate('/profile')}
+                        className="bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 p-2.5 rounded-full text-gray-700 dark:text-gray-200 shadow-sm transition-all"
+                        title="Go Back"
+                    >
+                        <FiArrowLeft size={20} />
                     </button>
                     <h1 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
                         <FiStar className="text-yellow-500" /> My Favorites

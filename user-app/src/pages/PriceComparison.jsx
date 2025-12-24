@@ -135,22 +135,25 @@ const PriceComparison = () => {
                     <div>
                         <button
                             onClick={() => navigate(-1)}
-                            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center gap-2 mb-1"
+                            className="bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 p-2.5 rounded-full text-gray-700 dark:text-gray-200 shadow-sm transition-all mb-1"
+                            title="Go Back"
                         >
-                            <FiArrowLeft /> Back
+                            <FiArrowLeft size={20} />
                         </button>
                         <h1 className="text-xl font-bold text-gray-800 dark:text-white">Price Comparison</h1>
                     </div>
-                    <button
-                        onClick={handleFavoriteClick}
-                        className={`p-3 rounded-full transition-all ${isProductFavorite(product?.$id)
-                            ? 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400'
-                            : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
-                            }`}
-                        title={isProductFavorite(product?.$id) ? 'Remove from favorites' : 'Add to favorites'}
-                    >
-                        <FiHeart className={isProductFavorite(product?.$id) ? 'fill-current' : ''} size={24} />
-                    </button>
+                    {user && (
+                        <button
+                            onClick={handleFavoriteClick}
+                            className={`p-3 rounded-full transition-all ${isProductFavorite(product?.$id)
+                                ? 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400'
+                                : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+                                }`}
+                            title={isProductFavorite(product?.$id) ? 'Remove from favorites' : 'Add to favorites'}
+                        >
+                            <FiHeart className={isProductFavorite(product?.$id) ? 'fill-current' : ''} size={24} />
+                        </button>
+                    )}
                 </div>
             </header>
 

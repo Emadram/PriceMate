@@ -21,6 +21,11 @@ const Register = () => {
     return (
         <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 px-4 transition-colors">
             <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-md p-8">
+                <Link to="/" className="flex justify-center mb-6">
+                    <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-md">
+                        P
+                    </div>
+                </Link>
                 <h2 className="text-2xl font-bold text-center mb-6 text-gray-800 dark:text-white">Create an Account</h2>
                 {error && <div className="bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-200 p-3 rounded mb-4">{error}</div>}
                 <form onSubmit={handleSubmit} className="space-y-4">

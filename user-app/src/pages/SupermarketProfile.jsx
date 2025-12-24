@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { FiShoppingBag, FiPackage, FiMapPin, FiPhone, FiMail, FiMessageSquare, FiStar, FiArrowLeft, FiGlobe, FiClock, FiHome, FiAlertTriangle } from 'react-icons/fi';
+import { FiShoppingBag, FiPackage, FiMapPin, FiPhone, FiMail, FiMessageSquare, FiStar, FiArrowLeft, FiGlobe, FiClock, FiHome, FiAlertTriangle, FiTrendingDown } from 'react-icons/fi';
 import { fetchSupermarketById, fetchPricesBySupermarket } from '../utils/productUtils';
 import ReportModal from '../components/ReportModal';
 import useFavoritesStore from '../stores/favoritesStore';
@@ -111,9 +111,9 @@ const SupermarketProfile = () => {
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-6 border border-gray-100 dark:border-gray-700">
                     <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
                         {/* Logo */}
-                        <div className="w-32 h-32 bg-white dark:bg-gray-700 rounded-xl shadow-md p-2 flex items-center justify-center flex-shrink-0 border border-gray-100 dark:border-gray-600">
-                            {supermarket.logoUrl ? (
-                                <img src={supermarket.logoUrl} alt={supermarket.name} className="w-full h-full object-contain" />
+                        <div className="w-32 h-32 bg-white dark:bg-gray-800 rounded-xl shadow-md p-2 flex items-center justify-center flex-shrink-0 border border-gray-100 dark:border-gray-700">
+                            {supermarket.icon || supermarket.logoUrl ? (
+                                <img src={supermarket.icon || supermarket.logoUrl} alt={supermarket.name} className="w-full h-full object-contain" />
                             ) : (
                                 <FiShoppingBag className="text-gray-400 text-5xl" />
                             )}
@@ -132,16 +132,18 @@ const SupermarketProfile = () => {
                                     </div>
                                 </div>
                                 <div className="flex gap-3">
-                                    <button
-                                        onClick={handleFavoriteClick}
-                                        className={`flex items-center gap-2 px-4 py-2 rounded-lg transition shadow-sm font-medium ${isSupermarketFavorite(supermarket.$id)
-                                            ? 'bg-yellow-500 text-white hover:bg-yellow-600'
-                                            : 'bg-blue-600 text-white hover:bg-blue-700'
-                                            }`}
-                                    >
-                                        <FiStar className={isSupermarketFavorite(supermarket.$id) ? 'fill-current' : ''} />
-                                        {isSupermarketFavorite(supermarket.$id) ? 'Favorited' : 'Favorite'}
-                                    </button>
+                                    {user && (
+                                        <button
+                                            onClick={handleFavoriteClick}
+                                            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition shadow-sm font-medium ${isSupermarketFavorite(supermarket.$id)
+                                                ? 'bg-yellow-500 text-white hover:bg-yellow-600'
+                                                : 'bg-blue-600 text-white hover:bg-blue-700'
+                                                }`}
+                                        >
+                                            <FiStar className={isSupermarketFavorite(supermarket.$id) ? 'fill-current' : ''} />
+                                            {isSupermarketFavorite(supermarket.$id) ? 'Favorited' : 'Favorite'}
+                                        </button>
+                                    )}
                                     <button
                                         onClick={handleReportClick}
                                         className="flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 transition font-medium border border-red-200 dark:border-red-800"
@@ -210,7 +212,13 @@ const SupermarketProfile = () => {
                                         <div className="absolute top-2 right-2 bg-white/90 dark:bg-gray-900/90 backdrop-blur px-2 py-1 rounded-lg text-xs font-medium text-gray-700 dark:text-gray-300 shadow-sm">
                                             {Array.isArray(product.categoryId) ? product.categoryId[0]?.categoryName : product.categoryId?.categoryName}
                                         </div>
-                                        {/* REMOVED: isLowest indicator because in supermarket context we only care about THIS supermarket's price */}
+
+                                        {product.isLowest && (
+                                            <div className="absolute bottom-2 left-2 bg-green-500 text-white text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded shadow-lg flex items-center gap-1">
+                                                <FiTrendingDown className="text-sm" />
+                                                Best Price
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="p-4 flex-1 flex flex-col">
                                         <h3 className="font-bold text-gray-900 dark:text-white mb-1 truncate group-hover:text-blue-600 transition-colors">
@@ -224,7 +232,7 @@ const SupermarketProfile = () => {
                                             <div className="flex items-end justify-between">
                                                 <div className="flex flex-col">
                                                     <span className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Price at {supermarket.name}</span>
-                                                    <span className="text-xl font-bold text-gray-900 dark:text-white leading-none">
+                                                    <span className={`text-xl font-bold leading-none ${product.isLowest ? 'text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>
                                                         {product.price.toFixed(2)} <span className="text-sm font-normal text-gray-500">{product.currency}</span>
                                                     </span>
                                                 </div>

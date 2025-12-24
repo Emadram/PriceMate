@@ -1,43 +1,60 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { FiArrowLeft, FiSearch } from 'react-icons/fi';
-import { fetchProducts, fetchAllPrices, getPricesForProduct, searchProducts } from '../utils/productUtils';
+import { fetchProducts, fetchAllPrices, getPricesForProduct, searchProducts, fetchCategories } from '../utils/productUtils';
 import ProductCard from '../components/ProductCard';
 
 const SearchResults = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const query = searchParams.get('q') || '';
+    const categoryIdFromUrl = searchParams.get('category') || '';
 
     const [products, setProducts] = useState([]);
     const [prices, setPrices] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [categories, setCategories] = useState([]);
+
+    // Search form states
+    const [searchInput, setSearchInput] = useState(query);
+    const [selectedCategory, setSelectedCategory] = useState(categoryIdFromUrl);
 
     useEffect(() => {
-        if (query) {
-            performSearch();
-        }
-    }, [query]);
+        loadInitialData();
+    }, [query, categoryIdFromUrl]);
 
-    const performSearch = async () => {
+    const loadInitialData = async () => {
         setLoading(true);
         try {
-            console.log('Searching for:', query);
-
-            // Use server-side search utility and fetch prices
-            const [searchResults, allPrices] = await Promise.all([
-                searchProducts(query),
-                fetchAllPrices()
+            // Fetch categories if not already fetched
+            const [searchResults, allPrices, allCategories] = await Promise.all([
+                searchProducts(query, categoryIdFromUrl),
+                fetchAllPrices(),
+                categories.length === 0 ? fetchCategories() : Promise.resolve(categories)
             ]);
 
-            console.log('Products found:', searchResults.length);
             setProducts(searchResults);
             setPrices(allPrices);
+            if (categories.length === 0) setCategories(allCategories);
 
+            // Sync local input with URL
+            setSearchInput(query);
+            setSelectedCategory(categoryIdFromUrl);
         } catch (error) {
-            console.error('Search error:', error);
+            console.error('Data loading error:', error);
         }
         setLoading(false);
+    };
+
+    const handleSearch = (e) => {
+        e.preventDefault();
+        if (searchInput.trim() || selectedCategory) {
+            let url = `/search?q=${encodeURIComponent(searchInput.trim())}`;
+            if (selectedCategory) {
+                url += `&category=${encodeURIComponent(selectedCategory)}`;
+            }
+            navigate(url);
+        }
     };
 
 
@@ -45,31 +62,73 @@ const SearchResults = () => {
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
             {/* Header */}
             <header className="bg-white dark:bg-gray-800 shadow sticky top-0 z-10">
-                <div className="max-w-4xl mx-auto px-4 py-4">
-                    <button
-                        onClick={() => navigate('/')}
-                        className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center gap-2 mb-3"
-                    >
-                        <FiArrowLeft /> Back to Home
-                    </button>
-                    <div className="flex items-center gap-3">
-                        <FiSearch className="text-gray-400 text-xl" />
-                        <div>
-                            <h1 className="text-xl font-bold text-gray-800 dark:text-white">
-                                Search Results
+                <div className="max-w-5xl mx-auto px-4 py-4">
+                    <div className="flex flex-col md:flex-row md:items-center gap-4">
+                        <div className="flex items-center gap-4 flex-shrink-0">
+                            <button
+                                onClick={() => navigate('/')}
+                                className="bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 p-2.5 rounded-full text-gray-700 dark:text-gray-200 shadow-sm transition-all"
+                                title="Back to Home"
+                            >
+                                <FiArrowLeft size={20} />
+                            </button>
+                            <h1 className="text-xl font-bold text-gray-800 dark:text-white whitespace-nowrap hidden sm:block">
+                                Results
                             </h1>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                                "{query}"
-                            </p>
                         </div>
+
+                        <form onSubmit={handleSearch} className="flex-1 flex flex-col sm:flex-row gap-2">
+                            <div className="flex-1 relative">
+                                <input
+                                    type="text"
+                                    value={searchInput}
+                                    onChange={(e) => setSearchInput(e.target.value)}
+                                    placeholder="Search again..."
+                                    className="w-full pl-4 pr-10 py-2.5 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white placeholder-gray-500 focus:ring-2 focus:ring-blue-500 transition"
+                                />
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                                    <FiSearch size={18} />
+                                </div>
+                            </div>
+                            <div className="flex gap-2">
+                                <select
+                                    value={selectedCategory}
+                                    onChange={(e) => setSelectedCategory(e.target.value)}
+                                    className="px-3 py-2.5 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 transition text-sm min-w-[120px]"
+                                >
+                                    <option value="">All Categories</option>
+                                    {categories.map((cat) => (
+                                        <option key={cat.$id} value={cat.$id}>
+                                            {cat.categoryName}
+                                        </option>
+                                    ))}
+                                </select>
+                                <button
+                                    type="submit"
+                                    className="bg-blue-600 text-white px-6 py-2.5 rounded-xl hover:bg-blue-700 transition shadow-md font-semibold text-sm"
+                                >
+                                    Search
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </header>
 
-            <main className="max-w-4xl mx-auto px-4 py-6">
+            <main className="max-w-5xl mx-auto px-4 py-6">
+                <div className="mb-6 flex items-center justify-between">
+                    <div>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                            Current Search: <span className="text-blue-600 dark:text-blue-400 font-medium">{query ? `"${query}"` : 'All Products'}</span>
+                            {categoryIdFromUrl && <span className="ml-2 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-xs">Filtered by Category</span>}
+                        </p>
+                    </div>
+                </div>
+
                 {loading ? (
                     <div className="text-center py-12">
-                        <div className="text-gray-600 dark:text-gray-400">Searching...</div>
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                        <div className="text-gray-600 dark:text-gray-400">Refreshing results...</div>
                     </div>
                 ) : products.length === 0 ? (
                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-12 text-center">

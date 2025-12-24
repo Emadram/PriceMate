@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import useAuthStore from './stores/authStore';
 import useThemeStore from './stores/themeStore';
+import useFavoritesStore from './stores/favoritesStore';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Home from './pages/Home';
@@ -32,6 +33,8 @@ const ProtectedRoute = ({ children }) => {
 
 function App() {
   const checkSession = useAuthStore((state) => state.checkSession);
+  const user = useAuthStore((state) => state.user);
+  const { syncFavorites, clearFavorites } = useFavoritesStore();
   const setTheme = useThemeStore((state) => state.setTheme);
   const theme = useThemeStore((state) => state.theme);
 
@@ -39,6 +42,15 @@ function App() {
     checkSession();
     setTheme(theme); // Initialize theme on mount
   }, [checkSession, setTheme, theme]);
+
+  // Sync favorites when user changes
+  useEffect(() => {
+    if (user) {
+      syncFavorites();
+    } else {
+      clearFavorites();
+    }
+  }, [user, syncFavorites, clearFavorites]);
 
   return (
     <Router>

@@ -120,26 +120,34 @@ export const fetchProducts = async (limit = 50) => {
 /**
  * Search products by name or barcode
  */
-export const searchProducts = async (query) => {
-    if (!query) return [];
+export const searchProducts = async (query, categoryId = null) => {
     try {
-        const searchLower = query.toLowerCase();
+        const searchLower = query?.toLowerCase() || '';
 
-        // Fetch all products (since we don't have fulltext index)
+        const queries = [
+            Query.limit(100),
+            Query.select(['*', 'categoryId.*'])
+        ];
+
+        // If category is provided, we can filter server-side
+        if (categoryId) {
+            queries.push(Query.equal('categoryId', categoryId));
+        }
+
         const response = await databases.listDocuments(
             DATABASE_ID,
             COLLECTIONS.PRODUCTS,
-            [
-                Query.limit(100), // Increase limit to search more products
-                Query.select(['*', 'categoryId.*'])
-            ]
+            queries
         );
 
-        // Filter client-side by name or barcode
-        const filtered = response.documents.filter(product =>
-            product.name.toLowerCase().includes(searchLower) ||
-            product.barcode.includes(query)
-        );
+        // Filter client-side by name or barcode if query exists
+        let filtered = response.documents;
+        if (searchLower) {
+            filtered = filtered.filter(product =>
+                product.name.toLowerCase().includes(searchLower) ||
+                product.barcode.includes(query)
+            );
+        }
 
         return filtered.slice(0, 20); // Return top 20 matches
 
@@ -274,6 +282,21 @@ export const fetchPricesBySupermarket = async (supermarketId) => {
 
     } catch (error) {
         console.error('Error fetching supermarket prices:', error);
+        return [];
+    }
+};/**
+ * Fetch all categories
+ */
+export const fetchCategories = async () => {
+    try {
+        const response = await databases.listDocuments(
+            DATABASE_ID,
+            COLLECTIONS.CATEGORIES,
+            [Query.limit(100), Query.orderAsc('categoryName')]
+        );
+        return response.documents;
+    } catch (error) {
+        console.error('Error fetching categories:', error);
         return [];
     }
 };

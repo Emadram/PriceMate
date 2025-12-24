@@ -3,42 +3,50 @@ import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { FiSearch, FiCamera, FiTrendingUp } from 'react-icons/fi';
 import useAuthStore from '../stores/authStore';
-import { fetchProducts, fetchAllPrices, getPricesForProduct } from '../utils/productUtils';
+import { fetchProducts, fetchAllPrices, getPricesForProduct, fetchCategories } from '../utils/productUtils';
 import ProductCard from '../components/ProductCard';
 
 const Home = () => {
     const user = useAuthStore((state) => state.user);
     const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState('');
+    const [categories, setCategories] = useState([]);
     const [featuredProducts, setFeaturedProducts] = useState([]);
     const [prices, setPrices] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        loadFeaturedProducts();
+        loadData();
     }, []);
 
-    const loadFeaturedProducts = async () => {
+    const loadData = async () => {
         setLoading(true);
         try {
-            // Fetch products and prices
-            const [products, allPrices] = await Promise.all([
+            // Fetch products, prices, and categories
+            const [products, allPrices, allCategories] = await Promise.all([
                 fetchProducts(6), // Get 6 featured products
-                fetchAllPrices()
+                fetchAllPrices(),
+                fetchCategories()
             ]);
 
             setFeaturedProducts(products);
             setPrices(allPrices);
+            setCategories(allCategories);
         } catch (error) {
-            console.error('Error loading featured products:', error);
+            console.error('Error loading data:', error);
         }
         setLoading(false);
     };
 
     const handleSearch = (e) => {
         e.preventDefault();
-        if (searchQuery.trim()) {
-            navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+        if (searchQuery.trim() || selectedCategory) {
+            let url = `/search?q=${encodeURIComponent(searchQuery.trim())}`;
+            if (selectedCategory) {
+                url += `&category=${encodeURIComponent(selectedCategory)}`;
+            }
+            navigate(url);
         }
     };
 
@@ -49,21 +57,41 @@ const Home = () => {
             <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
                 {/* Search Bar */}
                 <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
-                    <form onSubmit={handleSearch} className="relative">
-                        <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Search for products..."
-                            className="w-full pl-6 pr-14 py-4 bg-gray-50 dark:bg-gray-700 border-0 rounded-xl text-gray-900 dark:text-white placeholder-gray-500 focus:ring-2 focus:ring-blue-500 transition shadow-inner"
-                        />
-                        <button
-                            type="submit"
-                            className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition shadow-md"
-                            aria-label="Search"
-                        >
-                            <FiSearch size={20} />
-                        </button>
+                    <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-4">
+                        <div className="flex-1 relative">
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Search for products..."
+                                className="w-full pl-6 pr-12 py-4 bg-gray-50 dark:bg-gray-700 border-0 rounded-xl text-gray-900 dark:text-white placeholder-gray-500 focus:ring-2 focus:ring-blue-500 transition shadow-inner"
+                            />
+                            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
+                                <FiSearch size={20} />
+                            </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                            <select
+                                value={selectedCategory}
+                                onChange={(e) => setSelectedCategory(e.target.value)}
+                                className="px-4 py-4 bg-gray-50 dark:bg-gray-700 border-0 rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 transition shadow-inner min-w-[140px] cursor-pointer appearance-none"
+                            >
+                                <option value="">All Categories</option>
+                                {categories.map((cat) => (
+                                    <option key={cat.$id} value={cat.$id}>
+                                        {cat.categoryName}
+                                    </option>
+                                ))}
+                            </select>
+
+                            <button
+                                type="submit"
+                                className="bg-blue-600 text-white px-8 py-4 rounded-xl hover:bg-blue-700 transition shadow-md font-bold flex-shrink-0"
+                            >
+                                Search
+                            </button>
+                        </div>
                     </form>
                 </div>
 

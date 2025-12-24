@@ -11,8 +11,12 @@ const Profile = () => {
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
             <div className="max-w-3xl mx-auto">
                 {/* Back Link */}
-                <Link to="/" className="inline-flex items-center gap-2 text-blue-600 dark:text-blue-400 font-medium hover:underline mb-6">
-                    <FiArrowLeft /> Back to Home
+                <Link
+                    to="/"
+                    className="bg-white hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 p-3 rounded-full text-blue-600 dark:text-blue-400 shadow-md transition-all mb-6 inline-flex items-center justify-center w-12 h-12"
+                    title="Back to Home"
+                >
+                    <FiArrowLeft size={24} />
                 </Link>
 
                 <div className="bg-white dark:bg-gray-800 shadow-xl rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-700">
