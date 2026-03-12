@@ -4,8 +4,10 @@ import { FiArrowLeft, FiMapPin, FiShoppingCart, FiShare2, FiHeart, FiPackage, Fi
 import { fetchProductByBarcode, fetchAllPrices, getPricesForProduct } from '../utils/productUtils';
 import useAuthStore from '../stores/authStore';
 import useFavoritesStore from '../stores/favoritesStore';
+import useCurrencyStore from '../stores/currencyStore';
 
 const PriceComparison = () => {
+    const { convert, getCurrencySymbol } = useCurrencyStore();
     const { barcode } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
@@ -223,9 +225,9 @@ const PriceComparison = () => {
                                 <div className="flex items-center gap-3">
                                     <FiTrendingDown className="text-green-600 dark:text-green-400 text-2xl" />
                                     <div>
-                                        <p className="text-sm text-gray-600 dark:text-gray-400">Best Price</p>
-                                        <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                                            {lowestPrice.price} {lowestPrice.currency || 'EGP'}
+                                        <p className="text-sm text-gray-600 dark:text-gray-400 font-semibold">Best Price</p>
+                                        <p className="text-3xl font-bold text-green-600 dark:text-green-400">
+                                            {convert(lowestPrice.price, 'TRY')} {getCurrencySymbol()}
                                         </p>
                                     </div>
                                 </div>
@@ -305,17 +307,17 @@ const PriceComparison = () => {
 
                                                 {/* Price Info */}
                                                 <div className="text-right">
-                                                    <div className="flex items-baseline gap-2">
-                                                        <span className={`text-3xl font-bold ${isLowest ? 'text-green-600 dark:text-green-400' : 'text-gray-800 dark:text-white'}`}>
-                                                            {priceEntry.price}
+                                                    <div className="flex items-baseline gap-1.5">
+                                                        <span className={`text-2xl font-bold ${isLowest ? 'text-green-600 dark:text-green-400' : 'text-gray-800 dark:text-white'}`}>
+                                                            {convert(priceEntry.price, 'TRY')}
                                                         </span>
-                                                        <span className="text-gray-500 dark:text-gray-400 text-sm">
-                                                            {priceEntry.currency || 'TRY'}
+                                                        <span className="text-gray-500 dark:text-gray-400 text-sm font-semibold">
+                                                            {getCurrencySymbol()}
                                                         </span>
                                                     </div>
                                                     {priceDiff > 0 && (
-                                                        <div className="text-xs text-red-600 dark:text-red-400 mt-1">
-                                                            +{priceDiff} TRY more
+                                                        <div className="text-xs text-red-600 dark:text-red-400 mt-1 font-medium italic">
+                                                            +{convert(priceDiff, 'TRY')} {getCurrencySymbol()} difference
                                                         </div>
                                                     )}
                                                 </div>

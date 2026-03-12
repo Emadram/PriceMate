@@ -1,7 +1,10 @@
 import { Link } from 'react-router-dom';
 import { FiPackage, FiShoppingBag, FiTag } from 'react-icons/fi';
+import useCurrencyStore from '../stores/currencyStore';
 
 const ProductCard = ({ product, prices = [] }) => {
+    const { convert, getCurrencySymbol } = useCurrencyStore();
+    
     // Get the lowest price for this product
     const lowestPrice = prices.length > 0
         ? prices.reduce((min, p) => p.price < min.price ? p : min, prices[0])
@@ -49,12 +52,12 @@ const ProductCard = ({ product, prices = [] }) => {
                             <div className="flex items-center justify-between">
                                 <div>
                                     <p className="text-xs text-gray-500 dark:text-gray-400">From</p>
-                                    <div className="flex items-baseline gap-1">
-                                        <span className="text-2xl font-bold text-green-600 dark:text-green-400">
-                                            {lowestPrice.price}
+                                    <div className="flex items-baseline gap-1 mt-0.5">
+                                        <span className="text-xl font-bold text-green-600 dark:text-green-400">
+                                            {convert(lowestPrice.price, 'TRY')}
                                         </span>
-                                        <span className="text-sm text-gray-600 dark:text-gray-400">
-                                            {lowestPrice.currency || 'EGP'}
+                                        <span className="text-sm font-semibold text-green-600 dark:text-green-400">
+                                            {getCurrencySymbol()}
                                         </span>
                                     </div>
                                 </div>

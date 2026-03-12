@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
-import { FiSearch, FiCamera, FiTrendingUp } from 'react-icons/fi';
+import { FiSearch, FiCamera, FiTrendingUp, FiCpu } from 'react-icons/fi';
 import useAuthStore from '../stores/authStore';
 import { fetchProducts, fetchAllPrices, getPricesForProduct, fetchCategories } from '../utils/productUtils';
 import ProductCard from '../components/ProductCard';
+import AIChatBox from '../components/AIChatBox';
 
 const Home = () => {
     const user = useAuthStore((state) => state.user);
@@ -15,6 +16,7 @@ const Home = () => {
     const [featuredProducts, setFeaturedProducts] = useState([]);
     const [prices, setPrices] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [isAIChatOpen, setIsAIChatOpen] = useState(false);
 
     useEffect(() => {
         loadData();
@@ -66,8 +68,18 @@ const Home = () => {
                                 placeholder="Search for products..."
                                 className="w-full pl-6 pr-12 py-4 bg-gray-50 dark:bg-gray-700 border-0 rounded-xl text-gray-900 dark:text-white placeholder-gray-500 focus:ring-2 focus:ring-blue-500 transition shadow-inner"
                             />
-                            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
-                                <FiSearch size={20} />
+                            <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsAIChatOpen(true)}
+                                    className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors border border-blue-100 dark:border-blue-900/50"
+                                    title="AI Shopping Assistant"
+                                >
+                                    <FiCpu size={20} />
+                                </button>
+                                <div className="text-gray-400">
+                                    <FiSearch size={20} />
+                                </div>
                             </div>
                         </div>
 
@@ -144,6 +156,8 @@ const Home = () => {
                         </div>
                     )}
                 </div>
+
+                <AIChatBox isOpen={isAIChatOpen} onClose={() => setIsAIChatOpen(false)} />
             </main>
         </div>
     );

@@ -1,14 +1,27 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { FiUser, FiLogOut, FiMoon, FiSun, FiMenu, FiX } from 'react-icons/fi';
+import { FiUser, FiLogOut, FiMoon, FiSun, FiMenu, FiX, FiGlobe, FiDollarSign } from 'react-icons/fi';
+import { useTranslation } from 'react-i18next';
 import useAuthStore from '../stores/authStore';
+import useCurrencyStore from '../stores/currencyStore';
 
 const Navbar = () => {
+    const { t, i18n } = useTranslation();
     const user = useAuthStore((state) => state.user);
     const logout = useAuthStore((state) => state.logout);
+    const { currency, setCurrency, fetchRates } = useCurrencyStore();
     const navigate = useNavigate();
     const [darkMode, setDarkMode] = useState(false);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+    useEffect(() => {
+        fetchRates();
+    }, []);
+
+    const toggleLanguage = () => {
+        const newLang = i18n.language === 'en' ? 'tr' : 'en';
+        i18n.changeLanguage(newLang);
+    };
 
     useEffect(() => {
         // Check system preference or local storage
@@ -54,7 +67,33 @@ const Navbar = () => {
                     </div>
 
                     {/* Desktop Actions */}
-                    <div className="hidden md:flex items-center gap-4">
+                    <div className="hidden md:flex items-center gap-3">
+                        {/* Currency Selector */}
+                        <div className="flex items-center bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-100 dark:border-gray-700 px-1">
+                            {['TRY', 'USD', 'EUR', 'GBP'].map((curr) => (
+                                <button
+                                    key={curr}
+                                    onClick={() => setCurrency(curr)}
+                                    className={`px-2 py-1 text-xs font-bold rounded-md transition-all ${
+                                        currency === curr 
+                                            ? 'bg-blue-600 text-white shadow-sm' 
+                                            : 'text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-300'
+                                    }`}
+                                >
+                                    {curr === 'TRY' ? 'TL' : curr}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Language Toggle */}
+                        <button
+                            onClick={toggleLanguage}
+                            className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors border border-transparent hover:border-gray-200 dark:hover:border-gray-600"
+                            title={i18n.language === 'en' ? 'Türkçe\'ye Geç' : 'Switch to English'}
+                        >
+                            <span className="text-sm font-bold uppercase">{i18n.language.substring(0, 2)}</span>
+                        </button>
+
                         <button
                             onClick={toggleTheme}
                             className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
@@ -72,12 +111,12 @@ const Navbar = () => {
                                     <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-300">
                                         <FiUser size={16} />
                                     </div>
-                                    <span>{user.name}</span>
+                                    <span className="max-w-[100px] truncate">{user.name}</span>
                                 </Link>
                                 <button
                                     onClick={handleLogout}
                                     className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                                    title="Logout"
+                                    title={t('logout')}
                                 >
                                     <FiLogOut size={20} />
                                 </button>
@@ -87,7 +126,7 @@ const Navbar = () => {
                                 to="/login"
                                 className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
                             >
-                                Login
+                                {t('login')}
                             </Link>
                         )}
                     </div>
