@@ -102,9 +102,9 @@ const Favorites = () => {
                                             to={`/supermarket/${market.$id}`}
                                             className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm hover:shadow-md transition flex items-center gap-4 border border-gray-100 dark:border-gray-700"
                                         >
-                                            <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
-                                                {market.logoUrl ? (
-                                                    <img src={market.logoUrl} className="w-full h-full object-contain" alt={market.name} />
+                                            <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center overflow-hidden">
+                                                {market.icon || market.logoUrl ? (
+                                                    <img src={market.icon || market.logoUrl} className="w-full h-full object-contain" alt={market.name} />
                                                 ) : (
                                                     <FiShoppingBag className="text-gray-400 text-2xl" />
                                                 )}

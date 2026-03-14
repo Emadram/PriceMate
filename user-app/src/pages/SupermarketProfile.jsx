@@ -82,7 +82,7 @@ const SupermarketProfile = () => {
                     <img
                         src={supermarket.bannerUrl}
                         alt={supermarket.name}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain"
                     />
                 ) : (
                     <div className="w-full h-full bg-blue-600"></div>
@@ -111,7 +111,7 @@ const SupermarketProfile = () => {
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-6 border border-gray-100 dark:border-gray-700">
                     <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
                         {/* Logo */}
-                        <div className="w-32 h-32 bg-white dark:bg-gray-800 rounded-xl shadow-md p-2 flex items-center justify-center flex-shrink-0 border border-gray-100 dark:border-gray-700">
+                        <div className="w-32 h-32 bg-white dark:bg-gray-800 rounded-xl shadow-md p-2 flex items-center justify-center flex-shrink-0 border border-gray-100 dark:border-gray-700 overflow-hidden">
                             {supermarket.icon || supermarket.logoUrl ? (
                                 <img src={supermarket.icon || supermarket.logoUrl} alt={supermarket.name} className="w-full h-full object-contain" />
                             ) : (
@@ -207,7 +207,7 @@ const SupermarketProfile = () => {
                                         <img
                                             src={product.imageUrl}
                                             alt={product.name}
-                                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                            className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
                                         />
                                         <div className="absolute top-2 right-2 bg-white/90 dark:bg-gray-900/90 backdrop-blur px-2 py-1 rounded-lg text-xs font-medium text-gray-700 dark:text-gray-300 shadow-sm">
                                             {Array.isArray(product.categoryId) ? product.categoryId[0]?.categoryName : product.categoryId?.categoryName}

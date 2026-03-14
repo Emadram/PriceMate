@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { FiArrowLeft, FiMapPin, FiShoppingCart, FiShare2, FiHeart, FiPackage, FiShoppingBag, FiTrendingDown, FiBox } from 'react-icons/fi';
+import { useParams, useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom';
+import { FiArrowLeft, FiMapPin, FiShoppingCart, FiShare2, FiHeart, FiPackage, FiShoppingBag, FiTrendingDown, FiBox, FiHome, FiCamera, FiImage } from 'react-icons/fi';
 import { fetchProductByBarcode, fetchAllPrices, getPricesForProduct } from '../utils/productUtils';
 import useAuthStore from '../stores/authStore';
 import useFavoritesStore from '../stores/favoritesStore';
@@ -8,12 +8,16 @@ import useFavoritesStore from '../stores/favoritesStore';
 const PriceComparison = () => {
     const { barcode } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
+    const [searchParams] = useSearchParams();
     const [product, setProduct] = useState(null);
     const [prices, setPrices] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const user = useAuthStore((state) => state.user);
     const { isProductFavorite, toggleProductFavorite } = useFavoritesStore();
+
+    const fromScan = location.state?.fromScan || searchParams.get('fromScan') === '1';
 
     const handleFavoriteClick = () => {
         if (!user) {
@@ -23,7 +27,6 @@ const PriceComparison = () => {
         toggleProductFavorite(product.$id);
     };
 
-    const [searchParams] = useSearchParams();
     const supermarketIdParam = searchParams.get('supermarketId');
 
     useEffect(() => {
@@ -127,6 +130,22 @@ const PriceComparison = () => {
 
     const lowestPrice = getLowestPrice();
 
+    const handleBack = () => {
+        if (fromScan) {
+            navigate('/scan');
+        } else {
+            navigate(-1);
+        }
+    };
+
+    const handleScanAnother = () => {
+        navigate('/scan');
+    };
+
+    const handleGoHome = () => {
+        navigate('/');
+    };
+
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
             {/* Header */}
@@ -134,7 +153,7 @@ const PriceComparison = () => {
                 <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
                     <div>
                         <button
-                            onClick={() => navigate(-1)}
+                            onClick={handleBack}
                             className="bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 p-2.5 rounded-full text-gray-700 dark:text-gray-200 shadow-sm transition-all mb-1"
                             title="Go Back"
                         >
@@ -168,7 +187,7 @@ const PriceComparison = () => {
                                     <img
                                         src={product.imageUrl}
                                         alt={product.name}
-                                        className="w-full h-full object-cover"
+                                        className="w-full h-full object-contain"
                                     />
                                 ) : (
                                     <FiPackage className="text-gray-400 text-4xl" />
@@ -251,8 +270,16 @@ const PriceComparison = () => {
                                                     to={`/supermarket/${supermarket?.$id}`}
                                                     className="flex items-center gap-4 flex-1 hover:opacity-80 transition group"
                                                 >
-                                                    <div className={`w-16 h-16 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition ${isSelectedContext ? 'bg-blue-200 dark:bg-blue-800' : 'bg-blue-100 dark:bg-blue-900'}`}>
-                                                        <FiShoppingBag className="text-blue-600 dark:text-blue-400 text-2xl" />
+                                                    <div className={`w-16 h-16 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden group-hover:scale-110 transition ${isSelectedContext ? 'bg-blue-200 dark:bg-blue-800' : 'bg-blue-100 dark:bg-blue-900'}`}>
+                                                        {supermarket?.icon || supermarket?.logoUrl ? (
+                                                            <img
+                                                                src={supermarket.icon || supermarket.logoUrl}
+                                                                alt={supermarket?.name || 'Supermarket'}
+                                                                className="w-full h-full object-contain"
+                                                            />
+                                                        ) : (
+                                                            <FiShoppingBag className="text-blue-600 dark:text-blue-400 text-2xl" />
+                                                        )}
                                                     </div>
                                                     <div className="flex-1">
                                                         <h4 className="font-bold text-gray-800 dark:text-white text-lg group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">
@@ -301,6 +328,26 @@ const PriceComparison = () => {
                     )}
                 </div>
             </main>
+
+            {/* Quick actions only when coming from scanner */}
+            {fromScan && (
+                <div className="sticky bottom-0 left-0 right-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur border-t border-gray-200 dark:border-gray-700">
+                    <div className="max-w-4xl mx-auto px-4 py-3 flex gap-3">
+                        <button
+                            onClick={handleGoHome}
+                            className="flex-1 inline-flex items-center justify-center gap-2 py-3 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+                        >
+                            <FiHome /> Home
+                        </button>
+                        <button
+                            onClick={handleScanAnother}
+                            className="flex-1 inline-flex items-center justify-center gap-2 py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-500/30 transition"
+                        >
+                            <FiCamera /> Scan Another
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

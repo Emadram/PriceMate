@@ -21,7 +21,7 @@ const ScanPage = () => {
                 {!scannedCode ? (
                     <div className="p-6">
                         <div className="rounded-xl overflow-hidden shadow-inner bg-gray-100 dark:bg-gray-900">
-                            <Scanner onDetected={handleDetected} />
+                            <Scanner onDetected={handleDetected} paused={!!scannedCode} />
                         </div>
                         <p className="text-center text-gray-500 dark:text-gray-400 mt-6 text-sm flex items-center justify-center gap-2">
                             Point your camera at a barcode
@@ -45,7 +45,7 @@ const ScanPage = () => {
                                 Scan Again
                             </button>
                             <button
-                                onClick={() => navigate(`/product/${scannedCode}`)}
+                                onClick={() => navigate(`/product/${scannedCode}`, { state: { fromScan: true } })}
                                 className="bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 shadow-lg shadow-blue-500/30 transition"
                             >
                                 View Product

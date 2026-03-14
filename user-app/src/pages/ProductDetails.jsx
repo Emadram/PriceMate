@@ -1,16 +1,19 @@
 import { useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import useProductStore from '../stores/productStore';
 
 const ProductDetails = () => {
     const { barcode } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const { product, prices, loading, error, fetchProductByBarcode } = useProductStore();
 
     useEffect(() => {
-        // Redirect to the new price comparison page
-        navigate(`/price-comparison/${barcode}`);
-    }, [barcode, navigate]);
+        // Only redirect to price comparison when we arrived from the scanner flow
+        if (location.state?.fromScan) {
+            navigate(`/price-comparison/${barcode}?fromScan=1`, { replace: true, state: { fromScan: true } });
+        }
+    }, [barcode, navigate, location.state]);
 
     // ... (keep existing loading/error/null checks)
 

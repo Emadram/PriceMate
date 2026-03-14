@@ -10,11 +10,19 @@ const useFavoritesStore = create(
             favoriteProducts: [],
             favoriteSupermarkets: [],
             loading: false,
+            _warnedMissingFavorites: false,
 
             // Fetch favorites from backend
             syncFavorites: async () => {
                 const user = useAuthStore.getState().user;
                 if (!user) return;
+                if (!COLLECTIONS.FAVORITES) {
+                    if (!get()._warnedMissingFavorites) {
+                        console.warn('Favorites collection ID is not configured');
+                        set({ _warnedMissingFavorites: true });
+                    }
+                    return;
+                }
 
                 set({ loading: true });
                 try {
@@ -38,7 +46,11 @@ const useFavoritesStore = create(
                         loading: false
                     });
                 } catch (error) {
-                    console.error('Error fetching favorites:', error);
+                    if (error?.code === 404) {
+                        console.warn('Favorites collection missing in Appwrite (404). Skipping sync.');
+                    } else {
+                        console.error('Error fetching favorites:', error);
+                    }
                     set({ loading: false });
                 }
             },
