@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { FiArrowLeft, FiSearch } from 'react-icons/fi';
+import { useTranslation } from 'react-i18next';
 import { fetchProducts, fetchAllPrices, getPricesForProduct, searchProducts, fetchCategories } from '../utils/productUtils';
 import ProductCard from '../components/ProductCard';
 
 const SearchResults = () => {
+    const { t } = useTranslation();
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const query = searchParams.get('q') || '';
@@ -64,16 +66,16 @@ const SearchResults = () => {
             <header className="bg-white dark:bg-gray-800 shadow sticky top-0 z-10">
                 <div className="max-w-5xl mx-auto px-4 py-4">
                     <div className="flex flex-col md:flex-row md:items-center gap-4">
-                        <div className="flex items-center gap-4 flex-shrink-0">
+                        <div className="flex items-center gap-3 flex-shrink-0">
                             <button
                                 onClick={() => navigate('/')}
-                                className="bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 p-2.5 rounded-full text-gray-700 dark:text-gray-200 shadow-sm transition-all"
+                                className="bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 p-2 rounded-full text-gray-700 dark:text-gray-200 shadow-sm transition-all"
                                 title="Back to Home"
                             >
-                                <FiArrowLeft size={20} />
+                                <FiArrowLeft size={16} />
                             </button>
-                            <h1 className="text-xl font-bold text-gray-800 dark:text-white whitespace-nowrap hidden sm:block">
-                                Results
+                            <h1 className="text-[10px] sm:text-[11px] font-black uppercase tracking-[0.2em] text-gray-800 dark:text-white whitespace-nowrap hidden sm:block">
+                                {t('results')}
                             </h1>
                         </div>
 
@@ -83,20 +85,20 @@ const SearchResults = () => {
                                     type="text"
                                     value={searchInput}
                                     onChange={(e) => setSearchInput(e.target.value)}
-                                    placeholder="Search again..."
-                                    className="w-full pl-4 pr-10 py-2.5 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white placeholder-gray-500 focus:ring-2 focus:ring-blue-500 transition"
+                                    placeholder={t('search_placeholder')}
+                                    className="w-full pl-4 pr-10 py-1.5 bg-gray-50 dark:bg-gray-900 border-0 rounded-xl text-gray-900 dark:text-white placeholder-gray-500 focus:ring-2 focus:ring-blue-500 transition text-[11px] font-bold"
                                 />
                                 <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                                    <FiSearch size={18} />
+                                    <FiSearch size={14} />
                                 </div>
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 h-[34px]">
                                 <select
                                     value={selectedCategory}
                                     onChange={(e) => setSelectedCategory(e.target.value)}
-                                    className="px-3 py-2.5 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 transition text-sm min-w-[120px]"
+                                    className="px-3 py-1 bg-gray-50 dark:bg-gray-900 border-0 rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 transition text-[10px] font-black uppercase tracking-widest min-w-[100px] appearance-none"
                                 >
-                                    <option value="">All Categories</option>
+                                    <option value="">{t('categories')}</option>
                                     {categories.map((cat) => (
                                         <option key={cat.$id} value={cat.$id}>
                                             {cat.categoryName}
@@ -105,9 +107,9 @@ const SearchResults = () => {
                                 </select>
                                 <button
                                     type="submit"
-                                    className="bg-blue-600 text-white px-6 py-2.5 rounded-xl hover:bg-blue-700 transition shadow-md font-semibold text-sm"
+                                    className="bg-blue-600 text-white px-5 py-1 rounded-xl hover:bg-black transition shadow-sm font-black text-[10px] uppercase tracking-widest"
                                 >
-                                    Search
+                                    {t('search')}
                                 </button>
                             </div>
                         </form>
@@ -133,17 +135,17 @@ const SearchResults = () => {
                 ) : products.length === 0 ? (
                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-12 text-center">
                         <FiSearch className="text-gray-400 text-6xl mx-auto mb-4" />
-                        <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-2">
-                            No products found
+                        <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-2 uppercase tracking-tight">
+                            {t('no_results')}
                         </h2>
-                        <p className="text-gray-600 dark:text-gray-400 mb-6">
-                            Try searching with a different keyword
+                        <p className="text-gray-600 dark:text-gray-400 mb-6 font-medium">
+                            {t('try_different_search')}
                         </p>
                         <button
                             onClick={() => navigate('/')}
-                            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+                            className="bg-blue-600 text-white px-8 py-2 rounded-full font-black uppercase tracking-widest text-[10px] hover:bg-black transition-colors"
                         >
-                            Go Back Home
+                            {t('go_back_home')}
                         </button>
                     </div>
                 ) : (
@@ -151,7 +153,7 @@ const SearchResults = () => {
                         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                             Found {products.length} {products.length === 1 ? 'product' : 'products'}
                         </p>
-                        <div className="space-y-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {products.map((product) => (
                                 <ProductCard
                                     key={product.$id}

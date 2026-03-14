@@ -12,8 +12,8 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [] }) => {
         // 1. Remove redundancy: remove lines that the cards will handle
         let text = content;
         
-        // Remove individual price points followed by TL/₺
-        text = text.replace(/^(?:\s*)(?:[-•*]\s?.*:\s*\d+(?:\.\d+)?\s*(?:TL|₺)\s*\n?)+/gm, '');
+        // Remove individual price points followed by TRY/TL/₺
+        text = text.replace(/^(?:\s*)(?:[-•*]\s?.*:\s*\d+(?:\.\d+)?\s*(?:TRY|TL|₺)\s*\n?)+/gm, '');
         
         // Remove lead-in sentences for removed lists
         text = text.replace(/(?:The prices are:|Prices are:|Available at:)\s*\n?/gi, '');
@@ -166,7 +166,7 @@ const AIChatBox = ({ isOpen, onClose }) => {
                     const category = Array.isArray(p.categoryId) ? p.categoryId[0]?.categoryName : (p.categoryId?.categoryName || "General");
                     const priceDetails = p.prices.map(pr => {
                         const smName = Array.isArray(pr.supermarkets) ? pr.supermarkets[0]?.name : (pr.supermarketName || pr.supermarkets?.name || "Store");
-                        return `${smName}: ${pr.price} TL`;
+                        return `${smName}: ${pr.price} TRY`;
                     }).join(', ');
                     
                     return `- [ID:${p.barcode}] ${p.name || p.productName}: [${category}] ${priceDetails || "No current price"}`;
@@ -222,7 +222,7 @@ const AIChatBox = ({ isOpen, onClose }) => {
                 4. FOR EVERY PRODUCT you mention, you MUST include its barcode ID in square brackets like this: [BARCODE:123456]. 
                    DO NOT use [ID:123456], ONLY use the word BARCODE in the brackets.
                 5. MINIMIZE TEXT. Do not describe features or give long intros. Just a short sentence and the barcode.
-                6. DO NOT repeat price lists (e.g., "- Store: X TL"). The UI will show the card automatically.
+                6. DO NOT repeat price lists (e.g., "- Store: X TRY"). The UI will show the card automatically.
                 7. Use the exact product names from the context.
             `;
 

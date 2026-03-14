@@ -31,7 +31,8 @@ const usePricesStore = create((set) => ({
         try {
             const payload = {
                 price: parseFloat(data.price),
-                userId: data.userId
+                userId: data.userId,
+                stockStatus: data.stockStatus || 'in_stock'
             };
 
             // Add optional fields
@@ -39,13 +40,13 @@ const usePricesStore = create((set) => ({
                 payload.currency = data.currency;
             }
 
-            // Add relationships
+            // Relationship references (ensure they are strings)
             if (data.products) {
-                payload.products = data.products;
+                payload.products = typeof data.products === 'object' ? data.products.$id : data.products;
             }
 
             if (data.supermarkets) {
-                payload.supermarkets = data.supermarkets;
+                payload.supermarkets = typeof data.supermarkets === 'object' ? data.supermarkets.$id : data.supermarkets;
             }
 
             console.log('Price payload:', payload);
@@ -56,6 +57,24 @@ const usePricesStore = create((set) => ({
                 ID.unique(),
                 payload
             );
+
+            // LOG TO PRICE HISTORY
+            try {
+                await databases.createDocument(
+                    APPWRITE_CONFIG.DATABASE_ID,
+                    'price_history',
+                    ID.unique(),
+                    {
+                        price: parseFloat(data.price),
+                        products: payload.products,
+                        supermarkets: payload.supermarkets,
+                        date: new Date().toISOString()
+                    }
+                );
+            } catch (historyErr) {
+                console.warn('Could not log history (collection might not exist):', historyErr);
+            }
+
             console.log('Price created:', result);
             await usePricesStore.getState().fetchPrices();
             set({ loading: false });
@@ -77,17 +96,18 @@ const usePricesStore = create((set) => ({
         try {
             const payload = {
                 price: parseFloat(data.price),
-                userId: data.userId
+                userId: data.userId,
+                stockStatus: data.stockStatus || 'in_stock'
             };
 
             if (data.currency) {
                 payload.currency = data.currency;
             }
             if (data.products) {
-                payload.products = data.products;
+                payload.products = typeof data.products === 'object' ? data.products.$id : data.products;
             }
             if (data.supermarkets) {
-                payload.supermarkets = data.supermarkets;
+                payload.supermarkets = typeof data.supermarkets === 'object' ? data.supermarkets.$id : data.supermarkets;
             }
 
             await databases.updateDocument(
@@ -96,6 +116,24 @@ const usePricesStore = create((set) => ({
                 id,
                 payload
             );
+
+            // LOG TO PRICE HISTORY
+            try {
+                await databases.createDocument(
+                    APPWRITE_CONFIG.DATABASE_ID,
+                    'price_history',
+                    ID.unique(),
+                    {
+                        price: parseFloat(data.price),
+                        products: payload.products,
+                        supermarkets: payload.supermarkets,
+                        date: new Date().toISOString()
+                    }
+                );
+            } catch (historyErr) {
+                console.warn('Could not log history:', historyErr);
+            }
+
             await usePricesStore.getState().fetchPrices();
             set({ loading: false });
             return true;

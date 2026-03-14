@@ -19,6 +19,7 @@ const Prices = () => {
         currency: 'EGP',
         products: '',
         supermarkets: '',
+        stockStatus: 'in_stock',
         userId: ''
     });
 
@@ -52,6 +53,7 @@ const Prices = () => {
                 currency: 'EGP',
                 products: '',
                 supermarkets: '',
+                stockStatus: 'in_stock',
                 userId: adminUser?.$id || ''
             });
         } else {
@@ -75,6 +77,7 @@ const Prices = () => {
             currency: price.currency || 'EGP',
             products: productId,
             supermarkets: supermarketId,
+            stockStatus: price.stockStatus || 'in_stock',
             userId: adminUser?.$id || price.userId || ''
         });
         setShowModal(true);
@@ -87,6 +90,7 @@ const Prices = () => {
             currency: 'EGP',
             products: '',
             supermarkets: '',
+            stockStatus: 'in_stock',
             userId: adminUser?.$id || ''
         });
     };
@@ -230,6 +234,7 @@ const Prices = () => {
                                     >
                                         Currency <SortIcon columnKey="currency" />
                                     </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Stock</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Actions</th>
                                 </tr>
                             </thead>
@@ -242,6 +247,15 @@ const Prices = () => {
                                             {price.price}
                                         </td>
                                         <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{price.currency || 'EGP'}</td>
+                                        <td className="px-6 py-4 text-sm">
+                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                                price.stockStatus === 'in_stock' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                                                price.stockStatus === 'low_stock' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                                                'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                            }`}>
+                                                {price.stockStatus ? price.stockStatus.replace('_', ' ') : 'in stock'}
+                                            </span>
+                                        </td>
                                         <td className="px-6 py-4 text-sm">
                                             <button
                                                 onClick={() => handleEdit(price)}
@@ -337,6 +351,20 @@ const Prices = () => {
                                         className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                                         placeholder="EGP"
                                     />
+                                </div>
+                                <div className="flex-1">
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Stock Status
+                                    </label>
+                                    <select
+                                        value={formData.stockStatus || 'in_stock'}
+                                        onChange={(e) => setFormData({ ...formData, stockStatus: e.target.value })}
+                                        className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                    >
+                                        <option value="in_stock">In Stock</option>
+                                        <option value="low_stock">Low Stock</option>
+                                        <option value="out_of_stock">Out of Stock</option>
+                                    </select>
                                 </div>
                             </div>
 

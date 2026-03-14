@@ -29,6 +29,8 @@ const useSupermarketsStore = create((set) => ({
                 ID.unique(),
                 {
                     name: data.name,
+                    brand: data.brand || null,
+                    branchName: data.branchName || null,
                     latitude: parseFloat(data.latitude),
                     longitude: parseFloat(data.longitude),
                     address: data.address || null,
@@ -56,6 +58,8 @@ const useSupermarketsStore = create((set) => ({
                 id,
                 {
                     name: data.name,
+                    brand: data.brand || null,
+                    branchName: data.branchName || null,
                     latitude: parseFloat(data.latitude),
                     longitude: parseFloat(data.longitude),
                     address: data.address || null,

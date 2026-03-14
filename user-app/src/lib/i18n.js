@@ -22,7 +22,24 @@ const resources = {
       "price": "Price",
       "supermarket": "Supermarket",
       "details": "Details",
-      // Add more English translations as needed
+      "best_price": "Best Price Today",
+      "starting_from": "Starting From",
+      "in_stock": "In Stock",
+      "low_stock": "Low Stock",
+      "out_of_stock": "Out of Stock",
+      "price_history": "Price History",
+      "available_stores": "Available Stores",
+      "get_directions": "Get Directions",
+      "trends": "Trends",
+      "personalized_deals": "Personalized deals for you",
+      "view_all": "View All",
+      "scan_barcode": "Scan Barcode",
+      "compare_live": "Compare live market prices",
+      "instant": "Instant",
+      "market_avg": "Market Avg",
+      "stock": "Stock",
+      "last_updated": "Last Updated",
+      "calculating": "Calculating..."
     }
   },
   tr: {
@@ -44,7 +61,24 @@ const resources = {
       "price": "Fiyat",
       "supermarket": "Süpermarket",
       "details": "Detaylar",
-      // Add more Turkish translations as needed
+      "best_price": "Günün En İyi Fiyatı",
+      "starting_from": "Başlangıç Fiyatı",
+      "in_stock": "Stokta Var",
+      "low_stock": "Azalıyor",
+      "out_of_stock": "Stokta Yok",
+      "price_history": "Fiyat Geçmişi",
+      "available_stores": "Mevcut Mağazalar",
+      "get_directions": "Yol Tarifi Al",
+      "trends": "Trendler",
+      "personalized_deals": "Sizin için seçilen fırsatlar",
+      "view_all": "Tümünü Gör",
+      "scan_barcode": "Barkod Tara",
+      "compare_live": "Canlı piyasa fiyatlarını karşılaştır",
+      "instant": "Anında",
+      "market_avg": "Piyasa Ortalaması",
+      "stock": "Stok",
+      "last_updated": "Son Güncelleme",
+      "calculating": "Hesaplanıyor..."
     }
   }
 };

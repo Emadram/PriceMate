@@ -88,10 +88,13 @@ const Navbar = () => {
                         {/* Language Toggle */}
                         <button
                             onClick={toggleLanguage}
-                            className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors border border-transparent hover:border-gray-200 dark:hover:border-gray-600"
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all border border-transparent hover:border-gray-200 dark:hover:border-gray-600 shadow-sm active:scale-95"
                             title={i18n.language === 'en' ? 'Türkçe\'ye Geç' : 'Switch to English'}
                         >
-                            <span className="text-sm font-bold uppercase">{i18n.language.substring(0, 2)}</span>
+                            <FiGlobe className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                            <span className="text-[10px] font-black uppercase tracking-widest leading-none">
+                                {i18n.language === 'en' ? 'EN' : 'TR'}
+                            </span>
                         </button>
 
                         <button

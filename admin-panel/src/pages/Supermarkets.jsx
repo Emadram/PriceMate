@@ -15,6 +15,8 @@ const Supermarkets = () => {
 
     const [formData, setFormData] = useState({
         name: '',
+        brand: '',
+        branchName: '',
         latitude: 0,
         longitude: 0,
         address: '',
@@ -70,13 +72,15 @@ const Supermarkets = () => {
     };
 
     const resetForm = () => {
-        setFormData({ name: '', latitude: 0, longitude: 0, address: '', phoneNumber: '', email: '', icon: '' });
+        setFormData({ name: '', brand: '', branchName: '', latitude: 0, longitude: 0, address: '', phoneNumber: '', email: '', icon: '' });
     };
 
     const handleEdit = (supermarket) => {
         setEditing(supermarket);
         setFormData({
             name: supermarket.name,
+            brand: supermarket.brand || '',
+            branchName: supermarket.branchName || '',
             latitude: supermarket.latitude,
             longitude: supermarket.longitude,
             address: supermarket.address || '',
@@ -180,7 +184,9 @@ const Supermarkets = () => {
                                                     )}
                                                 </div>
                                                 <div className="ml-4">
-                                                    <div className="text-sm font-medium text-gray-900 dark:text-white">{item.name}</div>
+                                                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                                        {item.brand ? `${item.brand} (${item.branchName || item.name})` : item.name}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </td>
@@ -256,7 +262,7 @@ const Supermarkets = () => {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name *</label>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Display Name *</label>
                                 <input
                                     type="text"
                                     value={formData.name}
@@ -264,6 +270,29 @@ const Supermarkets = () => {
                                     className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                                     required
                                 />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Brand</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. Carrefour"
+                                        value={formData.brand}
+                                        onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                                        className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Branch Name</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. Downtown"
+                                        value={formData.branchName}
+                                        onChange={(e) => setFormData({ ...formData, branchName: e.target.value })}
+                                        className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                    />
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">

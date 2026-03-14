@@ -118,6 +118,50 @@ export const fetchProducts = async (limit = 50) => {
 };
 
 /**
+ * Calculate distance between two coordinates using Haversine formula
+ * @returns {number} Distance in kilometers
+ */
+export const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+    const R = 6371; // Radius of the earth in km
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return (R * c).toFixed(1);
+};
+
+/**
+ * Fetch price history for a specific product
+ */
+export const fetchPriceHistory = async (productId, branchId = null) => {
+    try {
+        const queries = [
+            Query.equal('products', productId),
+            Query.orderDesc('$createdAt'),
+            Query.limit(50)
+        ];
+
+        if (branchId) {
+            queries.push(Query.equal('supermarkets', branchId));
+        }
+
+        const response = await databases.listDocuments(
+            DATABASE_ID,
+            COLLECTIONS.PRICE_HISTORY || 'price_history',
+            queries
+        );
+        return response.documents;
+    } catch (error) {
+        console.error('Error fetching price history:', error);
+        return [];
+    }
+};
+
+/**
  * Search products by name or barcode
  */
 export const searchProducts = async (query, categoryId = null) => {

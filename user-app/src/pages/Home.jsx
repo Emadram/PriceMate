@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import Navbar from '../components/Navbar';
-import { FiSearch, FiCamera, FiTrendingUp, FiCpu } from 'react-icons/fi';
+import { FiSearch, FiCamera, FiTrendingUp, FiCpu, FiChevronRight, FiPackage } from 'react-icons/fi';
 import useAuthStore from '../stores/authStore';
 import { fetchProducts, fetchAllPrices, getPricesForProduct, fetchCategories } from '../utils/productUtils';
 import ProductCard from '../components/ProductCard';
 import AIChatBox from '../components/AIChatBox';
 
 const Home = () => {
+    const { t } = useTranslation();
     const user = useAuthStore((state) => state.user);
     const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
@@ -27,7 +29,7 @@ const Home = () => {
         try {
             // Fetch products, prices, and categories
             const [products, allPrices, allCategories] = await Promise.all([
-                fetchProducts(6), // Get 6 featured products
+                fetchProducts(12), // Get 12 featured products
                 fetchAllPrices(),
                 fetchCategories()
             ]);
@@ -56,96 +58,115 @@ const Home = () => {
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
             <Navbar />
 
-            <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+            <main className="max-w-4xl mx-auto px-4 py-8 space-y-10">
                 {/* Search Bar */}
-                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
-                    <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-4">
-                        <div className="flex-1 relative">
-                            <input
-                                type="text"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder="Search for products..."
-                                className="w-full pl-6 pr-12 py-4 bg-gray-50 dark:bg-gray-700 border-0 rounded-xl text-gray-900 dark:text-white placeholder-gray-500 focus:ring-2 focus:ring-blue-500 transition shadow-inner"
-                            />
-                            <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsAIChatOpen(true)}
-                                    className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors border border-blue-100 dark:border-blue-900/50"
-                                    title="AI Shopping Assistant"
-                                >
-                                    <FiCpu size={20} />
-                                </button>
-                                <div className="text-gray-400">
-                                    <FiSearch size={20} />
+                <div className="relative group">
+                    <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-[2rem] blur opacity-25 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
+                    <div className="relative bg-white dark:bg-gray-800 rounded-[2rem] shadow-2xl p-6 border border-gray-100 dark:border-gray-700">
+                        <form onSubmit={handleSearch} className="flex flex-col md:flex-row gap-4">
+                            <div className="flex-1 relative">
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    placeholder={t('search_placeholder')}
+                                    className="w-full pl-14 pr-12 py-5 bg-gray-50 dark:bg-gray-900 border-0 rounded-2xl text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 transition shadow-inner font-bold"
+                                />
+                                <div className="absolute left-5 top-1/2 -translate-y-1/2 text-blue-500">
+                                    <FiSearch size={22} className="stroke-[2.5]" />
+                                </div>
+                                <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsAIChatOpen(true)}
+                                        className="p-2.5 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-xl transition-all border border-indigo-100 dark:border-indigo-900/50 shadow-sm hover:scale-105 active:scale-95"
+                                        title="AI Shopping Assistant"
+                                    >
+                                        <FiCpu size={20} className="stroke-[2]" />
+                                    </button>
                                 </div>
                             </div>
-                        </div>
 
-                        <div className="flex gap-2">
-                            <select
-                                value={selectedCategory}
-                                onChange={(e) => setSelectedCategory(e.target.value)}
-                                className="px-4 py-4 bg-gray-50 dark:bg-gray-700 border-0 rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 transition shadow-inner min-w-[140px] cursor-pointer appearance-none"
-                            >
-                                <option value="">All Categories</option>
-                                {categories.map((cat) => (
-                                    <option key={cat.$id} value={cat.$id}>
-                                        {cat.categoryName}
-                                    </option>
-                                ))}
-                            </select>
+                            <div className="flex gap-3 h-[60px] md:h-auto">
+                                <select
+                                    value={selectedCategory}
+                                    onChange={(e) => setSelectedCategory(e.target.value)}
+                                    className="px-6 py-4 bg-gray-50 dark:bg-gray-900 border-0 rounded-2xl text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 transition shadow-inner font-black uppercase tracking-widest text-[10px] cursor-pointer appearance-none min-w-[160px] text-center"
+                                >
+                                    <option value="">Categories</option>
+                                    {categories.map((cat) => (
+                                        <option key={cat.$id} value={cat.$id}>
+                                            {cat.categoryName}
+                                        </option>
+                                    ))}
+                                </select>
 
-                            <button
-                                type="submit"
-                                className="bg-blue-600 text-white px-8 py-4 rounded-xl hover:bg-blue-700 transition shadow-md font-bold flex-shrink-0"
-                            >
-                                Search
-                            </button>
-                        </div>
-                    </form>
+                                <button
+                                    type="submit"
+                                    className="bg-blue-600 hover:bg-black text-white px-10 py-4 rounded-2xl transition-all duration-300 shadow-[0_10px_20px_rgba(37,99,235,0.2)] font-black uppercase tracking-[0.2em] text-[10px] flex-shrink-0 active:scale-95"
+                                >
+                                    {t('search')}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
 
                 {/* Quick Actions */}
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-1 gap-6">
                     <button
                         onClick={() => navigate('/scan')}
-                        className="bg-blue-600 rounded-2xl shadow-lg p-6 text-white hover:bg-blue-700 transition transform hover:scale-105"
+                        className="group relative bg-black dark:bg-blue-600 rounded-[2.5rem] shadow-2xl p-1 overflow-hidden transition-transform active:scale-[0.98]"
                     >
-                        <div className="flex items-center gap-4">
-                            <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
-                                <FiCamera size={28} />
+                        <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                        <div className="relative flex items-center gap-6 p-8 rounded-[2.4rem]">
+                            <div className="w-16 h-16 bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl flex items-center justify-center shadow-2xl group-hover:rotate-6 transition-transform duration-500">
+                                <FiCamera size={32} className="text-white" />
                             </div>
                             <div className="text-left flex-1">
-                                <h3 className="text-xl font-bold">Scan Barcode</h3>
-                                <p className="text-white/80 text-sm">Compare prices instantly</p>
+                                <div className="flex items-center gap-2">
+                                    <span className="bg-white/20 text-white text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">{t('instant')}</span>
+                                </div>
+                                <h3 className="text-2xl font-black text-white uppercase tracking-tight">{t('scan_barcode')}</h3>
+                                <p className="text-white/60 text-sm font-bold mt-1 uppercase tracking-widest">{t('compare_live_prices')}</p>
+                            </div>
+                            <div className="hidden sm:block opacity-0 group-hover:opacity-100 transition-opacity -translate-x-4 group-hover:translate-x-0 group-hover:duration-500">
+                                <FiChevronRight size={32} className="text-white" />
                             </div>
                         </div>
                     </button>
                 </div>
 
                 {/* Featured Products */}
-                <div className="mt-8">
-                    <div className="flex items-center gap-2 mb-4">
-                        <FiTrendingUp className="text-blue-600 dark:text-blue-400 text-xl" />
-                        <h2 className="text-xl font-bold text-gray-800 dark:text-white">
-                            Featured Products
-                        </h2>
+                <div className="mt-4">
+                    <div className="flex items-center justify-between mb-8 px-2">
+                        <div className="flex flex-col">
+                            <h2 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tighter flex items-center gap-3">
+                                <div className="p-2 bg-blue-600 rounded-xl shadow-lg shadow-blue-500/20">
+                                    <FiTrendingUp className="text-white" />
+                                </div>
+                                {t('trends')}
+                            </h2>
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mt-2">{t('personalized_deals')}</p>
+                        </div>
+                        <button className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:underline px-4 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-full">
+                            {t('view_all')}
+                        </button>
                     </div>
 
                     {loading ? (
-                        <div className="text-center py-12">
-                            <div className="text-gray-600 dark:text-gray-400">Loading products...</div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {[1, 2, 4].map(i => (
+                                <div key={i} className="h-40 bg-gray-100 dark:bg-gray-800 rounded-[2rem] animate-pulse"></div>
+                            ))}
                         </div>
                     ) : featuredProducts.length === 0 ? (
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-8 text-center">
-                            <p className="text-gray-600 dark:text-gray-400">
-                                No products available yet
-                            </p>
+                        <div className="bg-white dark:bg-gray-800 rounded-[2rem] shadow-xl p-16 text-center border-2 border-dashed border-gray-100 dark:border-gray-700">
+                            <FiPackage size={48} className="mx-auto text-gray-300 mb-4" />
+                            <p className="text-gray-400 font-black uppercase tracking-widest">{t('no_products')}</p>
                         </div>
                     ) : (
-                        <div className="space-y-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {featuredProducts.map((product) => (
                                 <ProductCard
                                     key={product.$id}
