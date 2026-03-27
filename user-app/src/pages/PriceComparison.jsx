@@ -309,17 +309,6 @@ const PriceComparison = () => {
                     </div>
                     <PriceTimeline productId={product?.$id} />
                 </div>
-                                </div>
-                                <div className="text-center sm:text-right border-t sm:border-t-0 sm:border-l border-green-500/10 pt-2 sm:pt-0 sm:pl-4">
-                                    <p className="text-[8px] text-green-700 dark:text-green-400 font-black uppercase tracking-widest">{t('market_avg')}</p>
-                                    <p className="text-sm font-bold text-gray-500 line-through decoration-red-500/30">
-                                        {convert(lowestPrice.price * 1.15, 'TRY')} {getCurrencySymbol()}
-                                    </p>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
 
                 {/* Navigation Tabs */}
                 <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 p-1.5 rounded-2xl border border-gray-200 dark:border-gray-700">
