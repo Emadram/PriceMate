@@ -234,90 +234,81 @@ const PriceComparison = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20 sm:pb-0">
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-32 md:pb-12">
             <Navbar />
             
-            {/* Header */}
-            <header className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md sticky top-0 z-30 border-b border-gray-100 dark:border-gray-700">
-                <div className="max-w-4xl mx-auto px-4 py-2 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <button
-                            onClick={handleBack}
-                            className="bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 p-2 rounded-full text-gray-700 dark:text-gray-200 shadow-sm transition-all"
-                            title={t('home')}
-                        >
-                            <FiArrowLeft size={16} />
-                        </button>
-                        <h1 className="text-sm font-black uppercase tracking-widest text-gray-800 dark:text-white">{t('compare_prices')}</h1>
-                    </div>
-                    {user && (
-                        <button
-                            onClick={handleFavoriteClick}
-                            className={`p-2 rounded-full transition-all ${isProductFavorite(product?.$id)
-                                ? 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400'
-                                : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
-                                }`}
-                            title={isProductFavorite(product?.$id) ? t('favorites') : t('favorites')}
-                        >
-                            <FiHeart className={isProductFavorite(product?.$id) ? 'fill-current' : ''} size={18} />
-                        </button>
-                    )}
-                </div>
-            </header>
-
-            <main className="max-w-4xl mx-auto px-4 py-4 space-y-4">
-                {/* Product Info Card */}
-                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden border border-gray-100 dark:border-gray-700">
-                    <div className="p-4">
-                        <div className="flex flex-col sm:flex-row gap-4 items-center sm:items-start text-center sm:text-left">
+            <main className="max-w-4xl mx-auto px-4 py-4 md:py-8 space-y-4 md:space-y-8">
+                {/* Product Info Card - Modern & Mobile Friendly */}
+                <div className="bg-white dark:bg-gray-800 rounded-2xl md:rounded-[2.5rem] shadow-xl overflow-hidden border border-gray-100 dark:border-gray-700">
+                    <div className="p-4 md:p-10">
+                        <div className="flex flex-col md:flex-row gap-8 items-center md:items-start text-center md:text-left">
                             {/* Product Image */}
-                            <div className="w-32 h-32 bg-gray-50 dark:bg-gray-900 rounded-2xl flex items-center justify-center flex-shrink-0 overflow-hidden border border-gray-100 dark:border-gray-700/50">
+                            <div className="w-40 h-40 md:w-64 md:h-64 bg-gray-50 dark:bg-gray-900 rounded-3xl md:rounded-[3rem] flex items-center justify-center flex-shrink-0 overflow-hidden shadow-inner border border-gray-100 dark:border-gray-800/50 relative group">
                                 {product.imageUrl ? (
                                     <img
                                         src={product.imageUrl}
                                         alt={product.name}
-                                        className="w-24 h-24 object-contain"
+                                        className="w-full h-full object-contain p-6 transition-transform group-hover:scale-110 duration-500"
                                     />
                                 ) : (
-                                    <FiPackage className="text-gray-300 text-4xl" />
+                                    <FiPackage className="text-gray-300 text-6xl" />
                                 )}
                             </div>
 
                             {/* Product Details */}
-                            <div className="flex-1">
-                                <h2 className="text-base sm:text-lg font-black text-gray-900 dark:text-white mb-2 uppercase tracking-tight leading-tight">
-                                    {product.name}
-                                </h2>
-                                <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
-                                    <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-600 px-2 py-0.5 rounded-lg text-[9px] items-center gap-1 inline-flex uppercase tracking-[0.2em] font-black">
-                                        <FiTag size={10} /> {getCategoryName()}
-                                    </span>
-                                    <span className="flex items-center gap-1 text-[9px] font-black text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded-lg uppercase tracking-widest">
-                                        <FiBox size={10} /> {t('stock')}: {product.stockQuantity || 0}
-                                    </span>
+                            <div className="flex-1 space-y-5">
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-center md:justify-start gap-2">
+                                        <span className="bg-blue-600/10 text-blue-600 dark:text-blue-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-blue-600/20">
+                                            {getCategoryName()}
+                                        </span>
+                                        {product.stockQuantity > 0 && (
+                                            <span className="bg-green-600/10 text-green-600 dark:text-green-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-green-600/20">
+                                                In Stock
+                                            </span>
+                                        )}
+                                    </div>
+                                    <h2 className="text-2xl md:text-5xl font-black text-gray-900 dark:text-white tracking-tighter leading-tight">
+                                        {product.name}
+                                    </h2>
                                 </div>
+                                
                                 {product.description && (
-                                    <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mt-2 leading-relaxed italic max-w-sm">
+                                    <p className="text-sm md:text-base text-gray-500 dark:text-gray-400 leading-relaxed max-w-xl font-medium italic">
                                         "{product.description}"
                                     </p>
                                 )}
-                            </div>
-                        </div>
 
-                        {/* Best Price Banner */}
-                        {lowestPrice && (
-                            <div className="mt-4 bg-green-50 dark:bg-green-900/20 rounded-xl p-3 border border-green-500/20 dark:border-green-600/20 flex flex-col sm:flex-row items-center justify-between gap-3">
-                                <div className="flex items-center gap-3">
-                                    <div className="bg-green-600 p-2 rounded-xl shadow-lg shadow-green-500/20">
-                                        <FiTrendingDown className="text-white text-base" />
-                                    </div>
-                                    <div>
-                                        <p className="text-[8px] uppercase font-black tracking-[0.2em] text-green-700 dark:text-green-400">{t('best_price')}</p>
-                                        <div className="flex items-baseline gap-1">
-                                            <span className="text-2xl font-black text-green-600 dark:text-green-400">{convert(lowestPrice.price, 'TRY')}</span>
-                                            <span className="text-xs font-bold text-green-600/60 ">{getCurrencySymbol()}</span>
+                                {/* Best Price Floating Badge */}
+                                {lowestPrice && (
+                                    <div className="inline-flex items-center gap-5 bg-green-500/10 border border-green-500/20 rounded-2xl px-6 py-4 mt-2 shadow-sm transition-all hover:shadow-md">
+                                        <div className="p-2.5 bg-green-500 rounded-xl shadow-lg shadow-green-500/30">
+                                            <FiTrendingDown className="text-white" size={24} />
+                                        </div>
+                                        <div className="text-left">
+                                            <p className="text-[10px] font-black text-green-700 dark:text-green-400 uppercase tracking-widest leading-none mb-1.5">MARKET LOWEST</p>
+                                            <div className="flex items-baseline gap-1.5">
+                                                <span className="text-3xl font-black text-gray-900 dark:text-white leading-none">
+                                                    {convert(lowestPrice.price, 'TRY')}
+                                                </span>
+                                                <span className="text-sm font-bold text-gray-400 uppercase tracking-widest">{getCurrencySymbol()}</span>
+                                            </div>
                                         </div>
                                     </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Price History Section */}
+                <div className="space-y-4 md:space-y-6">
+                    <div className="px-2">
+                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.4em]">Trends</p>
+                         <h3 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white mt-1 tracking-tight">Market History</h3>
+                    </div>
+                    <PriceTimeline productId={product?.$id} />
+                </div>
                                 </div>
                                 <div className="text-center sm:text-right border-t sm:border-t-0 sm:border-l border-green-500/10 pt-2 sm:pt-0 sm:pl-4">
                                     <p className="text-[8px] text-green-700 dark:text-green-400 font-black uppercase tracking-widest">{t('market_avg')}</p>

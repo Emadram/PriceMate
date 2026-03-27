@@ -61,44 +61,53 @@ const SearchResults = () => {
 
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-            {/* Header */}
-            <header className="bg-white dark:bg-gray-800 shadow sticky top-0 z-10">
-                <div className="max-w-5xl mx-auto px-4 py-4">
-                    <div className="flex flex-col md:flex-row md:items-center gap-4">
-                        <div className="flex items-center gap-3 flex-shrink-0">
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24 md:pb-8">
+            <Navbar />
+            
+            {/* Extended Header for Search Context */}
+            <div className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 md:sticky md:top-16 z-30">
+                <div className="max-w-5xl mx-auto px-4 py-4 md:py-6">
+                    <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
+                        <div className="flex items-center justify-between md:justify-start gap-4 flex-shrink-0">
                             <button
                                 onClick={() => navigate('/')}
-                                className="bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 p-2 rounded-full text-gray-700 dark:text-gray-200 shadow-sm transition-all"
+                                className="bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 p-2.5 rounded-xl text-gray-700 dark:text-gray-200 shadow-sm transition-all active:scale-95"
                                 title="Back to Home"
                             >
-                                <FiArrowLeft size={16} />
+                                <FiArrowLeft size={18} />
                             </button>
-                            <h1 className="text-[10px] sm:text-[11px] font-black uppercase tracking-[0.2em] text-gray-800 dark:text-white whitespace-nowrap hidden sm:block">
+                            <h1 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white tracking-tighter">
                                 {t('results')}
                             </h1>
+                            <div className="md:hidden">
+                                {products.length > 0 && (
+                                    <span className="bg-blue-600/10 text-blue-600 dark:text-blue-400 text-[10px] font-black px-2 py-1 rounded-lg uppercase tracking-widest">
+                                        {products.length} Items
+                                    </span>
+                                )}
+                            </div>
                         </div>
 
-                        <form onSubmit={handleSearch} className="flex-1 flex flex-col sm:flex-row gap-2">
-                            <div className="flex-1 relative">
+                        <form onSubmit={handleSearch} className="flex-1 flex flex-col sm:flex-row gap-2 md:gap-3">
+                            <div className="flex-1 relative group">
                                 <input
                                     type="text"
                                     value={searchInput}
                                     onChange={(e) => setSearchInput(e.target.value)}
                                     placeholder={t('search_placeholder')}
-                                    className="w-full pl-4 pr-10 py-1.5 bg-gray-50 dark:bg-gray-900 border-0 rounded-xl text-gray-900 dark:text-white placeholder-gray-500 focus:ring-2 focus:ring-blue-500 transition text-[11px] font-bold"
+                                    className="w-full pl-5 pr-12 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 transition text-sm font-bold shadow-inner"
                                 />
-                                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                                    <FiSearch size={14} />
+                                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-blue-500 group-focus-within:scale-110 transition-transform">
+                                    <FiSearch size={18} className="stroke-[2.5]" />
                                 </div>
                             </div>
-                            <div className="flex gap-2 h-[34px]">
+                            <div className="flex gap-2 h-auto">
                                 <select
                                     value={selectedCategory}
                                     onChange={(e) => setSelectedCategory(e.target.value)}
-                                    className="px-3 py-1 bg-gray-50 dark:bg-gray-900 border-0 rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 transition text-[10px] font-black uppercase tracking-widest min-w-[100px] appearance-none"
+                                    className="flex-1 md:flex-none px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 transition text-[10px] font-black uppercase tracking-widest min-w-[120px] appearance-none text-center shadow-inner"
                                 >
-                                    <option value="">{t('categories')}</option>
+                                    <option value="">ALL CATEGORIES</option>
                                     {categories.map((cat) => (
                                         <option key={cat.$id} value={cat.$id}>
                                             {cat.categoryName}
@@ -107,7 +116,7 @@ const SearchResults = () => {
                                 </select>
                                 <button
                                     type="submit"
-                                    className="bg-blue-600 text-white px-5 py-1 rounded-xl hover:bg-black transition shadow-sm font-black text-[10px] uppercase tracking-widest"
+                                    className="bg-blue-600 text-white px-6 md:px-8 py-3 rounded-xl hover:bg-black transition shadow-lg shadow-blue-500/20 font-black text-[10px] uppercase tracking-widest active:scale-95"
                                 >
                                     {t('search')}
                                 </button>
@@ -115,16 +124,23 @@ const SearchResults = () => {
                         </form>
                     </div>
                 </div>
-            </header>
+            </div>
 
-            <main className="max-w-5xl mx-auto px-4 py-6">
-                <div className="mb-6 flex items-center justify-between">
-                    <div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                            Current Search: <span className="text-blue-600 dark:text-blue-400 font-medium">{query ? `"${query}"` : 'All Products'}</span>
-                            {categoryIdFromUrl && <span className="ml-2 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-xs">Filtered by Category</span>}
-                        </p>
+            <main className="max-w-5xl mx-auto px-4 py-6 md:py-8">
+                <div className="mb-6 md:mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">Browsing</p>
+                        <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white">
+                            {query ? `Results for "${query}"` : 'All Available Products'}
+                            {categoryIdFromUrl && <span className="ml-3 text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full uppercase tracking-widest font-black">Filtered</span>}
+                        </h2>
                     </div>
+                    {!loading && products.length > 0 && (
+                        <div className="hidden md:block text-right">
+                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Found</p>
+                             <p className="text-sm font-bold text-blue-600 dark:text-blue-400">{products.length} items matched</p>
+                        </div>
+                    )}
                 </div>
 
                 {loading ? (

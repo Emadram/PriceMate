@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { FiShoppingBag, FiPackage, FiMapPin, FiPhone, FiMail, FiMessageSquare, FiStar, FiArrowLeft, FiGlobe, FiClock, FiHome, FiAlertTriangle, FiTrendingDown } from 'react-icons/fi';
 import { fetchSupermarketById, fetchPricesBySupermarket } from '../utils/productUtils';
 import ReportModal from '../components/ReportModal';
+import StoreMap from '../components/StoreMap';
 import useFavoritesStore from '../stores/favoritesStore';
 import useAuthStore from '../stores/authStore';
 
@@ -154,7 +155,7 @@ const SupermarketProfile = () => {
                             </div>
 
                             {/* Stats & Info Grid */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-t dark:border-gray-700 pt-4">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-t dark:border-gray-700 pt-4 mb-4">
                                 <div>
                                     <p className="text-sm text-gray-500 dark:text-gray-400">Products</p>
                                     <p className="text-xl font-bold text-gray-900 dark:text-white">{products.length}</p>
@@ -179,6 +180,20 @@ const SupermarketProfile = () => {
                                     )}
                                 </div>
                             </div>
+
+                            {/* Interactive Map Section */}
+                            {(supermarket.latitude && supermarket.longitude) && (
+                                <div className="mt-6 border-t dark:border-gray-700 pt-6">
+                                    <h3 className="text-sm font-black uppercase tracking-widest text-gray-400 mb-3 flex items-center gap-2">
+                                        <FiMapPin className="text-blue-500" /> Location View
+                                    </h3>
+                                    <StoreMap 
+                                        lat={supermarket.latitude} 
+                                        lon={supermarket.longitude} 
+                                        height="250px" 
+                                    />
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
