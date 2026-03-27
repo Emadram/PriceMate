@@ -4,6 +4,7 @@ import { FiArrowLeft, FiMapPin, FiShoppingCart, FiShare2, FiHeart, FiPackage, Fi
 import { useTranslation } from 'react-i18next';
 import { fetchProductByBarcode, fetchAllPrices, getPricesForProduct, calculateDistance } from '../utils/productUtils';
 import Navbar from '../components/Navbar';
+import PriceHistoryChart from '../components/PriceHistoryChart';
 import useAuthStore from '../stores/authStore';
 import useFavoritesStore from '../stores/favoritesStore';
 import useCurrencyStore from '../stores/currencyStore';
@@ -307,7 +308,7 @@ const PriceComparison = () => {
                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.4em]">Trends</p>
                          <h3 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white mt-1 tracking-tight">Market History</h3>
                     </div>
-                    <PriceTimeline productId={product?.$id} />
+                    <PriceHistoryChart productId={product?.$id} productName={product?.name} />
                 </div>
 
                 {/* Navigation Tabs */}
