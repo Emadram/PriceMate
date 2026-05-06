@@ -13,7 +13,10 @@ export default defineConfig({
         name: 'PriceMate',
         short_name: 'PriceMate',
         description: 'Real-time price comparison and barcode scanning',
-        theme_color: '#ffffff',
+        theme_color: '#3b82f6',
+        background_color: '#ffffff',
+        display: 'standalone',
+        orientation: 'portrait',
         icons: [
           {
             src: 'pwa-192x192.png',
@@ -24,6 +27,12 @@ export default defineConfig({
             src: 'pwa-512x512.png',
             sizes: '512x512',
             type: 'image/png'
+          },
+          {
+            src: 'pwa-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any maskable'
           }
         ]
       }
