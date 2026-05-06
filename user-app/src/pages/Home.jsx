@@ -2,43 +2,76 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import Navbar from '../components/Navbar';
-import { FiSearch, FiCamera, FiTrendingUp, FiCpu, FiChevronRight, FiPackage } from 'react-icons/fi';
-import useAuthStore from '../stores/authStore';
-import { fetchProducts, fetchAllPrices, getPricesForProduct, fetchCategories } from '../utils/productUtils';
+import { FiSearch, FiCamera, FiChevronRight, FiPackage, FiZap, FiBell, FiInfo, FiAlertTriangle } from 'react-icons/fi';
+import useAnnouncementStore from '../stores/announcementStore';
+import useCategoriesStore from '../stores/categoriesStore';
+import { fetchProducts, fetchPricesForProducts, normalizeProduct } from '../utils/productUtils';
+import { db, Query } from '../lib/appwrite';
 import ProductCard from '../components/ProductCard';
-import AIChatBox from '../components/AIChatBox';
+import { ProductCardSkeleton, CategorySkeleton } from '../components/SkeletonLoaders';
 
 const Home = () => {
     const { t } = useTranslation();
-    const user = useAuthStore((state) => state.user);
     const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('');
-    const [categories, setCategories] = useState([]);
-    const [featuredProducts, setFeaturedProducts] = useState([]);
-    const [prices, setPrices] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [isAIChatOpen, setIsAIChatOpen] = useState(false);
+    
+    // Stores
+    const { categories, fetchCategories, getIconForCategory, loading: categoriesLoading } = useCategoriesStore();
+    const activeAnnouncements = useAnnouncementStore(state => state.announcements);
+    const fetchActiveAnnouncements = useAnnouncementStore(state => state.fetchActiveAnnouncements);
 
+    const [featuredProducts, setFeaturedProducts] = useState([]);
+    const [marketInsights, setMarketInsights] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     useEffect(() => {
         loadData();
     }, []);
 
     const loadData = async () => {
         setLoading(true);
+        setError(null);
         try {
-            // Fetch products, prices, and categories
-            const [products, allPrices, allCategories] = await Promise.all([
-                fetchProducts(12), // Get 12 featured products
-                fetchAllPrices(),
+            // Fetch products and categories (Announcements handled by store)
+            const [products, fetchedAnnouncements] = await Promise.all([
+                fetchProducts(12),
+                fetchActiveAnnouncements(5),
                 fetchCategories()
             ]);
 
-            setFeaturedProducts(products);
-            setPrices(allPrices);
-            setCategories(allCategories);
+            if (!products) throw new Error('Failed to fetch products');
+
+            // Map store announcements to marketInsights format
+            const announcementInsights = (fetchedAnnouncements || activeAnnouncements).map((ann) => {
+                let icon = <FiBell className="text-blue-500" />;
+                if (ann.category === 'offer') icon = <FiZap className="text-yellow-500" />;
+                if (ann.category === 'alert') icon = <FiAlertTriangle className="text-red-500" />;
+                if (ann.category === 'info') icon = <FiInfo className="text-sky-500" />;
+                
+                return {
+                    id: ann.$id,
+                    text: ann.text,
+                    icon: icon
+                };
+            });
+
+            // Batch fetch prices for these products
+            const productIds = products.map(p => p.$id);
+            const batchPrices = await fetchPricesForProducts(productIds);
+
+            // Announcements are backend-only (no dynamic price insights)
+            setMarketInsights(announcementInsights);
+
+            // Normalize
+            const normalizedProducts = products.map(p => 
+                normalizeProduct(p, batchPrices)
+            );
+
+            setFeaturedProducts(normalizedProducts);
         } catch (error) {
             console.error('Error loading data:', error);
+            setError('Failed to load products. Please check your connection.');
         }
         setLoading(false);
     };
@@ -55,130 +88,212 @@ const Home = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20 md:pb-0">
+        <div className="min-h-screen bg-[#F5F5F7] dark:bg-gray-950 pb-20 md:pb-12 text-gray-900 dark:text-gray-100 selection:bg-blue-500/30">
             <Navbar />
 
-            <main className="max-w-4xl mx-auto px-4 py-6 md:py-8 space-y-6 md:space-y-10">
-                {/* Search Bar */}
-                <div className="relative group">
-                    <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl md:rounded-[2rem] blur opacity-10 md:opacity-25 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
-                    <div className="relative bg-white dark:bg-gray-800 rounded-2xl md:rounded-[2rem] shadow-xl md:shadow-2xl p-4 md:p-6 border border-gray-100 dark:border-gray-700">
-                        <form onSubmit={handleSearch} className="flex flex-col gap-3 md:gap-4">
-                            <div className="flex-1 relative">
+            <main className="max-w-5xl mx-auto px-4 pt-4 md:pt-12 space-y-12 animate-in fade-in duration-700">
+                {/* Header Section */}
+                <header className="px-1 md:px-0 space-y-4">
+                    <div className="flex items-center justify-between">
+                        <div className="animate-in slide-in-from-left-4 duration-700">
+                            <h1 className="text-3xl md:text-4xl font-black tracking-tight">
+                                {t('find_best_prices', 'Find the best prices')}
+                            </h1>
+                            <p className="text-gray-500 dark:text-gray-400 font-medium md:text-lg mt-1">
+                                {t('ready_to_save', 'Ready to find the best deals today?')}
+                            </p>
+                        </div>
+                    </div>
+
+                        {/* Live Market Overview */}
+                    <div className="relative -mx-4 px-4 overflow-x-auto no-scrollbar flex items-center gap-4 animate-in slide-in-from-bottom-2 duration-1000 pb-2 snap-x">
+                        {marketInsights.map((insight) => (
+                            <div 
+                                key={insight.id} 
+                                className="flex-shrink-0 bg-white dark:bg-gray-900 transition-all border border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 shadow-soft flex items-center gap-3 min-w-[280px] cursor-default hover:border-blue-100 dark:hover:border-blue-900/30 snap-center"
+                            >
+                                <div className="text-lg">{insight.icon}</div>
+                                <span className="text-sm font-semibold tracking-tight">{insight.text}</span>
+                            </div>
+                        ))}
+                        {marketInsights.length === 0 && (
+                            <div className="flex-shrink-0 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 shadow-soft flex items-center gap-3 min-w-[280px]">
+                                <FiBell className="text-gray-400" />
+                                <span className="text-sm font-medium text-gray-400 tracking-tight">Checking for updates...</span>
+                            </div>
+                        )}
+                    </div>
+                </header>
+
+                {/* Search Bar - Stripe Inspired Softness */}
+                <section className="relative group animate-in slide-in-from-bottom-6 duration-700 delay-150">
+                    <div className="absolute -inset-2 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 rounded-[3rem] blur-2xl opacity-0 group-hover:opacity-100 transition duration-1000"></div>
+                    <div className="relative bg-white dark:bg-gray-900 rounded-[2.5rem] shadow-soft border border-gray-200/50 dark:border-gray-800/50 p-2 md:p-3 overflow-hidden">
+                        <form onSubmit={handleSearch} className="flex flex-col md:flex-row items-center gap-2">
+                            <div className="flex-1 relative w-full">
                                 <input
                                     type="text"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     placeholder={t('search_placeholder')}
-                                    className="w-full pl-12 md:pl-14 pr-12 py-4 md:py-5 bg-gray-50 dark:bg-gray-900 border-0 rounded-xl md:rounded-2xl text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 transition shadow-inner font-bold text-sm md:text-base"
+                                    className="w-full pl-14 pr-12 py-5 bg-transparent border-0 rounded-3xl text-gray-900 dark:text-white placeholder-gray-400 focus:ring-0 font-semibold text-lg"
                                 />
-                                <div className="absolute left-4 md:left-5 top-1/2 -translate-y-1/2 text-blue-500">
-                                    <FiSearch size={20} className="md:size-[22px] stroke-[2.5]" />
-                                </div>
-                                <div className="absolute right-3 md:right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsAIChatOpen(true)}
-                                        className="p-2 md:p-2.5 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg md:rounded-xl transition-all border border-indigo-100 dark:border-indigo-900/50 shadow-sm hover:scale-105 active:scale-95"
-                                        title="AI Shopping Assistant"
-                                    >
-                                        <FiCpu size={18} className="md:size-[20px] stroke-[2]" />
-                                    </button>
+                                <div className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400">
+                                    <FiSearch size={22} className="stroke-[2.5]" />
                                 </div>
                             </div>
 
-                            <div className="flex flex-row gap-2 h-auto">
-                                <select
-                                    value={selectedCategory}
-                                    onChange={(e) => setSelectedCategory(e.target.value)}
-                                    className="flex-1 md:flex-none px-3 md:px-6 py-3 md:py-4 bg-gray-50 dark:bg-gray-900 border-0 rounded-xl md:rounded-2xl text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 transition shadow-inner font-black uppercase tracking-widest text-[9px] md:text-[10px] cursor-pointer appearance-none md:min-w-[160px] text-center"
-                                >
-                                    <option value="">Categories</option>
-                                    {categories.map((cat) => (
-                                        <option key={cat.$id} value={cat.$id}>
-                                            {cat.categoryName}
-                                        </option>
-                                    ))}
-                                </select>
-
+                            <div className="flex items-center gap-2 w-full md:w-auto p-2 md:p-0">
                                 <button
                                     type="submit"
-                                    className="bg-blue-600 hover:bg-black text-white px-6 md:px-10 py-3 md:py-4 rounded-xl md:rounded-2xl transition-all duration-300 shadow-[0_10px_20px_rgba(37,99,235,0.2)] font-black uppercase tracking-[0.15em] md:tracking-[0.2em] text-[9px] md:text-[10px] flex-shrink-0 active:scale-95"
+                                    className="flex-1 md:flex-none bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-2xl transition-all duration-300 shadow-lg shadow-blue-500/25 font-bold tracking-tight text-base active:scale-95"
                                 >
                                     {t('search')}
                                 </button>
                             </div>
                         </form>
                     </div>
-                </div>
+                </section>
 
-                {/* Quick Actions - Mobile Optimized */}
-                <div className="grid grid-cols-1 gap-4 md:gap-6">
+                {/* Categories Grid - Apple Style */}
+                <section className="space-y-6 animate-in slide-in-from-bottom-8 duration-700 delay-300">
+                    <div className="flex items-center justify-between px-1">
+                        <div className="flex flex-col">
+                            <h2 className="text-xl font-bold tracking-tight">{t('popular_categories', 'Popular Categories')}</h2>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{t('browse_by_type', 'BROWSE BY TYPE')}</p>
+                        </div>
+                        <button 
+                            onClick={() => navigate('/search')}
+                            className="flex items-center gap-1 text-xs font-bold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 px-3 py-1.5 rounded-full transition-all"
+                        >
+                            {t('view_all', 'View All')}
+                            <FiChevronRight size={14} />
+                        </button>
+                    </div>
+                    
+                    <div className="flex overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4 pb-2 snap-x">
+                        {loading || categoriesLoading
+                            ? [...Array(6)].map((_, i) => <div key={i} className="flex-shrink-0 w-32 h-32 sm:w-auto bg-gray-200 dark:bg-gray-800 rounded-3xl animate-pulse" />)
+                            : categories.slice(0, 11).map((cat) => {
+                                const categoryLabel = cat.categoryName || cat.name || 'Category';
+
+                                return (
+                                    <button 
+                                        key={cat.$id}
+                                        onClick={() => navigate(`/search?category=${cat.$id}`)}
+                                        className="flex-shrink-0 w-32 h-32 sm:w-auto flex flex-col items-center justify-center p-6 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[2rem] shadow-soft hover:shadow-xl hover:translate-y-[-4px] transition-all group snap-center"
+                                    >
+                                        <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-gray-800 flex items-center justify-center text-2xl text-blue-600 group-hover:scale-110 transition-transform">
+                                            {getIconForCategory(cat)}
+                                        </div>
+                                        <span className="mt-4 text-[13px] font-bold tracking-tight text-gray-900 dark:text-gray-100 text-center line-clamp-1">
+                                            {categoryLabel}
+                                        </span>
+                                    </button>
+                                );
+                            })}
+
+                        {!loading && categories.length > 11 && (
+                            <button 
+                                onClick={() => navigate('/search')}
+                                className="flex-shrink-0 w-32 h-32 sm:w-auto flex flex-col items-center justify-center p-6 bg-blue-600 border border-blue-500 rounded-[2rem] shadow-soft hover:shadow-xl hover:translate-y-[-4px] transition-all group snap-center"
+                            >
+                                <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-2xl text-white group-hover:scale-110 transition-transform">
+                                    <FiChevronRight />
+                                </div>
+                                <span className="mt-4 text-[13px] font-bold tracking-tight text-white text-center">{t('view_all', 'View All')}</span>
+                            </button>
+                        )}
+                    </div>
+                </section>
+
+                {/* Scanner CTA */}
+                <section className="animate-in slide-in-from-bottom-10 duration-700 delay-450">
                     <button
                         onClick={() => navigate('/scan')}
-                        className="group relative bg-black dark:bg-blue-600 rounded-3xl md:rounded-[2.5rem] shadow-xl md:shadow-2xl p-0.5 md:p-1 overflow-hidden transition-transform active:scale-[0.98]"
+                        className="w-full group relative bg-black dark:bg-blue-600 rounded-[2.5rem] p-8 md:p-12 overflow-hidden shadow-2xl transition-all active:scale-[0.99]"
                     >
-                        <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                        <div className="relative flex items-center gap-4 md:gap-6 p-5 md:p-8 rounded-[1.8rem] md:rounded-[2.4rem]">
-                            <div className="w-12 h-12 md:w-16 md:h-16 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl md:rounded-3xl flex items-center justify-center shadow-2xl group-hover:rotate-6 transition-transform duration-500">
-                                <FiCamera size={24} className="md:size-[32px] text-white" />
+                        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-blue-400 opacity-20 blur-3xl rounded-full transition-transform group-hover:translate-x-12"></div>
+                        <div className="relative flex flex-col items-center gap-6 md:flex-row md:items-center md:gap-8 text-left">
+                            <div className="w-20 h-20 md:w-24 md:h-24 bg-white/10 backdrop-blur-xl border border-white/20 rounded-[2rem] flex items-center justify-center shadow-2xl group-hover:rotate-6 transition-transform">
+                                <FiCamera size={40} className="text-white" />
                             </div>
-                            <div className="text-left flex-1">
-                                <div className="flex items-center gap-2">
-                                    <span className="bg-white/20 text-white text-[8px] md:text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">{t('instant')}</span>
+                            <div className="flex-1 text-center md:text-left">
+                                <h3 className="text-2xl md:text-4xl font-black text-white leading-tight tracking-tight">
+                                    {t('scan_barcode')}
+                                </h3>
+                                <p className="text-blue-100/60 text-sm md:text-lg font-medium mt-2">
+                                    {t('compare_live_prices', 'Instant price comparison at your fingertips')}
+                                </p>
+                            </div>
+                            <div className="hidden md:block">
+                                <div className="w-14 h-14 rounded-full border border-white/20 flex items-center justify-center text-white group-hover:bg-white group-hover:text-black transition-all">
+                                    <FiChevronRight size={32} />
                                 </div>
-                                <h3 className="text-lg md:text-2xl font-black text-white uppercase tracking-tight leading-tight">{t('scan_barcode')}</h3>
-                                <p className="text-white/60 text-[10px] md:text-sm font-bold mt-0.5 md:mt-1 uppercase tracking-widest">{t('compare_live_prices')}</p>
                             </div>
-                            <div className="hidden sm:block opacity-0 group-hover:opacity-100 transition-opacity -translate-x-4 group-hover:translate-x-0 group-hover:duration-500">
-                                <FiChevronRight size={28} className="md:size-[32px] text-white" />
+                            <div className="md:hidden mt-2">
+                                <span className="px-6 py-2.5 bg-white text-black text-sm font-bold rounded-full">
+                                    {t('start_scanning', 'Start Scanning')}
+                                </span>
                             </div>
                         </div>
                     </button>
-                </div>
+                </section>
 
                 {/* Featured Products */}
-                <div className="mt-4">
-                    <div className="flex items-center justify-between mb-8 px-2">
+                <section className="space-y-8 animate-in slide-in-from-bottom-10 duration-700 delay-500">
+                    <div className="flex items-center justify-between px-2">
                         <div className="flex flex-col">
-                            <h2 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tighter flex items-center gap-3">
-                                <div className="p-2 bg-blue-600 rounded-xl shadow-lg shadow-blue-500/20">
-                                    <FiTrendingUp className="text-white" />
-                                </div>
-                                {t('trends')}
+                            <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-3">
+                                {t('featured_products', 'Featured Picks')}
                             </h2>
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mt-2">{t('personalized_deals')}</p>
+                            <p className="text-sm font-semibold text-gray-400 mt-1 uppercase tracking-widest leading-none">
+                                {t('personalized_deals', 'DEALS PICKED FOR YOU')}
+                            </p>
                         </div>
-                        <button className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:underline px-4 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-full">
+                        <button 
+                            onClick={() => navigate('/search')}
+                            className="flex items-center gap-1 text-sm font-bold text-blue-600 hover:text-blue-700 px-5 py-2.5 bg-blue-50 dark:bg-blue-900/20 rounded-full transition-all"
+                        >
                             {t('view_all')}
+                            <FiChevronRight size={16} />
                         </button>
                     </div>
 
                     {loading ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {[1, 2, 4].map(i => (
-                                <div key={i} className="h-40 bg-gray-100 dark:bg-gray-800 rounded-[2rem] animate-pulse"></div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 px-1">
+                            {[...Array(4)].map((_, i) => (
+                                <ProductCardSkeleton key={i} />
                             ))}
                         </div>
+                    ) : error ? (
+                        <div className="bg-white dark:bg-gray-900 rounded-[3rem] shadow-soft p-20 text-center border border-gray-100 dark:border-gray-800">
+                            <FiAlertTriangle size={56} className="mx-auto text-red-100 dark:text-red-900/30 mb-6" />
+                            <p className="text-gray-900 dark:text-white font-bold text-lg mb-4">{error}</p>
+                            <button 
+                                onClick={loadData}
+                                className="px-8 py-3 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest text-sm hover:bg-blue-700 transition-colors"
+                            >
+                                Try Again
+                            </button>
+                        </div>
                     ) : featuredProducts.length === 0 ? (
-                        <div className="bg-white dark:bg-gray-800 rounded-[2rem] shadow-xl p-16 text-center border-2 border-dashed border-gray-100 dark:border-gray-700">
-                            <FiPackage size={48} className="mx-auto text-gray-300 mb-4" />
-                            <p className="text-gray-400 font-black uppercase tracking-widest">{t('no_products')}</p>
+                        <div className="bg-white dark:bg-gray-900 rounded-[3rem] shadow-soft p-20 text-center border border-gray-100 dark:border-gray-800">
+                            <FiPackage size={56} className="mx-auto text-gray-200 mb-6" />
+                            <p className="text-gray-400 font-bold text-lg">{t('no_products')}</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 px-1 pb-10">
                             {featuredProducts.map((product) => (
                                 <ProductCard
                                     key={product.$id}
                                     product={product}
-                                    prices={getPricesForProduct(prices, product.$id)}
+                                    prices={product.prices}
                                 />
                             ))}
                         </div>
                     )}
-                </div>
-
-                <AIChatBox isOpen={isAIChatOpen} onClose={() => setIsAIChatOpen(false)} />
+                </section>
             </main>
         </div>
     );

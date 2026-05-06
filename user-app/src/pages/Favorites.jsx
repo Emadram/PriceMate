@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { FiStar, FiArrowLeft, FiShoppingBag, FiPackage } from 'react-icons/fi';
-import { databases, DATABASE_ID, COLLECTIONS, Query } from '../lib/appwrite';
-import { fetchAllPrices, getPricesForProduct } from '../utils/productUtils';
+import { Link } from 'react-router-dom';
+import { FiStar, FiShoppingBag, FiPackage, FiChevronRight } from 'react-icons/fi';
+import { db, Query } from '../lib/appwrite';
+import { fetchAllPrices, normalizeProduct } from '../utils/productUtils';
 import ProductCard from '../components/ProductCard';
 import useFavoritesStore from '../stores/favoritesStore';
+import BackButton from '../components/BackButton';
+import { ProductCardSkeleton } from '../components/SkeletonLoaders';
 
 const Favorites = () => {
-    const navigate = useNavigate();
     const [products, setProducts] = useState([]);
     const [supermarkets, setSupermarkets] = useState([]);
-    const [prices, setPrices] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [activeTab, setActiveTab] = useState('products');
     const { favoriteProducts, favoriteSupermarkets } = useFavoritesStore();
 
     useEffect(() => {
@@ -23,32 +24,26 @@ const Favorites = () => {
         try {
             const promises = [];
 
-            // Fetch Products if any
-            if (favoriteProducts.length > 0) {
+            if (favoriteProducts && favoriteProducts.length > 0) {
                 promises.push(
-                    databases.listDocuments(
-                        DATABASE_ID,
-                        COLLECTIONS.PRODUCTS,
-                        [
+                    db.products
+                        .list([
                             Query.equal('$id', favoriteProducts),
-                            Query.select(['*', 'categoryId.*'])
-                        ]
-                    ).then(res => res.documents)
+                            Query.select(['*', 'categoryId.*']),
+                        ])
+                        .then((res) => res.documents)
                 );
                 promises.push(fetchAllPrices());
             } else {
-                promises.push(Promise.resolve([])); // Products placeholder
-                promises.push(Promise.resolve([])); // Prices placeholder
+                promises.push(Promise.resolve([]));
+                promises.push(Promise.resolve([]));
             }
 
-            // Fetch Supermarkets if any
-            if (favoriteSupermarkets.length > 0) {
+            if (favoriteSupermarkets && favoriteSupermarkets.length > 0) {
                 promises.push(
-                    databases.listDocuments(
-                        DATABASE_ID,
-                        COLLECTIONS.SUPERMARKETS,
-                        [Query.equal('$id', favoriteSupermarkets)]
-                    ).then(res => res.documents)
+                    db.supermarkets
+                        .list([Query.equal('$id', favoriteSupermarkets)])
+                        .then((res) => res.documents)
                 );
             } else {
                 promises.push(Promise.resolve([]));
@@ -56,98 +51,173 @@ const Favorites = () => {
 
             const [productsData, allPrices, supermarketsData] = await Promise.all(promises);
 
-            setProducts(productsData);
-            setPrices(allPrices);
-            setSupermarkets(supermarketsData);
+            const normalizedProducts = productsData.map((p) => normalizeProduct(p, allPrices));
 
+            setProducts(normalizedProducts);
+            setSupermarkets(supermarketsData);
         } catch (error) {
             console.error('Error fetching favorites:', error);
         }
         setLoading(false);
     };
 
+    const productCount = favoriteProducts?.length ?? 0;
+    const marketCount = favoriteSupermarkets?.length ?? 0;
+    const hasAny = productCount > 0 || marketCount > 0;
+
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
-            <header className="bg-white dark:bg-gray-800 shadow p-4">
+        <div className="min-h-screen bg-[#F5F5F7] dark:bg-black transition-colors pb-20">
+            <header className="bg-white/80 dark:bg-black/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 dark:border-white/5 p-4">
                 <div className="max-w-4xl mx-auto flex items-center justify-between">
-                    <button
-                        onClick={() => navigate('/profile')}
-                        className="bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 p-2.5 rounded-full text-gray-700 dark:text-gray-200 shadow-sm transition-all"
-                        title="Go Back"
-                    >
-                        <FiArrowLeft size={20} />
-                    </button>
-                    <h1 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                        <FiStar className="text-yellow-500" /> My Favorites
+                    <BackButton to="/profile" />
+                    <h1 className="text-xl font-black text-gray-900 dark:text-white flex items-center gap-2">
+                        <FiStar className="text-yellow-500" /> Favorites
                     </h1>
-                    <div className="w-16"></div>
+                    <div className="w-10"></div>
                 </div>
             </header>
 
-            <main className="max-w-4xl mx-auto p-4 space-y-8">
+            <main className="max-w-4xl mx-auto p-6 space-y-8">
                 {loading ? (
-                    <div className="text-center py-8 text-gray-600 dark:text-gray-400">Loading...</div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {[1, 2, 3, 4].map((i) => (
+                            <ProductCardSkeleton key={i} />
+                        ))}
+                    </div>
+                ) : !hasAny ? (
+                    <div className="text-center py-24 bg-white dark:bg-[#121214] rounded-[3rem] shadow-soft border border-gray-100/50 dark:border-white/5">
+                        <div className="flex justify-center mb-6">
+                            <div className="p-6 bg-yellow-50 dark:bg-yellow-900/20 rounded-[2.5rem]">
+                                <FiStar size={48} className="text-yellow-500" />
+                            </div>
+                        </div>
+                        <h3 className="text-2xl font-black text-gray-900 dark:text-white mb-2">No Favorites Yet</h3>
+                        <p className="text-gray-500 dark:text-gray-400 max-w-xs mx-auto mb-8 font-medium">
+                            Save products and stores to quickly compare prices later.
+                        </p>
+                        <Link
+                            to="/"
+                            className="inline-flex items-center justify-center px-8 py-4 bg-black dark:bg-white text-white dark:text-black rounded-2xl font-black uppercase tracking-widest text-[10px] hover:scale-105 transition-transform active:scale-95 shadow-lg shadow-black/10 dark:shadow-white/5"
+                        >
+                            Start Exploring
+                        </Link>
+                    </div>
                 ) : (
                     <>
-                        {/* Favorite Supermarkets Section */}
-                        {supermarkets.length > 0 && (
-                            <section>
-                                <h2 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
-                                    <FiShoppingBag className="text-blue-600 dark:text-blue-400" /> Favorite Supermarkets
-                                </h2>
+                        <div className="flex p-1 rounded-2xl bg-gray-200/60 dark:bg-gray-800/80 border border-gray-100 dark:border-gray-700">
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('products')}
+                                className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                                    activeTab === 'products'
+                                        ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm'
+                                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+                                }`}
+                            >
+                                <FiPackage className={activeTab === 'products' ? 'text-red-500' : ''} size={16} />
+                                Products
+                                <span
+                                    className={`min-w-[1.25rem] rounded-full px-1.5 py-0.5 text-[10px] ${
+                                        activeTab === 'products'
+                                            ? 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400'
+                                            : 'bg-gray-100 dark:bg-gray-800 text-gray-500'
+                                    }`}
+                                >
+                                    {productCount}
+                                </span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('supermarkets')}
+                                className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                                    activeTab === 'supermarkets'
+                                        ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm'
+                                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+                                }`}
+                            >
+                                <FiShoppingBag className={activeTab === 'supermarkets' ? 'text-blue-600 dark:text-blue-400' : ''} size={16} />
+                                Supermarkets
+                                <span
+                                    className={`min-w-[1.25rem] rounded-full px-1.5 py-0.5 text-[10px] ${
+                                        activeTab === 'supermarkets'
+                                            ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400'
+                                            : 'bg-gray-100 dark:bg-gray-800 text-gray-500'
+                                    }`}
+                                >
+                                    {marketCount}
+                                </span>
+                            </button>
+                        </div>
+
+                        {activeTab === 'products' &&
+                            (products.length > 0 ? (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 px-1">
+                                    {products.map((product) => (
+                                        <ProductCard key={product.$id} product={product} prices={product.prices} />
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-center py-16 bg-white dark:bg-[#121214] rounded-[2.5rem] border border-gray-100 dark:border-white/10">
+                                    <FiPackage className="mx-auto text-gray-300 dark:text-gray-600 mb-4" size={40} />
+                                    <p className="font-bold text-gray-900 dark:text-white mb-1">No saved products</p>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Heart a product on its price comparison page.</p>
+                                    <Link
+                                        to="/"
+                                        className="text-sm font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest"
+                                    >
+                                        Browse products
+                                    </Link>
+                                </div>
+                            ))}
+
+                        {activeTab === 'supermarkets' &&
+                            (supermarkets.length > 0 ? (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {supermarkets.map((market) => (
                                         <Link
                                             key={market.$id}
                                             to={`/supermarket/${market.$id}`}
-                                            className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm hover:shadow-md transition flex items-center gap-4 border border-gray-100 dark:border-gray-700"
+                                            className="group bg-white dark:bg-[#121214] p-5 rounded-[2.5rem] shadow-soft hover:shadow-soft-lg transition-all border border-gray-100/50 dark:border-white/5 active:scale-[0.98] flex items-center gap-4"
                                         >
-                                            <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center overflow-hidden">
+                                            <div className="w-20 h-20 bg-gray-50 dark:bg-[#1C1C1E] rounded-3xl flex items-center justify-center overflow-hidden p-3 group-hover:scale-105 transition-transform">
                                                 {market.icon || market.logoUrl ? (
-                                                    <img src={market.icon || market.logoUrl} className="w-full h-full object-contain" alt={market.name} />
+                                                    <img
+                                                        src={market.icon || market.logoUrl}
+                                                        className="w-full h-full object-contain"
+                                                        alt={market.name}
+                                                    />
                                                 ) : (
                                                     <FiShoppingBag className="text-gray-400 text-2xl" />
                                                 )}
                                             </div>
-                                            <div>
-                                                <h3 className="font-bold text-gray-900 dark:text-white">{market.name}</h3>
-                                                <p className="text-sm text-gray-500 dark:text-gray-400">{market.address}</p>
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className="font-bold text-gray-900 dark:text-white text-lg truncate mb-1">{market.name}</h3>
+                                                <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{market.address}</p>
+                                                <div className="mt-2 flex items-center gap-2">
+                                                    <span className="text-[10px] bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-500 px-2 py-0.5 rounded-full font-bold uppercase tracking-tighter">
+                                                        Open
+                                                    </span>
+                                                </div>
                                             </div>
+                                            <FiChevronRight className="text-gray-300 group-hover:translate-x-1 transition-transform shrink-0" />
                                         </Link>
                                     ))}
                                 </div>
-                            </section>
-                        )}
-
-                        {/* Favorite Products Section */}
-                        {products.length > 0 && (
-                            <section>
-                                <h2 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
-                                    <FiPackage className="text-blue-600 dark:text-blue-400" /> Favorite Products
-                                </h2>
-                                <div className="space-y-3">
-                                    {products.map((product) => (
-                                        <ProductCard
-                                            key={product.$id}
-                                            product={product}
-                                            prices={getPricesForProduct(prices, product.$id)}
-                                        />
-                                    ))}
+                            ) : (
+                                <div className="text-center py-16 bg-white dark:bg-[#121214] rounded-[2.5rem] border border-gray-100 dark:border-white/10">
+                                    <FiShoppingBag className="mx-auto text-gray-300 dark:text-gray-600 mb-4" size={40} />
+                                    <p className="font-bold text-gray-900 dark:text-white mb-1">No saved stores</p>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                                        Save a supermarket from its profile page.
+                                    </p>
+                                    <Link
+                                        to="/"
+                                        className="text-sm font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest"
+                                    >
+                                        Find stores
+                                    </Link>
                                 </div>
-                            </section>
-                        )}
-
-                        {products.length === 0 && supermarkets.length === 0 && (
-                            <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg">
-                                <div className="flex justify-center mb-4">
-                                    <FiStar className="text-yellow-500 text-6xl" />
-                                </div>
-                                <p className="text-gray-500 dark:text-gray-400">No favorites yet</p>
-                                <Link to="/" className="text-blue-600 dark:text-blue-400 hover:underline mt-2 inline-block">
-                                    Start exploring
-                                </Link>
-                            </div>
-                        )}
+                            ))}
                     </>
                 )}
             </main>

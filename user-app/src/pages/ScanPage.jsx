@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiArrowLeft } from 'react-icons/fi';
 import Scanner from '../components/Scanner';
+import BackButton from '../components/BackButton';
 
 const ScanPage = () => {
     const [scannedCode, setScannedCode] = useState(null);
@@ -55,13 +55,7 @@ const ScanPage = () => {
                 )}
 
                 <div className="p-6 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex justify-center">
-                    <button
-                        onClick={() => navigate('/')}
-                        className="bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 p-3 rounded-full text-gray-700 dark:text-gray-200 shadow-sm transition-all"
-                        title="Back to Home"
-                    >
-                        <FiArrowLeft size={24} />
-                    </button>
+                    <BackButton to="/" label="Back to Home" />
                 </div>
             </div>
         </div>
