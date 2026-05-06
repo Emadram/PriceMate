@@ -1,27 +1,152 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom';
-import { FiArrowLeft, FiMapPin, FiShoppingCart, FiShare2, FiHeart, FiPackage, FiShoppingBag, FiTrendingDown, FiBox, FiHome, FiCamera, FiImage } from 'react-icons/fi';
-import { fetchProductByBarcode, fetchAllPrices, getPricesForProduct } from '../utils/productUtils';
+import { 
+    FiArrowLeft, FiMapPin, FiShoppingCart, FiShare2, FiPackage, 
+    FiShoppingBag, FiTrendingDown, FiTrendingUp, FiBox, FiHome, FiCamera, 
+    FiImage, FiNavigation, FiClock, FiCheckCircle, FiAlertCircle, 
+    FiCalendar, FiTag, FiPlusCircle, FiAlertTriangle, FiInfo 
+} from 'react-icons/fi';
+import { useTranslation } from 'react-i18next';
+import { calculateDistance, hasValidLatLon } from '../utils/productUtils';
+import Navbar from '../components/Navbar';
+import PriceHistoryChart from '../components/PriceHistoryChart';
+import AddPriceModal from '../components/AddPriceModal';
+import ReportModal from '../components/ReportModal';
+import StoreMap from '../components/StoreMap';
+import BackButton from '../components/BackButton';
+import FavoriteHeartButton from '../components/FavoriteHeartButton';
+import toast from 'react-hot-toast';
 import useAuthStore from '../stores/authStore';
+import useProductStore from '../stores/productStore';
 import useFavoritesStore from '../stores/favoritesStore';
+import useCurrencyStore from '../stores/currencyStore';
+import useUserLocation from '../hooks/useUserLocation';
+
+const normalizeStockStatus = (status) => {
+    if (!status) return 'in_stock';
+    if (status === 'high' || status === 'in_stock') return 'in_stock';
+    if (status === 'low' || status === 'low_stock') return 'low_stock';
+    if (status === 'none' || status === 'out_of_stock') return 'out_of_stock';
+    return status;
+};
+
+const StockBranch = ({ name, status, price, distance, t, currencyLabel, supermarketId }) => {
+    const normalizedStatus = normalizeStockStatus(status);
+    const statusColors = {
+        in_stock: "text-green-600 bg-green-50 dark:bg-green-900/20",
+        low_stock: "text-amber-600 bg-amber-50 dark:bg-amber-900/20",
+        out_of_stock: "text-red-500 bg-red-50 dark:bg-red-900/20"
+    };
+    
+    const getStatusLabel = () => {
+        if (normalizedStatus === 'out_of_stock') return t('out_of_stock');
+        if (normalizedStatus === 'low_stock') return t('low_stock');
+        return t('in_stock');
+    };
+
+    const inner = (
+        <>
+            <div className="flex flex-col gap-1 min-w-0">
+                <span className="font-semibold text-gray-900 dark:text-white truncate group-hover:text-blue-600 transition-colors">
+                    {name}
+                </span>
+                <div className="flex items-center gap-2">
+                    {distance && (
+                        <span className="flex items-center gap-1 text-xs font-medium text-gray-400">
+                             <FiMapPin size={10} /> {distance} km
+                        </span>
+                    )}
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${statusColors[normalizedStatus] || statusColors.in_stock}`}>
+                        {getStatusLabel()}
+                    </span>
+                </div>
+            </div>
+            
+            <div className="text-right flex flex-col items-end">
+                <span className="text-lg font-bold text-gray-900 dark:text-white">
+                    {price}
+                </span>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                    {currencyLabel || 'TRY'}
+                </span>
+            </div>
+        </>
+    );
+
+    const className =
+        'flex items-center justify-between p-4 rounded-2xl bg-white dark:bg-gray-800 shadow-soft hover:shadow-soft-lg transition-all border border-transparent hover:border-gray-100 dark:hover:border-gray-700 cursor-pointer group';
+
+    if (supermarketId) {
+        return (
+            <Link
+                to={`/supermarket/${supermarketId}`}
+                className={className}
+                role="listitem"
+                aria-label={`${name}, ${getStatusLabel()}, Distance: ${distance || 'unknown'} km, Price: ${price}`}
+            >
+                {inner}
+            </Link>
+        );
+    }
+
+    return (
+        <div 
+            className={className}
+            role="listitem"
+            aria-label={`${name}, ${getStatusLabel()}, Distance: ${distance || 'unknown'} km, Price: ${price}`}
+        >
+            {inner}
+        </div>
+    );
+};
 
 const PriceComparison = () => {
+    const { t } = useTranslation();
+    const { convert, getCurrencySymbol } = useCurrencyStore();
+    const { location: userLocation, loading: locationLoading } = useUserLocation();
     const { barcode } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
     const [searchParams] = useSearchParams();
-    const [product, setProduct] = useState(null);
-    const [prices, setPrices] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+    const [sortBy, setSortBy] = useState('price'); // 'price' or 'distance'
+    const [isAddPriceModalOpen, setIsAddPriceModalOpen] = useState(false);
+    const [isReportModalOpen, setIsReportModalOpen] = useState(false);
     const user = useAuthStore((state) => state.user);
     const { isProductFavorite, toggleProductFavorite } = useFavoritesStore();
+
+    // From productStore
+    const { 
+        product, 
+        prices: rawPrices, 
+        loading, 
+        error, 
+        fetchProductByBarcode 
+    } = useProductStore();
+    const [prices, setPrices] = useState([]);
+
+    const getSupermarketFromPrice = (price) => {
+        if (!price) return null;
+        if (price.supermarkets) {
+            return Array.isArray(price.supermarkets) ? price.supermarkets[0] : price.supermarkets;
+        }
+        return price.supermarketId || null;
+    };
+
+    const getSupermarketId = (price) => {
+        const supermarket = getSupermarketFromPrice(price);
+        if (!supermarket) return null;
+        return typeof supermarket === 'string' ? supermarket : supermarket.$id;
+    };
+
+    const getPriceTimestamp = (price) => price?.$updatedAt || price?.updatedAt || price?.$createdAt || price?.createdAt || null;
+
+    const getPriceCurrency = (price) => price?.currency || 'TRY';
 
     const fromScan = location.state?.fromScan || searchParams.get('fromScan') === '1';
 
     const handleFavoriteClick = () => {
         if (!user) {
-            alert('Please login to favorite products');
+            toast.error('Log in to save favorites');
             return;
         }
         toggleProductFavorite(product.$id);
@@ -30,59 +155,120 @@ const PriceComparison = () => {
     const supermarketIdParam = searchParams.get('supermarketId');
 
     useEffect(() => {
-        fetchProductAndPrices();
-    }, [barcode]);
+        fetchProductByBarcode(barcode);
+    }, [barcode, fetchProductByBarcode]);
 
-    const fetchProductAndPrices = async () => {
-        setLoading(true);
-        setError(null);
-        try {
-            console.log('Fetching product with barcode:', barcode);
+    useEffect(() => {
+        if (!rawPrices) return;
 
-            // Fetch product by barcode
-            const productData = await fetchProductByBarcode(barcode);
+        const pricesWithDistance = rawPrices.map((price) => {
+            const supermarket = getSupermarketFromPrice(price);
+            let distance = null;
 
-            if (!productData) {
-                setError('Product not found');
-                setLoading(false);
+            if (
+                userLocation &&
+                hasValidLatLon(userLocation.latitude, userLocation.longitude) &&
+                supermarket &&
+                typeof supermarket === 'object' &&
+                hasValidLatLon(supermarket.latitude, supermarket.longitude)
+            ) {
+                distance = calculateDistance(
+                    userLocation.latitude,
+                    userLocation.longitude,
+                    supermarket.latitude,
+                    supermarket.longitude
+                );
+            }
+
+            return { ...price, distance: distance ? parseFloat(distance) : null };
+        });
+
+        // Grouping logic for multi-branch support
+        const brandsMap = new Map();
+        const noStoreFallback = [];
+
+        pricesWithDistance.forEach((price) => {
+            const supermarket = getSupermarketFromPrice(price);
+            if (!supermarket) {
+                noStoreFallback.push(price);
                 return;
             }
 
-            console.log('Product data:', productData);
-            setProduct(productData);
+            // Identify the grouping key (parentId or brand name or the supermarket itself)
+            // If it's a branch, we group by its parentId. If it's a parent or has no parent, it's a group head.
+            const brandId = supermarket.parentId || (supermarket.isParent ? supermarket.$id : supermarket.$id);
+            
+            if (!brandsMap.has(brandId)) {
+                brandsMap.set(brandId, {
+                    brand: supermarket.isParent ? supermarket : (supermarket.brand || supermarket.name),
+                    prices: []
+                });
+            }
+            brandsMap.get(brandId).prices.push(price);
+        });
 
-            // Fetch ALL prices
-            const allPrices = await fetchAllPrices();
+        // For now, to maintain UI compatibility, we'll keep picking the best price per brand
+        // but mark entries that have "More branches"
+        const finalPrices = [];
+        brandsMap.forEach((group) => {
+            // Sort group prices by logic (e.g., latest update)
+            const sortedGroup = group.prices.sort((a, b) => {
+                const aTime = new Date(getPriceTimestamp(a)).getTime();
+                const bTime = new Date(getPriceTimestamp(b)).getTime();
+                return bTime - aTime;
+            });
+            
+            // Primary price entry for the brand
+            const primary = { ...sortedGroup[0], _allBranches: sortedGroup };
+            finalPrices.push(primary);
+        });
 
-            // Filter prices for this product
-            const productPrices = getPricesForProduct(allPrices, productData.$id);
+        setPrices([...finalPrices, ...noStoreFallback]);
+    }, [rawPrices, userLocation]);
 
-            console.log('Filtered prices for this product:', productPrices);
+    const handleRefreshData = () => {
+        fetchProductByBarcode(barcode);
+    };
 
-            let sortedPrices = productPrices;
+    const sortedPrices = useMemo(() => {
+        let sorted = [...prices];
+        const hasDistance = sorted.some((item) => item.distance !== null && item.distance !== undefined);
 
-            // If query param exists, put that supermarket's price first
-            if (supermarketIdParam) {
-                sortedPrices = productPrices.sort((a, b) => {
-                    const aId = Array.isArray(a.supermarkets) ? a.supermarkets[0].$id : a.supermarkets.$id;
-                    const bId = Array.isArray(b.supermarkets) ? b.supermarkets[0].$id : b.supermarkets.$id;
+        // If query param exists, put that supermarket's price first
+        if (supermarketIdParam) {
+            sorted.sort((a, b) => {
+                const aId = Array.isArray(a.supermarkets) ? a.supermarkets[0].$id : a.supermarkets.$id;
+                const bId = Array.isArray(b.supermarkets) ? b.supermarkets[0].$id : b.supermarkets.$id;
 
-                    if (aId === supermarketIdParam) return -1;
-                    if (bId === supermarketIdParam) return 1;
-                    return a.price - b.price; // sort remainder by price
+                if (aId === supermarketIdParam) return -1;
+                if (bId === supermarketIdParam) return 1;
+                
+                // Fallback to current sort preference
+                if (sortBy === 'distance' && hasDistance) {
+                    const aDist = a.distance ?? Infinity;
+                    const bDist = b.distance ?? Infinity;
+                    if (aDist !== bDist) return aDist - bDist;
+                    return a.price - b.price;
+                }
+                return a.price - b.price;
+            });
+        } else {
+            // Standard sorting
+            if (sortBy === 'distance' && hasDistance) {
+                sorted.sort((a, b) => {
+                    const aDist = a.distance ?? Infinity;
+                    const bDist = b.distance ?? Infinity;
+                    if (aDist !== bDist) return aDist - bDist;
+                    return a.price - b.price;
                 });
             } else {
-                // Default: Sort prices by value (lowest first)
-                sortedPrices = productPrices.sort((a, b) => a.price - b.price);
+                sorted.sort((a, b) => a.price - b.price);
             }
-
-            setPrices(sortedPrices);
-        } catch (err) {
-            console.error('Error fetching data:', err);
-            setError('Failed to load product information');
         }
-        setLoading(false);
-    };
+        return sorted;
+    }, [prices, sortBy, supermarketIdParam]);
+
+    const [showMapForIndex, setShowMapForIndex] = useState(null);
 
     const getCategoryName = () => {
         const cat = product?.categoryId;
@@ -96,15 +282,16 @@ const PriceComparison = () => {
 
     const getLowestPrice = () => {
         if (prices.length === 0) return null;
-        // If sorting logic puts specific supermarket first, checks against actual prices to verify if it is TRULY lowest
-        const lowest = [...prices].sort((a, b) => a.price - b.price)[0];
-        return lowest;
+        // Find truly lowest regardless of current display sort
+        return [...prices].sort((a, b) => a.price - b.price)[0];
     };
 
     if (loading) {
         return (
             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-                <div className="text-gray-600 dark:text-gray-400">Loading...</div>
+                <div className="text-gray-600 dark:text-gray-400 font-bold uppercase tracking-widest text-xs">
+                    {t('loading')}
+                </div>
             </div>
         );
     }
@@ -114,14 +301,14 @@ const PriceComparison = () => {
             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
                 <div className="text-center">
                     <FiPackage className="text-gray-400 text-6xl mx-auto mb-4" />
-                    <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-2">
-                        {error || 'Product Not Found'}
+                    <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-2 uppercase tracking-tight">
+                        {error ? t('failed_to_load_product') : t('product_not_found')}
                     </h2>
                     <button
                         onClick={() => navigate('/')}
-                        className="text-blue-600 dark:text-blue-400 hover:underline"
+                        className="bg-blue-600 text-white px-6 py-2 rounded-full font-black uppercase tracking-widest text-[10px] hover:bg-black transition-colors"
                     >
-                        Go Back Home
+                        {t('go_back_home')}
                     </button>
                 </div>
             </div>
@@ -147,206 +334,435 @@ const PriceComparison = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-            {/* Header */}
-            <header className="bg-white dark:bg-gray-800 shadow sticky top-0 z-10">
-                <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-                    <div>
-                        <button
-                            onClick={handleBack}
-                            className="bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 p-2.5 rounded-full text-gray-700 dark:text-gray-200 shadow-sm transition-all mb-1"
-                            title="Go Back"
-                        >
-                            <FiArrowLeft size={20} />
-                        </button>
-                        <h1 className="text-xl font-bold text-gray-800 dark:text-white">Price Comparison</h1>
-                    </div>
-                    {user && (
-                        <button
-                            onClick={handleFavoriteClick}
-                            className={`p-3 rounded-full transition-all ${isProductFavorite(product?.$id)
-                                ? 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400'
-                                : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
-                                }`}
-                            title={isProductFavorite(product?.$id) ? 'Remove from favorites' : 'Add to favorites'}
-                        >
-                            <FiHeart className={isProductFavorite(product?.$id) ? 'fill-current' : ''} size={24} />
-                        </button>
-                    )}
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-32 md:pb-12">
+            <Navbar />
+            
+            <main className="max-w-4xl mx-auto px-4 py-4 md:py-8 space-y-4 md:space-y-8">
+                <div className="flex items-center">
+                    <BackButton label="Go Back" onClick={handleBack} />
                 </div>
-            </header>
-
-            <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-                {/* Product Info Card */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
-                    <div className="p-6">
-                        <div className="flex gap-6">
+                {/* Product Info Card - Modern & Mobile Friendly */}
+                <div className="bg-white dark:bg-gray-800 rounded-2xl md:rounded-[2.5rem] shadow-xl overflow-hidden border border-gray-100 dark:border-gray-700">
+                    <div className="p-4 md:p-10">
+                        <div className="flex flex-col md:flex-row gap-8 items-center md:items-start text-center md:text-left">
                             {/* Product Image */}
-                            <div className="w-32 h-32 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
+                            <div className="w-40 h-40 md:w-64 md:h-64 bg-gray-50 dark:bg-gray-900 rounded-3xl md:rounded-[3rem] flex items-center justify-center flex-shrink-0 overflow-hidden shadow-inner border border-gray-100 dark:border-gray-800/50 relative group">
                                 {product.imageUrl ? (
                                     <img
                                         src={product.imageUrl}
                                         alt={product.name}
-                                        className="w-full h-full object-contain"
+                                        className="w-full h-full object-contain p-6 transition-transform group-hover:scale-110 duration-500"
                                     />
                                 ) : (
-                                    <FiPackage className="text-gray-400 text-4xl" />
+                                    <FiPackage className="text-gray-300 text-6xl" />
                                 )}
                             </div>
 
                             {/* Product Details */}
-                            <div className="flex-1">
-                                <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">
-                                    {product.name}
-                                </h2>
+                            <div className="flex-1 space-y-5">
                                 <div className="space-y-2">
-                                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                                        <FiPackage className="text-blue-600 dark:text-blue-400" />
-                                        <span>Category: {getCategoryName()}</span>
+                                    <div className="flex items-center justify-center md:justify-start gap-2 flex-wrap">
+                                        <span className="bg-blue-600/10 text-blue-600 dark:text-blue-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-blue-600/20">
+                                            {getCategoryName()}
+                                        </span>
+                                        {product.stockQuantity > 0 && (
+                                            <span className="bg-green-600/10 text-green-600 dark:text-green-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-green-600/20">
+                                                In Stock
+                                            </span>
+                                        )}
+                                        <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border ${
+                                            typeof product.stockQuantity === 'number' && product.stockQuantity <= 0
+                                                ? 'bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800'
+                                                : typeof product.stockQuantity === 'number' && product.stockQuantity <= 5
+                                                    ? 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800'
+                                                    : 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'
+                                        }`}>
+                                            {typeof product.stockQuantity === 'number' ? `${product.stockQuantity} Units` : 'Stock count unavailable'}
+                                        </span>
                                     </div>
-                                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                                        <FiBox className="text-green-600 dark:text-green-400" />
-                                        <span>Stock: {product.stockQuantity || 0} units</span>
+                                    <div className="flex items-start justify-center md:justify-start gap-3">
+                                        <h2 className="flex-1 min-w-0 text-2xl md:text-5xl font-black text-gray-900 dark:text-white tracking-tighter leading-tight text-center md:text-left">
+                                            {product.name}
+                                        </h2>
+                                        <FavoriteHeartButton
+                                            className="mt-1"
+                                            pressed={isProductFavorite(product.$id)}
+                                            onClick={handleFavoriteClick}
+                                        />
                                     </div>
-                                    {product.description && (
-                                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-3">
-                                            {product.description}
-                                        </p>
-                                    )}
                                 </div>
+
+                        {user && (
+                        <>
+                        <div className="flex justify-center md:justify-start">
+                            <button
+                                type="button"
+                                onClick={() => setIsReportModalOpen(true)}
+                                className="inline-flex items-center gap-2 text-xs font-bold text-gray-400 hover:text-red-500 transition-colors uppercase tracking-widest border border-gray-100 dark:border-gray-700 hover:border-red-100 dark:hover:border-red-900/30 px-4 py-2 rounded-xl bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm shadow-sm"
+                            >
+                                <FiAlertTriangle size={14} />
+                                Report Issue with this product
+                            </button>
+                        </div>
+                        <ReportModal 
+                            isOpen={isReportModalOpen} 
+                            onClose={() => setIsReportModalOpen(false)} 
+                            targetName={product.name}
+                            targetType="product"
+                            targetId={product.$id}
+                        />
+                        </>
+                        )}
+                        
+                        {product.description && (
+                                    <p className="text-sm md:text-base text-gray-500 dark:text-gray-400 leading-relaxed max-w-xl font-medium italic">
+                                        "{product.description}"
+                                    </p>
+                                )}
+
+                                {/* Global Database Health & Nutrition Info */}
+                                {(product.nutriscore || product.allergens || product.is_global) && (
+                                    <div className="pt-2 flex flex-wrap gap-3 items-center justify-center md:justify-start" aria-label="Product Nutrition and Information">
+                                        {/* Nutriscore Badge */}
+                                        {product.nutriscore && (
+                                            <div 
+                                                className="flex items-center gap-1.5 bg-white dark:bg-gray-800 border-2 border-gray-100 dark:border-gray-700 rounded-xl px-3 py-1.5 shadow-soft"
+                                                aria-label={`Nutriscore rating: ${product.nutriscore.toUpperCase()}`}
+                                            >
+                                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none">Nutriscore</span>
+                                                <span 
+                                                    className={`w-7 h-7 flex items-center justify-center rounded-lg font-black text-white text-sm
+                                                        ${product.nutriscore.toUpperCase() === 'A' ? 'bg-green-500 shadow-lg shadow-green-500/20' : 
+                                                          product.nutriscore.toUpperCase() === 'B' ? 'bg-emerald-400' :
+                                                          product.nutriscore.toUpperCase() === 'C' ? 'bg-yellow-400' :
+                                                          product.nutriscore.toUpperCase() === 'D' ? 'bg-orange-500' :
+                                                          'bg-red-500 shadow-lg shadow-red-500/20'}
+                                                    `}
+                                                    aria-hidden="true"
+                                                >
+                                                    {product.nutriscore.toUpperCase()}
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {/* Allergens List */}
+                                        {product.allergens && product.allergens.length > 0 && (
+                                            <div className="flex flex-wrap gap-1 items-center" aria-label={`Contains allergens: ${Array.isArray(product.allergens) ? product.allergens.join(', ') : product.allergens}`}>
+                                                <FiAlertTriangle className="text-amber-500 mr-1" size={14} aria-hidden="true" />
+                                                {(Array.isArray(product.allergens) ? product.allergens : product.allergens.split(',')).map((allergen, i) => (
+                                                    <span key={i} className="bg-amber-50 dark:bg-amber-900/10 text-amber-700 dark:text-amber-400 text-[9px] font-black px-2 py-1 rounded-md uppercase tracking-wider border border-amber-200/50">
+                                                        {allergen.trim().replace('en:', '')}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {/* Global Product Disclaimer */}
+                                        {product.is_global && (
+                                            <div className="flex items-center gap-1.5 text-[9px] font-bold text-blue-500/70 uppercase tracking-widest bg-blue-50/50 dark:bg-blue-900/10 px-3 py-1.5 rounded-xl border border-blue-100/30">
+                                                <FiInfo size={12} />
+                                                Global Database Source
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
                             </div>
                         </div>
-
-                        {/* Best Price Banner */}
-                        {lowestPrice && (
-                            <div className="mt-6 bg-green-50 dark:bg-green-900/20 rounded-lg p-4 border-2 border-green-500 dark:border-green-600">
-                                <div className="flex items-center gap-3">
-                                    <FiTrendingDown className="text-green-600 dark:text-green-400 text-2xl" />
-                                    <div>
-                                        <p className="text-sm text-gray-600 dark:text-gray-400">Best Price</p>
-                                        <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                                            {lowestPrice.price} {lowestPrice.currency || 'EGP'}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
                     </div>
                 </div>
 
-                {/* Prices Section */}
-                <div>
-                    <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">
-                        Available at {prices.length} {prices.length === 1 ? 'Store' : 'Stores'}
-                    </h3>
+                {/* Price History Section */}
+                <div className="space-y-4 md:space-y-6">
+                    <div className="px-2">
+                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.4em]">Trends</p>
+                         <h3 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white mt-1 tracking-tight">Market History</h3>
+                    </div>
+                    <PriceHistoryChart
+                        productId={product?.$id}
+                        productName={product?.name}
+                        currentPrices={rawPrices}
+                    />
+                </div>
+
+                {/* Available Stores Section */}
+                <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    {/* Prices List & Sorting Controls */}
+                    <div className="flex items-center justify-between mb-4 px-1">
+                        <h3 className="text-lg font-black text-gray-800 dark:text-white uppercase tracking-tight">
+                            {t('available_stores')} <span className="ml-1 text-blue-600 opacity-50">({prices.length})</span>
+                        </h3>
+                        
+                        <div className="flex items-center gap-1 bg-white dark:bg-gray-800 p-0.5 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+                            <button 
+                                type="button"
+                                onClick={() => setSortBy('price')}
+                                className={`p-2 rounded-lg transition-all ${sortBy === 'price' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-400 hover:text-blue-600'}`}
+                                title="By Price"
+                            >
+                                <FiTrendingDown size={14} />
+                            </button>
+                            <button 
+                                type="button"
+                                onClick={() => setSortBy('distance')}
+                                className={`p-2 rounded-lg transition-all ${sortBy === 'distance' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-400 hover:text-blue-600'}`}
+                                disabled={!userLocation}
+                                title="By Distance"
+                            >
+                                <FiNavigation size={14} />
+                            </button>
+                        </div>
+                    </div>
 
                     {prices.length === 0 ? (
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-12 text-center">
-                            <FiShoppingBag className="text-gray-400 text-5xl mx-auto mb-4" />
-                            <p className="text-gray-600 dark:text-gray-400">
-                                No prices available yet for this product
-                            </p>
+                        <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl p-10 md:p-16 text-center border-2 border-dashed border-gray-100 dark:border-gray-700 space-y-8 animate-in fade-in zoom-in duration-500">
+                            <div className="space-y-4">
+                                <div className="relative inline-flex items-center justify-center p-8 bg-blue-50/50 dark:bg-blue-900/10 rounded-full border border-blue-100/30">
+                                    <FiShoppingBag className="text-gray-300 text-6xl animate-pulse-slow" />
+                                    <div className="absolute -top-1 -right-1 p-3 bg-blue-600 rounded-2xl shadow-lg shadow-blue-500/30 animate-float">
+                                        <FiPlusCircle className="text-white" size={24} />
+                                    </div>
+                                </div>
+                                <div className="max-w-xs mx-auto space-y-2">
+                                    <h4 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">Help the community!</h4>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 font-medium leading-relaxed">
+                                        Be the first to add a price for this product at your local supermarket.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <button 
+                                onClick={() => setIsAddPriceModalOpen(true)}
+                                aria-label="Add the first price for this product"
+                                className="w-full max-w-sm inline-flex items-center justify-center gap-3 bg-blue-600 hover:bg-black text-white px-8 py-4 rounded-[1.5rem] font-black uppercase tracking-widest text-[11px] shadow-lg shadow-blue-500/30 hover:shadow-none transition-all duration-300 transform hover:scale-[0.98] active:scale-95 group"
+                            >
+                                <FiPlusCircle size={20} className="group-hover:rotate-90 transition-transform duration-300" />
+                                Add First Price
+                            </button>
+
+                            {product.is_global && (
+                                <div className="flex items-center justify-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50 dark:bg-gray-900/50 py-3 px-6 rounded-2xl border border-gray-100 dark:border-gray-800/50">
+                                    <FiInfo size={14} className="text-blue-500" />
+                                    From our global database
+                                </div>
+                            )}
                         </div>
                     ) : (
-                        <div className="space-y-3">
-                            {prices.map((priceEntry, index) => {
-                                const supermarket = Array.isArray(priceEntry.supermarkets) ? priceEntry.supermarkets[0] : priceEntry.supermarkets;
-                                const isSelectedContext = supermarketIdParam && supermarket?.$id === supermarketIdParam;
-                                const isLowest = getLowestPrice().$id === priceEntry.$id; // Re-calculate simple lowest for badge
-                                const priceDiff = (priceEntry.price - getLowestPrice().price).toFixed(2);
+                        <div className="space-y-4">
+                            {sortedPrices.map((priceEntry, index) => {
+                                    const supermarket = getSupermarketFromPrice(priceEntry);
+                                    const supermarketId = typeof supermarket === 'string' ? supermarket : supermarket?.$id;
+                                    const supermarketName = typeof supermarket === 'object' ? supermarket?.name : 'Store';
+                                    const supermarketAddress = typeof supermarket === 'object' ? supermarket?.address : null;
+                                    const hasCoordinates =
+                                        typeof supermarket === 'object' &&
+                                        hasValidLatLon(supermarket?.latitude, supermarket?.longitude);
+                                    const isSelectedContext = supermarketIdParam && supermarketId === supermarketIdParam;
+                                    const isLowest = getLowestPrice()?.$id === priceEntry.$id;
+                                    const normalizedStatus = normalizeStockStatus(priceEntry.stockStatus);
+                                    const priceCurrency = getPriceCurrency(priceEntry);
+                                    const convertedPrice = convert(priceEntry.price, priceCurrency);
+                                    
+                                    const updatedAtValue = getPriceTimestamp(priceEntry);
+                                    const updatedAt = updatedAtValue ? new Date(updatedAtValue) : new Date();
+                                    const formattedDate = updatedAt.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+                                    const formattedTime = updatedAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                                    const distanceDisplay = priceEntry.distance !== null ? `${priceEntry.distance} km` : t('calculating');
 
-                                return (
-                                    <div
-                                        key={priceEntry.$id}
-                                        className={`bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-xl transition-all duration-200 overflow-hidden 
-                                            ${isSelectedContext ? 'ring-2 ring-blue-500 dark:ring-blue-400 bg-blue-50/50 dark:bg-blue-900/10' : ''}
-                                            ${isLowest && !isSelectedContext ? 'ring-2 ring-green-500 dark:ring-green-600' : ''}
-                                        `}
-                                    >
-                                        <div className="p-5">
-                                            <div className="flex items-center justify-between gap-4">
-                                                {/* Supermarket Info */}
-                                                <Link
-                                                    to={`/supermarket/${supermarket?.$id}`}
-                                                    className="flex items-center gap-4 flex-1 hover:opacity-80 transition group"
-                                                >
-                                                    <div className={`w-16 h-16 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden group-hover:scale-110 transition ${isSelectedContext ? 'bg-blue-200 dark:bg-blue-800' : 'bg-blue-100 dark:bg-blue-900'}`}>
-                                                        {supermarket?.icon || supermarket?.logoUrl ? (
-                                                            <img
-                                                                src={supermarket.icon || supermarket.logoUrl}
-                                                                alt={supermarket?.name || 'Supermarket'}
-                                                                className="w-full h-full object-contain"
-                                                            />
+                                    return (
+                                        <div
+                                            key={priceEntry.$id}
+                                            className={`group relative bg-white dark:bg-gray-800 rounded-3xl p-5 shadow-soft hover:shadow-soft-lg hover:-translate-y-1 transition-all duration-300 border-2 
+                                                ${isSelectedContext ? 'border-blue-500 shadow-blue-500/10' : 'border-transparent'}
+                                                ${isLowest && !isSelectedContext ? 'border-green-500 shadow-green-500/10' : ''}
+                                            `}
+                                        >
+                                                <div className="flex items-center gap-4">
+                                                    <Link 
+                                                        to={supermarketId ? `/supermarket/${supermarketId}` : '#'}
+                                                        className="relative w-16 h-16 bg-gray-50 dark:bg-gray-900 rounded-2xl flex items-center justify-center flex-shrink-0 overflow-hidden"
+                                                    >
+                                                        {typeof supermarket === 'object' && (supermarket.icon || supermarket.logoUrl) ? (
+                                                            <img src={supermarket.icon || supermarket.logoUrl} className="w-12 h-12 object-contain" alt="" />
                                                         ) : (
-                                                            <FiShoppingBag className="text-blue-600 dark:text-blue-400 text-2xl" />
+                                                            <FiShoppingBag className="text-gray-200 text-xl" />
                                                         )}
-                                                    </div>
-                                                    <div className="flex-1">
-                                                        <h4 className="font-bold text-gray-800 dark:text-white text-lg group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">
-                                                            {supermarket?.name || 'Unknown Store'}
-                                                            {isSelectedContext && <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Viewing</span>}
+                                                    </Link>
+                                                
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <h4 className="text-base font-bold text-gray-900 dark:text-white truncate">
+                                                            {supermarketName}
                                                         </h4>
-                                                        {isLowest && (
-                                                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-600 dark:text-green-400 mt-1">
-                                                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                                                </svg>
-                                                                BEST PRICE
+                                                        {typeof supermarket === 'object' && supermarket?.branchName && (
+                                                            <span className="text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-500 px-2 py-0.5 rounded-full font-bold">
+                                                                {supermarket.branchName}
                                                             </span>
                                                         )}
-                                                        {supermarket?.address && !isLowest && (
-                                                            <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1">
-                                                                <FiMapPin className="text-xs" />
-                                                                {supermarket.address}
-                                                            </p>
-                                                        )}
                                                     </div>
-                                                </Link>
 
-                                                {/* Price Info */}
-                                                <div className="text-right">
-                                                    <div className="flex items-baseline gap-2">
-                                                        <span className={`text-3xl font-bold ${isLowest ? 'text-green-600 dark:text-green-400' : 'text-gray-800 dark:text-white'}`}>
-                                                            {priceEntry.price}
-                                                        </span>
-                                                        <span className="text-gray-500 dark:text-gray-400 text-sm">
-                                                            {priceEntry.currency || 'TRY'}
-                                                        </span>
-                                                    </div>
-                                                    {priceDiff > 0 && (
-                                                        <div className="text-xs text-red-600 dark:text-red-400 mt-1">
-                                                            +{priceDiff} TRY more
+                                                    {supermarketAddress && (
+                                                        <div className="flex items-center gap-1 text-[11px] text-gray-400 mb-2">
+                                                            <FiMapPin size={12} />
+                                                            <span className="truncate">{supermarketAddress}</span>
                                                         </div>
                                                     )}
+
+                                                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                                                        {hasCoordinates ? (
+                                                            <a
+                                                                href={`https://www.google.com/maps/dir/?api=1&destination=${supermarket.latitude},${supermarket.longitude}`}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700"
+                                                                title="Get Directions"
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            >
+                                                                <FiNavigation size={12} />
+                                                                {distanceDisplay}
+                                                            </a>
+                                                        ) : (
+                                                            <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-400">
+                                                                <FiNavigation size={12} />
+                                                                {distanceDisplay}
+                                                            </span>
+                                                        )}
+                                                        <span className={`inline-flex items-center gap-1.5 text-xs font-bold ${
+                                                            normalizedStatus === 'out_of_stock' ? 'text-red-500' : 
+                                                            normalizedStatus === 'low_stock' ? 'text-amber-500' : 
+                                                            'text-green-600'
+                                                        }`}>
+                                                            <div className={`w-1.5 h-1.5 rounded-full ${
+                                                                normalizedStatus === 'out_of_stock' ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]' : 
+                                                                normalizedStatus === 'low_stock' ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.4)]' : 
+                                                                'bg-green-600 shadow-[0_0_8px_rgba(22,163,74,0.4)]'
+                                                            }`} />
+                                                            {normalizedStatus === 'out_of_stock' ? t('out_of_stock') : 
+                                                             normalizedStatus === 'low_stock' ? t('low_stock') : 
+                                                             t('in_stock')}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="text-right flex flex-col items-end">
+                                                    <div className="flex items-baseline gap-1">
+                                                        <span className={`text-2xl font-bold ${isLowest ? 'text-green-600' : 'text-gray-900 dark:text-white'}`}>
+                                                            {convertedPrice}
+                                                        </span>
+                                                        <span className="text-xs font-semibold text-gray-400">{getCurrencySymbol()}</span>
+                                                    </div>
+                                                    <div className="mt-2 flex items-center gap-1 text-[10px] font-medium text-gray-300">
+                                                        <FiCalendar size={10} /> {formattedDate} {formattedTime}
+                                                    </div>
                                                 </div>
                                             </div>
+
+                                            {/* Simplified branch details - keeping hidden by default for minimalism */}
+                                            <details className="mt-4 group/details border-t border-gray-50 dark:border-gray-700/50 pt-3">
+                                                <summary className="list-none cursor-pointer flex items-center justify-between py-2 px-4 bg-gray-50 dark:bg-gray-900/40 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors">
+                                                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 group-hover/details:text-blue-600 flex items-center gap-2">
+                                                        {hasCoordinates ? (
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    setShowMapForIndex(showMapForIndex === index ? null : index);
+                                                                }}
+                                                                className={`h-5 w-5 rounded-full flex items-center justify-center transition-all ${
+                                                                    showMapForIndex === index
+                                                                        ? 'bg-blue-600 text-white'
+                                                                        : 'bg-gray-900/70 text-white hover:bg-blue-600'
+                                                                }`}
+                                                                title={showMapForIndex === index ? 'Hide Map' : 'Show Map'}
+                                                                aria-label={showMapForIndex === index ? 'Hide Map' : 'Show Map'}
+                                                            >
+                                                                <FiMapPin size={10} />
+                                                            </button>
+                                                        ) : (
+                                                            <FiMapPin size={12} />
+                                                        )}
+                                                        {t('view_all')} {t('stock')} <FiArrowLeft className="rotate-[270deg] transition-transform group-open/details:rotate-90" size={10} />
+                                                    </span>
+                                                </summary>
+                                                <div className="mt-4 space-y-4">
+                                                    {/* Local Map showing branches - only when toggled */}
+                                                        {showMapForIndex === index && hasCoordinates && (
+                                                        <div className="h-44 rounded-2xl overflow-hidden shadow-inner border border-gray-100 dark:border-gray-800/50 animate-in zoom-in-95 duration-300">
+                                                            <StoreMap 
+                                                                supermarkets={[supermarket]} 
+                                                                lat={supermarket.latitude} 
+                                                                lon={supermarket.longitude} 
+                                                                zoom={14} 
+                                                                height="100%" 
+                                                            />
+                                                        </div>
+                                                    )}
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-2 animate-in slide-in-from-top-2 duration-300">
+                                                        {priceEntry._allBranches?.map((branchPrice) => {
+                                                            const branchSM = getSupermarketFromPrice(branchPrice);
+                                                            const bConverted = convert(branchPrice.price, getPriceCurrency(branchPrice));
+                                                            const branchSupermarketId = getSupermarketId(branchPrice);
+                                                            return (
+                                                                <StockBranch 
+                                                                    key={branchPrice.$id}
+                                                                    name={`${supermarketName} - ${branchSM?.branchName || 'Main'}`}
+                                                                    status={branchPrice.stockStatus || 'high'} 
+                                                                    t={t}
+                                                                    price={`${bConverted}`}
+                                                                    currencyLabel={getCurrencySymbol()}
+                                                                    distance={branchPrice.distance !== null ? `${branchPrice.distance}` : null}
+                                                                    supermarketId={branchSupermarketId}
+                                                                />
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            </details>
                                         </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
             </main>
+
 
             {/* Quick actions only when coming from scanner */}
             {fromScan && (
-                <div className="sticky bottom-0 left-0 right-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur border-t border-gray-200 dark:border-gray-700">
+                <div className="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur border-t border-gray-200 dark:border-gray-700 z-40">
                     <div className="max-w-4xl mx-auto px-4 py-3 flex gap-3">
                         <button
                             onClick={handleGoHome}
+                            aria-label="Go to home page"
                             className="flex-1 inline-flex items-center justify-center gap-2 py-3 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
                         >
                             <FiHome /> Home
                         </button>
                         <button
                             onClick={handleScanAnother}
+                            aria-label="Scan another product"
                             className="flex-1 inline-flex items-center justify-center gap-2 py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-500/30 transition"
                         >
                             <FiCamera /> Scan Another
                         </button>
                     </div>
                 </div>
+            )}
+
+            {/* Contribution Modal */}
+            {product && (
+                <AddPriceModal 
+                    isOpen={isAddPriceModalOpen} 
+                    onClose={(wasSuccessful) => {
+                        setIsAddPriceModalOpen(false);
+                        if (wasSuccessful) {
+                            handleRefreshData();
+                        }
+                    }} 
+                    product={product}
+                    barcode={barcode}
+                />
             )}
         </div>
     );

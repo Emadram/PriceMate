@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { databases, APPWRITE_CONFIG } from '../lib/appwrite';
+import { db } from '../lib/appwrite';
 
 const useFeedbackStore = create((set) => ({
     feedback: [],
@@ -9,10 +9,7 @@ const useFeedbackStore = create((set) => ({
     fetchFeedback: async () => {
         set({ loading: true, error: null });
         try {
-            const response = await databases.listDocuments(
-                APPWRITE_CONFIG.DATABASE_ID,
-                APPWRITE_CONFIG.COLLECTIONS.FEEDBACK
-            );
+            const response = await db.feedback.list();
             set({ feedback: response.documents, loading: false });
         } catch (error) {
             set({ error: error.message, loading: false });
@@ -22,11 +19,20 @@ const useFeedbackStore = create((set) => ({
     deleteFeedback: async (id) => {
         set({ loading: true, error: null });
         try {
-            await databases.deleteDocument(
-                APPWRITE_CONFIG.DATABASE_ID,
-                APPWRITE_CONFIG.COLLECTIONS.FEEDBACK,
-                id
-            );
+            await db.feedback.delete(id);
+            await useFeedbackStore.getState().fetchFeedback();
+            set({ loading: false });
+            return true;
+        } catch (error) {
+            set({ error: error.message, loading: false });
+            return false;
+        }
+    },
+
+    updateFeedbackStatus: async (id, status) => {
+        set({ loading: true, error: null });
+        try {
+            await db.feedback.update(id, { status });
             await useFeedbackStore.getState().fetchFeedback();
             set({ loading: false });
             return true;

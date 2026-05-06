@@ -1,6 +1,5 @@
 import { create } from 'zustand';
-import { databases, APPWRITE_CONFIG } from '../lib/appwrite';
-import { ID } from 'appwrite';
+import { db } from '../lib/appwrite';
 
 const useCategoriesStore = create((set) => ({
     categories: [],
@@ -10,10 +9,7 @@ const useCategoriesStore = create((set) => ({
     fetchCategories: async () => {
         set({ loading: true, error: null });
         try {
-            const response = await databases.listDocuments(
-                APPWRITE_CONFIG.DATABASE_ID,
-                APPWRITE_CONFIG.COLLECTIONS.CATEGORIES
-            );
+            const response = await db.categories.list();
             set({ categories: response.documents, loading: false });
         } catch (error) {
             set({ error: error.message, loading: false });
@@ -35,12 +31,7 @@ const useCategoriesStore = create((set) => ({
 
             console.log('Payload being sent:', payload);
 
-            const result = await databases.createDocument(
-                APPWRITE_CONFIG.DATABASE_ID,
-                APPWRITE_CONFIG.COLLECTIONS.CATEGORIES,
-                ID.unique(),
-                payload
-            );
+            const result = await db.categories.create(payload);
             console.log('Category created successfully:', result);
             await useCategoriesStore.getState().fetchCategories();
             set({ loading: false });
@@ -60,15 +51,10 @@ const useCategoriesStore = create((set) => ({
     updateCategory: async (id, data) => {
         set({ loading: true, error: null });
         try {
-            await databases.updateDocument(
-                APPWRITE_CONFIG.DATABASE_ID,
-                APPWRITE_CONFIG.COLLECTIONS.CATEGORIES,
-                id,
-                {
-                    categoryName: data.categoryName,
-                    icon: data.icon || null
-                }
-            );
+            await db.categories.update(id, {
+                categoryName: data.categoryName,
+                icon: data.icon || null
+            });
             await useCategoriesStore.getState().fetchCategories();
             set({ loading: false });
             return true;
@@ -81,11 +67,7 @@ const useCategoriesStore = create((set) => ({
     deleteCategory: async (id) => {
         set({ loading: true, error: null });
         try {
-            await databases.deleteDocument(
-                APPWRITE_CONFIG.DATABASE_ID,
-                APPWRITE_CONFIG.COLLECTIONS.CATEGORIES,
-                id
-            );
+            await db.categories.delete(id);
             await useCategoriesStore.getState().fetchCategories();
             set({ loading: false });
             return true;

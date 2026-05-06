@@ -1,24 +1,35 @@
 import { create } from 'zustand';
-import { databases, APPWRITE_CONFIG } from '../lib/appwrite';
-import { ID, Query } from 'appwrite';
+import { db } from '../lib/appwrite';
+import { Query } from 'appwrite';
 
-const usePricesStore = create((set) => ({
+const usePricesStore = create((set, get) => ({
     prices: [],
     loading: false,
     error: null,
+    total: 0,
+    page: 1,
+    limit: 10,
 
-    fetchPrices: async () => {
+    setPage: (page) => set({ page }),
+
+    fetchPrices: async (page = 1) => {
         set({ loading: true, error: null });
         try {
-            const response = await databases.listDocuments(
-                APPWRITE_CONFIG.DATABASE_ID,
-                APPWRITE_CONFIG.COLLECTIONS.PRICES,
-                [
-                    Query.limit(100),
-                    Query.select(['*', 'products.name', 'products.$id', 'supermarkets.name', 'supermarkets.$id'])
-                ]
-            );
-            set({ prices: response.documents, loading: false });
+            const limit = get().limit;
+            const offset = (page - 1) * limit;
+
+            const response = await db.prices.list([
+                Query.limit(limit),
+                Query.offset(offset),
+                Query.orderDesc('$updatedAt'),
+                Query.select(['*', 'products.name', 'products.$id', 'supermarkets.name', 'supermarkets.$id'])
+            ]);
+            set({ 
+                prices: response.documents, 
+                total: response.total,
+                page: page,
+                loading: false 
+            });
         } catch (error) {
             console.error('Fetch prices error:', error);
             set({ error: error.message, loading: false });
@@ -31,7 +42,8 @@ const usePricesStore = create((set) => ({
         try {
             const payload = {
                 price: parseFloat(data.price),
-                userId: data.userId
+                userId: data.userId,
+                stockStatus: data.stockStatus || 'in_stock'
             };
 
             // Add optional fields
@@ -39,23 +51,31 @@ const usePricesStore = create((set) => ({
                 payload.currency = data.currency;
             }
 
-            // Add relationships
+            // Relationship references (ensure they are strings)
             if (data.products) {
-                payload.products = data.products;
+                payload.products = typeof data.products === 'object' ? data.products.$id : data.products;
             }
 
             if (data.supermarkets) {
-                payload.supermarkets = data.supermarkets;
+                payload.supermarkets = typeof data.supermarkets === 'object' ? data.supermarkets.$id : data.supermarkets;
             }
 
             console.log('Price payload:', payload);
 
-            const result = await databases.createDocument(
-                APPWRITE_CONFIG.DATABASE_ID,
-                APPWRITE_CONFIG.COLLECTIONS.PRICES,
-                ID.unique(),
-                payload
-            );
+            const result = await db.prices.create(payload);
+
+            // LOG TO PRICE HISTORY
+            try {
+                await db.priceHistory.create({
+                    price: parseFloat(data.price),
+                    productId: payload.products,
+                    supermarketId: payload.supermarkets,
+                    timestamp: new Date().toISOString()
+                });
+            } catch (historyErr) {
+                console.warn('Could not log history (collection might not exist):', historyErr);
+            }
+
             console.log('Price created:', result);
             await usePricesStore.getState().fetchPrices();
             set({ loading: false });
@@ -77,25 +97,34 @@ const usePricesStore = create((set) => ({
         try {
             const payload = {
                 price: parseFloat(data.price),
-                userId: data.userId
+                userId: data.userId,
+                stockStatus: data.stockStatus || 'in_stock'
             };
 
             if (data.currency) {
                 payload.currency = data.currency;
             }
             if (data.products) {
-                payload.products = data.products;
+                payload.products = typeof data.products === 'object' ? data.products.$id : data.products;
             }
             if (data.supermarkets) {
-                payload.supermarkets = data.supermarkets;
+                payload.supermarkets = typeof data.supermarkets === 'object' ? data.supermarkets.$id : data.supermarkets;
             }
 
-            await databases.updateDocument(
-                APPWRITE_CONFIG.DATABASE_ID,
-                APPWRITE_CONFIG.COLLECTIONS.PRICES,
-                id,
-                payload
-            );
+            await db.prices.update(id, payload);
+
+            // LOG TO PRICE HISTORY
+            try {
+                await db.priceHistory.create({
+                    price: parseFloat(data.price),
+                    productId: payload.products,
+                    supermarketId: payload.supermarkets,
+                    timestamp: new Date().toISOString()
+                });
+            } catch (historyErr) {
+                console.warn('Could not log history:', historyErr);
+            }
+
             await usePricesStore.getState().fetchPrices();
             set({ loading: false });
             return true;
@@ -109,11 +138,7 @@ const usePricesStore = create((set) => ({
     deletePrice: async (id) => {
         set({ loading: true, error: null });
         try {
-            await databases.deleteDocument(
-                APPWRITE_CONFIG.DATABASE_ID,
-                APPWRITE_CONFIG.COLLECTIONS.PRICES,
-                id
-            );
+            await db.prices.delete(id);
             await usePricesStore.getState().fetchPrices();
             set({ loading: false });
             return true;

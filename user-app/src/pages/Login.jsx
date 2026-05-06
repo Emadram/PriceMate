@@ -1,110 +1,183 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
 import useAuthStore from '../stores/authStore';
+import BackButton from '../components/BackButton';
 
 const Login = () => {
     const navigate = useNavigate();
     const login = useAuthStore((state) => state.login);
+    const resendVerification = useAuthStore((state) => state.resendVerification);
     const [formData, setFormData] = useState({
         email: '',
         password: ''
     });
     const [error, setError] = useState(null);
+    const [errorCode, setErrorCode] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [resendLoading, setResendLoading] = useState(false);
+    const [resendCooldown, setResendCooldown] = useState(0);
+    const [resendCount, setResendCount] = useState(0);
+
+    useEffect(() => {
+        if (resendCooldown <= 0) return;
+        const timer = setTimeout(() => {
+            setResendCooldown((prev) => Math.max(prev - 1, 0));
+        }, 1000);
+        return () => clearTimeout(timer);
+    }, [resendCooldown]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError(null);
+        setErrorCode(null);
         setLoading(true);
 
         const success = await login(formData.email, formData.password);
         if (success) {
             navigate('/');
         } else {
-            setError(useAuthStore.getState().error || 'Login failed');
+            const { error: storeError, errorCode: storeErrorCode } = useAuthStore.getState();
+            setError(storeError || 'Invalid credentials. Please try again.');
+            setErrorCode(storeErrorCode || null);
             setLoading(false);
         }
     };
 
+    const handleResendVerification = async () => {
+        if (resendCooldown > 0 || resendLoading) return;
+        if (!formData.email || !formData.password) {
+            setError('Enter your email and password to resend the verification email.');
+            setErrorCode('email_not_verified');
+            return;
+        }
+
+        setResendLoading(true);
+        const success = await resendVerification(formData.email, formData.password);
+        if (success) {
+            const nextCount = resendCount + 1;
+            setResendCount(nextCount);
+            setResendCooldown(nextCount * 30);
+        }
+        setResendLoading(false);
+    };
+
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-            <div className="sm:mx-auto sm:w-full sm:max-w-md">
-                <Link to="/" className="flex justify-center">
-                    <div className="mx-auto w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-lg">
-                        P
+        <div className="min-h-screen bg-[#F5F5F7] dark:bg-black flex flex-col px-6 py-12 relative overflow-hidden">
+            {/* Soft background decor */}
+            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/5 rounded-full blur-[120px] pointer-events-none"></div>
+            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-500/5 rounded-full blur-[120px] pointer-events-none"></div>
+
+            <div className="max-w-md mx-auto w-full mb-8">
+                <BackButton to="/" />
+            </div>
+
+            <div className="sm:mx-auto sm:w-full sm:max-w-md relative">
+                <div className="flex justify-center mb-8">
+                    <div className="w-16 h-16 bg-blue-600 rounded-[2rem] flex items-center justify-center shadow-xl shadow-blue-500/20 active:scale-95 transition-transform cursor-pointer">
+                        <span className="text-white font-black text-3xl tracking-tighter">P</span>
                     </div>
-                </Link>
-                <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-                    Sign in to your account
+                </div>
+                
+                <h2 className="text-center text-4xl font-black tracking-tight text-gray-900 dark:text-white">
+                    Sign in
                 </h2>
-                <p className="mt-2 text-center text-sm text-gray-600">
-                    Or{' '}
-                    <Link to="/register" className="font-medium text-blue-600 hover:text-blue-500">
-                        create a new account
-                    </Link>
+                <p className="mt-3 text-center text-gray-400 dark:text-gray-500 text-[10px] font-black uppercase tracking-[0.2em]">
+                    SIGN IN TO YOUR PRICEMATE ACCOUNT
                 </p>
             </div>
 
-            <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-                <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+            <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-md relative">
+                <div className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl py-10 px-8 shadow-soft border border-white dark:border-white/5 rounded-[3rem]">
                     <form className="space-y-6" onSubmit={handleSubmit}>
                         {error && (
-                            <div className="bg-red-50 border-l-4 border-red-400 p-4">
-                                <div className="flex">
-                                    <div className="ml-3">
-                                        <p className="text-sm text-red-700">{error}</p>
-                                    </div>
-                                </div>
+                            <div className="bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 rounded-2xl p-4 animate-in fade-in slide-in-from-top-2 space-y-3">
+                                <p className="text-xs text-red-600 dark:text-red-400 font-bold text-center uppercase tracking-wider">{error}</p>
+                                {errorCode === 'email_not_verified' && (
+                                    <button
+                                        type="button"
+                                        onClick={handleResendVerification}
+                                        disabled={resendLoading || resendCooldown > 0}
+                                        className="w-full py-3 bg-white text-red-600 border border-red-200 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-red-50 disabled:opacity-60"
+                                    >
+                                        {resendLoading
+                                            ? 'Sending...'
+                                            : resendCooldown > 0
+                                                ? `Resend in ${resendCooldown}s`
+                                                : 'Resend Verification Email'}
+                                    </button>
+                                )}
                             </div>
                         )}
 
-                        <div>
-                            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                                Email address
+                        <div className="space-y-2">
+                            <label htmlFor="email" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500 ml-1">
+                                Email Address
                             </label>
-                            <div className="mt-1">
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
+                                    <Mail className="h-4 w-4 text-gray-300 group-focus-within:text-blue-500 transition-colors" />
+                                </div>
                                 <input
                                     id="email"
-                                    name="email"
                                     type="email"
-                                    autoComplete="email"
                                     required
                                     value={formData.email}
                                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                    placeholder="name@example.com"
+                                    className="block w-full pl-12 pr-6 py-4 bg-gray-50/50 dark:bg-black/20 border-gray-100 dark:border-white/5 focus:bg-white dark:focus:bg-black border focus:border-blue-500 dark:focus:border-blue-500 rounded-2xl text-[15px] font-bold transition-all outline-none text-gray-900 dark:text-white placeholder:text-gray-300 dark:placeholder:text-gray-700 shadow-inner"
                                 />
                             </div>
                         </div>
 
-                        <div>
-                            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                                Password
-                            </label>
-                            <div className="mt-1">
+                        <div className="space-y-2">
+                            <div className="flex justify-between items-center ml-1">
+                                <label htmlFor="password" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                                    Password
+                                </label>
+                                <Link to="/forgot-password" className="text-[10px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-700">
+                                    Forgot?
+                                </Link>
+                            </div>
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
+                                    <Lock className="h-4 w-4 text-gray-300 group-focus-within:text-blue-500 transition-colors" />
+                                </div>
                                 <input
                                     id="password"
-                                    name="password"
                                     type="password"
-                                    autoComplete="current-password"
                                     required
                                     value={formData.password}
                                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                    placeholder="••••••••"
+                                    className="block w-full pl-12 pr-6 py-4 bg-gray-50/50 dark:bg-black/20 border-gray-100 dark:border-white/5 focus:bg-white dark:focus:bg-black border focus:border-blue-500 dark:focus:border-blue-500 rounded-2xl text-[15px] font-bold transition-all outline-none text-gray-900 dark:text-white placeholder:text-gray-300 dark:placeholder:text-gray-700 shadow-inner"
                                 />
                             </div>
                         </div>
 
-                        <div>
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            >
-                                {loading ? 'Signing in...' : 'Sign in'}
-                            </button>
-                        </div>
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full flex items-center justify-center gap-2 py-4 px-4 bg-blue-600 text-white rounded-[1.5rem] text-[15px] font-black uppercase tracking-[0.2em] hover:bg-black dark:hover:bg-white dark:hover:text-black active:scale-[0.98] transition-all focus:outline-none disabled:opacity-50 disabled:active:scale-100 shadow-xl shadow-blue-500/20"
+                        >
+                            {loading ? (
+                                <Loader2 className="h-5 w-5 animate-spin" />
+                            ) : (
+                                <>
+                                    <span>Sign in</span>
+                                    <ArrowRight className="h-4 w-4" />
+                                </>
+                            )}
+                        </button>
                     </form>
                 </div>
+
+                <p className="mt-10 text-center text-[14px] text-gray-500 font-medium">
+                    Don't have an account?{' '}
+                    <Link to="/register" className="font-black text-blue-600 dark:text-blue-500 hover:text-black dark:hover:text-white transition-colors uppercase tracking-widest text-[11px] ml-1">
+                        Create one
+                    </Link>
+                </p>
             </div>
         </div>
     );

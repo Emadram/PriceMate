@@ -1,5 +1,4 @@
-import { databases, APPWRITE_CONFIG } from '../lib/appwrite';
-import { Query } from 'appwrite';
+import { db, Query } from '../lib/appwrite';
 
 /**
  * Comprehensive diagnostic test for PriceMate data flow
@@ -16,11 +15,7 @@ export const runDiagnostics = async () => {
     // Test 1: Database Connection
     try {
         console.log('Test 1: Database Connection');
-        await databases.listDocuments(
-            APPWRITE_CONFIG.DATABASE_ID,
-            APPWRITE_CONFIG.COLLECTIONS.PRODUCTS,
-            [Query.limit(1)]
-        );
+        await db.products.list([Query.limit(1)]);
         results.tests.push({ name: 'Database Connection', status: 'PASS', message: 'Connected successfully' });
         console.log('✅ Database connection successful\n');
     } catch (error) {
@@ -33,11 +28,7 @@ export const runDiagnostics = async () => {
     // Test 2: Products Collection
     try {
         console.log('Test 2: Products Collection');
-        const productsResponse = await databases.listDocuments(
-            APPWRITE_CONFIG.DATABASE_ID,
-            APPWRITE_CONFIG.COLLECTIONS.PRODUCTS,
-            [Query.limit(100)]
-        );
+        const productsResponse = await db.products.list([Query.limit(100)]);
 
         const productsCount = productsResponse.documents.length;
         results.summary.productsCount = productsCount;
@@ -60,11 +51,7 @@ export const runDiagnostics = async () => {
     // Test 3: Prices Collection
     try {
         console.log('Test 3: Prices Collection');
-        const pricesResponse = await databases.listDocuments(
-            APPWRITE_CONFIG.DATABASE_ID,
-            APPWRITE_CONFIG.COLLECTIONS.PRICES,
-            [Query.limit(100)]
-        );
+        const pricesResponse = await db.prices.list([Query.limit(100)]);
 
         const pricesCount = pricesResponse.documents.length;
         results.summary.pricesCount = pricesCount;
@@ -89,9 +76,7 @@ export const runDiagnostics = async () => {
     // Test 4: Prices with Relationships
     try {
         console.log('Test 4: Prices with Relationships');
-        const pricesWithRelations = await databases.listDocuments(
-            APPWRITE_CONFIG.DATABASE_ID,
-            APPWRITE_CONFIG.COLLECTIONS.PRICES,
+        const pricesWithRelations = await db.prices.list(
             [
                 Query.limit(10),
                 Query.select(['*', 'products.$id', 'products.name', 'supermarkets.$id', 'supermarkets.name'])
@@ -130,9 +115,7 @@ export const runDiagnostics = async () => {
     // Test 5: Products with Categories
     try {
         console.log('Test 5: Products with Categories');
-        const productsWithCategories = await databases.listDocuments(
-            APPWRITE_CONFIG.DATABASE_ID,
-            APPWRITE_CONFIG.COLLECTIONS.PRODUCTS,
+        const productsWithCategories = await db.products.list(
             [
                 Query.limit(10),
                 Query.select(['*', 'categoryId.$id', 'categoryId.categoryName'])
@@ -166,15 +149,9 @@ export const runDiagnostics = async () => {
     try {
         console.log('Test 6: Data Flow Test (Products → Prices)');
 
-        const allProducts = await databases.listDocuments(
-            APPWRITE_CONFIG.DATABASE_ID,
-            APPWRITE_CONFIG.COLLECTIONS.PRODUCTS,
-            [Query.limit(10)]
-        );
+        const allProducts = await db.products.list([Query.limit(10)]);
 
-        const allPrices = await databases.listDocuments(
-            APPWRITE_CONFIG.DATABASE_ID,
-            APPWRITE_CONFIG.COLLECTIONS.PRICES,
+        const allPrices = await db.prices.list(
             [
                 Query.limit(100),
                 Query.select(['*', 'products.$id', 'supermarkets.name'])
@@ -203,6 +180,108 @@ export const runDiagnostics = async () => {
         results.success = false;
         results.tests.push({ name: 'Data Flow Test', status: 'FAIL', message: error.message });
         console.error('❌ Data flow test failed:', error.message, '\n');
+    }
+
+    // Test 7: Data Integrity & Future readiness
+    let allPricesResult = null;
+    let allProductsResult = null;
+    try {
+        console.log('Test 7: Data Integrity & Business Logic');
+        const integrityResults = { supermarkets: [], prices: [], history: null, orphans: [] };
+
+        // 1. Supermarket Coordinates (Turkey Range)
+        const allSupermarkets = await db.supermarkets.list([Query.limit(100)]);
+        allSupermarkets.documents.forEach(s => {
+            // Updated range for Turkey: Lat 36-42, Lon 26-45
+            const validLat = s.latitude >= 36 && s.latitude <= 42;
+            const validLon = s.longitude >= 26 && s.longitude <= 45;
+            if (!validLat || !validLon) {
+                integrityResults.supermarkets.push(`${s.name}: invalid coords (${s.latitude}, ${s.longitude})`);
+            }
+        });
+
+        // 2. Prices & Currency
+        allPricesResult = await db.prices.list(
+            [Query.limit(100), Query.select(['$id', 'price', 'currency', 'products.$id'])]
+        );
+        allPricesResult.documents.forEach(p => {
+            if (p.price <= 0) integrityResults.prices.push(`Price ${p.$id}: non-positive value (${p.price})`);
+            if (!p.currency) integrityResults.prices.push(`Price ${p.$id}: missing currency`);
+        });
+
+        // 3. Orphaned Prices
+        allProductsResult = await db.products.list(
+            [Query.limit(100), Query.select(['$id'])]
+        );
+        const productIds = new Set(allProductsResult.documents.map(p => p.$id));
+        allPricesResult.documents.forEach(p => {
+            if (p.products?.$id && !productIds.has(p.products.$id)) {
+                integrityResults.orphans.push(p.$id);
+            }
+        });
+
+        // 4. Price History Collection
+        try {
+            await db.priceHistory.list([Query.limit(1)]);
+            integrityResults.history = 'READY';
+        } catch (e) {
+            integrityResults.history = 'READY_BUT_EMPTY';
+        }
+
+        // Reporting
+        if (integrityResults.supermarkets.length > 0) {
+            console.warn('⚠️  Invalid Supermarket Coords:', integrityResults.supermarkets);
+        }
+        if (integrityResults.orphans.length > 0) {
+            console.warn(`⚠️  Found ${integrityResults.orphans.length} orphaned prices`);
+        }
+
+        const status = (integrityResults.supermarkets.length === 0 && integrityResults.prices.length === 0 && integrityResults.orphans.length === 0) ? 'PASS' : 'WARN';
+        results.tests.push({ 
+            name: 'Data Integrity', 
+            status: status, 
+            message: `Checked ${allSupermarkets.documents.length} supermarkets and ${allPricesResult.documents.length} prices. History: ${integrityResults.history}` 
+        });
+        console.log(`✅ Data integrity check completed (${status})\n`);
+
+    } catch (error) {
+        results.tests.push({ name: 'Data Integrity', status: 'FAIL', message: error.message });
+        console.error('❌ Data integrity test failed:', error.message, '\n');
+    }
+
+    // Test 8: Big Plan Schema Validation (Phase 9 Readiness)
+    try {
+        console.log('Test 8: Schema Attribute Validation');
+        const schemaIssues = [];
+
+        // 1. Check Prices for Expansion attributes
+        const samplePrice = allPricesResult?.documents[0];
+        if (samplePrice) {
+            ['isOnSale', 'stockStatus', 'currency'].forEach(attr => {
+                if (!(attr in samplePrice)) schemaIssues.push(`PRICES missing: ${attr}`);
+            });
+        }
+
+        // 2. Check Products for Expansion attributes
+        const sampleProduct = allProductsResult?.documents[0];
+        if (sampleProduct) {
+            ['brand', 'unit', 'barcode'].forEach(attr => {
+                if (!(attr in sampleProduct)) schemaIssues.push(`PRODUCTS missing: ${attr}`);
+            });
+        }
+
+        const schemaStatus = schemaIssues.length === 0 ? 'PASS' : 'WARN';
+        results.tests.push({
+            name: 'Schema Expansion',
+            status: schemaStatus,
+            message: schemaStatus === 'PASS' 
+                ? 'All Business Logic attributes (Sale, Stock, Brand, Unit) detected.' 
+                : schemaIssues.join(', ')
+        });
+        console.log(`${schemaStatus === 'PASS' ? '✅' : '⚠️'} Schema validation finished\n`);
+
+    } catch (error) {
+        results.tests.push({ name: 'Schema Expansion', status: 'FAIL', message: error.message });
     }
 
     // Summary

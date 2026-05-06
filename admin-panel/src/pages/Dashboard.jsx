@@ -1,8 +1,17 @@
-import { Link, useNavigate } from 'react-router-dom';
-import { FiPackage, FiShoppingBag, FiDollarSign, FiMessageSquare, FiTag, FiPlus, FiRefreshCcw } from 'react-icons/fi';
+import { useNavigate } from 'react-router-dom';
+import { 
+    FiPackage, FiShoppingBag, FiDollarSign, FiMessageSquare, 
+    FiTag, FiPlus, FiRefreshCcw, FiBell, FiCpu, FiTrendingUp, 
+    FiActivity, FiUsers, FiCalendar, FiArrowUpRight, FiArrowDownRight, FiLogOut 
+} from 'react-icons/fi';
+import { 
+    LineChart, Line, AreaChart, Area, XAxis, YAxis, 
+    CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell 
+} from 'recharts';
 import useAdminAuthStore from '../stores/adminAuthStore';
-import { useEffect, useState } from 'react';
-import { databases, DATABASE_ID, COLLECTIONS } from '../lib/appwrite';
+import { useEffect, useState, useMemo } from 'react';
+import { client, DATABASE_ID, COLLECTIONS, Query, db } from '../lib/appwrite';
+import Sidebar from '../components/Sidebar';
 
 const Dashboard = () => {
     const admin = useAdminAuthStore((state) => state.admin);
@@ -14,157 +23,457 @@ const Dashboard = () => {
         prices: 0,
         supermarkets: 0,
         categories: 0,
-        feedback: 0
+        pendingReports: 0,
+        outOfStock: 0,
+        announcements: 0,
+        chats: 0
     });
     const [loading, setLoading] = useState(true);
+    const [rawProducts, setRawProducts] = useState([]);
+    const [rawPrices, setRawPrices] = useState([]);
+    const [rawSupermarkets, setRawSupermarkets] = useState([]);
+    const [lastUpdated, setLastUpdated] = useState(null);
+    const [isFresh, setIsFresh] = useState(false);
 
     const fetchStats = async () => {
         setLoading(true);
         try {
-            // Fetch counts from all collections
-            // Note: We use limit(0) to just get the total count without fetching heavy documents if possible,
-            // otherwise listDocuments returns total.
-            const [products, prices, markets, cats, feedback] = await Promise.all([
-                databases.listDocuments(DATABASE_ID, COLLECTIONS.PRODUCTS),
-                databases.listDocuments(DATABASE_ID, COLLECTIONS.PRICES),
-                databases.listDocuments(DATABASE_ID, COLLECTIONS.SUPERMARKETS),
-                databases.listDocuments(DATABASE_ID, COLLECTIONS.CATEGORIES),
-                databases.listDocuments(DATABASE_ID, COLLECTIONS.FEEDBACK)
+            const safeList = async (listFn, label) => {
+                try {
+                    return await listFn();
+                } catch (error) {
+                    console.warn(`Dashboard: Failed to fetch ${label}:`, error.message);
+                    return { total: 0, documents: [] };
+                }
+            };
+
+            const [
+                productsRes,
+                pricesRes,
+                categoriesRes,
+                supermarketsRes,
+                pendingReportsRes,
+                outOfStockRes,
+                announcementsRes,
+                chatsRes
+            ] = await Promise.all([
+                safeList(() => db.products.list([
+                    Query.limit(200),
+                    Query.orderDesc('$createdAt'),
+                    Query.select(['$id', '$createdAt', 'categoryId', 'categoryId.$id'])
+                ]), 'products'),
+                safeList(() => db.prices.list([
+                    Query.limit(200),
+                    Query.orderDesc('$createdAt'),
+                    Query.select(['$id', '$createdAt'])
+                ]), 'prices'),
+                safeList(() => db.categories.list([Query.limit(1)]), 'categories'),
+                safeList(() => db.supermarkets.list([
+                    Query.limit(200),
+                    Query.select(['$id', 'name'])
+                ]), 'supermarkets'),
+                safeList(() => db.feedback.list([
+                    Query.equal('status', 'pending'),
+                    Query.limit(1)
+                ]), 'pending reports'),
+                safeList(() => db.prices.list([
+                    Query.equal('stockStatus', 'out_of_stock'),
+                    Query.limit(1)
+                ]), 'stock issues'),
+                safeList(() => db.announcements.list([Query.limit(1)]), 'announcements'),
+                safeList(() => db.chatHistory.list([Query.limit(1)]), 'chat history')
             ]);
 
+            setRawProducts(productsRes.documents || []);
+            setRawPrices(pricesRes.documents || []);
+            setRawSupermarkets(supermarketsRes.documents || []);
+
             setStats({
-                products: products.total,
-                prices: prices.total,
-                supermarkets: markets.total,
-                categories: cats.total,
-                feedback: feedback.total
+                products: productsRes.total || 0,
+                prices: pricesRes.total || 0,
+                supermarkets: supermarketsRes.total || 0,
+                categories: categoriesRes.total || 0,
+                pendingReports: pendingReportsRes.total || 0,
+                outOfStock: outOfStockRes.total || 0,
+                announcements: announcementsRes.total || 0,
+                chats: chatsRes.total || 0
             });
+            setLastUpdated(new Date().toISOString());
         } catch (error) {
             console.error('Error fetching dashboard stats:', error);
         }
         setLoading(false);
     };
 
+    const getWeeklyTrend = (items = [], dateField = '$createdAt') => {
+        if (!items.length) return null;
+        const now = new Date();
+        const currentStart = new Date(now);
+        currentStart.setDate(now.getDate() - 7);
+        const previousStart = new Date(now);
+        previousStart.setDate(now.getDate() - 14);
+
+        const currentCount = items.filter((item) => new Date(item[dateField]) >= currentStart).length;
+        const previousCount = items.filter((item) => {
+            const date = new Date(item[dateField]);
+            return date >= previousStart && date < currentStart;
+        }).length;
+
+        if (previousCount === 0) {
+            if (currentCount === 0) return null;
+            return { text: `+${currentCount}`, isUp: true };
+        }
+
+        const change = ((currentCount - previousCount) / previousCount) * 100;
+        const sign = change >= 0 ? '+' : '';
+        return { text: `${sign}${change.toFixed(1)}%`, isUp: change >= 0 };
+    };
+
+    const productTrend = useMemo(() => getWeeklyTrend(rawProducts), [rawProducts]);
+    const priceTrend = useMemo(() => getWeeklyTrend(rawPrices), [rawPrices]);
+
+    // Process Market Distribution Data for Chart
+    const marketChartData = useMemo(() => {
+        if (!rawProducts.length || !rawSupermarkets.length) return [];
+
+        const counts = {};
+        rawProducts.forEach((product) => {
+            const field = product.supermarkets;
+            let marketId = null;
+            if (Array.isArray(field)) {
+                marketId = field[0]?.$id || field[0] || null;
+            } else if (typeof field === 'object' && field) {
+                marketId = field.$id || null;
+            } else if (typeof field === 'string') {
+                marketId = field;
+            }
+
+            if (marketId) {
+                counts[marketId] = (counts[marketId] || 0) + 1;
+            }
+        });
+
+        const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
+        return rawSupermarkets
+            .map((market, i) => ({
+                name: market.name || 'Unknown Market',
+                value: counts[market.$id] || 0,
+                color: colors[i % colors.length]
+            }))
+            .filter((item) => item.value > 0)
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 5);
+    }, [rawProducts, rawSupermarkets]);
+
+    // Process Price Trends Data (Grouped by creation date)
+    const priceTrendsData = useMemo(() => {
+        if (!rawPrices.length) return [];
+        
+        const last7Days = [...Array(7)].map((_, i) => {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            return d.toISOString().split('T')[0];
+        }).reverse();
+
+        const dailyCounts = {};
+        rawPrices.forEach(p => {
+            const date = p.$createdAt.split('T')[0];
+            dailyCounts[date] = (dailyCounts[date] || 0) + 1;
+        });
+
+        return last7Days.map(date => ({
+            name: new Date(date).toLocaleDateString('en-US', { weekday: 'short' }),
+            updates: dailyCounts[date] || 0
+        }));
+    }, [rawPrices]);
+
     useEffect(() => {
         fetchStats();
+        const channels = [
+            `databases.${DATABASE_ID}.collections.${COLLECTIONS.PRODUCTS}.documents`,
+            `databases.${DATABASE_ID}.collections.${COLLECTIONS.PRICES}.documents`,
+            `databases.${DATABASE_ID}.collections.${COLLECTIONS.CATEGORIES}.documents`,
+            `databases.${DATABASE_ID}.collections.${COLLECTIONS.SUPERMARKETS}.documents`,
+            `databases.${DATABASE_ID}.collections.${COLLECTIONS.FEEDBACK}.documents`,
+            `databases.${DATABASE_ID}.collections.${COLLECTIONS.ANNOUNCEMENTS}.documents`,
+            `databases.${DATABASE_ID}.collections.${COLLECTIONS.CHAT_HISTORY}.documents`
+        ];
+        const unsubscribe = client.subscribe(channels, () => {
+            fetchStats();
+        });
+        return () => unsubscribe();
     }, []);
 
-    // Helper Card Component
-    const StatCard = ({ title, count, icon: Icon, colorClass, link, bgClass }) => (
-        <Link
-            to={link}
-            className={`bg-white dark:bg-gray-800 p-6 rounded-lg shadow hover:shadow-lg transition cursor-pointer border border-transparent dark:border-gray-700 relative overflow-hidden`}
-        >
-            <div className="flex justify-between items-start">
-                <div>
-                    <h2 className="text-gray-500 dark:text-gray-400 text-sm font-medium uppercase tracking-wide">{title}</h2>
-                    <p className={`text-4xl font-bold mt-2 ${loading ? 'animate-pulse bg-gray-200 dark:bg-gray-700 h-10 w-20 rounded text-transparent' : 'text-gray-800 dark:text-white'}`}>
-                        {loading ? '-' : count}
-                    </p>
-                </div>
-                <div className={`p-3 rounded-lg ${bgClass}`}>
-                    <Icon className={`${colorClass} text-2xl`} />
-                </div>
-            </div>
-            <div className="mt-4 flex items-center text-sm text-blue-600 dark:text-blue-400 font-medium">
-                View Details →
-            </div>
-        </Link>
-    );
+    useEffect(() => {
+        if (!lastUpdated) return;
+        setIsFresh(true);
+        const timer = setTimeout(() => setIsFresh(false), 1200);
+        return () => clearTimeout(timer);
+    }, [lastUpdated]);
+
+    const handleLogout = async () => {
+        await logout();
+        navigate('/login');
+    };
 
     return (
-        <div className="min-h-screen bg-gray-100 dark:bg-gray-900 font-sans">
-            <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10">
-                <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                        <div className="bg-blue-600 p-1.5 rounded text-white">
-                            <FiPackage />
-                        </div>
-                        <h1 className="text-xl font-bold text-gray-800 dark:text-white">PriceMate Admin</h1>
-                    </div>
-                    <div className="flex items-center gap-4">
-                        <button onClick={fetchStats} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition" title="Refresh Data">
-                            <FiRefreshCcw className={loading ? 'animate-spin' : ''} />
-                        </button>
-                        <div className="h-6 w-px bg-gray-200 dark:bg-gray-700"></div>
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold">
-                                {admin?.name?.charAt(0) || 'A'}
-                            </div>
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 hidden md:block">{admin?.name || 'Admin'}</span>
-                        </div>
-                        <button
-                            onClick={logout}
-                            className="text-sm text-red-600 hover:text-red-700 font-medium px-3 py-1.5 rounded hover:bg-red-50 transition"
-                        >
-                            Logout
-                        </button>
-                    </div>
-                </div>
-            </header>
-
-            <main className="max-w-7xl mx-auto px-6 py-8">
-                <div className="flex justify-between items-end mb-8">
+        <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden font-sans text-gray-900 dark:text-gray-100 uppercase-none">
+            <Sidebar />
+            
+            <div className="flex-1 flex flex-col h-screen overflow-y-auto custom-scrollbar">
+                {/* Modern Header */}
+                <header className="sticky top-0 z-20 bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-700 px-8 py-5 flex justify-between items-center">
                     <div>
-                        <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Overview</h2>
-                        <p className="text-gray-500 dark:text-gray-400 mt-1">Here's what's happening in your app today.</p>
+                        <div className="flex items-center gap-3">
+                            <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">Executive Dashboard</h1>
+                            <span className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-green-600 bg-green-50 px-2.5 py-1 rounded-full">
+                                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                                Live
+                            </span>
+                            <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${isFresh ? 'text-green-600' : 'text-gray-400'}`}>
+                                Updated {lastUpdated ? new Date(lastUpdated).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                            </span>
+                        </div>
+                        <p className="text-sm text-gray-500 font-medium tracking-tight">System health and real-time market overview</p>
                     </div>
-                    <div className="flex gap-3">
-                        <button
-                            onClick={() => navigate('/products')}
-                            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700 transition"
-                        >
-                            <FiPlus /> Add Product
-                        </button>
+                    <div className="flex items-center gap-6">
+                        <div className="hidden md:flex flex-col items-end">
+                            <span className="text-sm font-black text-gray-900 dark:text-white tracking-widest uppercase">{admin?.name || 'Admin'}</span>
+                            <span className="text-[10px] font-black uppercase text-green-500 flex items-center gap-1.5">
+                                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]"></span> Node Active
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button 
+                                onClick={fetchStats}
+                                className="p-2.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-2xl transition-all active:scale-95 border border-gray-200 dark:border-gray-600 shadow-sm"
+                                title="Sync Data"
+                            >
+                                <FiRefreshCcw className={loading ? 'animate-spin' : ''} />
+                            </button>
+                            <button 
+                                onClick={handleLogout}
+                                className="p-2.5 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-2xl transition-all active:scale-95 border border-rose-100 dark:border-rose-900/50 shadow-sm"
+                                title="Exit System"
+                            >
+                                <FiLogOut size={20} />
+                            </button>
+                        </div>
                     </div>
-                </div>
+                </header>
 
-                {/* Stats Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6 mb-10">
-                    <StatCard
-                        title="Total Products"
-                        count={stats.products}
-                        icon={FiPackage}
-                        colorClass="text-blue-600"
-                        bgClass="bg-blue-100 dark:bg-blue-900"
-                        link="/products"
-                    />
-                    <StatCard
-                        title="Price Entries"
-                        count={stats.prices}
-                        icon={FiDollarSign}
-                        colorClass="text-green-600"
-                        bgClass="bg-green-100 dark:bg-green-900"
-                        link="/prices"
-                    />
-                    <StatCard
-                        title="Supermarkets"
-                        count={stats.supermarkets}
-                        icon={FiShoppingBag}
-                        colorClass="text-purple-600"
-                        bgClass="bg-purple-100 dark:bg-purple-900"
-                        link="/supermarkets"
-                    />
-                    <StatCard
-                        title="Categories"
-                        count={stats.categories}
-                        icon={FiTag}
-                        colorClass="text-orange-600"
-                        bgClass="bg-orange-100 dark:bg-orange-900"
-                        link="/categories"
-                    />
-                    <StatCard
-                        title="Feedback"
-                        count={stats.feedback}
-                        icon={FiMessageSquare}
-                        colorClass="text-indigo-600"
-                        bgClass="bg-indigo-100 dark:bg-indigo-900"
-                        link="/feedback"
-                    />
-                </div>
+                <main className="flex-1 p-8 space-y-8 max-w-[1600px] mx-auto w-full">
+                    {/* Key Metrics Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <MetricCard 
+                            title="Total Products" 
+                            value={stats.products} 
+                            icon={FiPackage} 
+                            trend={productTrend?.text || ''} 
+                            isUp={productTrend?.isUp ?? true} 
+                            color="blue" 
+                            loading={loading}
+                        />
+                        <MetricCard 
+                            title="Active Market Prices" 
+                            value={stats.prices} 
+                            icon={FiDollarSign} 
+                            trend={priceTrend?.text || ''} 
+                            isUp={priceTrend?.isUp ?? true} 
+                            color="emerald" 
+                            loading={loading}
+                        />
+                        <MetricCard 
+                            title="User reports (pending)" 
+                            value={stats.pendingReports} 
+                            icon={FiActivity} 
+                            trend={''} 
+                            isUp={true} 
+                            color="rose" 
+                            loading={loading}
+                        />
+                        <MetricCard 
+                            title="Supermarket Nodes" 
+                            value={stats.supermarkets} 
+                            icon={FiShoppingBag} 
+                            trend={''} 
+                            isUp={true} 
+                            color="amber" 
+                            loading={loading}
+                        />
+                    </div>
 
-            </main>
+                    {/* Analytics Section */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        {/* Traffic Overview */}
+                        <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col h-[450px]">
+                            <div className="flex justify-between items-start mb-8">
+                                <div>
+                                    <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tight">Price Activity</h3>
+                                    <p className="text-[10px] text-gray-400 uppercase tracking-[0.2em] font-black">Updates in the last 7 days</p>
+                                </div>
+                                <div className="flex gap-2">
+                                    <span className="flex items-center gap-1.5 text-[10px] font-black text-blue-600 bg-blue-50 px-3 py-1 rounded-full uppercase">
+                                        <div className="w-1.5 h-1.5 bg-blue-600 rounded-full"></div> Activity
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="flex-1 w-full -ml-4">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={priceTrendsData}>
+                                        <defs>
+                                            <linearGradient id="colorSearches" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3}/>
+                                                <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8', fontWeight: 700}} />
+                                        <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8', fontWeight: 700}} />
+                                        <Tooltip 
+                                            contentStyle={{borderRadius: '20px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', padding: '12px 16px', backgroundColor: '#fff', color: '#000'}}
+                                            itemStyle={{fontSize: '12px', fontWeight: 800}}
+                                        />
+                                        <Area type="monotone" dataKey="updates" stroke="#3B82F6" fillOpacity={1} fill="url(#colorSearches)" strokeWidth={4} dot={{fill: '#3B82F6', strokeWidth: 2, r: 4}} activeDot={{r: 6, strokeWidth: 0}} />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+
+                        {/* Market distribution chart */}
+                        <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col h-[450px]">
+                            <div className="mb-8">
+                                <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tight">Market Distribution</h3>
+                                <p className="text-[10px] text-gray-400 uppercase tracking-[0.2em] font-black">Products per Market</p>
+                            </div>
+                            <div className="flex-1 w-full">
+                                {marketChartData.length === 0 ? (
+                                    <div className="h-full flex flex-col items-center justify-center text-center px-6">
+                                        <div className="w-16 h-16 rounded-2xl bg-gray-50 dark:bg-gray-900 flex items-center justify-center text-gray-300 dark:text-gray-600 mb-4">
+                                            <FiPackage size={28} />
+                                        </div>
+                                        <p className="text-sm font-bold text-gray-500">No market distribution yet</p>
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mt-2">Assign products to markets to populate this chart</p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={marketChartData} layout="vertical" margin={{left: -20}}>
+                                                <XAxis type="number" hide />
+                                                <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fontSize: 11, fill: '#475569', fontWeight: 800}} width={100} />
+                                                <Tooltip cursor={{fill: 'transparent'}} contentStyle={{backgroundColor: '#fff', color: '#000'}} />
+                                                <Bar dataKey="value" radius={[0, 12, 12, 0]} barSize={32}>
+                                                    {marketChartData.map((entry, index) => (
+                                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                                    ))}
+                                                </Bar>
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                        <div className="mt-6 space-y-3">
+                                            {marketChartData.map((market, i) => (
+                                                <div key={i} className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-gray-500">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-2 h-2 rounded-full" style={{backgroundColor: market.color}}></div>
+                                                        {market.name}
+                                                    </div>
+                                                    <span className="text-gray-900 dark:text-white">{market.value} Products</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Quick Access Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pb-8">
+                         <QuickStatus 
+                            title="AI Chat Logs" 
+                            value={stats.chats} 
+                            subText="Total stored messages" 
+                            icon={FiCpu} 
+                            color="blue"
+                            onClick={() => navigate('/chat-history')}
+                         />
+                         <QuickStatus 
+                            title="System Broadcasts" 
+                            value={stats.announcements} 
+                            subText="Active Platform Alerts" 
+                            icon={FiBell} 
+                            color="amber"
+                            onClick={() => navigate('/announcements')}
+                         />
+                         <QuickStatus 
+                            title="User reports queue" 
+                            value={stats.pendingReports} 
+                            subText="Resolution Required" 
+                            icon={FiMessageSquare} 
+                            color="rose"
+                            onClick={() => navigate('/feedback')}
+                         />
+                    </div>
+                </main>
+            </div>
         </div>
+    );
+};
+
+const MetricCard = ({ title, value, icon: Icon, trend, isUp, color, loading }) => {
+    const colorMap = {
+        blue: 'text-blue-600 bg-blue-50 border-blue-100 dark:bg-blue-900/30 dark:border-blue-800',
+        emerald: 'text-emerald-600 bg-emerald-50 border-emerald-100 dark:bg-emerald-900/30 dark:border-emerald-800',
+        rose: 'text-rose-600 bg-rose-50 border-rose-100 dark:bg-rose-900/30 dark:border-rose-800',
+        amber: 'text-amber-600 bg-amber-50 border-amber-100 dark:bg-amber-900/30 dark:border-amber-800',
+    };
+
+    return (
+        <div className="bg-white dark:bg-gray-800 p-7 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm relative group overflow-hidden transition-all hover:scale-[1.02] hover:shadow-xl">
+            <div className="absolute -top-4 -right-4 p-4 opacity-[0.03] group-hover:scale-150 transition-transform duration-500">
+                <Icon size={120} />
+            </div>
+            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 border-2 ${colorMap[color]}`}>
+                <Icon size={26} strokeWidth={2.5} />
+            </div>
+            <h4 className="text-gray-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2">{title}</h4>
+            <div className="flex items-baseline gap-3">
+                <span className={`text-3xl font-black tracking-tighter text-gray-900 dark:text-white ${loading ? 'animate-pulse opacity-20' : ''}`}>
+                    {loading ? '--' : value.toLocaleString()}
+                </span>
+                {trend ? (
+                    <span className={`text-[10px] font-black px-2.5 py-1 rounded-full flex items-center gap-1 ${isUp ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                        {isUp ? <FiArrowUpRight size={12} /> : <FiArrowDownRight size={12} />} {trend}
+                    </span>
+                ) : null}
+            </div>
+        </div>
+    );
+};
+
+const QuickStatus = ({ title, value, subText, icon: Icon, color, onClick }) => {
+    const colorMap = {
+        blue: 'bg-blue-600 shadow-blue-500/30',
+        amber: 'bg-amber-500 shadow-amber-500/30',
+        rose: 'bg-rose-500 shadow-rose-500/30',
+    };
+
+    return (
+        <button 
+            onClick={onClick}
+            className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm flex items-center gap-6 group hover:translate-y-[-6px] transition-all text-left w-full"
+        >
+            <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center text-white shadow-2xl transition-transform group-hover:rotate-12 ${colorMap[color]}`}>
+                <Icon size={28} strokeWidth={2.5} />
+            </div>
+            <div>
+                <h4 className="text-2xl font-black text-gray-900 dark:text-white leading-none mb-1.5 group-hover:text-blue-600 transition-colors">{value}</h4>
+                <p className="text-sm font-black text-gray-500 tracking-tight leading-none mb-2">{title}</p>
+                <div className="flex items-center gap-1.5 opacity-60">
+                    <div className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
+                    <p className="text-[9px] uppercase font-black tracking-widest text-gray-400">{subText}</p>
+                </div>
+            </div>
+        </button>
     );
 };
 

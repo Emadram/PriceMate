@@ -1,79 +1,162 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Mail, Lock, User, ArrowRight, Loader2, CheckCircle2 } from 'lucide-react';
 import useAuthStore from '../stores/authStore';
+import BackButton from '../components/BackButton';
 
 const Register = () => {
-    const [name, setName] = useState('');
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
+    const [formData, setFormData] = useState({
+        name: '',
+        email: '',
+        password: ''
+    });
     const signup = useAuthStore((state) => state.signup);
     const error = useAuthStore((state) => state.error);
+    const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        const success = await signup(email, password, name);
+        setLoading(true);
+        const success = await signup(formData.email, formData.password, formData.name);
         if (success) {
-            navigate('/');
+            // Redirect to login page instead of Home, since they are logged out
+            // until they verify their email.
+            navigate('/login');
         }
+        setLoading(false);
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 px-4 transition-colors">
-            <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-md p-8">
-                <Link to="/" className="flex justify-center mb-6">
-                    <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-md">
-                        P
+        <div className="min-h-screen bg-[#F5F5F7] dark:bg-black flex flex-col px-6 py-12 relative overflow-hidden">
+            {/* Soft background decor */}
+            <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/5 rounded-full blur-[120px] pointer-events-none"></div>
+            <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-500/5 rounded-full blur-[120px] pointer-events-none"></div>
+
+            <div className="max-w-md mx-auto w-full mb-8">
+                <BackButton to="/" />
+            </div>
+
+            <div className="sm:mx-auto sm:w-full sm:max-w-md relative">
+                <div className="flex justify-center mb-8">
+                    <div className="w-16 h-16 bg-blue-600 rounded-[2rem] flex items-center justify-center shadow-xl shadow-blue-500/20 active:scale-95 transition-transform cursor-pointer">
+                        <span className="text-white font-black text-3xl tracking-tighter">P</span>
                     </div>
-                </Link>
-                <h2 className="text-2xl font-bold text-center mb-6 text-gray-800 dark:text-white">Create an Account</h2>
-                {error && <div className="bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-200 p-3 rounded mb-4">{error}</div>}
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label className="block text-gray-700 dark:text-gray-300 mb-1">Name</label>
-                        <input
-                            type="text"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                            required
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-gray-700 dark:text-gray-300 mb-1">Email</label>
-                        <input
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                            required
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-gray-700 dark:text-gray-300 mb-1">Password</label>
-                        <input
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                            required
-                        />
-                    </div>
-                    <button
-                        type="submit"
-                        className="w-full bg-green-600 dark:bg-green-500 text-white py-2 rounded hover:bg-green-700 dark:hover:bg-green-600 transition duration-200"
-                    >
-                        Register
-                    </button>
-                </form>
-                <div className="mt-4 text-center">
-                    <p className="text-gray-600 dark:text-gray-400">
-                        Already have an account?{' '}
-                        <Link to="/login" className="text-blue-600 dark:text-blue-400 hover:underline">
-                            Login
-                        </Link>
-                    </p>
                 </div>
+                
+                <h2 className="text-center text-4xl font-black tracking-tight text-gray-900 dark:text-white">
+                    Join PriceMate
+                </h2>
+                <p className="mt-3 text-center text-gray-400 dark:text-gray-500 text-[10px] font-black uppercase tracking-[0.2em]">
+                    START SAVING ON EVERY SHOPPING TRIP
+                </p>
+            </div>
+
+            <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-md relative">
+                <div className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl py-10 px-8 shadow-soft border border-white dark:border-white/5 rounded-[3rem]">
+                    <form className="space-y-5" onSubmit={handleSubmit}>
+                        {error && (
+                            <div className="bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 rounded-2xl p-4 animate-in fade-in slide-in-from-top-2">
+                                <p className="text-xs text-red-600 dark:text-red-400 font-bold text-center uppercase tracking-wider">{error}</p>
+                            </div>
+                        )}
+
+                        <div className="space-y-2">
+                            <label htmlFor="name" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500 ml-1">
+                                Full Name
+                            </label>
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
+                                    <User className="h-4 w-4 text-gray-300 group-focus-within:text-blue-500 transition-colors" />
+                                </div>
+                                <input
+                                    id="name"
+                                    type="text"
+                                    required
+                                    value={formData.name}
+                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                    placeholder="John Doe"
+                                    className="block w-full pl-12 pr-6 py-4 bg-gray-50/50 dark:bg-black/20 border-gray-100 dark:border-white/5 focus:bg-white dark:focus:bg-black border focus:border-blue-500 dark:focus:border-blue-500 rounded-2xl text-[15px] font-bold transition-all outline-none text-gray-900 dark:text-white placeholder:text-gray-300 dark:placeholder:text-gray-700 shadow-inner"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label htmlFor="email" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500 ml-1">
+                                Email Address
+                            </label>
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
+                                    <Mail className="h-4 w-4 text-gray-300 group-focus-within:text-blue-500 transition-colors" />
+                                </div>
+                                <input
+                                    id="email"
+                                    type="email"
+                                    required
+                                    value={formData.email}
+                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                    placeholder="name@example.com"
+                                    className="block w-full pl-12 pr-6 py-4 bg-gray-50/50 dark:bg-black/20 border-gray-100 dark:border-white/5 focus:bg-white dark:focus:bg-black border focus:border-blue-500 dark:focus:border-blue-500 rounded-2xl text-[15px] font-bold transition-all outline-none text-gray-900 dark:text-white placeholder:text-gray-300 dark:placeholder:text-gray-700 shadow-inner"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label htmlFor="password" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500 ml-1">
+                                Password
+                            </label>
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
+                                    <Lock className="h-4 w-4 text-gray-300 group-focus-within:text-blue-500 transition-colors" />
+                                </div>
+                                <input
+                                    id="password"
+                                    type="password"
+                                    required
+                                    value={formData.password}
+                                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                    placeholder="Minimum 8 characters"
+                                    className="block w-full pl-12 pr-6 py-4 bg-gray-50/50 dark:bg-black/20 border-gray-100 dark:border-white/5 focus:bg-white dark:focus:bg-black border focus:border-blue-500 dark:focus:border-blue-500 rounded-2xl text-[15px] font-bold transition-all outline-none text-gray-900 dark:text-white placeholder:text-gray-300 dark:placeholder:text-gray-700 shadow-inner"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="py-2">
+                           <div className="flex items-start gap-3 px-1">
+                                <CheckCircle2 className="w-4 h-4 text-green-500 mt-1 shrink-0" />
+                                <p className="text-[11px] text-gray-400 font-medium leading-relaxed uppercase tracking-wider">
+                                    I agree to the <span className="text-blue-600 font-black cursor-pointer">Terms</span> and <span className="text-blue-600 font-black cursor-pointer">Privacy Policy</span>.
+                                </p>
+                           </div>
+                        </div>
+
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400 font-medium text-center">
+                            We will email a verification link to activate your account.
+                        </p>
+
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full flex items-center justify-center gap-2 py-4 px-4 bg-blue-600 text-white rounded-[1.5rem] text-[15px] font-black uppercase tracking-[0.2em] hover:bg-black dark:hover:bg-white dark:hover:text-black active:scale-[0.98] transition-all focus:outline-none disabled:opacity-50 disabled:active:scale-100 shadow-xl shadow-blue-500/20"
+                        >
+                            {loading ? (
+                                <Loader2 className="h-5 w-5 animate-spin" />
+                            ) : (
+                                <>
+                                    <span>Create Account</span>
+                                    <ArrowRight className="h-4 w-4" />
+                                </>
+                            )}
+                        </button>
+                    </form>
+                </div>
+
+                <p className="mt-10 text-center text-[14px] text-gray-500 font-medium">
+                    Already have an account?{' '}
+                    <Link to="/login" className="font-black text-blue-600 dark:text-blue-500 hover:text-black dark:hover:text-white transition-colors uppercase tracking-widest text-[11px] ml-1">
+                        Sign in
+                    </Link>
+                </p>
             </div>
         </div>
     );

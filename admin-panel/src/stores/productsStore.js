@@ -1,22 +1,91 @@
 import { create } from 'zustand';
-import { databases, APPWRITE_CONFIG } from '../lib/appwrite';
+import { db, storage, getAppwriteConfig } from '../lib/appwrite';
 import { ID, Query } from 'appwrite';
 
-const useProductsStore = create((set) => ({
+const { endpoint: APPWRITE_ENDPOINT, projectId: APPWRITE_PROJECT_ID } = getAppwriteConfig();
+const PRODUCT_IMAGES_BUCKET = import.meta.env.VITE_APPWRITE_BUCKET_SUPERMARKET_LOGOS || 'product-images';
+
+/** Optional product nutrition for in-app AI (Appwrite `products` attributes must exist). */
+const attachOptionalNutrition = (payload, data, { allowNullClear = false } = {}) => {
+    const rawSugars = data.sugarsPer100g;
+    const rawSodium = data.sodiumMgPer100g;
+
+    const sugarsEmpty = rawSugars === undefined || rawSugars === null || String(rawSugars).trim() === '';
+    const sodiumEmpty = rawSodium === undefined || rawSodium === null || String(rawSodium).trim() === '';
+
+    if (!sugarsEmpty) {
+        const n = parseFloat(String(rawSugars).replace(',', '.'));
+        if (Number.isFinite(n)) payload.sugarsPer100g = n;
+    } else if (allowNullClear) {
+        payload.sugarsPer100g = null;
+    }
+
+    if (!sodiumEmpty) {
+        const n = parseFloat(String(rawSodium).replace(',', '.'));
+        if (Number.isFinite(n)) payload.sodiumMgPer100g = n;
+    } else if (allowNullClear) {
+        payload.sodiumMgPer100g = null;
+    }
+
+    if (data.ingredientsText !== undefined && data.ingredientsText !== null) {
+        const t = String(data.ingredientsText).trim();
+        if (t || allowNullClear) payload.ingredientsText = t || null;
+    }
+
+    if (data.nutritionSource !== undefined && data.nutritionSource !== null) {
+        const t = String(data.nutritionSource).trim();
+        if (t || allowNullClear) payload.nutritionSource = t || null;
+    }
+
+    return payload;
+};
+
+const useProductsStore = create((set, get) => ({
     products: [],
     loading: false,
     error: null,
+    total: 0,
+    page: 1,
+    limit: 10,
 
-    fetchProducts: async () => {
+    setPage: (page) => set({ page }),
+
+    fetchProducts: async (page = 1) => {
         set({ loading: true, error: null });
         try {
-            const response = await databases.listDocuments(
-                APPWRITE_CONFIG.DATABASE_ID,
-                APPWRITE_CONFIG.COLLECTIONS.PRODUCTS
-            );
-            set({ products: response.documents, loading: false });
+            const limit = get().limit;
+            const offset = (page - 1) * limit;
+
+            const response = await db.products.list([
+                Query.limit(limit),
+                Query.offset(offset),
+                Query.orderDesc('$createdAt')
+            ]);
+            set({ 
+                products: response.documents, 
+                total: response.total,
+                page: page,
+                loading: false 
+            });
         } catch (error) {
             set({ error: error.message, loading: false });
+        }
+    },
+
+    uploadProductImage: async (file) => {
+        if (!file) return '';
+        try {
+            const response = await storage.createFile(
+                PRODUCT_IMAGES_BUCKET,
+                ID.unique(),
+                file
+            );
+
+            return `${APPWRITE_ENDPOINT}/storage/buckets/${PRODUCT_IMAGES_BUCKET}/files/${response.$id}/view?project=${APPWRITE_PROJECT_ID}`;
+        } catch (error) {
+            console.error('Product image upload failed:', error);
+            set({ error: error.message });
+            return '';
         }
     },
 
@@ -45,14 +114,11 @@ const useProductsStore = create((set) => ({
                 payload.supermarkets = data.supermarkets;
             }
 
+            attachOptionalNutrition(payload, data);
+
             console.log('Payload being sent:', payload);
 
-            const result = await databases.createDocument(
-                APPWRITE_CONFIG.DATABASE_ID,
-                APPWRITE_CONFIG.COLLECTIONS.PRODUCTS,
-                ID.unique(),
-                payload
-            );
+            const result = await db.products.create(payload);
             console.log('Product created successfully:', result);
             await useProductsStore.getState().fetchProducts();
             set({ loading: false });
@@ -94,14 +160,11 @@ const useProductsStore = create((set) => ({
                 payload.supermarkets = data.supermarkets;
             }
 
+            attachOptionalNutrition(payload, data, { allowNullClear: true });
+
             console.log('Update payload:', payload);
 
-            const result = await databases.updateDocument(
-                APPWRITE_CONFIG.DATABASE_ID,
-                APPWRITE_CONFIG.COLLECTIONS.PRODUCTS,
-                id,
-                payload
-            );
+            const result = await db.products.update(id, payload);
             console.log('Product updated successfully:', result);
             await useProductsStore.getState().fetchProducts();
             set({ loading: false });
@@ -121,11 +184,7 @@ const useProductsStore = create((set) => ({
     deleteProduct: async (id) => {
         set({ loading: true, error: null });
         try {
-            await databases.deleteDocument(
-                APPWRITE_CONFIG.DATABASE_ID,
-                APPWRITE_CONFIG.COLLECTIONS.PRODUCTS,
-                id
-            );
+            await db.products.delete(id);
             await useProductsStore.getState().fetchProducts();
             set({ loading: false });
             return true;

@@ -1,13 +1,12 @@
 import { useState } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
-import { FiMessageSquare, FiSend, FiArrowLeft, FiCheckCircle } from 'react-icons/fi';
-import { databases, APPWRITE_CONFIG } from '../lib/appwrite';
+import { Navigate } from 'react-router-dom';
+import { FiMessageSquare, FiSend, FiCheckCircle } from 'react-icons/fi';
+import { db } from '../lib/appwrite';
 import useAuthStore from '../stores/authStore';
-import { ID } from 'appwrite';
+import BackButton from '../components/BackButton';
 
 const FeedbackPage = () => {
     const user = useAuthStore((state) => state.user);
-    const navigate = useNavigate();
 
     if (!user) return <Navigate to="/login" />;
     const [formData, setFormData] = useState({
@@ -22,10 +21,7 @@ const FeedbackPage = () => {
         setSubmitting(true);
 
         try {
-            await databases.createDocument(
-                APPWRITE_CONFIG.DATABASE_ID,
-                APPWRITE_CONFIG.COLLECTIONS.FEEDBACK,
-                ID.unique(),
+            await db.feedback.create(
                 {
                     userId: user.$id,
                     type: formData.type,
@@ -48,44 +44,50 @@ const FeedbackPage = () => {
 
     if (submitted) {
         return (
-            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center max-w-md">
-                    <div className="flex justify-center mb-4">
-                        <FiCheckCircle className="text-green-600 text-6xl" />
+            <div className="min-h-screen bg-[#F5F5F7] dark:bg-black text-gray-900 dark:text-gray-100 flex flex-col">
+                <header className="bg-white/80 dark:bg-black/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 dark:border-white/5 p-4">
+                    <div className="max-w-4xl mx-auto flex items-center justify-between">
+                        <BackButton to="/profile" label="Back to profile" />
+                        <h1 className="text-xl font-black text-gray-900 dark:text-white flex items-center gap-2">
+                            <FiMessageSquare className="text-blue-500" />
+                            Send Feedback
+                        </h1>
+                        <div className="w-10" />
                     </div>
-                    <h2 className="text-2xl font-bold text-green-600 mb-2">Thank You!</h2>
-                    <p className="text-gray-600 dark:text-gray-400 mb-4">Your feedback has been submitted.</p>
-                    <button
-                        onClick={() => navigate('/profile')}
-                        className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-2 mx-auto"
-                    >
-                        <FiArrowLeft /> Back to Profile
-                    </button>
+                </header>
+                <div className="flex-1 flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-soft p-8 text-center max-w-md w-full">
+                        <div className="flex justify-center mb-4">
+                            <FiCheckCircle className="text-green-600 text-6xl" />
+                        </div>
+                        <h2 className="text-2xl font-bold text-green-600 mb-2">Thank You!</h2>
+                        <p className="text-gray-600 dark:text-gray-400 mb-6">
+                            Your feedback has been submitted.
+                        </p>
+                        <div className="flex justify-center">
+                            <BackButton to="/profile" label="Back to profile" className="!w-auto !h-auto !rounded-xl px-5 py-2.5 gap-2 !inline-flex" />
+                        </div>
+                    </div>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
-            <header className="bg-white dark:bg-gray-800 shadow p-4">
-                <div className="max-w-2xl mx-auto flex items-center justify-between">
-                    <button
-                        onClick={() => navigate('/profile')}
-                        className="bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 p-2.5 rounded-full text-gray-700 dark:text-gray-200 shadow-sm transition-all"
-                        title="Go Back"
-                    >
-                        <FiArrowLeft size={20} />
-                    </button>
-                    <h1 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                        <FiMessageSquare /> Send Feedback
+        <div className="min-h-screen bg-[#F5F5F7] dark:bg-black text-gray-900 dark:text-gray-100 pb-20 transition-colors">
+            <header className="bg-white/80 dark:bg-black/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 dark:border-white/5 p-4">
+                <div className="max-w-4xl mx-auto flex items-center justify-between">
+                    <BackButton to="/profile" label="Back to profile" />
+                    <h1 className="text-xl font-black text-gray-900 dark:text-white flex items-center gap-2">
+                        <FiMessageSquare className="text-blue-500" />
+                        Send Feedback
                     </h1>
-                    <div className="w-16"></div>
+                    <div className="w-10" />
                 </div>
             </header>
 
-            <main className="max-w-2xl mx-auto p-4">
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <main className="max-w-4xl mx-auto p-4">
+                <div className="max-w-2xl mx-auto bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-soft p-6">
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
