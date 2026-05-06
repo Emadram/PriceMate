@@ -1,4 +1,6 @@
-#Docs
+# Docs & drafting (keep README at repo root tracked via exception below)
+docs/
+
 *.docx
 *.md
 
@@ -9,6 +11,9 @@
 *.txt
 *.pub
 .env
+.env_tmp
+DataBaseJason.json
+appwrite.config.json
 
 # Dependencies
 node_modules/
