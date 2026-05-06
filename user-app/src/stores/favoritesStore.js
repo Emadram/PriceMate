@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { databases, DATABASE_ID, COLLECTIONS, Query } from '../lib/appwrite';
-import { ID } from 'appwrite';
+import { db, Query } from '../lib/appwrite';
 import useAuthStore from './authStore';
 
 const useFavoritesStore = create(
@@ -16,19 +15,10 @@ const useFavoritesStore = create(
             syncFavorites: async () => {
                 const user = useAuthStore.getState().user;
                 if (!user) return;
-                if (!COLLECTIONS.FAVORITES) {
-                    if (!get()._warnedMissingFavorites) {
-                        console.warn('Favorites collection ID is not configured');
-                        set({ _warnedMissingFavorites: true });
-                    }
-                    return;
-                }
 
                 set({ loading: true });
                 try {
-                    const response = await databases.listDocuments(
-                        DATABASE_ID,
-                        COLLECTIONS.FAVORITES,
+                    const response = await db.favorites.list(
                         [Query.equal('userId', user.$id)]
                     );
 
@@ -47,7 +37,10 @@ const useFavoritesStore = create(
                     });
                 } catch (error) {
                     if (error?.code === 404) {
-                        console.warn('Favorites collection missing in Appwrite (404). Skipping sync.');
+                        if (!get()._warnedMissingFavorites) {
+                            console.warn('Favorites collection missing in Appwrite (404). Skipping sync.');
+                            set({ _warnedMissingFavorites: true });
+                        }
                     } else {
                         console.error('Error fetching favorites:', error);
                     }
@@ -58,46 +51,35 @@ const useFavoritesStore = create(
             // Products
             toggleProductFavorite: async (productId) => {
                 const user = useAuthStore.getState().user;
+                if (!user) return;
+
                 const { favoriteProducts } = get();
                 const isFavorite = favoriteProducts.includes(productId);
 
-                if (user) {
-                    try {
-                        if (isFavorite) {
-                            // Find and delete the document in Appwrite
-                            const response = await databases.listDocuments(
-                                DATABASE_ID,
-                                COLLECTIONS.FAVORITES,
-                                [
-                                    Query.equal('userId', user.$id),
-                                    Query.equal('productId', productId)
-                                ]
-                            );
+                try {
+                    if (isFavorite) {
+                        const response = await db.favorites.list(
+                            [
+                                Query.equal('userId', user.$id),
+                                Query.equal('productId', productId)
+                            ]
+                        );
 
-                            // Delete all matches just in case of duplicates
-                            for (const doc of response.documents) {
-                                await databases.deleteDocument(DATABASE_ID, COLLECTIONS.FAVORITES, doc.$id);
-                            }
-                        } else {
-                            // Create document in Appwrite
-                            await databases.createDocument(
-                                DATABASE_ID,
-                                COLLECTIONS.FAVORITES,
-                                ID.unique(),
-                                {
-                                    userId: user.$id,
-                                    productId: productId,
-                                    supermarketId: '' // Explicitly set to empty string if your collection allows it or depends on your schema
-                                }
-                            );
+                        for (const doc of response.documents) {
+                            await db.favorites.delete(doc.$id);
                         }
-                    } catch (error) {
-                        console.error('Error toggling product favorite in backend:', error);
-                        // Optionally show an alert or toast here
+                    } else {
+                        await db.favorites.create({
+                            userId: user.$id,
+                            productId: productId,
+                            supermarketId: ''
+                            }
+                        );
                     }
+                } catch (error) {
+                    console.error('Error toggling product favorite in backend:', error);
                 }
 
-                // Update local state regardless (provides instant feedback)
                 if (isFavorite) {
                     set({ favoriteProducts: favoriteProducts.filter(id => id !== productId) });
                 } else {
@@ -112,41 +94,32 @@ const useFavoritesStore = create(
             // Supermarkets
             toggleSupermarketFavorite: async (supermarketId) => {
                 const user = useAuthStore.getState().user;
+                if (!user) return;
+
                 const { favoriteSupermarkets } = get();
                 const isFavorite = favoriteSupermarkets.includes(supermarketId);
 
-                if (user) {
-                    try {
-                        if (isFavorite) {
-                            // Find and delete the document in Appwrite
-                            const response = await databases.listDocuments(
-                                DATABASE_ID,
-                                COLLECTIONS.FAVORITES,
-                                [
-                                    Query.equal('userId', user.$id),
-                                    Query.equal('supermarketId', supermarketId)
-                                ]
-                            );
+                try {
+                    if (isFavorite) {
+                        const response = await db.favorites.list(
+                            [
+                                Query.equal('userId', user.$id),
+                                Query.equal('supermarketId', supermarketId)
+                            ]
+                        );
 
-                            for (const doc of response.documents) {
-                                await databases.deleteDocument(DATABASE_ID, COLLECTIONS.FAVORITES, doc.$id);
-                            }
-                        } else {
-                            // Create document in Appwrite
-                            await databases.createDocument(
-                                DATABASE_ID,
-                                COLLECTIONS.FAVORITES,
-                                ID.unique(),
-                                {
-                                    userId: user.$id,
-                                    supermarketId: supermarketId,
-                                    productId: ''
-                                }
-                            );
+                        for (const doc of response.documents) {
+                            await db.favorites.delete(doc.$id);
                         }
-                    } catch (error) {
-                        console.error('Error toggling supermarket favorite in backend:', error);
+                    } else {
+                        await db.favorites.create({
+                            userId: user.$id,
+                            supermarketId: supermarketId,
+                            productId: ''
+                        });
                     }
+                } catch (error) {
+                    console.error('Error toggling supermarket favorite in backend:', error);
                 }
 
                 if (isFavorite) {

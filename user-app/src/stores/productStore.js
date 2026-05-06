@@ -1,34 +1,157 @@
 import { create } from 'zustand';
-import { databases, APPWRITE_CONFIG } from '../lib/appwrite';
-import { Query } from 'appwrite';
+import { db, Query } from '../lib/appwrite';
+import * as productUtils from '../utils/productUtils';
 
-const useProductStore = create((set) => ({
+const CACHE_STALENESS_LIMIT = 5 * 60 * 1000; // 5 minutes
+
+const useProductStore = create((set, get) => ({
+    // State
     product: null,
     prices: [],
+    searchResults: [],
     loading: false,
     error: null,
+    cache: {
+        products: {},
+        search: {},
+    },
+
+    addPrice: async (priceData) => {
+        set({ loading: true, error: null });
+        try {
+            const { productId, supermarketId, price, stockStatus, barcode } = priceData;
+
+            // 1. Create document in prices collection
+            await db.prices.create({
+                productId,
+                supermarketId,
+                price: parseFloat(price),
+                stockStatus,
+                updatedAt: new Date().toISOString()
+            });
+
+            // 2. Create document in price_history collection
+            try {
+                await db.priceHistory.create({
+                    productId,
+                    supermarketId,
+                    price: parseFloat(price),
+                    timestamp: new Date().toISOString()
+                });
+            } catch (historyErr) {
+                console.warn('Failed to Create Price History:', historyErr);
+            }
+
+            // Refresh product data
+            if (barcode) {
+                await get().fetchProductByBarcode(barcode);
+            } else if (productId) {
+                const currentProduct = get().product;
+                if (currentProduct && currentProduct.$id === productId) {
+                   await get().fetchProductByBarcode(currentProduct.barcode);
+                }
+            }
+
+            set({ loading: false });
+            return true;
+        } catch (error) {
+            set({ loading: false, error: error.message });
+            return false;
+        }
+    },
 
     fetchProductByBarcode: async (barcode) => {
         set({ loading: true, error: null, product: null, prices: [] });
+        
         try {
-            const response = await databases.listDocuments(
-                APPWRITE_CONFIG.DATABASE_ID,
-                APPWRITE_CONFIG.COLLECTIONS.PRODUCTS,
-                [Query.equal('barcode', barcode)]
-            );
-
-            if (response.documents.length === 0) {
-                set({ loading: false, error: 'Product not found' });
-                return null;
+            // Check cache
+            const cached = get().cache.products[barcode];
+            if (cached && (Date.now() - cached.timestamp < CACHE_STALENESS_LIMIT)) {
+                set({ 
+                    product: cached.product, 
+                    prices: cached.prices,
+                    loading: false 
+                });
+                return cached.product;
             }
 
-            const product = response.documents[0];
-            set({ product });
+            const fetchByBarcode = async (value) => db.products.list(
+                [
+                    Query.equal('barcode', value),
+                    Query.limit(1),
+                    Query.select(['*', 'categoryId.*'])
+                ]
+            );
 
-            // Fetch prices for this product
-            await useProductStore.getState().fetchPrices(product.$id);
+            let response = await fetchByBarcode(barcode);
 
-            set({ loading: false });
+            if (response.documents.length === 0) {
+                const numericBarcode = Number(barcode);
+                if (!Number.isNaN(numericBarcode) && String(numericBarcode) === String(barcode)) {
+                    response = await fetchByBarcode(numericBarcode);
+                }
+            }
+
+            if (response.documents.length === 0) {
+                response = await db.products.list(
+                    [
+                        Query.equal('$id', barcode),
+                        Query.limit(1),
+                        Query.select(['*', 'categoryId.*'])
+                    ]
+                );
+            }
+
+            let product = null;
+            let prices = [];
+
+            if (response.documents.length === 0) {
+                // Fallback to Global OpenFoodFacts API
+                const globalProduct = await productUtils.fetchGlobalProduct(barcode);
+                if (!globalProduct) {
+                    set({ loading: false, error: 'Product not found in local or global database' });
+                    return null;
+                }
+                product = productUtils.normalizeProduct(globalProduct);
+            } else {
+                product = response.documents[0];
+                const fetchPrices = async (attribute) => db.prices.list(
+                    [
+                        Query.equal(attribute, product.$id),
+                        Query.orderAsc('price'),
+                        Query.select(['*', 'supermarkets.*', 'products.*'])
+                    ]
+                );
+
+                try {
+                    const pricesRes = await fetchPrices('products');
+                    prices = pricesRes.documents;
+                } catch (priceError) {
+                    const message = priceError?.message || '';
+                    const isNetworkError = message.includes('NetworkError') || message.includes('Failed to fetch');
+                    if (isNetworkError) {
+                        console.warn('Prices temporarily unavailable due to network error.');
+                    } else {
+                        console.error('Price lookup failed:', priceError);
+                    }
+                    prices = [];
+                }
+            }
+
+            // Cache it
+            set((state) => ({
+                product,
+                prices,
+                loading: false,
+                cache: {
+                    ...state.cache,
+                    products: {
+                        ...state.cache.products,
+                        [barcode]: { product, prices, timestamp: Date.now() }
+                    }
+                }
+            }));
+
             return product;
         } catch (error) {
             set({ loading: false, error: error.message });
@@ -36,65 +159,47 @@ const useProductStore = create((set) => ({
         }
     },
 
-    fetchPrices: async (productId) => {
+    search: async (queryStr) => {
+        set({ loading: true, error: null });
+        const query = queryStr.trim().toLowerCase();
+
         try {
-            const response = await databases.listDocuments(
-                APPWRITE_CONFIG.DATABASE_ID,
-                APPWRITE_CONFIG.COLLECTIONS.PRICES,
-                [Query.equal('productId', productId), Query.orderAsc('price')]
+            // Quick Cache Check
+            const cached = get().cache.search[query];
+            if (cached && (Date.now() - cached.timestamp < CACHE_STALENESS_LIMIT)) {
+                set({ searchResults: cached.results, loading: false });
+                return cached.results;
+            }
+
+            const products = await productUtils.searchProducts(query);
+            const productIds = products.map(p => p.$id);
+            const prices = await productUtils.fetchPricesForProducts(productIds);
+
+            const results = products.map(product => 
+                productUtils.normalizeProduct(product, prices)
             );
-            set({ prices: response.documents });
+
+            // Update state & cache
+            set((state) => ({
+                searchResults: results,
+                loading: false,
+                cache: {
+                    ...state.cache,
+                    search: {
+                        ...state.cache.search,
+                        [query]: { results, timestamp: Date.now() }
+                    }
+                }
+            }));
+            
+            return results;
         } catch (error) {
-            console.error('Error fetching prices:', error);
+            set({ loading: false, error: error.message, searchResults: [] });
+            return [];
         }
     },
 
-    fetchProductsByName: async (name) => {
-        set({ loading: true, error: null, prices: [] });
-        console.log('🔍 Searching for products with name:', name);
-        console.log('📊 Using database:', APPWRITE_CONFIG.DATABASE_ID);
-        console.log('📦 Using collection:', APPWRITE_CONFIG.COLLECTIONS.PRODUCTS);
-
-        try {
-            let response;
-
-            // Strategy 1: Try fulltext search (requires index)
-            try {
-                response = await databases.listDocuments(
-                    APPWRITE_CONFIG.DATABASE_ID,
-                    APPWRITE_CONFIG.COLLECTIONS.PRODUCTS,
-                    [Query.search('name', name)]
-                );
-                console.log('✅ Fulltext search successful!');
-            } catch (searchError) {
-                console.log('⚠️ Fulltext search failed (index might be missing), trying alternative...');
-
-                // Strategy 2: Get all products and filter client-side
-                const allProducts = await databases.listDocuments(
-                    APPWRITE_CONFIG.DATABASE_ID,
-                    APPWRITE_CONFIG.COLLECTIONS.PRODUCTS
-                );
-
-                response = {
-                    documents: allProducts.documents.filter(p =>
-                        p.name.toLowerCase().includes(name.toLowerCase())
-                    )
-                };
-                console.log('✅ Client-side filter successful!');
-            }
-
-            console.log('✅ Search complete! Found', response.documents.length, 'products');
-            console.log('📄 Products:', response.documents);
-
-            set({ loading: false });
-            return response.documents;
-        } catch (error) {
-            console.error('❌ Search error:', error.message);
-            console.error('Full error:', error);
-            set({ loading: false, error: error.message });
-            return [];
-        }
-    }
+    clearSearch: () => set({ searchResults: [], error: null }),
 }));
 
 export default useProductStore;

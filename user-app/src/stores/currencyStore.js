@@ -5,7 +5,8 @@ const useCurrencyStore = create(
     persist(
         (set, get) => ({
             currency: 'TRY', // Default currency
-            rates: { TRY: 1, USD: 0.031, EUR: 0.029, GBP: 0.024 }, // Initial placeholder rates
+            // TODO: Replace placeholder rates by eagerly fetching live rates on app start.
+            rates: { TRY: 1, USD: 0.031, EUR: 0.029, GBP: 0.024 },
             lastUpdated: null,
             loading: false,
 
@@ -22,7 +23,7 @@ const useCurrencyStore = create(
 
                 set({ loading: true });
                 try {
-                    const apiKey = '4f184da9dc8a15867d2ac415';
+                    const apiKey = import.meta.env.VITE_EXCHANGE_RATE_API_KEY || '4f184da9dc8a15867d2ac415';
                     const response = await fetch(`https://v6.exchangerate-api.com/v6/${apiKey}/latest/TRY`);
                     const data = await response.json();
 
