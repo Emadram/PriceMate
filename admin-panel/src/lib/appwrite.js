@@ -1,4 +1,4 @@
-import { Client, Account, Databases, Storage, Functions } from 'appwrite';
+import { Client, Account, Databases, Storage, Functions, Teams, ID } from 'appwrite';
 
 const resolveAppwriteConfig = () => {
     const endpoint = import.meta.env.VITE_APPWRITE_ENDPOINT;
@@ -11,9 +11,7 @@ const resolveAppwriteConfig = () => {
     if (!databaseId) missing.push('VITE_APPWRITE_DATABASE_ID');
 
     if (missing.length) {
-        const message = `Missing Appwrite environment variables: ${missing.join(', ')}. Add them to your .env file.`;
-        console.error(message);
-        throw new Error(message);
+        console.warn(`Environment variables missing: ${missing.join(', ')}. App might malfunction.`);
     }
 
     return { endpoint, projectId, databaseId };
@@ -29,22 +27,87 @@ export const account = new Account(client);
 export const databases = new Databases(client);
 export const storage = new Storage(client);
 export const functions = new Functions(client);
+export const teams = new Teams(client);
 
 export const APPWRITE_CONFIG = {
     PROJECT_ID: RESOLVED_APPWRITE_CONFIG.projectId,
     DATABASE_ID: RESOLVED_APPWRITE_CONFIG.databaseId,
     COLLECTIONS: {
-        CATEGORIES: import.meta.env.VITE_APPWRITE_COLLECTION_CATEGORIES,
-        PRODUCTS: import.meta.env.VITE_APPWRITE_COLLECTION_PRODUCTS,
-        SUPERMARKETS: import.meta.env.VITE_APPWRITE_COLLECTION_SUPERMARKETS,
-        PRICES: import.meta.env.VITE_APPWRITE_COLLECTION_PRICES,
-        FEEDBACK: import.meta.env.VITE_APPWRITE_COLLECTION_FEEDBACK,
-        USER_PROFILES: import.meta.env.VITE_APPWRITE_COLLECTION_USER_PROFILES
+        CATEGORIES: import.meta.env.VITE_APPWRITE_COLLECTION_CATEGORIES || 'category',
+        PRODUCTS: import.meta.env.VITE_APPWRITE_COLLECTION_PRODUCTS || 'products',
+        SUPERMARKETS: import.meta.env.VITE_APPWRITE_COLLECTION_SUPERMARKETS || 'supermarkets',
+        PRICES: import.meta.env.VITE_APPWRITE_COLLECTION_PRICES || 'prices_collection',
+        PRICE_HISTORY: import.meta.env.VITE_APPWRITE_COLLECTION_PRICE_HISTORY || 'price_history',
+        FEEDBACK: import.meta.env.VITE_APPWRITE_COLLECTION_FEEDBACK || 'feedback',
+        ANNOUNCEMENTS: import.meta.env.VITE_APPWRITE_COLLECTION_ANNOUNCEMENTS || 'announcements',
+        CHAT_HISTORY: import.meta.env.VITE_APPWRITE_COLLECTION_CHAT_HISTORY || 'chat_history'
     }
 };
 
 export const getAppwriteConfig = () => RESOLVED_APPWRITE_CONFIG;
 export const { DATABASE_ID, COLLECTIONS } = APPWRITE_CONFIG;
+export { Query } from 'appwrite';
+
+const dbAction = {
+    list: (collectionId, queries = []) =>
+        databases.listDocuments(DATABASE_ID, collectionId, queries),
+    get: (collectionId, documentId, queries = []) =>
+        databases.getDocument(DATABASE_ID, collectionId, documentId, queries),
+    create: (collectionId, data, permissions) =>
+        databases.createDocument(DATABASE_ID, collectionId, ID.unique(), data, permissions),
+    update: (collectionId, documentId, data, permissions) =>
+        databases.updateDocument(DATABASE_ID, collectionId, documentId, data, permissions),
+    delete: (collectionId, documentId) =>
+        databases.deleteDocument(DATABASE_ID, collectionId, documentId)
+};
+
+export const db = {
+    categories: {
+        list: (queries) => dbAction.list(COLLECTIONS.CATEGORIES, queries),
+        create: (data, permissions) => dbAction.create(COLLECTIONS.CATEGORIES, data, permissions),
+        update: (id, data, permissions) => dbAction.update(COLLECTIONS.CATEGORIES, id, data, permissions),
+        delete: (id) => dbAction.delete(COLLECTIONS.CATEGORIES, id)
+    },
+    products: {
+        list: (queries) => dbAction.list(COLLECTIONS.PRODUCTS, queries),
+        create: (data, permissions) => dbAction.create(COLLECTIONS.PRODUCTS, data, permissions),
+        update: (id, data, permissions) => dbAction.update(COLLECTIONS.PRODUCTS, id, data, permissions),
+        delete: (id) => dbAction.delete(COLLECTIONS.PRODUCTS, id)
+    },
+    supermarkets: {
+        list: (queries) => dbAction.list(COLLECTIONS.SUPERMARKETS, queries),
+        create: (data, permissions) => dbAction.create(COLLECTIONS.SUPERMARKETS, data, permissions),
+        update: (id, data, permissions) => dbAction.update(COLLECTIONS.SUPERMARKETS, id, data, permissions),
+        delete: (id) => dbAction.delete(COLLECTIONS.SUPERMARKETS, id)
+    },
+    prices: {
+        list: (queries) => dbAction.list(COLLECTIONS.PRICES, queries),
+        create: (data, permissions) => dbAction.create(COLLECTIONS.PRICES, data, permissions),
+        update: (id, data, permissions) => dbAction.update(COLLECTIONS.PRICES, id, data, permissions),
+        delete: (id) => dbAction.delete(COLLECTIONS.PRICES, id)
+    },
+    priceHistory: {
+        list: (queries) => dbAction.list(COLLECTIONS.PRICE_HISTORY, queries),
+        create: (data, permissions) => dbAction.create(COLLECTIONS.PRICE_HISTORY, data, permissions),
+        update: (id, data, permissions) => dbAction.update(COLLECTIONS.PRICE_HISTORY, id, data, permissions),
+        delete: (id) => dbAction.delete(COLLECTIONS.PRICE_HISTORY, id)
+    },
+    feedback: {
+        list: (queries) => dbAction.list(COLLECTIONS.FEEDBACK, queries),
+        update: (id, data, permissions) => dbAction.update(COLLECTIONS.FEEDBACK, id, data, permissions),
+        delete: (id) => dbAction.delete(COLLECTIONS.FEEDBACK, id)
+    },
+    announcements: {
+        list: (queries) => dbAction.list(COLLECTIONS.ANNOUNCEMENTS, queries),
+        create: (data, permissions) => dbAction.create(COLLECTIONS.ANNOUNCEMENTS, data, permissions),
+        update: (id, data, permissions) => dbAction.update(COLLECTIONS.ANNOUNCEMENTS, id, data, permissions),
+        delete: (id) => dbAction.delete(COLLECTIONS.ANNOUNCEMENTS, id)
+    },
+    chatHistory: {
+        list: (queries) => dbAction.list(COLLECTIONS.CHAT_HISTORY, queries),
+        delete: (id) => dbAction.delete(COLLECTIONS.CHAT_HISTORY, id)
+    }
+};
 
 
 

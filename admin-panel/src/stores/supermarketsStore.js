@@ -1,6 +1,9 @@
 import { create } from 'zustand';
-import { databases, APPWRITE_CONFIG } from '../lib/appwrite';
+import { db, storage, getAppwriteConfig } from '../lib/appwrite';
 import { ID } from 'appwrite';
+
+const { endpoint: APPWRITE_ENDPOINT, projectId: APPWRITE_PROJECT_ID } = getAppwriteConfig();
+const SUPERMARKETS_LOGO_BUCKET = import.meta.env.VITE_APPWRITE_BUCKET_SUPERMARKET_LOGOS || 'supermarkets-logo';
 
 const useSupermarketsStore = create((set) => ({
     supermarkets: [],
@@ -10,35 +13,46 @@ const useSupermarketsStore = create((set) => ({
     fetchSupermarkets: async () => {
         set({ loading: true, error: null });
         try {
-            const response = await databases.listDocuments(
-                APPWRITE_CONFIG.DATABASE_ID,
-                APPWRITE_CONFIG.COLLECTIONS.SUPERMARKETS
-            );
+            const response = await db.supermarkets.list();
             set({ supermarkets: response.documents, loading: false });
         } catch (error) {
             set({ error: error.message, loading: false });
         }
     },
 
+    uploadSupermarketLogo: async (file) => {
+        if (!file) return '';
+        try {
+            const response = await storage.createFile(
+                SUPERMARKETS_LOGO_BUCKET,
+                ID.unique(),
+                file
+            );
+
+            return `${APPWRITE_ENDPOINT}/storage/buckets/${SUPERMARKETS_LOGO_BUCKET}/files/${response.$id}/view?project=${APPWRITE_PROJECT_ID}`;
+        } catch (error) {
+            console.error('Supermarket logo upload failed:', error);
+            set({ error: error.message });
+            return '';
+        }
+    },
+
     addSupermarket: async (data) => {
         set({ loading: true, error: null });
         try {
-            await databases.createDocument(
-                APPWRITE_CONFIG.DATABASE_ID,
-                APPWRITE_CONFIG.COLLECTIONS.SUPERMARKETS,
-                ID.unique(),
-                {
-                    name: data.name,
-                    brand: data.brand || null,
-                    branchName: data.branchName || null,
-                    latitude: parseFloat(data.latitude),
-                    longitude: parseFloat(data.longitude),
-                    address: data.address || null,
-                    phoneNumber: data.phoneNumber || null,
-                    email: data.email || null,
-                    icon: data.icon || null
-                }
-            );
+            await db.supermarkets.create({
+                name: data.name,
+                brand: data.brand || null,
+                branchName: data.branchName || null,
+                latitude: parseFloat(data.latitude),
+                longitude: parseFloat(data.longitude),
+                address: data.address || null,
+                phoneNumber: data.phoneNumber || null,
+                email: data.email || null,
+                icon: data.icon || null,
+                isParent: data.isParent || false,
+                parentId: data.parentId || null
+            });
             await useSupermarketsStore.getState().fetchSupermarkets();
             set({ loading: false });
             return true;
@@ -52,22 +66,19 @@ const useSupermarketsStore = create((set) => ({
     updateSupermarket: async (id, data) => {
         set({ loading: true, error: null });
         try {
-            await databases.updateDocument(
-                APPWRITE_CONFIG.DATABASE_ID,
-                APPWRITE_CONFIG.COLLECTIONS.SUPERMARKETS,
-                id,
-                {
-                    name: data.name,
-                    brand: data.brand || null,
-                    branchName: data.branchName || null,
-                    latitude: parseFloat(data.latitude),
-                    longitude: parseFloat(data.longitude),
-                    address: data.address || null,
-                    phoneNumber: data.phoneNumber || null,
-                    email: data.email || null,
-                    icon: data.icon || null
-                }
-            );
+            await db.supermarkets.update(id, {
+                name: data.name,
+                brand: data.brand || null,
+                branchName: data.branchName || null,
+                latitude: parseFloat(data.latitude),
+                longitude: parseFloat(data.longitude),
+                address: data.address || null,
+                phoneNumber: data.phoneNumber || null,
+                email: data.email || null,
+                icon: data.icon || null,
+                isParent: data.isParent || false,
+                parentId: data.parentId || null
+            });
             await useSupermarketsStore.getState().fetchSupermarkets();
             set({ loading: false });
             return true;
@@ -81,11 +92,7 @@ const useSupermarketsStore = create((set) => ({
     deleteSupermarket: async (id) => {
         set({ loading: true, error: null });
         try {
-            await databases.deleteDocument(
-                APPWRITE_CONFIG.DATABASE_ID,
-                APPWRITE_CONFIG.COLLECTIONS.SUPERMARKETS,
-                id
-            );
+            await db.supermarkets.delete(id);
             await useSupermarketsStore.getState().fetchSupermarkets();
             set({ loading: false });
             return true;
