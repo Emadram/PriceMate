@@ -1,94 +1,165 @@
 import { Link } from 'react-router-dom';
-import { FiPackage, FiShoppingBag, FiTag, FiTrendingDown, FiNavigation, FiChevronRight } from 'react-icons/fi';
+import { FiPackage, FiShoppingBag, FiGlobe, FiClock, FiAlertTriangle } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
+import { useState } from 'react';
 import useCurrencyStore from '../stores/currencyStore';
+import useAuthStore from '../stores/authStore';
+import ReportModal from '../components/ReportModal';
+import CategoryIconLabel from '../components/CategoryIconLabel';
 
 const ProductCard = ({ product, prices = [] }) => {
     const { t } = useTranslation();
-    const { convert, getCurrencySymbol } = useCurrencyStore();
+    const { convert } = useCurrencyStore();
+    const user = useAuthStore((state) => state.user);
+    const [isReportOpen, setIsReportOpen] = useState(false);
     
     // Get the lowest price for this product
     const lowestPrice = prices.length > 0
         ? prices.reduce((min, p) => p.price < min.price ? p : min, prices[0])
         : null;
 
-    // Get category name
-    const categoryName = Array.isArray(product.categoryId)
-        ? product.categoryId[0]?.categoryName
-        : product.categoryId?.categoryName || 'Uncategorized';
+    // Use normalized data if available, otherwise fallback
+    const categoryName = product.category || 
+        (Array.isArray(product.categoryId)
+            ? product.categoryId[0]?.categoryName
+            : product.categoryId?.categoryName || 'Other');
+
+    const imageUrl = product.imageUrl || product.image || product.image_url || product.image_front_url;
+    const productKey = product.barcode || product.code || product.$id || product.id || '';
+    const [imageFailed, setImageFailed] = useState(false);
+
+    // Freshness indicator logic using actual updatedAt from the cheapest price or product
+    const getFreshnessText = () => {
+        const dateToUse = lowestPrice?.updatedAt || product.updatedAt || product.$createdAt;
+        if (!dateToUse) return t('recently_updated', 'Recently updated');
+
+        const diffInMs = Date.now() - new Date(dateToUse).getTime();
+        const diffInMins = Math.floor(diffInMs / (1000 * 60));
+        const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+        const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+
+        if (diffInMins < 60) {
+            return `${diffInMins}m ${t('ago', 'ago')}`;
+        } else if (diffInHours < 24) {
+            return `${diffInHours}h ${t('ago', 'ago')}`;
+        } else {
+            return `${diffInDays}d ${t('ago', 'ago')}`;
+        }
+    };
+
+    const freshnessText = getFreshnessText();
 
     return (
-        <Link
-            to={`/price-comparison/${product.barcode}`}
-            className="group relative bg-white dark:bg-gray-800 rounded-2xl p-3 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgba(8,112,184,0.1)] hover:-translate-y-1 transition-all duration-500 border border-gray-100 dark:border-gray-700/50 hover:border-blue-500/20 block overflow-hidden"
-        >
-            <div className="flex items-center gap-4">
+        <div className="relative group">
+            <Link
+                to={`/price-comparison/${productKey}`}
+                className="group block bg-white dark:bg-gray-800 rounded-3xl p-4 shadow-soft hover:shadow-soft-lg hover:-translate-y-1 transition-all duration-300 border border-transparent hover:border-gray-100 dark:hover:border-gray-700 overflow-hidden"
+            >
+                <div className="flex items-center gap-5">
                 {/* Product Image Wrapper */}
-                <div className="relative w-20 h-20 sm:w-24 sm:h-24 bg-gray-50/50 dark:bg-gray-900/50 rounded-[1.25rem] flex items-center justify-center flex-shrink-0 overflow-hidden border border-gray-100 dark:border-gray-700/30 group-hover:scale-105 transition-transform duration-700 ease-out">
-                    {product.imageUrl ? (
+                <div className="relative w-24 h-24 sm:w-28 sm:h-28 bg-gray-50 dark:bg-gray-900 rounded-2xl flex items-center justify-center flex-shrink-0 overflow-hidden">
+                    {imageUrl && !imageFailed ? (
                         <img
-                            src={product.imageUrl}
+                            src={imageUrl}
                             alt={product.name}
-                            className="w-16 h-16 sm:w-20 sm:h-20 object-contain drop-shadow-xl"
+                            className="w-20 h-20 sm:w-24 sm:h-24 object-contain mix-blend-multiply dark:mix-blend-normal transform group-hover:scale-110 transition-transform duration-500"
+                            onError={() => setImageFailed(true)}
+                            loading="lazy"
                         />
                     ) : (
-                        <FiPackage className="text-gray-300 text-2xl" />
+                        <FiPackage className="text-gray-300 text-3xl" />
                     )}
-                    
-                    {/* Floating Badge for Price Drop (Simulated) */}
-                    {lowestPrice && (
-                        <div className="absolute top-1 left-1 bg-green-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full shadow-lg flex items-center gap-0.5 uppercase tracking-tighter">
-                            <FiTrendingDown size={8} /> -12%
+
+                    {/* Global Badge */}
+                    {product.is_global && (
+                        <div className="absolute top-1 right-1 bg-blue-500 text-white p-1 rounded-full shadow-lg z-10" title="Global Database">
+                            <FiGlobe size={10} />
                         </div>
                     )}
                 </div>
 
                 {/* Content Area */}
-                <div className="flex-1 min-w-0 flex flex-col justify-between py-1">
-                    <div>
-                        <div className="flex items-start justify-between gap-2">
-                            <h3 className="font-bold text-gray-900 dark:text-white text-[10px] sm:text-[11px] truncate uppercase tracking-tight group-hover:text-blue-600 transition-colors leading-tight">
-                                {product.name}
-                            </h3>
-                            <div className="bg-gray-50 dark:bg-gray-700/50 p-1 rounded-lg text-gray-400 group-hover:text-blue-500 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 group-hover:translate-x-1 transition-all flex-shrink-0 shadow-sm">
-                                <FiChevronRight size={10} />
+                <div className="flex-1 min-w-0 flex flex-col h-full py-1">
+                    <div className="mb-auto">
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="flex flex-col min-w-0 flex-1">
+                                <h3 className="font-semibold text-gray-900 dark:text-white text-base sm:text-lg truncate group-hover:text-blue-600 transition-colors leading-tight">
+                                    {product.name}
+                                </h3>
+                                {product.is_global && (
+                                    <span className="text-[10px] text-blue-500 font-bold uppercase tracking-tighter mt-0.5">Global DB</span>
+                                )}
                             </div>
+                            {user && (
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setIsReportOpen(true);
+                                }}
+                                className="shrink-0 flex h-10 w-10 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 shadow-sm transition-all hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-400 dark:hover:bg-red-500/25"
+                                title="Report Issue"
+                                aria-label="Report issue"
+                            >
+                                <FiAlertTriangle size={18} />
+                            </button>
+                            )}
                         </div>
 
-                        <div className="flex items-center gap-1.5 mt-1">
-                            <span className="text-[8px] bg-gray-100 dark:bg-gray-700/80 text-gray-500 dark:text-gray-400 px-2 py-0.5 rounded-full font-black uppercase tracking-[0.1em] flex items-center gap-1 border border-gray-200/50 dark:border-gray-600/30">
-                                <FiTag size={8} className="text-blue-500/70" /> {categoryName}
+                        <div className="flex flex-col gap-1 mt-1.5">
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1.5">
+                                <CategoryIconLabel categoryId={product.categoryId} fallbackName={categoryName} />
+                                {product.brand && (
+                                    <>
+                                        <span className="hidden sm:inline w-1 h-1 rounded-full bg-gray-300 shrink-0" aria-hidden />
+                                        <span className="text-xs text-gray-400 font-medium truncate max-w-[40%] sm:max-w-none">{product.brand}</span>
+                                    </>
+                                )}
+                            </div>
+                            <span className="text-[10px] text-green-600 dark:text-green-400 font-bold flex items-center gap-1 uppercase tracking-tight">
+                                <FiClock size={10} /> {freshnessText}
                             </span>
                         </div>
                     </div>
 
                     {/* Footer / Price Section */}
-                    {lowestPrice ? (
-                        <div className="flex items-end justify-between mt-3">
+                    <div className="flex items-end justify-between mt-4">
+                        {lowestPrice ? (
                             <div className="flex flex-col">
-                                <span className="text-[7px] font-black text-green-600 dark:text-green-400 uppercase tracking-[0.2em] mb-0.5">{t('starting_from')}</span>
+                                <span className="text-[10px] uppercase font-bold tracking-widest text-gray-400 mb-0.5">{t('starting_from')}</span>
                                 <div className="flex items-baseline gap-1">
-                                    <span className="text-sm font-black text-gray-900 dark:text-white leading-none tracking-tight">
+                                        <span className="text-xl font-bold text-gray-900 dark:text-white leading-none">
                                         {convert(lowestPrice.price, 'TRY')}
                                     </span>
-                                    <span className="text-[10px] font-black text-gray-400 mb-0.5">{getCurrencySymbol()}</span>
+                                    <span className="text-sm font-medium text-gray-400">TRY</span>
                                 </div>
                             </div>
-                            
-                            <div className="text-right flex flex-col items-end gap-1">
-                                <span className="flex items-center gap-1 text-[8px] font-black text-blue-600 dark:text-blue-400 bg-blue-50/80 dark:bg-blue-900/30 px-2 py-1 rounded-xl border border-blue-100 dark:border-blue-800/30 shadow-sm uppercase tracking-wider">
-                                    <FiShoppingBag size={8} className="mb-0.5" /> {prices.length} {prices.length === 1 ? t('supermarket') : t('supermarket') + 's'}
-                                </span>
+                        ) : (
+                            <div className="text-xs font-medium text-gray-400">
+                                {t('price')} scanning...
                             </div>
-                        </div>
-                    ) : (
-                        <div className="mt-4 bg-gray-50/50 dark:bg-gray-900/30 border border-dashed border-gray-200 dark:border-gray-700/30 py-2 rounded-xl text-[8px] font-black text-gray-400 text-center uppercase tracking-[0.15em]">
-                            {t('price')} scanning...
-                        </div>
-                    )}
+                        )}
+                        
+                        {prices.length > 0 && (
+                            <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-full border border-blue-100 dark:border-blue-800/30">
+                                <FiShoppingBag size={12} />
+                                <span>{prices.length} {prices.length === 1 ? t('supermarket') : t('supermarket') + 's'}</span>
+                            </div>
+                        )}
+                    </div>
                 </div>
-            </div>
-        </Link>
+                </div>
+            </Link>
+
+            <ReportModal
+                isOpen={isReportOpen}
+                onClose={() => setIsReportOpen(false)}
+                targetName={product.name}
+                targetType="product"
+                targetId={product.$id || product.barcode || productKey}
+            />
+        </div>
     );
 };
 

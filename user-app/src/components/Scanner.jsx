@@ -23,6 +23,12 @@ const Scanner = ({ onDetected, paused = false }) => {
     const REQUIRED_MATCHES = 3;
     const MATCH_WINDOW_MS = 1200;
 
+    const triggerHaptic = () => {
+        if ('vibrate' in navigator) {
+            navigator.vibrate(100); // 100ms vibration
+        }
+    };
+
     useEffect(() => {
         onDetectedRef.current = onDetected;
     }, [onDetected]);
@@ -240,6 +246,7 @@ const Scanner = ({ onDetected, paused = false }) => {
                             candidateRef.current.count >= REQUIRED_MATCHES &&
                             trimmed !== lastCodeRef.current
                         ) {
+                            triggerHaptic();
                             lastCodeRef.current = trimmed;
                             candidateRef.current = { text: null, count: 0, firstTs: 0, lastTs: 0 };
                             if (navigator.vibrate) navigator.vibrate(120);

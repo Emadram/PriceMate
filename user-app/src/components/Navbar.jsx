@@ -4,66 +4,36 @@ import { FiUser, FiLogOut, FiMoon, FiSun, FiMenu, FiX, FiGlobe, FiDollarSign, Fi
 import { useTranslation } from 'react-i18next';
 import useAuthStore from '../stores/authStore';
 import useCurrencyStore from '../stores/currencyStore';
+import useThemeStore from '../stores/themeStore';
 
 const Navbar = () => {
     const { t, i18n } = useTranslation();
     const user = useAuthStore((state) => state.user);
     const logout = useAuthStore((state) => state.logout);
     const { currency, setCurrency, fetchRates } = useCurrencyStore();
+    const { theme, toggleTheme } = useThemeStore();
     const navigate = useNavigate();
     const location = useLocation();
-    const [darkMode, setDarkMode] = useState(false);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [isCurrencyMenuOpen, setIsCurrencyMenuOpen] = useState(false);
 
     useEffect(() => {
         fetchRates();
-    }, []);
+    }, [fetchRates]);
 
-    const toggleLanguage = () => {
-        const newLang = i18n.language === 'en' ? 'tr' : 'en';
-        i18n.changeLanguage(newLang);
+    const toggleCurrency = () => {
+        setIsCurrencyMenuOpen(!isCurrencyMenuOpen);
     };
 
-    useEffect(() => {
-        // Check system preference or local storage
-        const isDark = localStorage.getItem('theme') === 'dark' ||
-            (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
-        setDarkMode(isDark);
-        if (isDark) {
-            document.documentElement.classList.add('dark');
-        }
-    }, [darkMode]);
-
-    const toggleTheme = () => {
-        const newMode = !darkMode;
-        setDarkMode(newMode);
-        if (newMode) {
-            document.documentElement.classList.add('dark');
-            localStorage.setItem('theme', 'dark');
-        } else {
-            document.documentElement.classList.remove('dark');
-            localStorage.setItem('theme', 'light');
-        }
+    const toggleLanguage = () => {
+        const currentLang = i18n.resolvedLanguage || i18n.language;
+        const newLang = currentLang === 'tr' ? 'en' : 'tr';
+        i18n.changeLanguage(newLang);
     };
 
     const handleLogout = async () => {
         await logout();
         navigate('/login');
-    };
-
-    const NavItem = ({ to, icon: Icon, label }) => {
-        const isActive = location.pathname === to;
-        return (
-            <Link
-                to={to}
-                className={`flex flex-col items-center justify-center gap-1 transition-colors ${
-                    isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'
-                }`}
-            >
-                <Icon size={20} className={isActive ? 'stroke-[2.5]' : 'stroke-[2]'} />
-                <span className="text-[10px] font-bold uppercase tracking-widest">{label}</span>
-            </Link>
-        );
     };
 
     return (
@@ -109,7 +79,7 @@ const Navbar = () => {
                             >
                                 <FiGlobe className="w-4 h-4 text-blue-500 group-hover:rotate-12 transition-transform" />
                                 <span className="text-[10px] font-black uppercase tracking-widest leading-none">
-                                    {i18n.language === 'en' ? 'EN' : 'TR'}
+                                    {(i18n.resolvedLanguage || i18n.language) === 'en' ? 'EN' : 'TR'}
                                 </span>
                             </button>
 
@@ -118,7 +88,7 @@ const Navbar = () => {
                                 className="p-2.5 text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl transition-all shadow-sm hover:scale-105"
                                 aria-label="Toggle Dark Mode"
                             >
-                                {darkMode ? <FiSun size={20} /> : <FiMoon size={20} />}
+                                {theme === 'dark' ? <FiSun size={20} /> : <FiMoon size={20} />}
                             </button>
 
                             {user ? (
@@ -127,25 +97,26 @@ const Navbar = () => {
                                         to="/profile"
                                         className="flex items-center gap-2.5 pl-2.5 pr-1.5 py-1.5 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl hover:border-blue-500/50 transition-all shadow-sm group"
                                     >
-                                        <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/50 rounded-xl flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold group-hover:scale-95 transition-transform overflow-hidden">
+                                        <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/50 rounded-xl flex items-center justify-center text-blue-600 dark:text-blue-400 font-black group-hover:scale-95 transition-transform overflow-hidden">
                                             {user.name?.charAt(0).toUpperCase()}
                                         </div>
                                         <div className="flex flex-col">
                                             <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">Account</span>
-                                            <span className="text-xs font-bold text-gray-900 dark:text-white leading-none max-w-[80px] truncate">{user.name}</span>
+                                            <span className="text-xs font-black text-gray-900 dark:text-white leading-none max-w-[80px] truncate tracking-tight">{user.name}</span>
                                         </div>
-                                        <button
-                                            onClick={(e) => { e.preventDefault(); handleLogout(); }}
-                                            className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors ml-1"
-                                        >
-                                            <FiLogOut size={16} />
-                                        </button>
                                     </Link>
+                                    <button
+                                        onClick={handleLogout}
+                                        className="p-3 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-xl transition-all active:scale-95"
+                                        title={t('logout')}
+                                    >
+                                        <FiLogOut size={18} />
+                                    </button>
                                 </div>
                             ) : (
                                 <Link
                                     to="/login"
-                                    className="bg-blue-600 text-white px-6 py-2.5 rounded-xl hover:bg-black transition-all font-black uppercase tracking-widest text-[10px] shadow-lg shadow-blue-500/25 active:scale-95"
+                                    className="bg-blue-600 text-white px-8 py-3 rounded-2xl hover:bg-black transition-all font-black uppercase tracking-widest text-[10px] shadow-lg shadow-blue-500/25 active:scale-95"
                                 >
                                     {t('login')}
                                 </Link>
@@ -162,38 +133,85 @@ const Navbar = () => {
                         {/* Mobile Actions Right */}
                         <div className="flex items-center md:hidden gap-2">
                              <button
+                                onClick={toggleCurrency}
+                                className={`p-2.5 text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl shadow-sm transition-all ${isCurrencyMenuOpen ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 !border-blue-200' : ''}`}
+                            >
+                                <span className="text-[10px] font-black uppercase">{currency}</span>
+                            </button>
+                             <button
                                 onClick={toggleLanguage}
                                 className="p-2.5 text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl shadow-sm"
                             >
-                                <span className="text-[10px] font-black uppercase">{i18n.language}</span>
+                                <span className="text-[10px] font-black uppercase">{i18n.resolvedLanguage || i18n.language}</span>
                             </button>
                             <button
                                 onClick={toggleTheme}
                                 className="p-2.5 text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl shadow-sm"
                             >
-                                {darkMode ? <FiSun size={20} /> : <FiMoon size={20} />}
+                                {theme === 'dark' ? <FiSun size={20} /> : <FiMoon size={20} />}
                             </button>
                         </div>
                     </div>
                 </div>
+
+                {/* Mobile Currency Quick Select Drawer */}
+                {isCurrencyMenuOpen && (
+                    <div className="md:hidden border-t border-gray-100 dark:border-gray-700 bg-gray-50/90 dark:bg-gray-900/90 backdrop-blur-sm animate-in slide-in-from-top duration-300 overflow-hidden">
+                        <div className="px-4 py-3 flex items-center justify-between gap-2">
+                            {['TRY', 'USD', 'EUR', 'GBP'].map((curr) => (
+                                <button
+                                    key={curr}
+                                    onClick={() => {
+                                        setCurrency(curr);
+                                        setIsCurrencyMenuOpen(false);
+                                    }}
+                                    className={`flex-1 py-3 text-xs font-black rounded-2xl transition-all ${
+                                        currency === curr 
+                                            ? 'bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-sm border border-blue-100 dark:border-blue-900/50' 
+                                            : 'text-gray-500 dark:text-gray-400 border border-transparent'
+                                    }`}
+                                >
+                                    {curr}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </nav>
 
             {/* Mobile Bottom Navigation */}
-            <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg border-t border-gray-100 dark:border-gray-800 px-6 py-3 shadow-[0_-10px_20px_rgba(0,0,0,0.05)]">
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg border-t border-gray-100 dark:border-gray-800 px-6 py-4 shadow-soft">
                 <div className="flex justify-between items-center max-w-md mx-auto">
-                    <NavItem to="/" icon={FiHome} label="Home" />
-                    <NavItem to="/search" icon={FiSearch} label="Search" />
+                    <NavItem to="/" icon={FiHome} label={t('home')} currentPath={location.pathname} />
+                    <NavItem to="/search" icon={FiSearch} label={t('search')} currentPath={location.pathname} />
                     <Link
                         to="/scan"
-                        className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-500/40 -mt-8 relative border-4 border-white dark:border-gray-900 active:scale-90 transition-transform"
+                        className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-soft -mt-10 relative border-8 border-white dark:border-gray-900 active:scale-90 transition-all duration-300"
                     >
-                        <FiCamera size={24} className="stroke-[2.5]" />
+                        <FiCamera size={28} strokeWidth={2.5} />
                     </Link>
-                    <NavItem to="/favorites" icon={FiHeart} label="Saved" />
-                    <NavItem to="/profile" icon={FiUser} label="Profile" />
+                    <NavItem to="/favorites" icon={FiHeart} label={t('favorites')} currentPath={location.pathname} />
+                    <NavItem to="/profile" icon={FiUser} label={t('profile')} currentPath={location.pathname} />
                 </div>
             </div>
         </>
+    );
+};
+
+const NavItem = ({ to, icon: Icon, label, currentPath }) => {
+    const isActive = currentPath === to;
+    return (
+        <Link
+            to={to}
+            className={`flex flex-col items-center justify-center gap-1.5 transition-all active:scale-90 ${
+                isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'
+            }`}
+        >
+            <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />
+            <span className={`text-[10px] font-semibold tracking-tight ${isActive ? 'opacity-100' : 'opacity-80'}`}>
+                {label}
+            </span>
+        </Link>
     );
 };
 

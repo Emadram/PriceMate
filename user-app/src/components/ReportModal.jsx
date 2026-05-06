@@ -1,14 +1,17 @@
 import { useState } from 'react';
-import { FiX, FiAlertTriangle, FiCheckCircle } from 'react-icons/fi';
+import { FiX, FiAlertTriangle, FiCheckCircle, FiLoader } from 'react-icons/fi';
+import { db } from '../lib/appwrite';
 
-const ReportModal = ({ isOpen, onClose, supermarketName }) => {
+const ReportModal = ({ isOpen, onClose, targetName, targetType = 'supermarket', targetId }) => {
     const [step, setStep] = useState(1);
     const [selectedReason, setSelectedReason] = useState('');
     const [details, setDetails] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [error, setError] = useState(null);
 
     if (!isOpen) return null;
 
-    const reasons = [
+    const marketReasons = [
         'Incorrect Prices',
         'Out of Stock Products',
         'Wrong Location',
@@ -16,21 +19,53 @@ const ReportModal = ({ isOpen, onClose, supermarketName }) => {
         'Other Issue'
     ];
 
-    const handleSubmit = (e) => {
+    const productReasons = [
+        'Wrong Price Listed',
+        'Missing Image',
+        'Wrong Category',
+        'Incorrect Product Details',
+        'Inappropriate Content'
+    ];
+
+    const reasons = targetType === 'product' ? productReasons : marketReasons;
+
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        // Mock submission
-        setStep(2);
-        setTimeout(() => {
-            onClose();
-            setStep(1);
-            setSelectedReason('');
-            setDetails('');
-        }, 2000);
+        setIsSubmitting(true);
+        setError(null);
+
+        try {
+            await db.feedback.create(
+                {
+                    targetId: targetId || 'unknown',
+                    targetType,
+                    targetName,
+                    reason: selectedReason,
+                    details,
+                    status: 'pending',
+                    createdAt: new Date().toISOString()
+                }
+            );
+
+            setStep(2);
+            setTimeout(() => {
+                onClose();
+                setStep(1);
+                setSelectedReason('');
+                setDetails('');
+            }, 3000);
+
+        } catch (err) {
+            console.error('Error submitting report:', err);
+            setError(err.message || 'Failed to submit report. Please try again.');
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md overflow-hidden transform transition-all scale-100">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-300">
+            <div className="bg-white dark:bg-gray-900 rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden transform transition-all scale-100 animate-in zoom-in duration-300">
 
                 {/* Header */}
                 <div className="flex justify-between items-center p-6 border-b dark:border-gray-700">
@@ -51,8 +86,15 @@ const ReportModal = ({ isOpen, onClose, supermarketName }) => {
                     {step === 1 ? (
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <p className="text-sm text-gray-600 dark:text-gray-400">
-                                Help us improve <strong>{supermarketName}</strong> by reporting an issue.
+                                Help us improve <strong>{targetName}</strong> by reporting an issue.
                             </p>
+
+                            {error && (
+                                <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-3 rounded-xl text-sm flex items-center gap-2">
+                                    <FiAlertTriangle className="shrink-0" />
+                                    {error}
+                                </div>
+                            )}
 
                             <div className="space-y-2">
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -63,6 +105,7 @@ const ReportModal = ({ isOpen, onClose, supermarketName }) => {
                                         <button
                                             key={reason}
                                             type="button"
+                                            disabled={isSubmitting}
                                             onClick={() => setSelectedReason(reason)}
                                             className={`text-left px-4 py-3 rounded-xl border transition-all ${selectedReason === reason
                                                     ? 'border-red-500 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300'
@@ -81,6 +124,7 @@ const ReportModal = ({ isOpen, onClose, supermarketName }) => {
                                 </label>
                                 <textarea
                                     value={details}
+                                    disabled={isSubmitting}
                                     onChange={(e) => setDetails(e.target.value)}
                                     className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-red-500 focus:border-transparent transition"
                                     rows="3"
@@ -90,10 +134,11 @@ const ReportModal = ({ isOpen, onClose, supermarketName }) => {
 
                             <button
                                 type="submit"
-                                disabled={!selectedReason}
-                                className="w-full bg-red-600 text-white py-3 rounded-xl font-bold hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-red-500/30"
+                                disabled={!selectedReason || isSubmitting}
+                                className="w-full bg-red-600 text-white py-3 rounded-xl font-bold hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-red-500/30 flex items-center justify-center gap-2"
                             >
-                                Submit Report
+                                {isSubmitting ? <FiLoader className="animate-spin" /> : null}
+                                {isSubmitting ? 'Sending Request...' : 'Submit Report'}
                             </button>
                         </form>
                     ) : (

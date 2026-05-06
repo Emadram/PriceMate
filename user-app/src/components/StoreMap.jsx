@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import 'ol/ol.css';
 import Map from 'ol/Map';
 import View from 'ol/View';
@@ -10,35 +10,80 @@ import Point from 'ol/geom/Point';
 import { Vector as VectorLayer } from 'ol/layer';
 import { Vector as VectorSource } from 'ol/source';
 import { Style, Icon } from 'ol/style';
+import { hasValidLatLon } from '../utils/productUtils';
 
-const StoreMap = ({ lat, lon, zoom = 15, height = "300px" }) => {
+const StoreMap = ({ lat, lon, zoom = 15, height = "300px", supermarkets = [], center: centerProp }) => {
   const mapRef = useRef();
   const mapElement = useRef();
 
+  const mapInputsKey = useMemo(
+    () =>
+      [
+        lat,
+        lon,
+        zoom,
+        centerProp?.[0],
+        centerProp?.[1],
+        supermarkets.map((s) => [s?.$id, s?.latitude, s?.longitude].join(',')).join('|'),
+      ].join('::'),
+    [lat, lon, zoom, centerProp, supermarkets]
+  );
+
   useEffect(() => {
-    if (!lat || !lon) return;
+    // Determine center
+    let centerCoords;
+    if (centerProp && hasValidLatLon(centerProp[0], centerProp[1])) {
+        centerCoords = fromLonLat([parseFloat(centerProp[1]), parseFloat(centerProp[0])]);
+    } else if (hasValidLatLon(lat, lon)) {
+        centerCoords = fromLonLat([parseFloat(lon), parseFloat(lat)]);
+    } else if (supermarkets.length > 0 && hasValidLatLon(supermarkets[0].latitude, supermarkets[0].longitude)) {
+        centerCoords = fromLonLat([parseFloat(supermarkets[0].longitude), parseFloat(supermarkets[0].latitude)]);
+    } else {
+      return;
+    }
 
-    // Center coordinates
-    const center = fromLonLat([parseFloat(lon), parseFloat(lat)]);
-
-    // Marker feature
-    const marker = new Feature({
-      geometry: new Point(center),
-    });
-
-    // Marker style
-    marker.setStyle(
-      new Style({
-        image: new Icon({
-          anchor: [0.5, 1],
-          src: 'https://cdn-icons-png.flaticon.com/512/684/684908.png', // Default pin icon
-          scale: 0.05,
-        }),
-      })
-    );
+    // Marker features
+    const features = [];
+    
+    // Add markers for supermarkets array if provided
+    if (supermarkets.length > 0) {
+        supermarkets.forEach(s => {
+            if (hasValidLatLon(s.latitude, s.longitude)) {
+                const feat = new Feature({
+                    geometry: new Point(fromLonLat([parseFloat(s.longitude), parseFloat(s.latitude)])),
+                    name: s.name
+                });
+                feat.setStyle(
+                    new Style({
+                        image: new Icon({
+                            anchor: [0.5, 1],
+                            src: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+                            scale: 0.06,
+                        }),
+                    })
+                );
+                features.push(feat);
+            }
+        });
+    } else if (hasValidLatLon(lat, lon)) {
+        // Fallback to single lat/lon
+        const marker = new Feature({
+            geometry: new Point(centerCoords),
+        });
+        marker.setStyle(
+            new Style({
+                image: new Icon({
+                    anchor: [0.5, 1],
+                    src: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+                    scale: 0.06,
+                }),
+            })
+        );
+        features.push(marker);
+    }
 
     const vectorSource = new VectorSource({
-      features: [marker],
+      features: features,
     });
 
     const vectorLayer = new VectorLayer({
@@ -54,7 +99,7 @@ const StoreMap = ({ lat, lon, zoom = 15, height = "300px" }) => {
         vectorLayer,
       ],
       view: new View({
-        center: center,
+        center: centerCoords,
         zoom: zoom,
       }),
       controls: [], // Minimalist - no bulky controls
@@ -67,7 +112,7 @@ const StoreMap = ({ lat, lon, zoom = 15, height = "300px" }) => {
         mapRef.current.setTarget(null);
       }
     };
-  }, [lat, lon, zoom]);
+  }, [mapInputsKey]);
 
   return (
     <div className="relative rounded-2xl overflow-hidden shadow-inner border border-gray-100 dark:border-gray-700">
