@@ -34,19 +34,85 @@ export const APPWRITE_CONFIG = {
     PROJECT_ID: RESOLVED_APPWRITE_CONFIG.projectId,
     DATABASE_ID: RESOLVED_APPWRITE_CONFIG.databaseId,
     COLLECTIONS: {
-        CATEGORIES: 'category',
-        PRODUCTS: 'products',
-        SUPERMARKETS: 'supermarkets',
-        PRICES: 'prices_collection',
-        FEEDBACK: 'feedback',
+        CATEGORIES: import.meta.env.VITE_APPWRITE_COLLECTION_CATEGORIES || 'category',
+        // Optional on products (AI ingredient fallback): sugarsPer100g (double), ingredientsText (string), nutritionSource (string), sodiumMgPer100g (double)
+        PRODUCTS: import.meta.env.VITE_APPWRITE_COLLECTION_PRODUCTS || 'products',
+        SUPERMARKETS: import.meta.env.VITE_APPWRITE_COLLECTION_SUPERMARKETS || 'supermarkets',
+        PRICES: import.meta.env.VITE_APPWRITE_COLLECTION_PRICES || 'prices_collection',
+        PRICE_HISTORY: import.meta.env.VITE_APPWRITE_COLLECTION_PRICE_HISTORY || 'price_history', 
+        FEEDBACK: import.meta.env.VITE_APPWRITE_COLLECTION_FEEDBACK || 'feedback',
         USER_PROFILES: import.meta.env.VITE_APPWRITE_COLLECTION_USER_PROFILES || 'user_profiles',
-        FAVORITES: import.meta.env.VITE_APPWRITE_COLLECTION_FAVORITES || 'favorites'
+        FAVORITES: import.meta.env.VITE_APPWRITE_COLLECTION_FAVORITES || 'favorites',
+        ANNOUNCEMENTS: import.meta.env.VITE_APPWRITE_COLLECTION_ANNOUNCEMENTS || 'announcements',
+        CHAT_HISTORY: import.meta.env.VITE_APPWRITE_COLLECTION_CHAT_HISTORY || 'chat_history'
     }
 };
 
 export const getAppwriteConfig = () => RESOLVED_APPWRITE_CONFIG;
 export const { DATABASE_ID, COLLECTIONS } = APPWRITE_CONFIG;
-export { Query } from 'appwrite';
+export { Query, ID } from 'appwrite';
+import { ID } from 'appwrite';
+
+/**
+ * DB Helper - Centralized logic for database operations
+ * achieving a cleaner `db.collection.action()` API.
+ */
+const dbAction = {
+    list: (collectionId, queries = []) => 
+        databases.listDocuments(DATABASE_ID, collectionId, queries),
+    get: (collectionId, documentId, queries = []) => 
+        databases.getDocument(DATABASE_ID, collectionId, documentId, queries),
+    create: (collectionId, data, permissions) => 
+        databases.createDocument(DATABASE_ID, collectionId, ID.unique(), data, permissions),
+    update: (collectionId, documentId, data, permissions) => 
+        databases.updateDocument(DATABASE_ID, collectionId, documentId, data, permissions),
+    delete: (collectionId, documentId) =>
+        databases.deleteDocument(DATABASE_ID, collectionId, documentId)
+};
+
+export const db = {
+    categories: {
+        list: (queries) => dbAction.list(COLLECTIONS.CATEGORIES, queries),
+        get: (id) => dbAction.get(COLLECTIONS.CATEGORIES, id),
+    },
+    products: {
+        list: (queries) => dbAction.list(COLLECTIONS.PRODUCTS, queries),
+        get: (id) => dbAction.get(COLLECTIONS.PRODUCTS, id),
+        update: (id, data) => dbAction.update(COLLECTIONS.PRODUCTS, id, data),
+    },
+    supermarkets: {
+        list: (queries) => dbAction.list(COLLECTIONS.SUPERMARKETS, queries),
+        get: (id) => dbAction.get(COLLECTIONS.SUPERMARKETS, id),
+    },
+    prices: {
+        list: (queries) => dbAction.list(COLLECTIONS.PRICES, queries),
+        create: (data) => dbAction.create(COLLECTIONS.PRICES, data),
+    },
+    priceHistory: {
+        list: (queries) => dbAction.list(COLLECTIONS.PRICE_HISTORY, queries),
+        create: (data) => dbAction.create(COLLECTIONS.PRICE_HISTORY, data),
+    },
+    favorites: {
+        list: (queries) => dbAction.list(COLLECTIONS.FAVORITES, queries),
+        create: (data) => dbAction.create(COLLECTIONS.FAVORITES, data),
+        delete: (id) => dbAction.delete(COLLECTIONS.FAVORITES, id),
+    },
+    announcements: {
+        list: (queries) => dbAction.list(COLLECTIONS.ANNOUNCEMENTS, queries),
+    },
+    feedback: {
+        list: (queries) => dbAction.list(COLLECTIONS.FEEDBACK, queries),
+        create: (data) => dbAction.create(COLLECTIONS.FEEDBACK, data),
+    },
+    // chat_history (COLLECTIONS.CHAT_HISTORY): REQUIRED for multi-thread AI chat — add optional String attribute
+    //   key: conversationId, size ≥ 36 (UUID), required: no. Without it, creates fail when the app sends thread IDs.
+    //   Legacy messages omit this field; they are grouped as one thread in the UI.
+    chatHistory: {
+        list: (queries) => dbAction.list(COLLECTIONS.CHAT_HISTORY, queries),
+        create: (data) => dbAction.create(COLLECTIONS.CHAT_HISTORY, data),
+        delete: (id) => dbAction.delete(COLLECTIONS.CHAT_HISTORY, id),
+    }
+};
 
 
 
