@@ -3,7 +3,9 @@
   "private": true,
   "scripts": {
     "install:user-app": "npm ci --prefix user-app",
-    "build:user-app": "npm run build --prefix user-app"
+    "build:user-app": "npm run build --prefix user-app",
+    "install:admin-panel": "npm ci --prefix admin-panel",
+    "build:admin-panel": "npm run build --prefix admin-panel"
   },
   "dependencies": {
     "dotenv": "^17.3.1",
