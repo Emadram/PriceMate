@@ -299,17 +299,42 @@ const PriceComparison = () => {
     if (error || !product) {
         return (
             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
-                <div className="text-center">
-                    <FiPackage className="text-gray-400 text-6xl mx-auto mb-4" />
-                    <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-2 uppercase tracking-tight">
+                <div className="w-full max-w-md rounded-[2rem] bg-white dark:bg-gray-800 shadow-xl border border-gray-100 dark:border-gray-700 p-8 text-center">
+                    <div className="w-20 h-20 rounded-3xl bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center mx-auto mb-5">
+                        <FiPackage className="text-amber-500 text-4xl" />
+                    </div>
+                    <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-3">
                         {error ? t('failed_to_load_product') : t('product_not_found')}
                     </h2>
-                    <button
-                        onClick={() => navigate('/')}
-                        className="bg-blue-600 text-white px-6 py-2 rounded-full font-black uppercase tracking-widest text-[10px] hover:bg-black transition-colors"
-                    >
-                        {t('go_back_home')}
-                    </button>
+                    <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400 font-medium leading-relaxed mb-2">
+                        {error
+                            ? error
+                            : barcode
+                                ? `We could not find a product for barcode ${barcode}. Try scanning again or search manually.`
+                                : 'We could not find a product for this scan. Try scanning again or search manually.'}
+                    </p>
+                    {barcode && (
+                        <div className="mt-4 mb-6 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gray-50 dark:bg-gray-900/60 text-xs font-bold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+                            <FiAlertCircle className="text-amber-500" />
+                            {barcode}
+                        </div>
+                    )}
+                    <div className="flex flex-col sm:flex-row gap-3">
+                        <button
+                            onClick={() => navigate('/scan')}
+                            className="flex-1 inline-flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-3 rounded-2xl font-bold shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-colors"
+                        >
+                            <FiCamera />
+                            {t('scan_another_product')}
+                        </button>
+                        <button
+                            onClick={() => navigate('/')}
+                            className="flex-1 inline-flex items-center justify-center gap-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-5 py-3 rounded-2xl font-bold hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                        >
+                            <FiHome />
+                            {t('go_back_home')}
+                        </button>
+                    </div>
                 </div>
             </div>
         );
