@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FiCpu } from 'react-icons/fi';
+import { Bot } from 'lucide-react';
 import AIChatBox from './AIChatBox';
 
 const FloatingAIChatLauncher = () => {
@@ -10,15 +10,11 @@ const FloatingAIChatLauncher = () => {
             <button
                 type="button"
                 onClick={() => setIsOpen(true)}
-                className="fixed z-[60] flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg shadow-blue-500/30 transition hover:bg-blue-700 active:scale-95 md:h-16 md:w-16"
-                style={{
-                    right: 'max(1rem, env(safe-area-inset-right))',
-                    bottom: 'max(1rem, env(safe-area-inset-bottom))',
-                }}
+                className="fixed z-[60] flex h-14 w-14 items-center justify-center rounded-full border border-black/10 bg-neutral-900 text-neutral-100 shadow-xl shadow-black/25 transition hover:bg-neutral-800 active:scale-95 dark:border-white/15 dark:bg-neutral-100 dark:text-neutral-900 dark:shadow-black/30 dark:hover:bg-neutral-200 md:h-16 md:w-16 right-[max(1rem,env(safe-area-inset-right,0px))] max-md:bottom-[calc(6.5rem+env(safe-area-inset-bottom,0px))] md:bottom-[max(1rem,env(safe-area-inset-bottom,0px))]"
                 title="AI Assistant"
                 aria-label="Open AI Assistant"
             >
-                <FiCpu className="h-7 w-7 md:h-8 md:w-8" aria-hidden />
+                <Bot className="h-7 w-7 md:h-8 md:w-8" strokeWidth={2} aria-hidden />
             </button>
             <AIChatBox isOpen={isOpen} onClose={() => setIsOpen(false)} />
         </>
