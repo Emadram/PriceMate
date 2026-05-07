@@ -25,6 +25,21 @@ export const client = new Client()
     .setEndpoint(RESOLVED_APPWRITE_CONFIG.endpoint)
     .setProject(RESOLVED_APPWRITE_CONFIG.projectId);
 
+/**
+ * Verifies reachability of the Appwrite API (called once from main.jsx on startup).
+ * Safe to ignore in production; check the browser console for "[Appwrite] ping OK".
+ */
+export function pingAppwriteBackend() {
+    client
+        .ping()
+        .then((response) => {
+            console.info('[Appwrite] ping OK:', response);
+        })
+        .catch((err) => {
+            console.warn('[Appwrite] ping failed:', err?.message || err);
+        });
+}
+
 export const account = new Account(client);
 export const databases = new Databases(client);
 export const storage = new Storage(client);

@@ -23,6 +23,24 @@ export const client = new Client()
     .setEndpoint(RESOLVED_APPWRITE_CONFIG.endpoint)
     .setProject(RESOLVED_APPWRITE_CONFIG.projectId);
 
+/**
+ * Verifies reachability of the Appwrite API (called once from main.jsx on startup).
+ */
+export function pingAppwriteBackend() {
+    if (!RESOLVED_APPWRITE_CONFIG.endpoint || !RESOLVED_APPWRITE_CONFIG.projectId) {
+        console.warn('[Appwrite] ping skipped: VITE_APPWRITE_ENDPOINT or VITE_APPWRITE_PROJECT_ID missing');
+        return;
+    }
+    client
+        .ping()
+        .then((response) => {
+            console.info('[Appwrite] ping OK:', response);
+        })
+        .catch((err) => {
+            console.warn('[Appwrite] ping failed:', err?.message || err);
+        });
+}
+
 export const account = new Account(client);
 export const databases = new Databases(client);
 export const storage = new Storage(client);
