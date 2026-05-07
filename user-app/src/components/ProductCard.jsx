@@ -53,21 +53,21 @@ const ProductCard = ({ product, prices = [] }) => {
         <div className="relative group">
             <Link
                 to={`/price-comparison/${productKey}`}
-                className="group block bg-white dark:bg-gray-800 rounded-3xl p-4 shadow-soft hover:shadow-soft-lg hover:-translate-y-1 transition-all duration-300 border border-transparent hover:border-gray-100 dark:hover:border-gray-700 overflow-hidden"
+                className="group block bg-white dark:bg-gray-800 rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-soft hover:shadow-soft-lg hover:-translate-y-1 transition-all duration-300 border border-transparent hover:border-gray-100 dark:hover:border-gray-700 overflow-hidden"
             >
-                <div className="flex items-center gap-5">
+                <div className="flex items-center gap-3 sm:gap-4 md:gap-5">
                 {/* Product Image Wrapper */}
-                <div className="relative w-24 h-24 sm:w-28 sm:h-28 bg-gray-50 dark:bg-gray-900 rounded-2xl flex items-center justify-center flex-shrink-0 overflow-hidden">
+                <div className="relative w-[4.75rem] h-[4.75rem] sm:w-24 sm:h-24 md:w-28 md:h-28 bg-gray-50 dark:bg-gray-900 rounded-xl sm:rounded-2xl flex items-center justify-center flex-shrink-0 overflow-hidden">
                     {imageUrl && !imageFailed ? (
                         <img
                             src={imageUrl}
                             alt={product.name}
-                            className="w-20 h-20 sm:w-24 sm:h-24 object-contain mix-blend-multiply dark:mix-blend-normal transform group-hover:scale-110 transition-transform duration-500"
+                            className="w-[3.75rem] h-[3.75rem] sm:w-20 sm:h-20 md:w-24 md:h-24 object-contain mix-blend-multiply dark:mix-blend-normal transform group-hover:scale-110 transition-transform duration-500"
                             onError={() => setImageFailed(true)}
                             loading="lazy"
                         />
                     ) : (
-                        <FiPackage className="text-gray-300 text-3xl" />
+                        <FiPackage className="text-gray-300 text-2xl sm:text-3xl" />
                     )}
 
                     {/* Global Badge */}
@@ -83,7 +83,7 @@ const ProductCard = ({ product, prices = [] }) => {
                     <div className="mb-auto">
                         <div className="flex items-start justify-between gap-3">
                             <div className="flex flex-col min-w-0 flex-1">
-                                <h3 className="font-semibold text-gray-900 dark:text-white text-base sm:text-lg truncate group-hover:text-blue-600 transition-colors leading-tight">
+                                <h3 className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base md:text-lg truncate group-hover:text-blue-600 transition-colors leading-tight">
                                     {product.name}
                                 </h3>
                                 {product.is_global && (
@@ -98,11 +98,11 @@ const ProductCard = ({ product, prices = [] }) => {
                                     e.stopPropagation();
                                     setIsReportOpen(true);
                                 }}
-                                className="shrink-0 flex h-10 w-10 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 shadow-sm transition-all hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-400 dark:hover:bg-red-500/25"
+                                className="shrink-0 flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 shadow-sm transition-all hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-400 dark:hover:bg-red-500/25"
                                 title="Report Issue"
                                 aria-label="Report issue"
                             >
-                                <FiAlertTriangle size={18} />
+                                <FiAlertTriangle className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                             </button>
                             )}
                         </div>
@@ -124,15 +124,15 @@ const ProductCard = ({ product, prices = [] }) => {
                     </div>
 
                     {/* Footer / Price Section */}
-                    <div className="flex items-end justify-between mt-4">
+                    <div className="flex items-end justify-between mt-3 sm:mt-4 gap-2">
                         {lowestPrice ? (
-                            <div className="flex flex-col">
-                                <span className="text-[10px] uppercase font-bold tracking-widest text-gray-400 mb-0.5">{t('starting_from')}</span>
+                            <div className="flex flex-col min-w-0">
+                                <span className="text-[9px] sm:text-[10px] uppercase font-bold tracking-widest text-gray-400 mb-0.5">{t('starting_from')}</span>
                                 <div className="flex items-baseline gap-1">
-                                        <span className="text-xl font-bold text-gray-900 dark:text-white leading-none">
+                                        <span className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white leading-none">
                                         {convert(lowestPrice.price, 'TRY')}
                                     </span>
-                                    <span className="text-sm font-medium text-gray-400">TRY</span>
+                                    <span className="text-xs sm:text-sm font-medium text-gray-400">TRY</span>
                                 </div>
                             </div>
                         ) : (
@@ -142,8 +142,8 @@ const ProductCard = ({ product, prices = [] }) => {
                         )}
                         
                         {prices.length > 0 && (
-                            <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-full border border-blue-100 dark:border-blue-800/30">
-                                <FiShoppingBag size={12} />
+                            <div className="flex items-center gap-1 text-[10px] sm:text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-1 sm:px-3 sm:py-1.5 rounded-full border border-blue-100 dark:border-blue-800/30 shrink-0">
+                                <FiShoppingBag className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                                 <span>{prices.length} {prices.length === 1 ? t('supermarket') : t('supermarket') + 's'}</span>
                             </div>
                         )}

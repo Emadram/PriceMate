@@ -144,8 +144,8 @@ const SupermarketProfile = () => {
             </div>
 
             {/* Profile Content */}
-            <div className="max-w-4xl mx-auto px-6 mt-6 relative z-10">
-                <div className="relative bg-white dark:bg-[#121214] rounded-[2.5rem] shadow-soft p-8 border border-gray-100 dark:border-white/5 transition-colors">
+            <div className="max-w-4xl mx-auto px-4 sm:px-6 mt-4 sm:mt-6 relative z-10">
+                <div className="relative bg-white dark:bg-[#121214] rounded-2xl sm:rounded-[2.5rem] shadow-soft p-4 sm:p-6 md:p-8 border border-gray-100 dark:border-white/5 transition-colors">
                     <div className="absolute top-6 right-6 flex gap-2">
                         <button className="w-11 h-11 bg-gray-50 dark:bg-white/5 hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black rounded-full flex items-center justify-center text-gray-500 dark:text-gray-300 transition-all active:scale-90">
                             <Share2 size={18} />
@@ -160,13 +160,13 @@ const SupermarketProfile = () => {
                             }
                         />
                     </div>
-                    <div className="flex flex-col md:flex-row items-start md:items-end gap-8">
+                    <div className="flex flex-col md:flex-row items-start md:items-end gap-4 sm:gap-6 md:gap-8">
                         {/* Logo / Icon */}
-                        <div className="w-32 h-32 bg-white dark:bg-[#1C1C1E] rounded-[2.2rem] shadow-2xl p-4 flex items-center justify-center flex-shrink-0 border border-gray-50 dark:border-white/5 overflow-hidden ring-8 ring-white dark:ring-[#121214]">
+                        <div className="w-24 h-24 sm:w-28 sm:h-32 md:w-32 md:h-32 bg-white dark:bg-[#1C1C1E] rounded-[1.5rem] sm:rounded-[2.2rem] shadow-2xl p-3 sm:p-4 flex items-center justify-center flex-shrink-0 border border-gray-50 dark:border-white/5 overflow-hidden ring-4 sm:ring-8 ring-white dark:ring-[#121214]">
                             {supermarket.icon || supermarket.logoUrl ? (
                                 <img src={supermarket.icon || supermarket.logoUrl} alt={supermarket.name} className="w-full h-full object-contain" />
                             ) : (
-                                <ShoppingBag className="text-gray-300 w-12 h-12" />
+                                <ShoppingBag className="text-gray-300 w-10 h-10 sm:w-12 sm:h-12" />
                             )}
                         </div>
 
@@ -187,7 +187,7 @@ const SupermarketProfile = () => {
                             
                             <div className="space-y-1 relative">
                                 <div className="flex items-center gap-3">
-                                    <h1 className="text-4xl font-bold text-gray-900 dark:text-white tracking-tight">
+                                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 dark:text-white tracking-tight">
                                         {supermarket.name}
                                     </h1>
                                     
@@ -255,7 +255,7 @@ const SupermarketProfile = () => {
                                         </div>
                                     )}
                                 </div>
-                                <p className="text-[15px] text-gray-500 dark:text-gray-400 flex items-center gap-1.5 ml-0.5">
+                                <p className="text-sm sm:text-[15px] text-gray-500 dark:text-gray-400 flex items-center gap-1.5 ml-0.5">
                                     <MapPin size={14} className="text-gray-400" />
                                     {supermarket.address}
                                 </p>
@@ -264,16 +264,16 @@ const SupermarketProfile = () => {
                     </div>
 
                     {/* Quick Stats / Action Bar */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-10 pt-8 border-t border-gray-50 dark:border-white/5">
-                        <div className="bg-gray-50 dark:bg-[#1C1C1E] p-4 rounded-2xl">
-                            <p className="text-[11px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest mb-1">Products</p>
-                            <p className="text-xl font-bold dark:text-white">{products.length}</p>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3 md:gap-4 mt-6 sm:mt-10 pt-6 sm:pt-8 border-t border-gray-50 dark:border-white/5">
+                        <div className="bg-gray-50 dark:bg-[#1C1C1E] p-3 sm:p-4 rounded-xl sm:rounded-2xl">
+                            <p className="text-[10px] sm:text-[11px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest mb-1">Products</p>
+                            <p className="text-lg sm:text-xl font-bold dark:text-white">{products.length}</p>
                         </div>
-                        <div className="bg-gray-50 dark:bg-[#1C1C1E] p-4 rounded-2xl">
-                            <p className="text-[11px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest mb-1">Rating</p>
+                        <div className="bg-gray-50 dark:bg-[#1C1C1E] p-3 sm:p-4 rounded-xl sm:rounded-2xl">
+                            <p className="text-[10px] sm:text-[11px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest mb-1">Rating</p>
                             {ratingValue !== null && ratingValue !== undefined ? (
                                 <div className="flex items-center gap-1">
-                                    <p className="text-xl font-bold dark:text-white">{ratingValue}</p>
+                                    <p className="text-lg sm:text-xl font-bold dark:text-white">{ratingValue}</p>
                                     <Star size={14} className="fill-yellow-400 text-yellow-400" />
                                     {reviewsCount !== null && reviewsCount !== undefined && (
                                         <span className="text-[10px] text-gray-400 font-medium ml-1">({reviewsCount})</span>
@@ -283,25 +283,25 @@ const SupermarketProfile = () => {
                                 <p className="text-sm font-semibold text-gray-400 pt-1">No ratings yet</p>
                             )}
                         </div>
-                        <div className="bg-gray-50 dark:bg-[#1C1C1E] p-4 rounded-2xl">
-                            <p className="text-[11px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest mb-1">Status</p>
+                        <div className="bg-gray-50 dark:bg-[#1C1C1E] p-3 sm:p-4 rounded-xl sm:rounded-2xl">
+                            <p className="text-[10px] sm:text-[11px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest mb-1">Status</p>
                             <div className="flex items-center gap-1.5 pt-1">
                                 {isOpen ? (
                                     <>
                                         <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                                        <p className="text-sm font-semibold text-green-600 dark:text-green-500">Open Now</p>
+                                        <p className="text-xs sm:text-sm font-semibold text-green-600 dark:text-green-500">Open Now</p>
                                     </>
                                 ) : (
                                     <>
                                         <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                                        <p className="text-sm font-semibold text-red-600 dark:text-red-500">Closed</p>
+                                        <p className="text-xs sm:text-sm font-semibold text-red-600 dark:text-red-500">Closed</p>
                                     </>
                                 )}
                             </div>
                         </div>
-                        <div className="bg-gray-50 dark:bg-[#1C1C1E] p-4 rounded-2xl">
-                            <p className="text-[11px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest mb-1">Last Update</p>
-                            <p className="text-sm font-semibold dark:text-white pt-1">
+                        <div className="bg-gray-50 dark:bg-[#1C1C1E] p-3 sm:p-4 rounded-xl sm:rounded-2xl">
+                            <p className="text-[10px] sm:text-[11px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest mb-1">Last Update</p>
+                            <p className="text-xs sm:text-sm font-semibold dark:text-white pt-1">
                                 {lastUpdateValue ? formatLastUpdate(lastUpdateValue) : 'No updates yet'}
                             </p>
                         </div>
@@ -343,14 +343,14 @@ const SupermarketProfile = () => {
                 </div>
 
                 {/* Section Tabs */}
-                <div className="mt-12 space-y-12">
+                <div className="mt-8 sm:mt-12 space-y-8 sm:space-y-12">
                     {/* Map Section */}
-                    <section className="space-y-6">
+                    <section className="space-y-4 sm:space-y-6">
                         <div className="flex items-center justify-between px-2">
-                            <h2 className="text-2xl font-bold dark:text-white tracking-tight">Location</h2>
-                            <span className="text-sm font-medium text-gray-400">Tap to expand map</span>
+                            <h2 className="text-xl sm:text-2xl font-bold dark:text-white tracking-tight">Location</h2>
+                            <span className="text-xs sm:text-sm font-medium text-gray-400">Tap to expand map</span>
                         </div>
-                        <div className="rounded-[2.5rem] overflow-hidden shadow-soft border border-gray-100 dark:border-white/5 h-64 relative group">
+                        <div className="rounded-2xl sm:rounded-[2.5rem] overflow-hidden shadow-soft border border-gray-100 dark:border-white/5 h-52 sm:h-64 relative group">
                             {storeGeoOk ? (
                                 <StoreMap 
                                     supermarkets={[supermarket]} 
@@ -366,22 +366,22 @@ const SupermarketProfile = () => {
                                     )}
                                 </div>
                             )}
-                            <div className="absolute inset-0 pointer-events-none ring-1 ring-inset ring-black/5 dark:ring-white/5 rounded-[2.5rem]"></div>
+                            <div className="absolute inset-0 pointer-events-none ring-1 ring-inset ring-black/5 dark:ring-white/5 rounded-2xl sm:rounded-[2.5rem]"></div>
                         </div>
                     </section>
 
                     {/* Available Products Section */}
-                    <section className="space-y-6">
-                        <div className="flex items-center justify-between px-2">
-                            <h2 className="text-2xl font-bold dark:text-white tracking-tight">Available Items</h2>
-                            <div className="flex items-center gap-4">
-                                <TrendingDown size={18} className="text-green-500" />
-                                <span className="text-sm font-medium text-gray-500">Live prices</span>
+                    <section className="space-y-4 sm:space-y-6">
+                        <div className="flex items-center justify-between px-2 gap-2">
+                            <h2 className="text-xl sm:text-2xl font-bold dark:text-white tracking-tight">Available Items</h2>
+                            <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+                                <TrendingDown size={16} className="sm:w-[18px] sm:h-[18px] text-green-500" />
+                                <span className="text-xs sm:text-sm font-medium text-gray-500">Live prices</span>
                             </div>
                         </div>
 
                         {products.length > 0 ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                                 {products.map((price) => {
                                     const status = (price.stockStatus || '').toLowerCase();
                                     const stockBadgeClass =
@@ -411,25 +411,25 @@ const SupermarketProfile = () => {
                                     <Link 
                                         key={price.$id} 
                                         to={`/price-comparison/${productKey}`}
-                                        className="group relative block overflow-hidden rounded-3xl border border-transparent bg-white p-4 shadow-soft transition-all duration-300 hover:-translate-y-1 hover:border-gray-100 hover:shadow-soft-lg dark:bg-gray-800 dark:hover:border-gray-700"
+                                        className="group relative block overflow-hidden rounded-2xl sm:rounded-3xl border border-transparent bg-white p-3 sm:p-4 shadow-soft transition-all duration-300 hover:-translate-y-1 hover:border-gray-100 hover:shadow-soft-lg dark:bg-gray-800 dark:hover:border-gray-700"
                                     >
-                                        <div className="flex items-center gap-5">
-                                            <div className="relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gray-50 dark:bg-gray-900 sm:h-28 sm:w-28">
+                                        <div className="flex items-center gap-3 sm:gap-4 md:gap-5">
+                                            <div className="relative flex h-[4.5rem] w-[4.5rem] shrink-0 items-center justify-center overflow-hidden rounded-xl sm:rounded-2xl bg-gray-50 dark:bg-gray-900 sm:h-24 sm:w-24 md:h-28 md:w-28">
                                                 {(price.products?.image || price.products?.imageUrl || price.products?.image_url) ? (
                                                     <img 
                                                         src={price.products.image || price.products.imageUrl || price.products.image_url} 
                                                         alt={price.products.name} 
-                                                        className="h-20 w-20 object-contain mix-blend-multiply transition-transform duration-500 group-hover:scale-110 dark:mix-blend-normal sm:h-24 sm:w-24" 
+                                                        className="h-[3.5rem] w-[3.5rem] object-contain mix-blend-multiply transition-transform duration-500 group-hover:scale-110 dark:mix-blend-normal sm:h-20 sm:w-20 md:h-24 md:w-24" 
                                                     />
                                                 ) : (
-                                                    <Package className="h-8 w-8 text-gray-300" />
+                                                    <Package className="h-7 w-7 text-gray-300 sm:h-8 sm:w-8" />
                                                 )}
                                             </div>
-                                            <div className="flex min-w-0 flex-1 flex-col py-1">
+                                            <div className="flex min-w-0 flex-1 flex-col py-0.5 sm:py-1">
                                                 <div className="mb-auto">
                                                     <div className="flex items-start justify-between gap-3">
                                                         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                                                            <h3 className="truncate text-base font-semibold leading-tight text-gray-900 transition-colors group-hover:text-blue-600 dark:text-white sm:text-lg">
+                                                            <h3 className="truncate text-sm font-semibold leading-tight text-gray-900 transition-colors group-hover:text-blue-600 dark:text-white sm:text-base md:text-lg">
                                                                 {price.products?.name || 'Unknown Product'}
                                                             </h3>
                                                             {price.stockStatus && (
@@ -447,11 +447,11 @@ const SupermarketProfile = () => {
                                                                 setProductReportTarget({ id: productReportId, name: productReportName });
                                                                 setIsProductReportOpen(true);
                                                             }}
-                                                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 shadow-sm transition-all hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-400 dark:hover:bg-red-500/25"
+                                                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 shadow-sm transition-all hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-400 dark:hover:bg-red-500/25 sm:h-10 sm:w-10"
                                                             title="Report an issue"
                                                             aria-label="Report an issue"
                                                         >
-                                                            <AlertTriangle size={18} />
+                                                            <AlertTriangle size={16} className="sm:w-[18px] sm:h-[18px]" />
                                                         </button>
                                                         )}
                                                     </div>
@@ -471,9 +471,9 @@ const SupermarketProfile = () => {
                                                         Updated {new Date(price.$updatedAt).toLocaleDateString()}
                                                     </p>
                                                 </div>
-                                                <div className="mt-4 flex flex-wrap items-end justify-between gap-2">
+                                                <div className="mt-3 sm:mt-4 flex flex-wrap items-end justify-between gap-2">
                                                     <div className="flex flex-wrap items-baseline gap-2">
-                                                        <span className="text-xl font-bold leading-none text-gray-900 dark:text-white">
+                                                        <span className="text-lg sm:text-xl font-bold leading-none text-gray-900 dark:text-white">
                                                             {getCurrencySymbol()} {convert(price.price)}
                                                         </span>
                                                         {price.isOnSale && (

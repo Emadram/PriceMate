@@ -63,7 +63,7 @@ const StockBranch = ({ name, status, price, distance, t, currencyLabel, supermar
             </div>
             
             <div className="text-right flex flex-col items-end">
-                <span className="text-lg font-bold text-gray-900 dark:text-white">
+                <span className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
                     {price}
                 </span>
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
@@ -74,7 +74,7 @@ const StockBranch = ({ name, status, price, distance, t, currencyLabel, supermar
     );
 
     const className =
-        'flex items-center justify-between p-4 rounded-2xl bg-white dark:bg-gray-800 shadow-soft hover:shadow-soft-lg transition-all border border-transparent hover:border-gray-100 dark:hover:border-gray-700 cursor-pointer group';
+        'flex items-center justify-between p-3 sm:p-4 rounded-2xl bg-white dark:bg-gray-800 shadow-soft hover:shadow-soft-lg transition-all border border-transparent hover:border-gray-100 dark:hover:border-gray-700 cursor-pointer group';
 
     if (supermarketId) {
         return (
@@ -342,24 +342,24 @@ const PriceComparison = () => {
                     <BackButton label="Go Back" onClick={handleBack} />
                 </div>
                 {/* Product Info Card - Modern & Mobile Friendly */}
-                <div className="bg-white dark:bg-gray-800 rounded-2xl md:rounded-[2.5rem] shadow-xl overflow-hidden border border-gray-100 dark:border-gray-700">
-                    <div className="p-4 md:p-10">
-                        <div className="flex flex-col md:flex-row gap-8 items-center md:items-start text-center md:text-left">
+                <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl md:rounded-[2.5rem] shadow-xl overflow-hidden border border-gray-100 dark:border-gray-700">
+                    <div className="p-3 sm:p-6 md:p-10">
+                        <div className="flex flex-col md:flex-row gap-4 sm:gap-6 md:gap-8 items-center md:items-start text-center md:text-left">
                             {/* Product Image */}
-                            <div className="w-40 h-40 md:w-64 md:h-64 bg-gray-50 dark:bg-gray-900 rounded-3xl md:rounded-[3rem] flex items-center justify-center flex-shrink-0 overflow-hidden shadow-inner border border-gray-100 dark:border-gray-800/50 relative group">
+                            <div className="w-[7.5rem] h-[7.5rem] sm:w-36 sm:h-36 md:w-56 md:h-56 lg:w-64 lg:h-64 bg-gray-50 dark:bg-gray-900 rounded-2xl md:rounded-[3rem] flex items-center justify-center flex-shrink-0 overflow-hidden shadow-inner border border-gray-100 dark:border-gray-800/50 relative group">
                                 {product.imageUrl ? (
                                     <img
                                         src={product.imageUrl}
                                         alt={product.name}
-                                        className="w-full h-full object-contain p-6 transition-transform group-hover:scale-110 duration-500"
+                                        className="w-full h-full object-contain p-3 sm:p-6 md:p-8 transition-transform group-hover:scale-110 duration-500"
                                     />
                                 ) : (
-                                    <FiPackage className="text-gray-300 text-6xl" />
+                                    <FiPackage className="text-gray-300 text-4xl sm:text-6xl" />
                                 )}
                             </div>
 
                             {/* Product Details */}
-                            <div className="flex-1 space-y-5">
+                            <div className="flex-1 space-y-3 sm:space-y-4 md:space-y-5 w-full max-w-full">
                                 <div className="space-y-2">
                                     <div className="flex items-center justify-center md:justify-start gap-2 flex-wrap">
                                         <span className="bg-blue-600/10 text-blue-600 dark:text-blue-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-blue-600/20">
@@ -381,7 +381,7 @@ const PriceComparison = () => {
                                         </span>
                                     </div>
                                     <div className="flex items-start justify-center md:justify-start gap-3">
-                                        <h2 className="flex-1 min-w-0 text-2xl md:text-5xl font-black text-gray-900 dark:text-white tracking-tighter leading-tight text-center md:text-left">
+                                        <h2 className="flex-1 min-w-0 text-lg sm:text-2xl md:text-4xl lg:text-5xl font-black text-gray-900 dark:text-white tracking-tighter leading-tight text-center md:text-left">
                                             {product.name}
                                         </h2>
                                         <FavoriteHeartButton
@@ -572,26 +572,26 @@ const PriceComparison = () => {
                                     return (
                                         <div
                                             key={priceEntry.$id}
-                                            className={`group relative bg-white dark:bg-gray-800 rounded-3xl p-5 shadow-soft hover:shadow-soft-lg hover:-translate-y-1 transition-all duration-300 border-2 
+                                            className={`group relative bg-white dark:bg-gray-800 rounded-2xl sm:rounded-3xl p-3 sm:p-5 shadow-soft hover:shadow-soft-lg hover:-translate-y-1 transition-all duration-300 border-2 
                                                 ${isSelectedContext ? 'border-blue-500 shadow-blue-500/10' : 'border-transparent'}
                                                 ${isLowest && !isSelectedContext ? 'border-green-500 shadow-green-500/10' : ''}
                                             `}
                                         >
-                                                <div className="flex items-center gap-4">
+                                                <div className="flex items-center gap-2.5 sm:gap-4">
                                                     <Link 
                                                         to={supermarketId ? `/supermarket/${supermarketId}` : '#'}
-                                                        className="relative w-16 h-16 bg-gray-50 dark:bg-gray-900 rounded-2xl flex items-center justify-center flex-shrink-0 overflow-hidden"
+                                                        className="relative w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 bg-gray-50 dark:bg-gray-900 rounded-xl sm:rounded-2xl flex items-center justify-center flex-shrink-0 overflow-hidden"
                                                     >
                                                         {typeof supermarket === 'object' && (supermarket.icon || supermarket.logoUrl) ? (
-                                                            <img src={supermarket.icon || supermarket.logoUrl} className="w-12 h-12 object-contain" alt="" />
+                                                            <img src={supermarket.icon || supermarket.logoUrl} className="w-9 h-9 sm:w-11 sm:h-11 md:w-12 md:h-12 object-contain" alt="" />
                                                         ) : (
-                                                            <FiShoppingBag className="text-gray-200 text-xl" />
+                                                            <FiShoppingBag className="text-gray-200 text-lg sm:text-xl" />
                                                         )}
                                                     </Link>
                                                 
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2 mb-1">
-                                                        <h4 className="text-base font-bold text-gray-900 dark:text-white truncate">
+                                                        <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white truncate">
                                                             {supermarketName}
                                                         </h4>
                                                         {typeof supermarket === 'object' && supermarket?.branchName && (
@@ -646,7 +646,7 @@ const PriceComparison = () => {
 
                                                 <div className="text-right flex flex-col items-end">
                                                     <div className="flex items-baseline gap-1">
-                                                        <span className={`text-2xl font-bold ${isLowest ? 'text-green-600' : 'text-gray-900 dark:text-white'}`}>
+                                                        <span className={`text-lg sm:text-xl md:text-2xl font-bold ${isLowest ? 'text-green-600' : 'text-gray-900 dark:text-white'}`}>
                                                             {convertedPrice}
                                                         </span>
                                                         <span className="text-xs font-semibold text-gray-400">{getCurrencySymbol()}</span>

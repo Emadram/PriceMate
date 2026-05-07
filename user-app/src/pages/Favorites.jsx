@@ -77,9 +77,9 @@ const Favorites = () => {
                 </div>
             </header>
 
-            <main className="max-w-4xl mx-auto p-6 space-y-8">
+            <main className="max-w-4xl mx-auto p-4 sm:p-6 space-y-6 sm:space-y-8">
                 {loading ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
                         {[1, 2, 3, 4].map((i) => (
                             <ProductCardSkeleton key={i} />
                         ))}
@@ -151,7 +151,7 @@ const Favorites = () => {
 
                         {activeTab === 'products' &&
                             (products.length > 0 ? (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 px-1">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 md:gap-6 lg:gap-8 px-1">
                                     {products.map((product) => (
                                         <ProductCard key={product.$id} product={product} prices={product.prices} />
                                     ))}
@@ -172,14 +172,14 @@ const Favorites = () => {
 
                         {activeTab === 'supermarkets' &&
                             (supermarkets.length > 0 ? (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                                     {supermarkets.map((market) => (
                                         <Link
                                             key={market.$id}
                                             to={`/supermarket/${market.$id}`}
-                                            className="group bg-white dark:bg-[#121214] p-5 rounded-[2.5rem] shadow-soft hover:shadow-soft-lg transition-all border border-gray-100/50 dark:border-white/5 active:scale-[0.98] flex items-center gap-4"
+                                            className="group bg-white dark:bg-[#121214] p-3.5 sm:p-5 rounded-2xl sm:rounded-[2.5rem] shadow-soft hover:shadow-soft-lg transition-all border border-gray-100/50 dark:border-white/5 active:scale-[0.98] flex items-center gap-3 sm:gap-4"
                                         >
-                                            <div className="w-20 h-20 bg-gray-50 dark:bg-[#1C1C1E] rounded-3xl flex items-center justify-center overflow-hidden p-3 group-hover:scale-105 transition-transform">
+                                            <div className="w-14 h-14 sm:w-16 sm:h-20 md:w-20 md:h-20 bg-gray-50 dark:bg-[#1C1C1E] rounded-2xl sm:rounded-3xl flex items-center justify-center overflow-hidden p-2 sm:p-3 group-hover:scale-105 transition-transform shrink-0">
                                                 {market.icon || market.logoUrl ? (
                                                     <img
                                                         src={market.icon || market.logoUrl}
@@ -191,7 +191,7 @@ const Favorites = () => {
                                                 )}
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <h3 className="font-bold text-gray-900 dark:text-white text-lg truncate mb-1">{market.name}</h3>
+                                                <h3 className="font-bold text-gray-900 dark:text-white text-sm sm:text-base md:text-lg truncate mb-0.5 sm:mb-1">{market.name}</h3>
                                                 <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{market.address}</p>
                                                 <div className="mt-2 flex items-center gap-2">
                                                     <span className="text-[10px] bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-500 px-2 py-0.5 rounded-full font-bold uppercase tracking-tighter">

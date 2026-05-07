@@ -91,7 +91,7 @@ const Home = () => {
         <div className="min-h-screen bg-[#F5F5F7] dark:bg-gray-950 pb-20 md:pb-12 text-gray-900 dark:text-gray-100 selection:bg-blue-500/30">
             <Navbar />
 
-            <main className="max-w-5xl mx-auto px-4 pt-4 md:pt-12 space-y-12 animate-in fade-in duration-700">
+            <main className="max-w-5xl mx-auto px-4 pt-4 md:pt-12 space-y-8 sm:space-y-10 md:space-y-12 animate-in fade-in duration-700">
                 {/* Header Section */}
                 <header className="px-1 md:px-0 space-y-4">
                     <div className="flex items-center justify-between">
@@ -106,20 +106,20 @@ const Home = () => {
                     </div>
 
                         {/* Live Market Overview */}
-                    <div className="relative -mx-4 px-4 overflow-x-auto no-scrollbar flex items-center gap-4 animate-in slide-in-from-bottom-2 duration-1000 pb-2 snap-x">
+                    <div className="relative -mx-4 px-4 overflow-x-auto no-scrollbar flex items-stretch gap-3 sm:gap-4 animate-in slide-in-from-bottom-2 duration-1000 pb-2 snap-x">
                         {marketInsights.map((insight) => (
                             <div 
                                 key={insight.id} 
-                                className="flex-shrink-0 bg-white dark:bg-gray-900 transition-all border border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 shadow-soft flex items-center gap-3 min-w-[280px] cursor-default hover:border-blue-100 dark:hover:border-blue-900/30 snap-center"
+                                className="flex-shrink-0 bg-white dark:bg-gray-900 transition-all border border-gray-100 dark:border-gray-800 rounded-xl sm:rounded-2xl px-3.5 py-3 sm:px-5 sm:py-4 shadow-soft flex items-center gap-2.5 sm:gap-3 max-w-[min(100%,18.5rem)] sm:max-w-none sm:min-w-[220px] md:min-w-[260px] cursor-default hover:border-blue-100 dark:hover:border-blue-900/30 snap-center"
                             >
-                                <div className="text-lg">{insight.icon}</div>
-                                <span className="text-sm font-semibold tracking-tight">{insight.text}</span>
+                                <div className="text-base sm:text-lg shrink-0">{insight.icon}</div>
+                                <span className="text-xs sm:text-sm font-semibold tracking-tight line-clamp-2">{insight.text}</span>
                             </div>
                         ))}
                         {marketInsights.length === 0 && (
-                            <div className="flex-shrink-0 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 shadow-soft flex items-center gap-3 min-w-[280px]">
-                                <FiBell className="text-gray-400" />
-                                <span className="text-sm font-medium text-gray-400 tracking-tight">Checking for updates...</span>
+                            <div className="flex-shrink-0 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl sm:rounded-2xl px-3.5 py-3 sm:px-5 sm:py-4 shadow-soft flex items-center gap-2.5 sm:gap-3 max-w-[min(100%,18.5rem)] sm:min-w-[220px]">
+                                <FiBell className="text-gray-400 shrink-0" />
+                                <span className="text-xs sm:text-sm font-medium text-gray-400 tracking-tight">Checking for updates...</span>
                             </div>
                         )}
                     </div>
@@ -171,9 +171,9 @@ const Home = () => {
                         </button>
                     </div>
                     
-                    <div className="flex overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4 pb-2 snap-x">
+                    <div className="flex overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 sm:gap-4 pb-2 snap-x">
                         {loading || categoriesLoading
-                            ? [...Array(6)].map((_, i) => <div key={i} className="flex-shrink-0 w-32 h-32 sm:w-auto bg-gray-200 dark:bg-gray-800 rounded-3xl animate-pulse" />)
+                            ? [...Array(6)].map((_, i) => <div key={i} className="flex-shrink-0 w-[6.75rem] h-[6.75rem] sm:w-auto sm:h-auto bg-gray-200 dark:bg-gray-800 rounded-2xl sm:rounded-3xl animate-pulse" />)
                             : categories.slice(0, 11).map((cat) => {
                                 const categoryLabel = cat.categoryName || cat.name || 'Category';
 
@@ -181,12 +181,12 @@ const Home = () => {
                                     <button 
                                         key={cat.$id}
                                         onClick={() => navigate(`/search?category=${cat.$id}`)}
-                                        className="flex-shrink-0 w-32 h-32 sm:w-auto flex flex-col items-center justify-center p-6 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[2rem] shadow-soft hover:shadow-xl hover:translate-y-[-4px] transition-all group snap-center"
+                                        className="flex-shrink-0 w-[6.75rem] h-[6.75rem] sm:w-auto sm:aspect-square sm:min-h-0 sm:h-auto flex flex-col items-center justify-center p-4 sm:p-6 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[1.5rem] sm:rounded-[2rem] shadow-soft hover:shadow-xl hover:translate-y-[-4px] transition-all group snap-center"
                                     >
-                                        <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-gray-800 flex items-center justify-center text-2xl text-blue-600 group-hover:scale-110 transition-transform">
+                                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-gray-50 dark:bg-gray-800 flex items-center justify-center text-xl sm:text-2xl text-blue-600 group-hover:scale-110 transition-transform">
                                             {getIconForCategory(cat)}
                                         </div>
-                                        <span className="mt-4 text-[13px] font-bold tracking-tight text-gray-900 dark:text-gray-100 text-center line-clamp-1">
+                                        <span className="mt-2.5 sm:mt-4 text-[11px] sm:text-[13px] font-bold tracking-tight text-gray-900 dark:text-gray-100 text-center line-clamp-2 sm:line-clamp-1">
                                             {categoryLabel}
                                         </span>
                                     </button>
@@ -196,12 +196,12 @@ const Home = () => {
                         {!loading && categories.length > 11 && (
                             <button 
                                 onClick={() => navigate('/search')}
-                                className="flex-shrink-0 w-32 h-32 sm:w-auto flex flex-col items-center justify-center p-6 bg-blue-600 border border-blue-500 rounded-[2rem] shadow-soft hover:shadow-xl hover:translate-y-[-4px] transition-all group snap-center"
+                                className="flex-shrink-0 w-[6.75rem] h-[6.75rem] sm:w-auto sm:aspect-square sm:min-h-0 sm:h-auto flex flex-col items-center justify-center p-4 sm:p-6 bg-blue-600 border border-blue-500 rounded-[1.5rem] sm:rounded-[2rem] shadow-soft hover:shadow-xl hover:translate-y-[-4px] transition-all group snap-center"
                             >
-                                <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-2xl text-white group-hover:scale-110 transition-transform">
+                                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-white/10 flex items-center justify-center text-xl sm:text-2xl text-white group-hover:scale-110 transition-transform">
                                     <FiChevronRight />
                                 </div>
-                                <span className="mt-4 text-[13px] font-bold tracking-tight text-white text-center">{t('view_all', 'View All')}</span>
+                                <span className="mt-2.5 sm:mt-4 text-[11px] sm:text-[13px] font-bold tracking-tight text-white text-center">{t('view_all', 'View All')}</span>
                             </button>
                         )}
                     </div>
@@ -211,15 +211,15 @@ const Home = () => {
                 <section className="animate-in slide-in-from-bottom-10 duration-700 delay-450">
                     <button
                         onClick={() => navigate('/scan')}
-                        className="w-full group relative bg-black dark:bg-blue-600 rounded-[2.5rem] p-8 md:p-12 overflow-hidden shadow-2xl transition-all active:scale-[0.99]"
+                        className="w-full group relative bg-black dark:bg-blue-600 rounded-[1.75rem] sm:rounded-[2.5rem] p-6 sm:p-8 md:p-12 overflow-hidden shadow-2xl transition-all active:scale-[0.99]"
                     >
                         <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-blue-400 opacity-20 blur-3xl rounded-full transition-transform group-hover:translate-x-12"></div>
-                        <div className="relative flex flex-col items-center gap-6 md:flex-row md:items-center md:gap-8 text-left">
-                            <div className="w-20 h-20 md:w-24 md:h-24 bg-white/10 backdrop-blur-xl border border-white/20 rounded-[2rem] flex items-center justify-center shadow-2xl group-hover:rotate-6 transition-transform">
-                                <FiCamera size={40} className="text-white" />
+                        <div className="relative flex flex-col items-center gap-4 sm:gap-6 md:flex-row md:items-center md:gap-8 text-left">
+                            <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 bg-white/10 backdrop-blur-xl border border-white/20 rounded-[1.5rem] sm:rounded-[2rem] flex items-center justify-center shadow-2xl group-hover:rotate-6 transition-transform">
+                                <FiCamera className="w-8 h-8 sm:w-10 sm:h-10 text-white" strokeWidth={2.5} />
                             </div>
                             <div className="flex-1 text-center md:text-left">
-                                <h3 className="text-2xl md:text-4xl font-black text-white leading-tight tracking-tight">
+                                <h3 className="text-xl sm:text-2xl md:text-4xl font-black text-white leading-tight tracking-tight">
                                     {t('scan_barcode')}
                                 </h3>
                                 <p className="text-blue-100/60 text-sm md:text-lg font-medium mt-2">
@@ -241,10 +241,10 @@ const Home = () => {
                 </section>
 
                 {/* Featured Products */}
-                <section className="space-y-8 animate-in slide-in-from-bottom-10 duration-700 delay-500">
+                <section className="space-y-5 sm:space-y-6 md:space-y-8 animate-in slide-in-from-bottom-10 duration-700 delay-500">
                     <div className="flex items-center justify-between px-2">
-                        <div className="flex flex-col">
-                            <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-3">
+                        <div className="flex flex-col min-w-0 pr-2">
+                            <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-3">
                                 {t('featured_products', 'Featured Picks')}
                             </h2>
                             <p className="text-sm font-semibold text-gray-400 mt-1 uppercase tracking-widest leading-none">
@@ -261,7 +261,7 @@ const Home = () => {
                     </div>
 
                     {loading ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 px-1">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 md:gap-6 lg:gap-8 px-1">
                             {[...Array(4)].map((_, i) => (
                                 <ProductCardSkeleton key={i} />
                             ))}
@@ -283,7 +283,7 @@ const Home = () => {
                             <p className="text-gray-400 font-bold text-lg">{t('no_products')}</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 px-1 pb-10">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 md:gap-6 lg:gap-8 px-1 pb-10">
                             {featuredProducts.map((product) => (
                                 <ProductCard
                                     key={product.$id}
