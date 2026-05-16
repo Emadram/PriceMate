@@ -140,7 +140,13 @@ const PriceComparison = () => {
 
     const getPriceTimestamp = (price) => price?.$updatedAt || price?.updatedAt || price?.$createdAt || price?.createdAt || null;
 
-    const getPriceCurrency = (price) => price?.currency || 'TRY';
+    const normalizePriceCurrency = (value) => {
+        if (!value) return 'TRY';
+        const upper = String(value).trim().toUpperCase();
+        return upper === 'TL' ? 'TRY' : upper;
+    };
+
+    const getPriceCurrency = (price) => normalizePriceCurrency(price?.currency);
 
     const fromScan = location.state?.fromScan || searchParams.get('fromScan') === '1';
 
