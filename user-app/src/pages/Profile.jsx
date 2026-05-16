@@ -64,7 +64,7 @@ const Profile = () => {
                 <div className="max-w-4xl mx-auto flex items-center justify-between">
                     <BackButton to="/" />
                     <h1 className="text-xl font-black text-gray-900 dark:text-white flex items-center gap-2">
-                        <FiUser className="text-blue-500" />
+                        <FiUser className="text-brand-600" />
                         {t('profile')}
                     </h1>
                     <div className="w-10" />
@@ -74,7 +74,7 @@ const Profile = () => {
             <div className="max-w-md mx-auto px-6 pt-6">
                 {/* Profile Top Section */}
                 <div className="flex flex-col items-center text-center mb-12">
-                    <div className="h-24 w-24 bg-white dark:bg-gray-900 rounded-[2rem] flex items-center justify-center text-blue-600 dark:text-blue-400 text-3xl font-black shadow-soft mb-6 border border-gray-100 dark:border-gray-800">
+                    <div className="h-24 w-24 bg-white dark:bg-gray-900 rounded-[2rem] flex items-center justify-center text-brand-600 dark:text-brand-500 text-3xl font-black shadow-soft mb-6 border border-gray-100 dark:border-gray-800">
                         {initials}
                     </div>
                     <h1 className="text-3xl font-black tracking-tight mb-1">
@@ -112,7 +112,7 @@ const Profile = () => {
                             className="flex items-center justify-between p-5 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-[2rem] transition-all group"
                         >
                             <div className="flex items-center gap-4">
-                                <div className="p-3 rounded-2xl bg-blue-50 dark:bg-blue-900/20 text-blue-500">
+                                <div className="p-3 rounded-2xl bg-brand-50 dark:bg-brand-900/20 text-brand-600">
                                     <FiMessageSquare size={20} />
                                 </div>
                                 <span className="font-bold tracking-tight">{t('send_feedback', 'Send Feedback')}</span>
@@ -131,7 +131,7 @@ const Profile = () => {
 
                         <form onSubmit={handleSaveName} className="space-y-3">
                             <div className="flex items-center gap-2 mb-1">
-                                <FiUser size={12} className="text-blue-500" />
+                                <FiUser size={12} className="text-brand-600" />
                                 <span className="text-[10px] uppercase font-black tracking-widest text-gray-400">Display name</span>
                             </div>
                             <input
@@ -139,7 +139,7 @@ const Profile = () => {
                                 value={displayName}
                                 onChange={(e) => setDisplayName(e.target.value)}
                                 autoComplete="name"
-                                className="w-full rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/30"
+                                className="w-full rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-brand-500/30"
                             />
                             <button
                                 type="submit"
@@ -163,7 +163,7 @@ const Profile = () => {
                                 onChange={(e) => setOldPassword(e.target.value)}
                                 autoComplete="current-password"
                                 placeholder={t('current_password', 'Current password')}
-                                className="w-full rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/30 placeholder:text-gray-400"
+                                className="w-full rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-brand-500/30 placeholder:text-gray-400"
                             />
                             <input
                                 type="password"
@@ -171,7 +171,7 @@ const Profile = () => {
                                 onChange={(e) => setNewPassword(e.target.value)}
                                 autoComplete="new-password"
                                 placeholder={t('new_password', 'New password (min 8 characters)')}
-                                className="w-full rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/30 placeholder:text-gray-400"
+                                className="w-full rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-brand-500/30 placeholder:text-gray-400"
                             />
                             <input
                                 type="password"
@@ -179,7 +179,7 @@ const Profile = () => {
                                 onChange={(e) => setConfirmPassword(e.target.value)}
                                 autoComplete="new-password"
                                 placeholder={t('confirm_new_password', 'Confirm new password')}
-                                className="w-full rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/30 placeholder:text-gray-400"
+                                className="w-full rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-brand-500/30 placeholder:text-gray-400"
                             />
                             <button
                                 type="submit"

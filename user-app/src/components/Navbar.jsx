@@ -44,7 +44,7 @@ const Navbar = () => {
                         {/* Logo */}
                         <div className="flex items-center">
                             <Link to="/" className="flex-shrink-0 flex items-center gap-2 group">
-                                <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-lg shadow-blue-500/30 group-hover:scale-105 transition-transform">
+                                <div className="w-10 h-10 bg-brand-600 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-lg shadow-brand-500/30 group-hover:scale-105 transition-transform">
                                     P
                                 </div>
                                 <span className="font-black text-2xl text-gray-900 dark:text-white hidden sm:block tracking-tighter">
@@ -63,8 +63,8 @@ const Navbar = () => {
                                         onClick={() => setCurrency(curr)}
                                         className={`px-3 py-1.5 text-[10px] font-black rounded-lg transition-all ${
                                             currency === curr 
-                                                ? 'bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-sm' 
-                                                : 'text-gray-500 dark:text-gray-400 hover:text-blue-600'
+                                                ? 'bg-white dark:bg-gray-800 text-brand-600 dark:text-brand-500 shadow-sm' 
+                                                : 'text-gray-500 dark:text-gray-400 hover:text-brand-600'
                                         }`}
                                     >
                                         {curr}
@@ -77,7 +77,7 @@ const Navbar = () => {
                                 onClick={toggleLanguage}
                                 className="flex items-center gap-1.5 px-3 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 rounded-xl transition-all border border-gray-100 dark:border-gray-700 shadow-sm group"
                             >
-                                <FiGlobe className="w-4 h-4 text-blue-500 group-hover:rotate-12 transition-transform" />
+                                <FiGlobe className="w-4 h-4 text-accent-500 group-hover:rotate-12 transition-transform" />
                                 <span className="text-[10px] font-black uppercase tracking-widest leading-none">
                                     {(i18n.resolvedLanguage || i18n.language) === 'en' ? 'EN' : 'TR'}
                                 </span>
@@ -97,7 +97,7 @@ const Navbar = () => {
                                         to="/profile"
                                         className="flex items-center gap-2.5 pl-2.5 pr-1.5 py-1.5 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl hover:border-blue-500/50 transition-all shadow-sm group"
                                     >
-                                        <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/50 rounded-xl flex items-center justify-center text-blue-600 dark:text-blue-400 font-black group-hover:scale-95 transition-transform overflow-hidden">
+                                            <div className="w-10 h-10 bg-brand-100 dark:bg-brand-900/50 rounded-xl flex items-center justify-center text-brand-600 dark:text-brand-500 font-black group-hover:scale-95 transition-transform overflow-hidden">
                                             {user.name?.charAt(0).toUpperCase()}
                                         </div>
                                         <div className="flex flex-col">
@@ -116,7 +116,7 @@ const Navbar = () => {
                             ) : (
                                 <Link
                                     to="/login"
-                                    className="bg-blue-600 text-white px-8 py-3 rounded-2xl hover:bg-black transition-all font-black uppercase tracking-widest text-[10px] shadow-lg shadow-blue-500/25 active:scale-95"
+                                    className="bg-brand-600 text-white px-8 py-3 rounded-2xl hover:bg-black transition-all font-black uppercase tracking-widest text-[10px] shadow-lg shadow-brand-500/25 active:scale-95"
                                 >
                                     {t('login')}
                                 </Link>
@@ -134,7 +134,7 @@ const Navbar = () => {
                         <div className="flex items-center md:hidden gap-2">
                              <button
                                 onClick={toggleCurrency}
-                                className={`p-2.5 text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl shadow-sm transition-all ${isCurrencyMenuOpen ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 !border-blue-200' : ''}`}
+                                className={`p-2.5 text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl shadow-sm transition-all ${isCurrencyMenuOpen ? 'bg-brand-50 dark:bg-brand-900/30 text-brand-600 !border-brand-200' : ''}`}
                             >
                                 <span className="text-[10px] font-black uppercase">{currency}</span>
                             </button>
@@ -167,7 +167,7 @@ const Navbar = () => {
                                     }}
                                     className={`flex-1 py-3 text-xs font-black rounded-2xl transition-all ${
                                         currency === curr 
-                                            ? 'bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-sm border border-blue-100 dark:border-blue-900/50' 
+                                            ? 'bg-white dark:bg-gray-800 text-brand-600 dark:text-brand-500 shadow-sm border border-brand-100 dark:border-brand-900/50' 
                                             : 'text-gray-500 dark:text-gray-400 border border-transparent'
                                     }`}
                                 >
@@ -204,7 +204,7 @@ const NavItem = ({ to, icon: Icon, label, currentPath }) => {
         <Link
             to={to}
             className={`flex flex-col items-center justify-center gap-1.5 transition-all active:scale-90 ${
-                isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'
+                isActive ? 'text-brand-600 dark:text-brand-500' : 'text-gray-400 dark:text-gray-500'
             }`}
         >
             <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />

@@ -47,7 +47,7 @@ const StockBranch = ({ name, status, price, distance, t, currencyLabel, supermar
     const inner = (
         <>
             <div className="flex flex-col gap-1 min-w-0">
-                <span className="font-semibold text-gray-900 dark:text-white truncate group-hover:text-blue-600 transition-colors">
+                <span className="font-semibold text-gray-900 dark:text-white truncate group-hover:text-brand-600 transition-colors">
                     {name}
                 </span>
                 <div className="flex items-center gap-2">
@@ -328,7 +328,7 @@ const PriceComparison = () => {
                     <div className="flex flex-col sm:flex-row gap-3">
                         <button
                             onClick={() => navigate('/scan')}
-                            className="flex-1 inline-flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-3 rounded-2xl font-bold shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-colors"
+                            className="flex-1 inline-flex items-center justify-center gap-2 bg-brand-600 text-white px-5 py-3 rounded-2xl font-bold shadow-lg shadow-brand-500/20 hover:bg-brand-700 transition-colors"
                         >
                             <FiCamera />
                             {t('scan_another_product')}
@@ -393,7 +393,7 @@ const PriceComparison = () => {
                             <div className="flex-1 space-y-3 sm:space-y-4 md:space-y-5 w-full max-w-full">
                                 <div className="space-y-2">
                                     <div className="flex items-center justify-center md:justify-start gap-2 flex-wrap">
-                                        <span className="bg-blue-600/10 text-blue-600 dark:text-blue-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-blue-600/20">
+                                        <span className="bg-brand-600/10 text-brand-600 dark:text-brand-500 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-brand-600/20">
                                             {getCategoryName()}
                                         </span>
                                         {product.stockQuantity > 0 && (
@@ -490,7 +490,7 @@ const PriceComparison = () => {
 
                                         {/* Global Product Disclaimer */}
                                         {product.is_global && (
-                                            <div className="flex items-center gap-1.5 text-[9px] font-bold text-blue-500/70 uppercase tracking-widest bg-blue-50/50 dark:bg-blue-900/10 px-3 py-1.5 rounded-xl border border-blue-100/30">
+                                            <div className="flex items-center gap-1.5 text-[9px] font-bold text-brand-500/70 uppercase tracking-widest bg-brand-50/50 dark:bg-brand-900/10 px-3 py-1.5 rounded-xl border border-brand-100/30">
                                                 <FiInfo size={12} />
                                                 Global Database Source
                                             </div>
@@ -521,14 +521,14 @@ const PriceComparison = () => {
                     {/* Prices List & Sorting Controls */}
                     <div className="flex items-center justify-between mb-4 px-1">
                         <h3 className="text-lg font-black text-gray-800 dark:text-white uppercase tracking-tight">
-                            {t('available_stores')} <span className="ml-1 text-blue-600 opacity-50">({prices.length})</span>
+                            {t('available_stores')} <span className="ml-1 text-brand-600 opacity-50">({prices.length})</span>
                         </h3>
                         
                         <div className="flex items-center gap-1 bg-white dark:bg-gray-800 p-0.5 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
                             <button 
                                 type="button"
                                 onClick={() => setSortBy('price')}
-                                className={`p-2 rounded-lg transition-all ${sortBy === 'price' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-400 hover:text-blue-600'}`}
+                                className={`p-2 rounded-lg transition-all ${sortBy === 'price' ? 'bg-brand-600 text-white shadow-md' : 'text-gray-400 hover:text-brand-600'}`}
                                 title="By Price"
                             >
                                 <FiTrendingDown size={14} />
@@ -536,7 +536,7 @@ const PriceComparison = () => {
                             <button 
                                 type="button"
                                 onClick={() => setSortBy('distance')}
-                                className={`p-2 rounded-lg transition-all ${sortBy === 'distance' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-400 hover:text-blue-600'}`}
+                                className={`p-2 rounded-lg transition-all ${sortBy === 'distance' ? 'bg-brand-600 text-white shadow-md' : 'text-gray-400 hover:text-brand-600'}`}
                                 disabled={!userLocation}
                                 title="By Distance"
                             >
@@ -548,9 +548,9 @@ const PriceComparison = () => {
                     {prices.length === 0 ? (
                         <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl p-10 md:p-16 text-center border-2 border-dashed border-gray-100 dark:border-gray-700 space-y-8 animate-in fade-in zoom-in duration-500">
                             <div className="space-y-4">
-                                <div className="relative inline-flex items-center justify-center p-8 bg-blue-50/50 dark:bg-blue-900/10 rounded-full border border-blue-100/30">
+                                <div className="relative inline-flex items-center justify-center p-8 bg-brand-50/50 dark:bg-brand-900/10 rounded-full border border-brand-100/30">
                                     <FiShoppingBag className="text-gray-300 text-6xl animate-pulse-slow" />
-                                    <div className="absolute -top-1 -right-1 p-3 bg-blue-600 rounded-2xl shadow-lg shadow-blue-500/30 animate-float">
+                                    <div className="absolute -top-1 -right-1 p-3 bg-brand-600 rounded-2xl shadow-lg shadow-brand-500/30 animate-float">
                                         <FiPlusCircle className="text-white" size={24} />
                                     </div>
                                 </div>
@@ -565,7 +565,7 @@ const PriceComparison = () => {
                             <button 
                                 onClick={() => setIsAddPriceModalOpen(true)}
                                 aria-label="Add the first price for this product"
-                                className="w-full max-w-sm inline-flex items-center justify-center gap-3 bg-blue-600 hover:bg-black text-white px-8 py-4 rounded-[1.5rem] font-black uppercase tracking-widest text-[11px] shadow-lg shadow-blue-500/30 hover:shadow-none transition-all duration-300 transform hover:scale-[0.98] active:scale-95 group"
+                                className="w-full max-w-sm inline-flex items-center justify-center gap-3 bg-brand-600 hover:bg-black text-white px-8 py-4 rounded-[1.5rem] font-black uppercase tracking-widest text-[11px] shadow-lg shadow-brand-500/30 hover:shadow-none transition-all duration-300 transform hover:scale-[0.98] active:scale-95 group"
                             >
                                 <FiPlusCircle size={20} className="group-hover:rotate-90 transition-transform duration-300" />
                                 Add First Price
@@ -573,7 +573,7 @@ const PriceComparison = () => {
 
                             {product.is_global && (
                                 <div className="flex items-center justify-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50 dark:bg-gray-900/50 py-3 px-6 rounded-2xl border border-gray-100 dark:border-gray-800/50">
-                                    <FiInfo size={14} className="text-blue-500" />
+                                    <FiInfo size={14} className="text-accent-500" />
                                     From our global database
                                 </div>
                             )}
@@ -604,7 +604,7 @@ const PriceComparison = () => {
                                         <div
                                             key={priceEntry.$id}
                                             className={`group relative bg-white dark:bg-gray-800 rounded-2xl sm:rounded-3xl p-3 sm:p-5 shadow-soft hover:shadow-soft-lg hover:-translate-y-1 transition-all duration-300 border-2 
-                                                ${isSelectedContext ? 'border-blue-500 shadow-blue-500/10' : 'border-transparent'}
+                                                ${isSelectedContext ? 'border-brand-500 shadow-brand-500/10' : 'border-transparent'}
                                                 ${isLowest && !isSelectedContext ? 'border-green-500 shadow-green-500/10' : ''}
                                             `}
                                         >
@@ -645,7 +645,7 @@ const PriceComparison = () => {
                                                                 href={`https://www.google.com/maps/dir/?api=1&destination=${supermarket.latitude},${supermarket.longitude}`}
                                                                 target="_blank"
                                                                 rel="noopener noreferrer"
-                                                                className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700"
+                                                                className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-600 dark:text-brand-500 hover:text-brand-700"
                                                                 title="Get Directions"
                                                                 onClick={(e) => e.stopPropagation()}
                                                             >
@@ -691,7 +691,7 @@ const PriceComparison = () => {
                                             {/* Simplified branch details - keeping hidden by default for minimalism */}
                                             <details className="mt-4 group/details border-t border-gray-50 dark:border-gray-700/50 pt-3">
                                                 <summary className="list-none cursor-pointer flex items-center justify-between py-2 px-4 bg-gray-50 dark:bg-gray-900/40 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors">
-                                                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 group-hover/details:text-blue-600 flex items-center gap-2">
+                                                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 group-hover/details:text-brand-600 flex items-center gap-2">
                                                         {hasCoordinates ? (
                                                             <button
                                                                 type="button"
@@ -702,8 +702,8 @@ const PriceComparison = () => {
                                                                 }}
                                                                 className={`h-5 w-5 rounded-full flex items-center justify-center transition-all ${
                                                                     showMapForIndex === index
-                                                                        ? 'bg-blue-600 text-white'
-                                                                        : 'bg-gray-900/70 text-white hover:bg-blue-600'
+                                                                        ? 'bg-brand-600 text-white'
+                                                                        : 'bg-gray-900/70 text-white hover:bg-brand-600'
                                                                 }`}
                                                                 title={showMapForIndex === index ? 'Hide Map' : 'Show Map'}
                                                                 aria-label={showMapForIndex === index ? 'Hide Map' : 'Show Map'}
@@ -773,7 +773,7 @@ const PriceComparison = () => {
                         <button
                             onClick={handleScanAnother}
                             aria-label="Scan another product"
-                            className="flex-1 inline-flex items-center justify-center gap-2 py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-500/30 transition"
+                            className="flex-1 inline-flex items-center justify-center gap-2 py-3 rounded-lg bg-brand-600 text-white hover:bg-brand-700 shadow-lg shadow-brand-500/30 transition"
                         >
                             <FiCamera /> Scan Another
                         </button>

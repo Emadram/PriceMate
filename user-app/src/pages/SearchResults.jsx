@@ -98,7 +98,7 @@ const SearchResults = () => {
                             </h1>
                             <div className="md:hidden">
                                 {products.length > 0 && (
-                                    <span className="bg-blue-600/10 text-blue-600 dark:text-blue-400 text-[10px] font-black px-2 py-1 rounded-lg uppercase tracking-widest">
+                                    <span className="bg-brand-600/10 text-brand-600 dark:text-brand-500 text-[10px] font-black px-2 py-1 rounded-lg uppercase tracking-widest">
                                         {products.length} Items
                                     </span>
                                 )}
@@ -112,9 +112,9 @@ const SearchResults = () => {
                                     value={searchInput}
                                     onChange={(e) => setSearchInput(e.target.value)}
                                     placeholder={t('search_placeholder')}
-                                    className="w-full pl-5 pr-12 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 transition text-sm font-bold shadow-inner"
+                                    className="w-full pl-5 pr-12 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-brand-500 transition text-sm font-bold shadow-inner"
                                 />
-                                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-blue-500 group-focus-within:scale-110 transition-transform">
+                                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-accent-500 group-focus-within:scale-110 transition-transform">
                                     <FiSearch size={18} className="stroke-[2.5]" />
                                 </div>
                             </div>
@@ -122,7 +122,7 @@ const SearchResults = () => {
                                 <select
                                     value={selectedCategory}
                                     onChange={(e) => setSelectedCategory(e.target.value)}
-                                    className="flex-1 md:flex-none px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 transition text-[10px] font-black uppercase tracking-widest min-w-[120px] appearance-none text-center shadow-inner"
+                                    className="flex-1 md:flex-none px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 transition text-[10px] font-black uppercase tracking-widest min-w-[120px] appearance-none text-center shadow-inner"
                                 >
                                     <option value="">ALL CATEGORIES</option>
                                     {categories.map((cat) => (
@@ -133,7 +133,7 @@ const SearchResults = () => {
                                 </select>
                                 <button
                                     type="submit"
-                                    className="bg-blue-600 text-white px-6 md:px-8 py-3 rounded-xl hover:bg-black transition shadow-lg shadow-blue-500/20 font-black text-[10px] uppercase tracking-widest active:scale-95"
+                                    className="bg-brand-600 text-white px-6 md:px-8 py-3 rounded-xl hover:bg-black transition shadow-lg shadow-brand-500/20 font-black text-[10px] uppercase tracking-widest active:scale-95"
                                 >
                                     {t('search')}
                                 </button>
@@ -149,7 +149,7 @@ const SearchResults = () => {
                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">Browsing</p>
                         <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white">
                             {query ? `Results for "${query}"` : 'All Available Products'}
-                            {categoryIdFromUrl && <span className="ml-3 text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full uppercase tracking-widest font-black">Filtered</span>}
+                            {categoryIdFromUrl && <span className="ml-3 text-[10px] bg-brand-600 text-white px-2 py-0.5 rounded-full uppercase tracking-widest font-black">Filtered</span>}
                         </h2>
                     </div>
                     
@@ -162,7 +162,7 @@ const SearchResults = () => {
                                 <select
                                     value={sortBy}
                                     onChange={(e) => setSortBy(e.target.value)}
-                                    className="pl-9 pr-8 py-2 bg-white dark:bg-gray-800 border-0 rounded-xl text-xs font-bold text-gray-600 dark:text-gray-300 shadow-soft appearance-none focus:ring-2 focus:ring-blue-500 cursor-pointer min-w-[140px]"
+                                    className="pl-9 pr-8 py-2 bg-white dark:bg-gray-800 border-0 rounded-xl text-xs font-bold text-gray-600 dark:text-gray-300 shadow-soft appearance-none focus:ring-2 focus:ring-brand-500 cursor-pointer min-w-[140px]"
                                 >
                                     <option value="relevance">Sort: Relevance</option>
                                     <option value="price-asc">Price: Low to High</option>
@@ -175,7 +175,7 @@ const SearchResults = () => {
                             </div>
                             <div className="hidden md:block text-right">
                                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Found</p>
-                                <p className="text-sm font-bold text-blue-600 dark:text-blue-400">{products.length} items</p>
+                                <p className="text-sm font-bold text-brand-600 dark:text-brand-500">{products.length} items</p>
                             </div>
                         </div>
                     )}
@@ -199,7 +199,7 @@ const SearchResults = () => {
                         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                             <button
                                 onClick={() => navigate('/search')}
-                                className="bg-blue-600 text-white px-8 py-2 rounded-full font-black uppercase tracking-widest text-[10px] hover:bg-black transition-colors"
+                                className="bg-brand-600 text-white px-8 py-2 rounded-full font-black uppercase tracking-widest text-[10px] hover:bg-black transition-colors"
                             >
                                 Clear filters
                             </button>

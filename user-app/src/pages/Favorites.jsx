@@ -135,12 +135,12 @@ const Favorites = () => {
                                         : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
                                 }`}
                             >
-                                <FiShoppingBag className={activeTab === 'supermarkets' ? 'text-blue-600 dark:text-blue-400' : ''} size={16} />
+                                <FiShoppingBag className={activeTab === 'supermarkets' ? 'text-brand-600 dark:text-brand-500' : ''} size={16} />
                                 Supermarkets
                                 <span
                                     className={`min-w-[1.25rem] rounded-full px-1.5 py-0.5 text-[10px] ${
                                         activeTab === 'supermarkets'
-                                            ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400'
+                                            ? 'bg-brand-100 dark:bg-brand-900/40 text-brand-600 dark:text-brand-500'
                                             : 'bg-gray-100 dark:bg-gray-800 text-gray-500'
                                     }`}
                                 >
@@ -163,7 +163,7 @@ const Favorites = () => {
                                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Heart a product on its price comparison page.</p>
                                     <Link
                                         to="/"
-                                        className="text-sm font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest"
+                                        className="text-sm font-black text-brand-600 dark:text-brand-500 uppercase tracking-widest"
                                     >
                                         Browse products
                                     </Link>
@@ -212,7 +212,7 @@ const Favorites = () => {
                                     </p>
                                     <Link
                                         to="/"
-                                        className="text-sm font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest"
+                                        className="text-sm font-black text-brand-600 dark:text-brand-500 uppercase tracking-widest"
                                     >
                                         Find stores
                                     </Link>

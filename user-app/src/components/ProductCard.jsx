@@ -72,7 +72,7 @@ const ProductCard = ({ product, prices = [] }) => {
 
                     {/* Global Badge */}
                     {product.is_global && (
-                        <div className="absolute top-1 right-1 bg-blue-500 text-white p-1 rounded-full shadow-lg z-10" title="Global Database">
+                        <div className="absolute top-1 right-1 bg-accent-500 text-white p-1 rounded-full shadow-lg z-10" title="Global Database">
                             <FiGlobe size={10} />
                         </div>
                     )}
@@ -83,11 +83,11 @@ const ProductCard = ({ product, prices = [] }) => {
                     <div className="mb-auto">
                         <div className="flex items-start justify-between gap-3">
                             <div className="flex flex-col min-w-0 flex-1">
-                                <h3 className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base md:text-lg truncate group-hover:text-blue-600 transition-colors leading-tight">
+                                <h3 className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base md:text-lg truncate group-hover:text-brand-600 transition-colors leading-tight">
                                     {product.name}
                                 </h3>
                                 {product.is_global && (
-                                    <span className="text-[10px] text-blue-500 font-bold uppercase tracking-tighter mt-0.5">Global DB</span>
+                                    <span className="text-[10px] text-accent-500 font-bold uppercase tracking-tighter mt-0.5">Global DB</span>
                                 )}
                             </div>
                             {user && (
@@ -142,7 +142,7 @@ const ProductCard = ({ product, prices = [] }) => {
                         )}
                         
                         {prices.length > 0 && (
-                            <div className="flex items-center gap-1 text-[10px] sm:text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-1 sm:px-3 sm:py-1.5 rounded-full border border-blue-100 dark:border-blue-800/30 shrink-0">
+                            <div className="flex items-center gap-1 text-[10px] sm:text-xs font-semibold text-brand-600 dark:text-brand-500 bg-brand-50 dark:bg-brand-900/30 px-2 py-1 sm:px-3 sm:py-1.5 rounded-full border border-brand-100 dark:border-brand-800/30 shrink-0">
                                 <FiShoppingBag className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                                 <span>{prices.length} {prices.length === 1 ? t('supermarket') : t('supermarket') + 's'}</span>
                             </div>
