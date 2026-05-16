@@ -2,6 +2,12 @@ import { create } from 'zustand';
 import { db } from '../lib/appwrite';
 import { Query } from 'appwrite';
 
+const normalizeCurrencyForWrite = (value) => {
+    if (!value) return value;
+    const upper = String(value).trim().toUpperCase();
+    return upper === 'TRY' ? 'TL' : upper;
+};
+
 const usePricesStore = create((set, get) => ({
     prices: [],
     loading: false,
@@ -48,7 +54,7 @@ const usePricesStore = create((set, get) => ({
 
             // Add optional fields
             if (data.currency) {
-                payload.currency = data.currency;
+                payload.currency = normalizeCurrencyForWrite(data.currency);
             }
 
             // Relationship references (ensure they are strings)
@@ -102,7 +108,7 @@ const usePricesStore = create((set, get) => ({
             };
 
             if (data.currency) {
-                payload.currency = data.currency;
+                payload.currency = normalizeCurrencyForWrite(data.currency);
             }
             if (data.products) {
                 payload.products = typeof data.products === 'object' ? data.products.$id : data.products;

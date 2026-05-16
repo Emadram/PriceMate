@@ -28,7 +28,7 @@ const Prices = () => {
     const [editingPrice, setEditingPrice] = useState(null);
     const [formData, setFormData] = useState({
         price: '',
-        currency: 'EGP',
+        currency: 'TRY',
         products: '',
         supermarkets: '',
         stockStatus: 'in_stock',
@@ -98,7 +98,7 @@ const Prices = () => {
             setEditingPrice(null);
             setFormData({
                 price: '',
-                currency: 'EGP',
+                currency: 'TRY',
                 products: '',
                 supermarkets: '',
                 stockStatus: 'in_stock',
@@ -118,11 +118,12 @@ const Prices = () => {
     const handleEdit = (price) => {
         const productId = price.products && typeof price.products === 'object' ? price.products.$id : '';
         const supermarketId = price.supermarkets && typeof price.supermarkets === 'object' ? price.supermarkets.$id : '';
+        const displayCurrency = price.currency === 'TL' ? 'TRY' : (price.currency || 'TRY');
 
         setEditingPrice(price);
         setFormData({
             price: price.price ?? '',
-            currency: price.currency || 'EGP',
+            currency: displayCurrency,
             products: productId,
             supermarkets: supermarketId,
             stockStatus: price.stockStatus || 'in_stock',
@@ -135,12 +136,17 @@ const Prices = () => {
         setEditingPrice(null);
         setFormData({
             price: '',
-            currency: 'EGP',
+            currency: 'TRY',
             products: '',
             supermarkets: '',
             stockStatus: 'in_stock',
             userId: adminUser?.$id || ''
         });
+    };
+
+    const formatCurrencyLabel = (value) => {
+        if (!value) return 'TRY';
+        return value === 'TL' ? 'TRY' : value;
     };
 
     const getProductName = (price) => {
@@ -343,7 +349,7 @@ const Prices = () => {
                                                 </td>
                                                 <td className="px-8 py-6 whitespace-nowrap">
                                                     <div className="text-base font-black text-green-600 dark:text-green-400">
-                                                        {price.price} <span className="text-[10px] font-black opacity-70 uppercase tracking-widest ml-1">{price.currency || 'EGP'}</span>
+                                                        {price.price} <span className="text-[10px] font-black opacity-70 uppercase tracking-widest ml-1">{formatCurrencyLabel(price.currency)}</span>
                                                     </div>
                                                 </td>
                                                 <td className="px-8 py-6 whitespace-nowrap">
@@ -486,7 +492,7 @@ const Prices = () => {
                                         value={formData.currency}
                                         onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
                                         className="w-full bg-gray-50 dark:bg-gray-900 border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-blue-500/20 outline-none text-gray-900 dark:text-white font-bold transition-all text-center uppercase"
-                                        placeholder="EGP"
+                                        placeholder="TRY"
                                     />
                                 </div>
                             </div>

@@ -35,6 +35,27 @@ const Dashboard = () => {
     const [lastUpdated, setLastUpdated] = useState(null);
     const [isFresh, setIsFresh] = useState(false);
 
+    const fetchAll = async (listFn, label) => {
+        const limit = 100;
+        const documents = [];
+        let offset = 0;
+
+        try {
+            while (true) {
+                const res = await listFn(offset, limit);
+                const batch = res?.documents || [];
+                documents.push(...batch);
+                if (batch.length < limit) break;
+                offset += limit;
+            }
+        } catch (error) {
+            console.warn(`Dashboard: Failed to fetch ${label}:`, error.message);
+            return [];
+        }
+
+        return documents;
+    };
+
     const fetchStats = async () => {
         setLoading(true);
         try {
@@ -58,19 +79,14 @@ const Dashboard = () => {
                 chatsRes
             ] = await Promise.all([
                 safeList(() => db.products.list([
-                    Query.limit(200),
-                    Query.orderDesc('$createdAt'),
-                    Query.select(['$id', '$createdAt', 'categoryId', 'categoryId.$id'])
+                    Query.limit(1)
                 ]), 'products'),
                 safeList(() => db.prices.list([
-                    Query.limit(200),
-                    Query.orderDesc('$createdAt'),
-                    Query.select(['$id', '$createdAt'])
+                    Query.limit(1)
                 ]), 'prices'),
                 safeList(() => db.categories.list([Query.limit(1)]), 'categories'),
                 safeList(() => db.supermarkets.list([
-                    Query.limit(200),
-                    Query.select(['$id', 'name'])
+                    Query.limit(1)
                 ]), 'supermarkets'),
                 safeList(() => db.feedback.list([
                     Query.equal('status', 'pending'),
@@ -84,9 +100,43 @@ const Dashboard = () => {
                 safeList(() => db.chatHistory.list([Query.limit(1)]), 'chat history')
             ]);
 
-            setRawProducts(productsRes.documents || []);
-            setRawPrices(pricesRes.documents || []);
-            setRawSupermarkets(supermarketsRes.documents || []);
+            const fourteenDaysAgo = new Date();
+            fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+            const pricesFrom = fourteenDaysAgo.toISOString();
+
+            const [productsDocs, pricesDocs, supermarketsDocs] = await Promise.all([
+                fetchAll(
+                    (offset, limit) => db.products.list([
+                        Query.limit(limit),
+                        Query.offset(offset),
+                        Query.orderDesc('$createdAt'),
+                        Query.select(['$id', '$createdAt', 'supermarkets', 'supermarkets.$id'])
+                    ]),
+                    'products for charts'
+                ),
+                fetchAll(
+                    (offset, limit) => db.prices.list([
+                        Query.limit(limit),
+                        Query.offset(offset),
+                        Query.greaterThanEqual('$createdAt', pricesFrom),
+                        Query.orderDesc('$createdAt'),
+                        Query.select(['$id', '$createdAt'])
+                    ]),
+                    'prices for charts'
+                ),
+                fetchAll(
+                    (offset, limit) => db.supermarkets.list([
+                        Query.limit(limit),
+                        Query.offset(offset),
+                        Query.select(['$id', 'name'])
+                    ]),
+                    'supermarkets for charts'
+                )
+            ]);
+
+            setRawProducts(productsDocs);
+            setRawPrices(pricesDocs);
+            setRawSupermarkets(supermarketsDocs);
 
             setStats({
                 products: productsRes.total || 0,
