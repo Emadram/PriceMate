@@ -28,9 +28,9 @@ const Register = () => {
     };
 
     return (
-        <div className="min-h-screen bg-[#F5F5F7] dark:bg-black flex flex-col px-6 py-12 relative overflow-hidden">
+        <div className="min-h-screen bg-[#F5F5F7] dark:bg-black flex flex-col px-6 py-12 pt-safe relative overflow-hidden">
             {/* Soft background decor */}
-            <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/5 rounded-full blur-[120px] pointer-events-none"></div>
+            <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-brand-500/5 rounded-full blur-[120px] pointer-events-none"></div>
             <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-500/5 rounded-full blur-[120px] pointer-events-none"></div>
 
             <div className="max-w-md mx-auto w-full mb-8">
@@ -39,7 +39,7 @@ const Register = () => {
 
             <div className="sm:mx-auto sm:w-full sm:max-w-md relative">
                 <div className="flex justify-center mb-8">
-                    <div className="w-16 h-16 bg-blue-600 rounded-[2rem] flex items-center justify-center shadow-xl shadow-blue-500/20 active:scale-95 transition-transform cursor-pointer">
+                    <div className="w-16 h-16 bg-brand-600 rounded-[2rem] flex items-center justify-center shadow-xl shadow-brand-500/20 active:scale-95 transition-transform cursor-pointer">
                         <span className="text-white font-black text-3xl tracking-tighter">P</span>
                     </div>
                 </div>
@@ -67,7 +67,7 @@ const Register = () => {
                             </label>
                             <div className="relative group">
                                 <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
-                                    <User className="h-4 w-4 text-gray-300 group-focus-within:text-blue-500 transition-colors" />
+                                    <User className="h-4 w-4 text-gray-300 group-focus-within:text-brand-500 transition-colors" />
                                 </div>
                                 <input
                                     id="name"
@@ -76,7 +76,7 @@ const Register = () => {
                                     value={formData.name}
                                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                     placeholder="John Doe"
-                                    className="block w-full pl-12 pr-6 py-4 bg-gray-50/50 dark:bg-black/20 border-gray-100 dark:border-white/5 focus:bg-white dark:focus:bg-black border focus:border-blue-500 dark:focus:border-blue-500 rounded-2xl text-[15px] font-bold transition-all outline-none text-gray-900 dark:text-white placeholder:text-gray-300 dark:placeholder:text-gray-700 shadow-inner"
+                                    className="block w-full pl-12 pr-6 py-4 bg-gray-50/50 dark:bg-black/20 border-gray-100 dark:border-white/5 focus:bg-white dark:focus:bg-black border focus:border-brand-500 dark:focus:border-brand-500 rounded-2xl text-[15px] font-bold transition-all outline-none text-gray-900 dark:text-white placeholder:text-gray-300 dark:placeholder:text-gray-700 shadow-inner"
                                 />
                             </div>
                         </div>
@@ -87,7 +87,7 @@ const Register = () => {
                             </label>
                             <div className="relative group">
                                 <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
-                                    <Mail className="h-4 w-4 text-gray-300 group-focus-within:text-blue-500 transition-colors" />
+                                    <Mail className="h-4 w-4 text-gray-300 group-focus-within:text-brand-500 transition-colors" />
                                 </div>
                                 <input
                                     id="email"
@@ -96,7 +96,7 @@ const Register = () => {
                                     value={formData.email}
                                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                                     placeholder="name@example.com"
-                                    className="block w-full pl-12 pr-6 py-4 bg-gray-50/50 dark:bg-black/20 border-gray-100 dark:border-white/5 focus:bg-white dark:focus:bg-black border focus:border-blue-500 dark:focus:border-blue-500 rounded-2xl text-[15px] font-bold transition-all outline-none text-gray-900 dark:text-white placeholder:text-gray-300 dark:placeholder:text-gray-700 shadow-inner"
+                                    className="block w-full pl-12 pr-6 py-4 bg-gray-50/50 dark:bg-black/20 border-gray-100 dark:border-white/5 focus:bg-white dark:focus:bg-black border focus:border-brand-500 dark:focus:border-brand-500 rounded-2xl text-[15px] font-bold transition-all outline-none text-gray-900 dark:text-white placeholder:text-gray-300 dark:placeholder:text-gray-700 shadow-inner"
                                 />
                             </div>
                         </div>
@@ -107,7 +107,7 @@ const Register = () => {
                             </label>
                             <div className="relative group">
                                 <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
-                                    <Lock className="h-4 w-4 text-gray-300 group-focus-within:text-blue-500 transition-colors" />
+                                    <Lock className="h-4 w-4 text-gray-300 group-focus-within:text-brand-500 transition-colors" />
                                 </div>
                                 <input
                                     id="password"
@@ -116,7 +116,7 @@ const Register = () => {
                                     value={formData.password}
                                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                                     placeholder="Minimum 8 characters"
-                                    className="block w-full pl-12 pr-6 py-4 bg-gray-50/50 dark:bg-black/20 border-gray-100 dark:border-white/5 focus:bg-white dark:focus:bg-black border focus:border-blue-500 dark:focus:border-blue-500 rounded-2xl text-[15px] font-bold transition-all outline-none text-gray-900 dark:text-white placeholder:text-gray-300 dark:placeholder:text-gray-700 shadow-inner"
+                                    className="block w-full pl-12 pr-6 py-4 bg-gray-50/50 dark:bg-black/20 border-gray-100 dark:border-white/5 focus:bg-white dark:focus:bg-black border focus:border-brand-500 dark:focus:border-brand-500 rounded-2xl text-[15px] font-bold transition-all outline-none text-gray-900 dark:text-white placeholder:text-gray-300 dark:placeholder:text-gray-700 shadow-inner"
                                 />
                             </div>
                         </div>
@@ -125,7 +125,7 @@ const Register = () => {
                            <div className="flex items-start gap-3 px-1">
                                 <CheckCircle2 className="w-4 h-4 text-green-500 mt-1 shrink-0" />
                                 <p className="text-[11px] text-gray-400 font-medium leading-relaxed uppercase tracking-wider">
-                                    I agree to the <span className="text-blue-600 font-black cursor-pointer">Terms</span> and <span className="text-blue-600 font-black cursor-pointer">Privacy Policy</span>.
+                                    I agree to the <span className="text-brand-600 font-black cursor-pointer">Terms</span> and <span className="text-brand-600 font-black cursor-pointer">Privacy Policy</span>.
                                 </p>
                            </div>
                         </div>
@@ -137,7 +137,7 @@ const Register = () => {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full flex items-center justify-center gap-2 py-4 px-4 bg-blue-600 text-white rounded-[1.5rem] text-[15px] font-black uppercase tracking-[0.2em] hover:bg-black dark:hover:bg-white dark:hover:text-black active:scale-[0.98] transition-all focus:outline-none disabled:opacity-50 disabled:active:scale-100 shadow-xl shadow-blue-500/20"
+                            className="w-full flex items-center justify-center gap-2 py-4 px-4 bg-brand-600 text-white rounded-[1.5rem] text-[15px] font-black uppercase tracking-[0.2em] hover:bg-black dark:hover:bg-white dark:hover:text-black active:scale-[0.98] transition-all focus:outline-none disabled:opacity-50 disabled:active:scale-100 shadow-xl shadow-brand-500/20"
                         >
                             {loading ? (
                                 <Loader2 className="h-5 w-5 animate-spin" />
@@ -153,7 +153,7 @@ const Register = () => {
 
                 <p className="mt-10 text-center text-[14px] text-gray-500 font-medium">
                     Already have an account?{' '}
-                    <Link to="/login" className="font-black text-blue-600 dark:text-blue-500 hover:text-black dark:hover:text-white transition-colors uppercase tracking-widest text-[11px] ml-1">
+                    <Link to="/login" className="font-black text-brand-600 dark:text-brand-500 hover:text-black dark:hover:text-white transition-colors uppercase tracking-widest text-[11px] ml-1">
                         Sign in
                     </Link>
                 </p>

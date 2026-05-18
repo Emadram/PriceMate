@@ -7,14 +7,14 @@ import BackButton from '../components/BackButton';
 
 const FeedbackPage = () => {
     const user = useAuthStore((state) => state.user);
-
-    if (!user) return <Navigate to="/login" />;
     const [formData, setFormData] = useState({
         type: 'general',
         message: ''
     });
     const [submitting, setSubmitting] = useState(false);
     const [submitted, setSubmitted] = useState(false);
+
+    if (!user) return <Navigate to="/login" />;
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -49,7 +49,7 @@ const FeedbackPage = () => {
                     <div className="max-w-4xl mx-auto flex items-center justify-between">
                         <BackButton to="/profile" label="Back to profile" />
                         <h1 className="text-xl font-black text-gray-900 dark:text-white flex items-center gap-2">
-                            <FiMessageSquare className="text-blue-500" />
+                            <FiMessageSquare className="text-accent-500" />
                             Send Feedback
                         </h1>
                         <div className="w-10" />
@@ -74,12 +74,12 @@ const FeedbackPage = () => {
     }
 
     return (
-        <div className="min-h-screen bg-[#F5F5F7] dark:bg-black text-gray-900 dark:text-gray-100 pb-20 transition-colors">
+        <div className="min-h-screen bg-[#F5F5F7] dark:bg-black text-gray-900 dark:text-gray-100 pb-safe transition-colors">
             <header className="bg-white/80 dark:bg-black/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 dark:border-white/5 p-4">
                 <div className="max-w-4xl mx-auto flex items-center justify-between">
                     <BackButton to="/profile" label="Back to profile" />
                     <h1 className="text-xl font-black text-gray-900 dark:text-white flex items-center gap-2">
-                        <FiMessageSquare className="text-blue-500" />
+                        <FiMessageSquare className="text-accent-500" />
                         Send Feedback
                     </h1>
                     <div className="w-10" />
@@ -96,7 +96,7 @@ const FeedbackPage = () => {
                             <select
                                 value={formData.type}
                                 onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                                className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                className="w-full min-h-11 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                                 required
                             >
                                 <option value="general">General</option>
@@ -113,7 +113,7 @@ const FeedbackPage = () => {
                             <textarea
                                 value={formData.message}
                                 onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                                className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                                 rows="6"
                                 placeholder="Tell us what you think..."
                                 required
@@ -123,7 +123,7 @@ const FeedbackPage = () => {
                         <button
                             type="submit"
                             disabled={submitting}
-                            className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition font-medium disabled:bg-gray-400 flex items-center justify-center gap-2"
+                            className="tap-target w-full min-h-11 bg-brand-600 text-white py-3 rounded-lg hover:bg-brand-700 transition font-medium disabled:bg-gray-400 flex items-center justify-center gap-2"
                         >
                             <FiSend /> {submitting ? 'Submitting...' : 'Submit Feedback'}
                         </button>

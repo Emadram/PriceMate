@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import Navbar from '../components/Navbar';
@@ -6,30 +6,24 @@ import { FiSearch, FiCamera, FiChevronRight, FiPackage, FiZap, FiBell, FiInfo, F
 import useAnnouncementStore from '../stores/announcementStore';
 import useCategoriesStore from '../stores/categoriesStore';
 import { fetchProducts, fetchPricesForProducts, normalizeProduct } from '../utils/productUtils';
-import { db, Query } from '../lib/appwrite';
 import ProductCard from '../components/ProductCard';
-import { ProductCardSkeleton, CategorySkeleton } from '../components/SkeletonLoaders';
+import { ProductCardSkeleton } from '../components/SkeletonLoaders';
 
 const Home = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedCategory, setSelectedCategory] = useState('');
     
     // Stores
     const { categories, fetchCategories, getIconForCategory, loading: categoriesLoading } = useCategoriesStore();
-    const activeAnnouncements = useAnnouncementStore(state => state.announcements);
     const fetchActiveAnnouncements = useAnnouncementStore(state => state.fetchActiveAnnouncements);
 
     const [featuredProducts, setFeaturedProducts] = useState([]);
     const [marketInsights, setMarketInsights] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    useEffect(() => {
-        loadData();
-    }, []);
 
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
         setLoading(true);
         setError(null);
         try {
@@ -43,7 +37,8 @@ const Home = () => {
             if (!products) throw new Error('Failed to fetch products');
 
             // Map store announcements to marketInsights format
-            const announcementInsights = (fetchedAnnouncements || activeAnnouncements).map((ann) => {
+            const safeAnnouncements = Array.isArray(fetchedAnnouncements) ? fetchedAnnouncements : [];
+            const announcementInsights = safeAnnouncements.map((ann) => {
                 let icon = <FiBell className="text-accent-500" />;
                 if (ann.category === 'offer') icon = <FiZap className="text-yellow-500" />;
                 if (ann.category === 'alert') icon = <FiAlertTriangle className="text-red-500" />;
@@ -74,32 +69,33 @@ const Home = () => {
             setError('Failed to load products. Please check your connection.');
         }
         setLoading(false);
-    };
+    }, [fetchActiveAnnouncements, fetchCategories]);
+
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
 
     const handleSearch = (e) => {
         e.preventDefault();
-        if (searchQuery.trim() || selectedCategory) {
-            let url = `/search?q=${encodeURIComponent(searchQuery.trim())}`;
-            if (selectedCategory) {
-                url += `&category=${encodeURIComponent(selectedCategory)}`;
-            }
+        if (searchQuery.trim()) {
+            const url = `/search?q=${encodeURIComponent(searchQuery.trim())}`;
             navigate(url);
         }
     };
 
     return (
-        <div className="min-h-screen bg-[#F5F5F7] dark:bg-gray-950 pb-20 md:pb-12 text-gray-900 dark:text-gray-100 selection:bg-brand-500/30">
+        <div className="min-h-screen bg-[#F5F5F7] dark:bg-gray-950 pb-safe md:pb-12 text-gray-900 dark:text-gray-100 selection:bg-brand-500/30 transition-colors">
             <Navbar />
 
-            <main className="max-w-5xl mx-auto px-4 pt-4 md:pt-12 space-y-8 sm:space-y-10 md:space-y-12 animate-in fade-in duration-700">
+            <main className="max-w-5xl mx-auto px-4 pt-3 md:pt-8 space-y-6 sm:space-y-8 md:space-y-12 animate-in fade-in duration-700">
                 {/* Header Section */}
-                <header className="px-1 md:px-0 space-y-4">
+                <header className="px-1 md:px-0 space-y-3">
                     <div className="flex items-center justify-between">
                         <div className="animate-in slide-in-from-left-4 duration-700">
-                            <h1 className="text-3xl md:text-4xl font-black tracking-tight">
+                            <h1 className="text-2xl md:text-4xl font-black tracking-tight">
                                 {t('find_best_prices', 'Find the best prices')}
                             </h1>
-                            <p className="text-gray-500 dark:text-gray-400 font-medium md:text-lg mt-1">
+                            <p className="text-gray-500 dark:text-gray-400 font-medium text-sm md:text-lg mt-1">
                                 {t('ready_to_save', 'Ready to find the best deals today?')}
                             </p>
                         </div>
@@ -164,7 +160,7 @@ const Home = () => {
                         </div>
                         <button 
                             onClick={() => navigate('/search')}
-                            className="flex items-center gap-1 text-xs font-bold text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-900/20 px-3 py-1.5 rounded-full transition-all"
+                            className="tap-target flex items-center gap-1 text-xs font-bold text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-900/20 px-3 py-2 rounded-full transition-all"
                         >
                             {t('view_all', 'View All')}
                             <FiChevronRight size={14} />
@@ -253,7 +249,7 @@ const Home = () => {
                         </div>
                         <button 
                             onClick={() => navigate('/search')}
-                            className="flex items-center gap-1 text-sm font-bold text-brand-600 hover:text-brand-700 px-5 py-2.5 bg-brand-50 dark:bg-brand-900/20 rounded-full transition-all"
+                            className="tap-target flex items-center gap-1 text-sm font-bold text-brand-600 hover:text-brand-700 px-5 py-3 bg-brand-50 dark:bg-brand-900/20 rounded-full transition-all"
                         >
                             {t('view_all')}
                             <FiChevronRight size={16} />
@@ -272,7 +268,7 @@ const Home = () => {
                             <p className="text-gray-900 dark:text-white font-bold text-lg mb-4">{error}</p>
                             <button 
                                 onClick={loadData}
-                                className="px-8 py-3 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest text-sm hover:bg-blue-700 transition-colors"
+                                className="px-8 py-3 bg-brand-600 text-white rounded-2xl font-black uppercase tracking-widest text-sm hover:bg-brand-700 transition-colors"
                             >
                                 Try Again
                             </button>

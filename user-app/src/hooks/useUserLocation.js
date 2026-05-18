@@ -5,16 +5,13 @@ import { useState, useEffect } from 'react';
  * @returns {Object} { location, error, loading }
  */
 const useUserLocation = () => {
+    const hasGeo = typeof navigator !== 'undefined' && !!navigator.geolocation;
     const [location, setLocation] = useState(null);
-    const [error, setError] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(hasGeo ? null : 'Geolocation is not supported by your browser');
+    const [loading, setLoading] = useState(hasGeo);
 
     useEffect(() => {
-        if (!navigator.geolocation) {
-            setError('Geolocation is not supported by your browser');
-            setLoading(false);
-            return;
-        }
+        if (!hasGeo) return;
 
         const handleSuccess = (position) => {
             setLocation({
@@ -40,7 +37,7 @@ const useUserLocation = () => {
         const watchId = navigator.geolocation.watchPosition(handleSuccess, handleError);
 
         return () => navigator.geolocation.clearWatch(watchId);
-    }, []);
+    }, [hasGeo]);
 
     return { location, error, loading };
 };

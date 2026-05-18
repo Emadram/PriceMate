@@ -187,7 +187,7 @@ export const runDiagnostics = async () => {
     let allProductsResult = null;
     try {
         console.log('Test 7: Data Integrity & Business Logic');
-        const integrityResults = { supermarkets: [], prices: [], history: null, orphans: [] };
+        const integrityResults = { supermarkets: [], prices: [], products: [], history: null, orphans: [] };
 
         // 1. Supermarket Coordinates (Turkey Range)
         const allSupermarkets = await db.supermarkets.list([Query.limit(100)]);
@@ -200,23 +200,35 @@ export const runDiagnostics = async () => {
             }
         });
 
-        // 2. Prices & Currency
+        // 2. Prices & Currency & Supermarket Relation
         allPricesResult = await db.prices.list(
-            [Query.limit(100), Query.select(['$id', 'price', 'currency', 'products.$id'])]
+            [Query.limit(500), Query.select(['$id', 'price', 'currency', 'products.$id', 'supermarkets.$id'])]
         );
+        const allowedCurrencies = new Set(['TL', 'TRY', 'USD', 'EUR', 'GBP']);
         allPricesResult.documents.forEach(p => {
             if (p.price <= 0) integrityResults.prices.push(`Price ${p.$id}: non-positive value (${p.price})`);
             if (!p.currency) integrityResults.prices.push(`Price ${p.$id}: missing currency`);
+            if (p.currency && !allowedCurrencies.has(String(p.currency).trim().toUpperCase())) {
+                integrityResults.prices.push(`Price ${p.$id}: unexpected currency (${p.currency})`);
+            }
+            if (!p.supermarkets || !p.supermarkets.$id) integrityResults.prices.push(`Price ${p.$id}: missing supermarket relation`);
         });
 
-        // 3. Orphaned Prices
+        // 3. Products & Orphaned Prices & Category Relation
         allProductsResult = await db.products.list(
-            [Query.limit(100), Query.select(['$id'])]
+            [Query.limit(500), Query.select(['$id', 'categoryId.$id'])]
         );
         const productIds = new Set(allProductsResult.documents.map(p => p.$id));
+        allProductsResult.documents.forEach(p => {
+            if (!p.categoryId || !p.categoryId.$id) {
+                integrityResults.products.push(`Product ${p.$id}: missing category relation`);
+            }
+        });
         allPricesResult.documents.forEach(p => {
             if (p.products?.$id && !productIds.has(p.products.$id)) {
                 integrityResults.orphans.push(p.$id);
+            } else if (!p.products || !p.products.$id) {
+                integrityResults.orphans.push(`Price ${p.$id}: absolutely no product relation`);
             }
         });
 
@@ -224,7 +236,7 @@ export const runDiagnostics = async () => {
         try {
             await db.priceHistory.list([Query.limit(1)]);
             integrityResults.history = 'READY';
-        } catch (e) {
+        } catch {
             integrityResults.history = 'READY_BUT_EMPTY';
         }
 
@@ -233,14 +245,17 @@ export const runDiagnostics = async () => {
             console.warn('⚠️  Invalid Supermarket Coords:', integrityResults.supermarkets);
         }
         if (integrityResults.orphans.length > 0) {
-            console.warn(`⚠️  Found ${integrityResults.orphans.length} orphaned prices`);
+            console.warn(`⚠️  Found ${integrityResults.orphans.length} orphaned/invalid prices`, integrityResults.orphans);
+        }
+        if (integrityResults.products.length > 0) {
+            console.warn(`⚠️  Found ${integrityResults.products.length} products without categories`, integrityResults.products);
         }
 
-        const status = (integrityResults.supermarkets.length === 0 && integrityResults.prices.length === 0 && integrityResults.orphans.length === 0) ? 'PASS' : 'WARN';
+        const status = (integrityResults.supermarkets.length === 0 && integrityResults.prices.length === 0 && integrityResults.orphans.length === 0 && integrityResults.products.length === 0) ? 'PASS' : 'WARN';
         results.tests.push({ 
             name: 'Data Integrity', 
             status: status, 
-            message: `Checked ${allSupermarkets.documents.length} supermarkets and ${allPricesResult.documents.length} prices. History: ${integrityResults.history}` 
+            message: `Checked ${allSupermarkets.documents.length} supermarkets, ${allProductsResult.documents.length} products, and ${allPricesResult.documents.length} prices. History: ${integrityResults.history}` 
         });
         console.log(`✅ Data integrity check completed (${status})\n`);
 

@@ -14,7 +14,7 @@ const ProductDetails = () => {
     const { barcode } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
-    const { product, prices, loading, error, fetchProductByBarcode } = useProductStore();
+    const { product, loading, error, fetchProductByBarcode } = useProductStore();
     const [isAddPriceOpen, setIsAddPriceOpen] = useState(false);
     const [imageFailed, setImageFailed] = useState(false);
 
@@ -31,7 +31,7 @@ const ProductDetails = () => {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-50 pb-24">
+            <div className="min-h-screen bg-gray-50 pb-safe">
                 <div className="bg-white px-6 pt-10 pb-8 rounded-b-[3rem] shadow-sm mb-6">
                     <div className="max-w-4xl mx-auto">
                         <div className="w-10 h-10 rounded-full bg-gray-100 animate-pulse" />
@@ -48,7 +48,7 @@ const ProductDetails = () => {
 
     if (error || !product) {
         return (
-            <div className="min-h-screen bg-gray-50 pb-24">
+            <div className="min-h-screen bg-gray-50 pb-safe">
                 <div className="bg-white px-6 pt-10 pb-8 rounded-b-[3rem] shadow-sm mb-6">
                     <div className="max-w-4xl mx-auto flex items-center">
                         <BackButton label="Go Back" className="-ml-2" />
@@ -65,7 +65,7 @@ const ProductDetails = () => {
                         </p>
                         <button
                             onClick={() => navigate('/scan')}
-                            className="px-6 py-3 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-500/20 hover:bg-blue-700"
+                            className="px-6 py-3 bg-brand-600 text-white rounded-2xl font-bold shadow-lg shadow-brand-500/20 hover:bg-brand-700"
                         >
                             Scan a product
                         </button>
@@ -81,7 +81,7 @@ const ProductDetails = () => {
     const imageSrc = imageFailed ? '' : (product.imageUrl || product.image || fallbackImageUrl);
 
     return (
-        <div className="min-h-screen bg-gray-50 pb-24">
+        <div className="min-h-screen bg-gray-50 pb-safe">
             {/* Header Info */}
             <div className="bg-white px-6 pt-10 pb-8 rounded-b-[3rem] shadow-sm mb-6">
                 <div className="max-w-4xl mx-auto flex items-center">
@@ -103,7 +103,7 @@ const ProductDetails = () => {
                     </div>
                     <h1 className="text-3xl font-black text-gray-900 mb-2">{product.name}</h1>
                     <div className="flex items-center gap-2 mb-4">
-                        <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-xs font-bold uppercase tracking-wider">
+                        <span className="px-3 py-1 bg-brand-50 text-brand-600 rounded-full text-xs font-bold uppercase tracking-wider">
                             {product.brand || 'No Brand'}
                         </span>
                         <span className="px-3 py-1 bg-gray-50 text-gray-400 rounded-full text-xs font-medium uppercase tracking-wider">
@@ -113,7 +113,7 @@ const ProductDetails = () => {
                 </div>
             </div>
 
-            <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-md border-t border-gray-100 flex gap-3 z-50">
+            <div className="fixed bottom-0 left-0 right-0 p-4 pb-safe-nav bg-white/80 backdrop-blur-md border-t border-gray-100 flex gap-3 z-50">
                 <button
                     onClick={() => navigate(-1)}
                     className="px-6 py-4 bg-gray-100 text-gray-700 rounded-2xl font-bold hover:bg-gray-200 transition-colors"
@@ -122,7 +122,7 @@ const ProductDetails = () => {
                 </button>
                 <button
                     onClick={() => setIsAddPriceOpen(true)}
-                    className="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-500/20 hover:bg-blue-700 active:scale-95 transition-all"
+                    className="flex-1 py-4 bg-brand-600 text-white rounded-2xl font-bold shadow-lg shadow-brand-500/20 hover:bg-brand-700 active:scale-95 transition-all"
                 >
                     Add Current Price
                 </button>

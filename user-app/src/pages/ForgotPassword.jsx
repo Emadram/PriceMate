@@ -45,8 +45,8 @@ const ForgotPassword = () => {
     };
 
     return (
-        <div className="min-h-screen bg-[#F5F5F7] dark:bg-black flex flex-col px-6 py-12 relative overflow-hidden">
-            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/5 rounded-full blur-[120px] pointer-events-none"></div>
+        <div className="min-h-screen bg-[#F5F5F7] dark:bg-black flex flex-col px-6 py-12 pt-safe relative overflow-hidden">
+            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-brand-500/5 rounded-full blur-[120px] pointer-events-none"></div>
             <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-500/5 rounded-full blur-[120px] pointer-events-none"></div>
 
             <div className="max-w-md mx-auto w-full mb-8">
@@ -55,7 +55,7 @@ const ForgotPassword = () => {
 
             <div className="sm:mx-auto sm:w-full sm:max-w-md relative">
                 <div className="flex justify-center mb-8">
-                    <div className="w-16 h-16 bg-blue-600 rounded-[2rem] flex items-center justify-center shadow-xl shadow-blue-500/20 active:scale-95 transition-transform cursor-pointer">
+                    <div className="w-16 h-16 bg-brand-600 rounded-[2rem] flex items-center justify-center shadow-xl shadow-brand-500/20 active:scale-95 transition-transform cursor-pointer">
                         <span className="text-white font-black text-3xl tracking-tighter">P</span>
                     </div>
                 </div>
@@ -79,7 +79,7 @@ const ForgotPassword = () => {
                                 type="button"
                                 onClick={sendResetEmail}
                                 disabled={loading || resendCooldown > 0}
-                                className="w-full py-4 bg-blue-600 text-white rounded-[1.5rem] text-[12px] font-black uppercase tracking-widest hover:bg-black dark:hover:bg-white dark:hover:text-black disabled:opacity-60"
+                                className="tap-target w-full min-h-11 py-4 bg-brand-600 text-white rounded-[1.5rem] text-[12px] font-black uppercase tracking-widest hover:bg-black dark:hover:bg-white dark:hover:text-black disabled:opacity-60"
                             >
                                 {loading
                                     ? 'Sending...'
@@ -89,7 +89,7 @@ const ForgotPassword = () => {
                             </button>
                             <Link
                                 to="/login"
-                                className="inline-flex items-center justify-center gap-2 w-full py-4 bg-black dark:bg-white text-white dark:text-black rounded-[1.5rem] text-[12px] font-black uppercase tracking-widest"
+                                className="tap-target inline-flex items-center justify-center gap-2 w-full min-h-11 py-4 bg-black dark:bg-white text-white dark:text-black rounded-[1.5rem] text-[12px] font-black uppercase tracking-widest"
                             >
                                 Go to Login
                                 <ArrowRight className="h-4 w-4" />
@@ -109,7 +109,7 @@ const ForgotPassword = () => {
                                 </label>
                                 <div className="relative group">
                                     <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
-                                        <Mail className="h-4 w-4 text-gray-300 group-focus-within:text-blue-500 transition-colors" />
+                                        <Mail className="h-4 w-4 text-gray-300 group-focus-within:text-brand-500 transition-colors" />
                                     </div>
                                     <input
                                         id="email"
@@ -118,7 +118,7 @@ const ForgotPassword = () => {
                                         value={email}
                                         onChange={(e) => setEmail(e.target.value)}
                                         placeholder="name@example.com"
-                                        className="block w-full pl-12 pr-6 py-4 bg-gray-50/50 dark:bg-black/20 border-gray-100 dark:border-white/5 focus:bg-white dark:focus:bg-black border focus:border-blue-500 dark:focus:border-blue-500 rounded-2xl text-[15px] font-bold transition-all outline-none text-gray-900 dark:text-white placeholder:text-gray-300 dark:placeholder:text-gray-700 shadow-inner"
+                                        className="block w-full pl-12 pr-6 py-4 bg-gray-50/50 dark:bg-black/20 border-gray-100 dark:border-white/5 focus:bg-white dark:focus:bg-black border focus:border-brand-500 dark:focus:border-brand-500 rounded-2xl text-[15px] font-bold transition-all outline-none text-gray-900 dark:text-white placeholder:text-gray-300 dark:placeholder:text-gray-700 shadow-inner"
                                     />
                                 </div>
                             </div>
@@ -126,7 +126,7 @@ const ForgotPassword = () => {
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="w-full flex items-center justify-center gap-2 py-4 px-4 bg-blue-600 text-white rounded-[1.5rem] text-[15px] font-black uppercase tracking-[0.2em] hover:bg-black dark:hover:bg-white dark:hover:text-black active:scale-[0.98] transition-all focus:outline-none disabled:opacity-50 disabled:active:scale-100 shadow-xl shadow-blue-500/20"
+                                className="w-full flex items-center justify-center gap-2 py-4 px-4 bg-brand-600 text-white rounded-[1.5rem] text-[15px] font-black uppercase tracking-[0.2em] hover:bg-black dark:hover:bg-white dark:hover:text-black active:scale-[0.98] transition-all focus:outline-none disabled:opacity-50 disabled:active:scale-100 shadow-xl shadow-brand-500/20"
                             >
                                 {loading ? (
                                     <Loader2 className="h-5 w-5 animate-spin" />

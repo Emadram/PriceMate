@@ -112,13 +112,16 @@ const StoreMap = ({ lat, lon, zoom = 15, height = "300px", supermarkets = [], ce
         mapRef.current.setTarget(null);
       }
     };
-  }, [mapInputsKey]);
+  }, [mapInputsKey, lat, lon, zoom, centerProp, supermarkets]);
 
   return (
-    <div className="relative rounded-2xl overflow-hidden shadow-inner border border-gray-100 dark:border-gray-700">
+    <div
+      className="relative rounded-2xl overflow-hidden shadow-inner border border-gray-100 dark:border-gray-700"
+      style={{ height }}
+    >
       <div 
         ref={mapElement} 
-        style={{ width: '100%', height: height }}
+        style={{ width: '100%', height: '100%' }}
         className="bg-gray-50 dark:bg-gray-900"
       />
       <div className="absolute bottom-2 right-2 bg-white/80 dark:bg-gray-800/80 backdrop-blur px-2 py-1 rounded text-[8px] font-bold text-gray-400 dark:text-gray-500 pointer-events-none">

@@ -9,23 +9,29 @@ export default {
     extend: {
       colors: {
         brand: {
-          50: '#f0fdf4',
-          100: '#dcfce7',
-          200: '#bbf7d0',
-          400: '#4ade80',
-          500: '#22c55e',
-          600: '#16a34a',
-          700: '#15803d',
-          800: '#166534',
-          900: '#052e16',
+          50: '#eef2ff',
+          100: '#e0e7ff',
+          200: '#c7d2fe',
+          300: '#a5b4fc',
+          400: '#818cf8',
+          500: '#6366f1',
+          600: '#4f46e5', // Indigo — primary
+          700: '#4338ca',
+          800: '#3730a3',
+          900: '#312e81',
         },
         accent: {
-          500: '#0ea5e9',
-          600: '#0284c7',
+          400: '#a78bfa',
+          500: '#8b5cf6',
+          600: '#7c3aed', // Violet — secondary
         },
         warm: {
-          500: '#f97316',
-          600: '#ea580c',
+          400: '#5eead4',
+          500: '#2dd4bf', // Mint — accent
+          600: '#14b8a6',
+        },
+        slate: {
+          850: '#1e293b', // Slate dark background
         },
       },
       fontFamily: {

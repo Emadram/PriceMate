@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
     ShoppingBag, Package, MapPin, Phone, Mail, 
@@ -61,11 +61,7 @@ const SupermarketProfile = () => {
         setIsReportModalOpen(true);
     };
 
-    useEffect(() => {
-        loadSupermarketData();
-    }, [id]);
-
-    const loadSupermarketData = async () => {
+    const loadSupermarketData = useCallback(async () => {
         setLoading(true);
         try {
             const supermarketData = await fetchSupermarketById(id);
@@ -88,7 +84,14 @@ const SupermarketProfile = () => {
             console.error('Error loading supermarket data:', error);
         }
         setLoading(false);
-    };
+    }, [id]);
+
+    useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            loadSupermarketData();
+        }, 0);
+        return () => clearTimeout(timeoutId);
+    }, [loadSupermarketData]);
 
     if (loading) {
         return (
@@ -134,7 +137,7 @@ const SupermarketProfile = () => {
     const lastUpdateValue = latestProductUpdate || supermarket.lastUpdatedAt || supermarket.updatedAt || supermarket.$updatedAt || null;
 
     return (
-        <div className="min-h-screen bg-[#FDFDFD] dark:bg-[#0A0A0B] pb-24">
+        <div className="min-h-screen bg-[#FDFDFD] dark:bg-[#0A0A0B] pb-safe">
             <Navbar />
 
             <div className="max-w-4xl mx-auto px-4 py-4">
@@ -147,7 +150,7 @@ const SupermarketProfile = () => {
             <div className="max-w-4xl mx-auto px-4 sm:px-6 mt-4 sm:mt-6 relative z-10">
                 <div className="relative bg-white dark:bg-[#121214] rounded-2xl sm:rounded-[2.5rem] shadow-soft p-4 sm:p-6 md:p-8 border border-gray-100 dark:border-white/5 transition-colors">
                     <div className="absolute top-6 right-6 flex gap-2">
-                        <button className="w-11 h-11 bg-gray-50 dark:bg-white/5 hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black rounded-full flex items-center justify-center text-gray-500 dark:text-gray-300 transition-all active:scale-90">
+                        <button className="tap-target h-11 w-11 bg-gray-50 dark:bg-white/5 hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black rounded-full flex items-center justify-center text-gray-500 dark:text-gray-300 transition-all active:scale-90">
                             <Share2 size={18} />
                         </button>
                         <FavoriteHeartButton
@@ -174,7 +177,7 @@ const SupermarketProfile = () => {
                         <div className="flex-1 w-full space-y-4">
                             <div className="flex flex-wrap items-center gap-3">
                                 {supermarket.isVerified && (
-                                    <span className="bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[11px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full border border-blue-100 dark:border-blue-500/20">
+                                    <span className="bg-brand-50 dark:bg-brand-500/10 text-brand-600 dark:text-brand-500 text-[11px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full border border-brand-100 dark:border-brand-500/20">
                                         Verified Partner
                                     </span>
                                 )}
@@ -196,7 +199,7 @@ const SupermarketProfile = () => {
                                         <div className="relative">
                                             <button 
                                                 onClick={() => setIsBranchDropdownOpen(!isBranchDropdownOpen)}
-                                                className="mt-1 p-2 bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-gray-400 rounded-full hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-all active:scale-95"
+                                                className="tap-target h-11 w-11 mt-1 p-2 bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-gray-400 rounded-full hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-all active:scale-95"
                                                 title="Switch Branch"
                                             >
                                                 <ChevronDown size={18} className={`transition-transform duration-300 ${isBranchDropdownOpen ? 'rotate-180' : ''}`} />
@@ -216,9 +219,9 @@ const SupermarketProfile = () => {
                                                             className="w-full px-4 py-3 flex items-start gap-3 bg-gray-50/80 dark:bg-white/5 text-left border-b border-gray-100 dark:border-white/5"
                                                             aria-current="true"
                                                         >
-                                                            <MapPin size={16} className="mt-0.5 text-blue-600 dark:text-blue-400" />
+                                                            <MapPin size={16} className="mt-0.5 text-brand-600 dark:text-brand-500" />
                                                             <div className="flex-1 min-w-0">
-                                                                <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-0.5">Current</p>
+                                                                <p className="text-[10px] font-bold text-brand-600 dark:text-brand-500 uppercase tracking-wider mb-0.5">Current</p>
                                                                 <p className="text-[14px] font-semibold text-gray-900 dark:text-white line-clamp-1">
                                                                     {supermarket.branchName ? `${supermarket.name} — ${supermarket.branchName}` : supermarket.address || 'This branch'}
                                                                 </p>
@@ -311,14 +314,14 @@ const SupermarketProfile = () => {
                     <div className="mt-8 space-y-4">
                         <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
                             <div className="flex gap-2">
-                                <button className="inline-flex items-center gap-2 px-5 py-3 bg-black dark:bg-white text-white dark:text-black rounded-2xl text-sm font-semibold hover:opacity-90 active:scale-95 transition-all w-full md:w-auto">
+                                <button className="tap-target inline-flex items-center gap-2 px-5 py-3 bg-black dark:bg-white text-white dark:text-black rounded-2xl text-sm font-semibold hover:opacity-90 active:scale-95 transition-all w-full md:w-auto">
                                     <ExternalLink size={16} />
                                     Get Directions
                                 </button>
                                 {user && (
                                 <button
                                     onClick={handleReportClick}
-                                    className="p-3 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 rounded-2xl hover:bg-red-100 dark:hover:bg-red-500/20 active:scale-95 transition-all border border-red-100 dark:border-red-500/20"
+                                    className="tap-target h-11 w-11 p-3 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 rounded-2xl hover:bg-red-100 dark:hover:bg-red-500/20 active:scale-95 transition-all border border-red-100 dark:border-red-500/20"
                                     title="Report an issue"
                                 >
                                     <AlertTriangle size={20} />
@@ -328,12 +331,12 @@ const SupermarketProfile = () => {
                             
                             <div className="flex gap-4">
                                 {supermarket.phone && (
-                                    <a href={`tel:${supermarket.phone}`} className="text-gray-400 hover:text-black dark:hover:text-white transition-colors">
+                                    <a href={`tel:${supermarket.phone}`} className="tap-target h-11 w-11 flex items-center justify-center text-gray-400 hover:text-black dark:hover:text-white transition-colors">
                                         <Phone size={20} />
                                     </a>
                                 )}
                                 {supermarket.website && (
-                                    <a href={supermarket.website} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-black dark:hover:text-white transition-colors">
+                                    <a href={supermarket.website} target="_blank" rel="noopener noreferrer" className="tap-target h-11 w-11 flex items-center justify-center text-gray-400 hover:text-black dark:hover:text-white transition-colors">
                                         <Globe size={20} />
                                     </a>
                                 )}
@@ -356,6 +359,7 @@ const SupermarketProfile = () => {
                                     supermarkets={[supermarket]} 
                                     center={[supermarket.latitude, supermarket.longitude]} 
                                     zoom={15}
+                                    height="100%"
                                 />
                             ) : (
                                 <div className="h-full flex flex-col items-center justify-center bg-gray-50 dark:bg-[#1C1C1E] px-6 text-center">
@@ -429,7 +433,7 @@ const SupermarketProfile = () => {
                                                 <div className="mb-auto">
                                                     <div className="flex items-start justify-between gap-3">
                                                         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                                                            <h3 className="truncate text-sm font-semibold leading-tight text-gray-900 transition-colors group-hover:text-blue-600 dark:text-white sm:text-base md:text-lg">
+                                                            <h3 className="truncate text-sm font-semibold leading-tight text-gray-900 transition-colors group-hover:text-brand-600 dark:text-white sm:text-base md:text-lg">
                                                                 {price.products?.name || 'Unknown Product'}
                                                             </h3>
                                                             {price.stockStatus && (
@@ -447,7 +451,7 @@ const SupermarketProfile = () => {
                                                                 setProductReportTarget({ id: productReportId, name: productReportName });
                                                                 setIsProductReportOpen(true);
                                                             }}
-                                                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 shadow-sm transition-all hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-400 dark:hover:bg-red-500/25 sm:h-10 sm:w-10"
+                                                            className="tap-target flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 shadow-sm transition-all hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-400 dark:hover:bg-red-500/25"
                                                             title="Report an issue"
                                                             aria-label="Report an issue"
                                                         >
@@ -499,7 +503,7 @@ const SupermarketProfile = () => {
                                 </div>
                                 <h3 className="text-xl font-semibold dark:text-white mb-2">No prices found</h3>
                                 <p className="text-gray-500 dark:text-gray-400 mb-8 max-w-sm mx-auto">Help the community by contributing the first price for this location!</p>
-                                <button className="bg-black dark:bg-white text-white dark:text-black px-6 py-3 rounded-2xl font-semibold active:scale-95 transition-all">
+                                <button className="tap-target bg-black dark:bg-white text-white dark:text-black px-6 py-3 rounded-2xl font-semibold active:scale-95 transition-all">
                                     Contribute Data
                                 </button>
                             </div>

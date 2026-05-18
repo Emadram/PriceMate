@@ -12,7 +12,7 @@ const ScanPage = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 transition-colors">
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 pt-safe pb-safe transition-colors">
             <div className="max-w-md mx-auto bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden border border-gray-100 dark:border-gray-700">
                 <div className="p-6 border-b dark:border-gray-700">
                     <h2 className="text-xl font-bold text-center text-gray-800 dark:text-white">Scan Barcode</h2>
@@ -40,13 +40,13 @@ const ScanPage = () => {
                         <div className="grid grid-cols-2 gap-4">
                             <button
                                 onClick={() => setScannedCode(null)}
-                                className="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-6 py-3 rounded-xl font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition"
+                                className="tap-target min-h-11 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-6 py-3 rounded-xl font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition"
                             >
                                 Scan Again
                             </button>
                             <button
                                 onClick={() => navigate(`/product/${scannedCode}`, { state: { fromScan: true } })}
-                                className="bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 shadow-lg shadow-blue-500/30 transition"
+                                className="tap-target min-h-11 bg-brand-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-brand-700 shadow-lg shadow-brand-500/30 transition"
                             >
                                 View Product
                             </button>

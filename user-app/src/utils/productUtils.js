@@ -1,11 +1,14 @@
 import { db, Query, COLLECTIONS } from '../lib/appwrite';
 
 const cacheStore = new Map();
+const inflightRequests = new Map();
 const CACHE_TTL = {
     products: 60 * 1000,
     prices: 30 * 1000,
     categories: 5 * 60 * 1000,
-    allPrices: 30 * 1000
+    allPrices: 30 * 1000,
+    search: 30 * 1000,
+    similar: 60 * 1000
 };
 
 const getCachedValue = (key) => {
@@ -23,6 +26,15 @@ const setCachedValue = (key, data, ttlMs) => {
         data,
         expiresAt: Date.now() + ttlMs
     });
+};
+
+const withInflight = async (key, fetcher) => {
+    if (inflightRequests.has(key)) {
+        return inflightRequests.get(key);
+    }
+    const promise = fetcher().finally(() => inflightRequests.delete(key));
+    inflightRequests.set(key, promise);
+    return promise;
 };
 
 /**
@@ -432,6 +444,37 @@ export const fetchProducts = async (limit = 50) => {
 };
 
 /**
+ * Fetch similar products for a category (excluding the current product).
+ */
+export const fetchSimilarProductsByCategory = async (categoryId, excludeId = null, limit = 6) => {
+    if (!categoryId) return [];
+    const cacheKey = `similar:${categoryId}:${excludeId || 'none'}:${limit}`;
+    const cached = getCachedValue(cacheKey);
+    if (cached) return cached;
+
+    return withInflight(cacheKey, async () => {
+        try {
+            const response = await db.products.list([
+                Query.equal('categoryId', categoryId),
+                Query.limit(limit + 1),
+                Query.orderDesc('$createdAt'),
+                Query.select(['*', 'categoryId.*'])
+            ]);
+
+            const filtered = response.documents
+                .filter((doc) => doc.$id !== excludeId)
+                .slice(0, limit);
+
+            setCachedValue(cacheKey, filtered, CACHE_TTL.similar);
+            return filtered;
+        } catch (error) {
+            console.error('Error fetching similar products:', error);
+            return [];
+        }
+    });
+};
+
+/**
  * True if lat/lon are finite numbers within WGS84 ranges (string/number inputs OK).
  */
 export const hasValidLatLon = (lat, lon) => {
@@ -684,55 +727,78 @@ export const fetchPriceHistory = async (productId, branchId = null) => {
  * Search products by name, barcode, or category with optimized server-side query
  */
 export const searchProducts = async (query = '', categoryId = null, limit = 20, sortBy = 'relevance') => {
-    try {
-        const queries = [Query.limit(limit)];
+    const normalizedQuery = String(query || '').trim().toLowerCase();
+    const normalizedCategory = categoryId || 'all';
+    const cacheKey = `search:${normalizedQuery || 'all'}:${normalizedCategory}:${limit}:${sortBy}`;
+    const cached = getCachedValue(cacheKey);
+    if (cached) return cached;
 
-        if (categoryId) {
-            queries.push(Query.equal('categoryId', categoryId));
-        }
+    return withInflight(cacheKey, async () => {
+        try {
+            const queries = [
+                Query.limit(limit),
+                Query.select(['*', 'categoryId.*'])
+            ];
 
-        // Handle Sorting Server-Side where possible
-        if (sortBy === 'name') {
-            queries.push(Query.orderAsc('name'));
-        } else if (sortBy === 'newest') {
-            queries.push(Query.orderDesc('$createdAt'));
-        }
-
-        // Optimized Search Strategy:
-        // If query is a digit sequence, suspect barcode
-        if (/^\d+$/.test(query)) {
-            queries.push(Query.equal('barcode', query));
-        } else if (query.trim()) {
-            // First attempt server-side search indexing
-            try {
-                const results = await db.products.list(
-                    [...queries, Query.contains('name', query)]
-                );
-                
-                // If we have results, return them. If not, don't fallback to "all latest" 
-                // because it confuses users to see unrelated products when they searched for something specific.
-                if (results.documents.length > 0) return results.documents;
-                if (query.trim().length > 2) return []; // Stop fallback for specific queries
-            } catch (error) {
-                console.warn('Server-side search index issue:', error.message);
+            if (categoryId) {
+                queries.push(Query.equal('categoryId', categoryId));
             }
+
+            // Handle Sorting Server-Side where possible
+            if (sortBy === 'name') {
+                queries.push(Query.orderAsc('name'));
+            } else if (sortBy === 'newest') {
+                queries.push(Query.orderDesc('$createdAt'));
+            }
+
+            let results = null;
+
+            // Optimized Search Strategy:
+            // If query is a digit sequence, suspect barcode
+            if (/^\d+$/.test(normalizedQuery)) {
+                queries.push(Query.equal('barcode', normalizedQuery));
+            } else if (normalizedQuery) {
+                // First attempt server-side search indexing
+                try {
+                    results = await db.products.list(
+                        [...queries, Query.contains('name', normalizedQuery)]
+                    );
+
+                    // If we have results, return them. If not, don't fallback to "all latest" 
+                    // because it confuses users to see unrelated products when they searched for something specific.
+                    if (results.documents.length > 0) {
+                        setCachedValue(cacheKey, results.documents, CACHE_TTL.search);
+                        return results.documents;
+                    }
+                    if (normalizedQuery.length > 2) {
+                        setCachedValue(cacheKey, [], CACHE_TTL.search);
+                        return [];
+                    }
+                } catch (error) {
+                    console.warn('Server-side search index issue:', error.message);
+                }
+            }
+
+            // Fallback: Fetch latest and filter (best for small datasets or missing indexes)
+            const response = results || await db.products.list(queries);
+
+            if (!normalizedQuery) {
+                setCachedValue(cacheKey, response.documents, CACHE_TTL.search);
+                return response.documents;
+            }
+
+            const filtered = response.documents.filter(product =>
+                product.name.toLowerCase().includes(normalizedQuery) ||
+                product.barcode?.includes(normalizedQuery)
+            );
+
+            setCachedValue(cacheKey, filtered, CACHE_TTL.search);
+            return filtered;
+        } catch (error) {
+            console.error('Error searching products:', error);
+            return [];
         }
-
-        // Fallback: Fetch latest and filter (best for small datasets or missing indexes)
-        const response = await db.products.list(queries);
-
-        const normalizedQuery = query.toLowerCase().trim();
-        if (!normalizedQuery) return response.documents;
-
-        return response.documents.filter(product =>
-            product.name.toLowerCase().includes(normalizedQuery) ||
-            product.barcode?.includes(query)
-        );
-
-    } catch (error) {
-        console.error('Error searching products:', error);
-        return [];
-    }
+    });
 };
 
 /**
@@ -746,26 +812,28 @@ export const fetchPricesForProducts = async (productIds) => {
     const cached = getCachedValue(cacheKey);
     if (cached) return cached;
 
-    // Appwrite Query.equal supports arrays, but large arrays should be chunked
-    const CHUNK_SIZE = 25;
-    const allPrices = [];
+    return withInflight(cacheKey, async () => {
+        // Appwrite Query.equal supports arrays, but large arrays should be chunked
+        const CHUNK_SIZE = 25;
+        const allPrices = [];
 
-    try {
-        for (let i = 0; i < normalizedIds.length; i += CHUNK_SIZE) {
-            const chunk = normalizedIds.slice(i, i + CHUNK_SIZE);
-            const response = await db.prices.list([
-                Query.equal('products', chunk),
-                Query.limit(100),
-                Query.select(['*', 'supermarkets.*'])
-            ]);
-            allPrices.push(...response.documents);
+        try {
+            for (let i = 0; i < normalizedIds.length; i += CHUNK_SIZE) {
+                const chunk = normalizedIds.slice(i, i + CHUNK_SIZE);
+                const response = await db.prices.list([
+                    Query.equal('products', chunk),
+                    Query.limit(100),
+                    Query.select(['*', 'supermarkets.*'])
+                ]);
+                allPrices.push(...response.documents);
+            }
+            setCachedValue(cacheKey, allPrices, CACHE_TTL.prices);
+            return allPrices;
+        } catch (error) {
+            console.error('Error fetching prices for batch products:', error);
+            return [];
         }
-        setCachedValue(cacheKey, allPrices, CACHE_TTL.prices);
-        return allPrices;
-    } catch (error) {
-        console.error('Error fetching prices for batch products:', error);
-        return [];
-    }
+    });
 };
 
 /**
@@ -934,7 +1002,6 @@ export const updatePriceWithHistory = async (priceId, productId, supermarketId, 
  */
 export const fetchPriceHistoryExtended = async (productId, branchId = null) => {
     try {
-        const historyColl = COLLECTIONS.PRICE_HISTORY || 'price_history';
         const queries = [
             Query.equal('products', productId),
             Query.orderDesc('recordedAt'),

@@ -62,7 +62,7 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [] }) => {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-1.5 mb-0.5">
-                                        <h4 className="text-sm font-bold text-gray-800 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                                        <h4 className="text-sm font-bold text-gray-800 dark:text-white truncate group-hover:text-brand-600 dark:group-hover:text-brand-500">
                                             {product.name || product.productName}
                                         </h4>
                                         {badgeText && (
@@ -111,7 +111,7 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [] }) => {
         <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[85%] p-3 rounded-2xl ${
                 msg.role === 'user' 
-                    ? 'bg-blue-600 text-white rounded-tr-none shadow-md' 
+                    ? 'bg-brand-600 text-white rounded-tr-none shadow-md' 
                     : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 shadow-sm border border-gray-100 dark:border-gray-700 rounded-tl-none'
             }`}>
                 <div className="text-sm leading-relaxed whitespace-pre-wrap">
@@ -926,7 +926,7 @@ const AIChatBox = ({ isOpen, onClose }) => {
                             startNewConversation();
                             afterPick?.();
                         }}
-                        className="w-full flex items-center justify-center gap-1 py-2 rounded-lg bg-blue-600 text-white text-[10px] font-black uppercase tracking-wide"
+                        className="w-full flex items-center justify-center gap-1 py-2 rounded-lg bg-brand-600 text-white text-[10px] font-black uppercase tracking-wide"
                     >
                         <FiPlus size={14} />
                         {t('ai_chat_new_short')}
@@ -935,7 +935,7 @@ const AIChatBox = ({ isOpen, onClose }) => {
                 <div className="flex-1 overflow-y-auto p-1 space-y-1">
                     {summariesLoading && conversationRows.length === 0 ? (
                         <div className="flex justify-center p-4">
-                            <FiLoader className="animate-spin text-blue-600" />
+                            <FiLoader className="animate-spin text-brand-600" />
                         </div>
                     ) : (
                         conversationRows.map((row) => {
@@ -945,7 +945,7 @@ const AIChatBox = ({ isOpen, onClose }) => {
                                     key={row.id}
                                     className={`group relative rounded-lg border ${
                                         selected
-                                            ? 'border-blue-500 bg-white dark:bg-gray-800 shadow-sm'
+                                            ? 'border-brand-500 bg-white dark:bg-gray-800 shadow-sm'
                                             : 'border-transparent bg-transparent hover:bg-white/60 dark:hover:bg-gray-800/60'
                                     }`}
                                 >
@@ -990,7 +990,7 @@ const AIChatBox = ({ isOpen, onClose }) => {
 
     return (
         <div className="fixed inset-0 sm:inset-auto sm:bottom-4 sm:right-4 sm:w-[400px] md:w-[448px] sm:h-[min(640px,90vh)] h-full bg-white dark:bg-gray-800 sm:rounded-2xl shadow-2xl flex flex-col z-[2000] border border-gray-200 dark:border-gray-700 overflow-hidden animate-in sm:slide-in-from-bottom-5 slide-in-from-right duration-300">
-            <div className="p-4 sm:p-5 bg-blue-600 dark:bg-blue-700 text-white flex justify-between items-center shrink-0 shadow-md gap-2">
+            <div className="p-4 sm:p-5 bg-brand-600 dark:bg-brand-700 text-white flex justify-between items-center shrink-0 shadow-md gap-2">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                     {user && (
                         <button
@@ -1057,7 +1057,7 @@ const AIChatBox = ({ isOpen, onClose }) => {
                         {user && !activeConversationId && (
                             summariesLoading ? (
                                 <div className="flex justify-center py-12">
-                                    <FiLoader className="animate-spin text-blue-600" />
+                                    <FiLoader className="animate-spin text-brand-600" />
                                 </div>
                             ) : (
                                 <div className="p-6 text-center text-sm text-gray-600 dark:text-gray-400 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 mx-auto max-w-sm">
@@ -1067,7 +1067,7 @@ const AIChatBox = ({ isOpen, onClose }) => {
                         )}
                         {user && activeConversationId && historyLoading && (
                             <div className="flex justify-center py-12">
-                                <FiLoader className="animate-spin text-blue-600" />
+                                <FiLoader className="animate-spin text-brand-600" />
                             </div>
                         )}
                         {user && activeConversationId && !historyLoading && (
@@ -1089,7 +1089,7 @@ const AIChatBox = ({ isOpen, onClose }) => {
                                 {isLoading && (
                                     <div className="flex justify-start">
                                         <div className="bg-white dark:bg-gray-800 p-3 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 rounded-tl-none">
-                                            <FiLoader className="animate-spin text-blue-600" />
+                                            <FiLoader className="animate-spin text-brand-600" />
                                         </div>
                                     </div>
                                 )}
@@ -1133,14 +1133,14 @@ const AIChatBox = ({ isOpen, onClose }) => {
                                           : t('ai_chat_input_placeholder')
                                 }
                                 disabled={isLoading || !user || !activeConversationId}
-                                className="flex-1 bg-gray-50 dark:bg-gray-900 border-none rounded-xl py-3 px-4 text-sm focus:ring-2 focus:ring-blue-500 transition-all dark:text-white disabled:opacity-50"
+                                className="flex-1 bg-gray-50 dark:bg-gray-900 border-none rounded-xl py-3 px-4 text-sm focus:ring-2 focus:ring-brand-500 transition-all dark:text-white disabled:opacity-50"
                             />
                             <button
                                 type="submit"
                                 disabled={
                                     !input.trim() || isLoading || !user || !activeConversationId
                                 }
-                                className="bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-xl transition-all active:scale-90 disabled:opacity-50 disabled:active:scale-100 shadow-lg shadow-blue-200 dark:shadow-none"
+                                className="bg-brand-600 hover:bg-brand-700 text-white p-3 rounded-xl transition-all active:scale-90 disabled:opacity-50 disabled:active:scale-100 shadow-lg shadow-brand-200 dark:shadow-none"
                             >
                                 <FiSend />
                             </button>

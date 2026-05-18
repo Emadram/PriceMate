@@ -16,17 +16,19 @@ const AddPriceModal = ({ isOpen, onClose, product }) => {
     useEffect(() => {
         if (isOpen) {
             fetchSupermarkets();
-            setPrice('');
-            setSelectedSupermarket('');
-            setStockStatus('high');
         }
     }, [isOpen, fetchSupermarkets]);
 
+    const resetForm = () => {
+        setSelectedSupermarket('');
+        setPrice('');
+        setStockStatus('high');
+        setStatus('idle');
+        setErrorMessage('');
+    };
+
     const handleClose = (wasSuccessful = false) => {
-        if (!wasSuccessful) {
-            setStatus('idle');
-            setErrorMessage('');
-        }
+        resetForm();
         onClose(wasSuccessful);
     };
 
@@ -102,7 +104,7 @@ const AddPriceModal = ({ isOpen, onClose, product }) => {
                                 <select 
                                     value={selectedSupermarket}
                                     onChange={(e) => setSelectedSupermarket(e.target.value)}
-                                    className="w-full bg-gray-50 dark:bg-gray-800/50 border-none rounded-2xl px-5 py-4 font-bold text-gray-900 dark:text-white appearance-none focus:ring-2 focus:ring-blue-500 transition-all outline-none"
+                                    className="w-full bg-gray-50 dark:bg-gray-800/50 border-none rounded-2xl px-5 py-4 font-bold text-gray-900 dark:text-white appearance-none focus:ring-2 focus:ring-brand-500 transition-all outline-none"
                                     required
                                 >
                                     <option value="" disabled>Select a supermarket</option>
@@ -124,7 +126,7 @@ const AddPriceModal = ({ isOpen, onClose, product }) => {
                                         placeholder="0.00"
                                         value={price}
                                         onChange={(e) => setPrice(e.target.value)}
-                                        className="w-full bg-gray-50 dark:bg-gray-800/50 border-none rounded-2xl px-5 py-4 font-black text-2xl text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 transition-all outline-none"
+                                        className="w-full bg-gray-50 dark:bg-gray-800/50 border-none rounded-2xl px-5 py-4 font-black text-2xl text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 transition-all outline-none"
                                         required
                                     />
                                     <span className="absolute right-5 top-1/2 -translate-y-1/2 font-black text-gray-300 pointer-events-none">₺</span>
@@ -146,7 +148,7 @@ const AddPriceModal = ({ isOpen, onClose, product }) => {
                                             onClick={() => setStockStatus(option.id)}
                                             className={`p-3 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${
                                                 stockStatus === option.id 
-                                                    ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-500/10' 
+                                                    ? 'border-brand-500 bg-brand-50/50 dark:bg-brand-500/10' 
                                                     : 'border-transparent bg-gray-50 dark:bg-gray-800/50 grayscale opacity-60'
                                             }`}
                                         >
@@ -169,7 +171,7 @@ const AddPriceModal = ({ isOpen, onClose, product }) => {
                                 type="submit"
                                 disabled={status === 'loading'}
                                 aria-label="Submit new price contribution"
-                                className="w-full bg-blue-600 hover:bg-black text-white font-black py-5 rounded-[1.5rem] uppercase tracking-widest text-[11px] shadow-lg shadow-blue-500/30 hover:shadow-none transition-all duration-300 transform hover:scale-[0.98] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed group"
+                                className="w-full bg-brand-600 hover:bg-black text-white font-black py-5 rounded-[1.5rem] uppercase tracking-widest text-[11px] shadow-lg shadow-brand-500/30 hover:shadow-none transition-all duration-300 transform hover:scale-[0.98] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed group"
                             >
                                 {status === 'loading' ? (
                                     <div className="flex items-center justify-center gap-2">

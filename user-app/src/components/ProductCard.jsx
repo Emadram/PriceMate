@@ -33,18 +33,11 @@ const ProductCard = ({ product, prices = [] }) => {
         const dateToUse = lowestPrice?.updatedAt || product.updatedAt || product.$createdAt;
         if (!dateToUse) return t('recently_updated', 'Recently updated');
 
-        const diffInMs = Date.now() - new Date(dateToUse).getTime();
-        const diffInMins = Math.floor(diffInMs / (1000 * 60));
-        const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
-        const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+        const parsed = new Date(dateToUse);
+        if (Number.isNaN(parsed.getTime())) return t('recently_updated', 'Recently updated');
 
-        if (diffInMins < 60) {
-            return `${diffInMins}m ${t('ago', 'ago')}`;
-        } else if (diffInHours < 24) {
-            return `${diffInHours}h ${t('ago', 'ago')}`;
-        } else {
-            return `${diffInDays}d ${t('ago', 'ago')}`;
-        }
+        const formatted = parsed.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' });
+        return `${t('updated', 'Updated')} ${formatted}`;
     };
 
     const freshnessText = getFreshnessText();
@@ -98,7 +91,7 @@ const ProductCard = ({ product, prices = [] }) => {
                                     e.stopPropagation();
                                     setIsReportOpen(true);
                                 }}
-                                className="shrink-0 flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 shadow-sm transition-all hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-400 dark:hover:bg-red-500/25"
+                                className="tap-target shrink-0 flex h-11 w-11 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 shadow-sm transition-all hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-400 dark:hover:bg-red-500/25"
                                 title="Report Issue"
                                 aria-label="Report issue"
                             >

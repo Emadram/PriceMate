@@ -3,7 +3,7 @@ import { account } from '../lib/appwrite';
 import { ID } from 'appwrite';
 import toast from 'react-hot-toast';
 
-const useAuthStore = create((set, get) => ({
+const useAuthStore = create((set) => ({
     user: null,
     loading: true,
     error: null,

@@ -75,7 +75,7 @@ const ReportModal = ({ isOpen, onClose, targetName, targetType = 'supermarket', 
                     </h3>
                     <button
                         onClick={onClose}
-                        className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 transition"
+                        className="tap-target h-11 w-11 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 transition"
                     >
                         <FiX size={24} />
                     </button>

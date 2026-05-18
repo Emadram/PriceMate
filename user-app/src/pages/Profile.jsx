@@ -59,7 +59,7 @@ const Profile = () => {
     };
 
     return (
-        <div className="min-h-screen bg-[#F5F5F7] dark:bg-black text-gray-900 dark:text-gray-100 pb-20">
+        <div className="min-h-screen bg-[#F5F5F7] dark:bg-black text-gray-900 dark:text-gray-100 pb-safe">
             <header className="bg-white/80 dark:bg-black/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 dark:border-white/5 p-4">
                 <div className="max-w-4xl mx-auto flex items-center justify-between">
                     <BackButton to="/" />
@@ -91,6 +91,7 @@ const Profile = () => {
                     <div className="bg-white dark:bg-gray-900 rounded-[2.5rem] p-2 shadow-soft border border-gray-100/50 dark:border-gray-800/50">
                         <Link
                             to="/favorites"
+                            state={{ from: '/profile' }}
                             className="flex items-center justify-between p-5 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-[2rem] transition-all group"
                         >
                             <div className="flex items-center gap-4">
@@ -112,7 +113,7 @@ const Profile = () => {
                             className="flex items-center justify-between p-5 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-[2rem] transition-all group"
                         >
                             <div className="flex items-center gap-4">
-                                <div className="p-3 rounded-2xl bg-brand-50 dark:bg-brand-900/20 text-brand-600">
+                                <div className="tap-target h-11 w-11 flex items-center justify-center rounded-2xl bg-brand-50 dark:bg-brand-900/20 text-brand-600">
                                     <FiMessageSquare size={20} />
                                 </div>
                                 <span className="font-bold tracking-tight">{t('send_feedback', 'Send Feedback')}</span>
@@ -139,12 +140,12 @@ const Profile = () => {
                                 value={displayName}
                                 onChange={(e) => setDisplayName(e.target.value)}
                                 autoComplete="name"
-                                className="w-full rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-brand-500/30"
+                                className="w-full min-h-11 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-brand-500/30"
                             />
                             <button
                                 type="submit"
                                 disabled={nameSaving || displayName.trim() === (user.name || '').trim() || !displayName.trim()}
-                                className="w-full rounded-2xl bg-black dark:bg-white py-3 text-xs font-black uppercase tracking-widest text-white dark:text-black transition-opacity disabled:opacity-40 disabled:pointer-events-none hover:opacity-90"
+                                className="tap-target w-full min-h-11 rounded-2xl bg-black dark:bg-white py-3 text-xs font-black uppercase tracking-widest text-white dark:text-black transition-opacity disabled:opacity-40 disabled:pointer-events-none hover:opacity-90"
                             >
                                 {nameSaving ? t('saving', 'Saving…') : t('save_name', 'Save name')}
                             </button>
@@ -163,7 +164,7 @@ const Profile = () => {
                                 onChange={(e) => setOldPassword(e.target.value)}
                                 autoComplete="current-password"
                                 placeholder={t('current_password', 'Current password')}
-                                className="w-full rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-brand-500/30 placeholder:text-gray-400"
+                                className="w-full min-h-11 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-brand-500/30 placeholder:text-gray-400"
                             />
                             <input
                                 type="password"
@@ -171,7 +172,7 @@ const Profile = () => {
                                 onChange={(e) => setNewPassword(e.target.value)}
                                 autoComplete="new-password"
                                 placeholder={t('new_password', 'New password (min 8 characters)')}
-                                className="w-full rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-brand-500/30 placeholder:text-gray-400"
+                                className="w-full min-h-11 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-brand-500/30 placeholder:text-gray-400"
                             />
                             <input
                                 type="password"
@@ -179,12 +180,12 @@ const Profile = () => {
                                 onChange={(e) => setConfirmPassword(e.target.value)}
                                 autoComplete="new-password"
                                 placeholder={t('confirm_new_password', 'Confirm new password')}
-                                className="w-full rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-brand-500/30 placeholder:text-gray-400"
+                                className="w-full min-h-11 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-brand-500/30 placeholder:text-gray-400"
                             />
                             <button
                                 type="submit"
                                 disabled={passwordSaving || !oldPassword || !newPassword || !confirmPassword}
-                                className="w-full rounded-2xl border border-gray-200 dark:border-gray-600 py-3 text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white transition-opacity disabled:opacity-40 disabled:pointer-events-none hover:bg-gray-50 dark:hover:bg-gray-800"
+                                className="tap-target w-full min-h-11 rounded-2xl border border-gray-200 dark:border-gray-600 py-3 text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white transition-opacity disabled:opacity-40 disabled:pointer-events-none hover:bg-gray-50 dark:hover:bg-gray-800"
                             >
                                 {passwordSaving ? t('updating', 'Updating…') : t('update_password', 'Update password')}
                             </button>
@@ -205,7 +206,7 @@ const Profile = () => {
                 <div className="mt-12 text-center">
                     <button
                         onClick={() => logout()}
-                        className="inline-flex items-center gap-2 px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-widest text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-all active:scale-95"
+                        className="tap-target inline-flex items-center gap-2 px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-widest text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-all active:scale-95"
                     >
                         <FiLogOut size={16} />
                         {t('logout', 'Sign Out')}

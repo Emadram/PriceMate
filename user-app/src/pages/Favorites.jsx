@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { FiStar, FiShoppingBag, FiPackage, FiChevronRight } from 'react-icons/fi';
 import { db, Query } from '../lib/appwrite';
 import { fetchAllPrices, normalizeProduct } from '../utils/productUtils';
@@ -9,17 +9,14 @@ import BackButton from '../components/BackButton';
 import { ProductCardSkeleton } from '../components/SkeletonLoaders';
 
 const Favorites = () => {
+    const location = useLocation();
     const [products, setProducts] = useState([]);
     const [supermarkets, setSupermarkets] = useState([]);
     const [loading, setLoading] = useState(false);
     const [activeTab, setActiveTab] = useState('products');
     const { favoriteProducts, favoriteSupermarkets } = useFavoritesStore();
 
-    useEffect(() => {
-        fetchFavorites();
-    }, [favoriteProducts, favoriteSupermarkets]);
-
-    const fetchFavorites = async () => {
+    const fetchFavorites = useCallback(async () => {
         setLoading(true);
         try {
             const promises = [];
@@ -59,17 +56,28 @@ const Favorites = () => {
             console.error('Error fetching favorites:', error);
         }
         setLoading(false);
-    };
+    }, [favoriteProducts, favoriteSupermarkets]);
+
+    useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            fetchFavorites();
+        }, 0);
+        return () => clearTimeout(timeoutId);
+    }, [fetchFavorites]);
 
     const productCount = favoriteProducts?.length ?? 0;
     const marketCount = favoriteSupermarkets?.length ?? 0;
     const hasAny = productCount > 0 || marketCount > 0;
 
+    const backTarget = (location.state && location.state.from && location.state.from !== '/favorites')
+        ? location.state.from
+        : '/';
+
     return (
-        <div className="min-h-screen bg-[#F5F5F7] dark:bg-black transition-colors pb-20">
+        <div className="min-h-screen bg-[#F5F5F7] dark:bg-black transition-colors pb-safe">
             <header className="bg-white/80 dark:bg-black/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 dark:border-white/5 p-4">
                 <div className="max-w-4xl mx-auto flex items-center justify-between">
-                    <BackButton to="/profile" />
+                    <BackButton to={backTarget} />
                     <h1 className="text-xl font-black text-gray-900 dark:text-white flex items-center gap-2">
                         <FiStar className="text-yellow-500" /> Favorites
                     </h1>
@@ -97,7 +105,7 @@ const Favorites = () => {
                         </p>
                         <Link
                             to="/"
-                            className="inline-flex items-center justify-center px-8 py-4 bg-black dark:bg-white text-white dark:text-black rounded-2xl font-black uppercase tracking-widest text-[10px] hover:scale-105 transition-transform active:scale-95 shadow-lg shadow-black/10 dark:shadow-white/5"
+                            className="tap-target inline-flex items-center justify-center px-8 py-4 bg-black dark:bg-white text-white dark:text-black rounded-2xl font-black uppercase tracking-widest text-[10px] hover:scale-105 transition-transform active:scale-95 shadow-lg shadow-black/10 dark:shadow-white/5"
                         >
                             Start Exploring
                         </Link>
@@ -108,7 +116,7 @@ const Favorites = () => {
                             <button
                                 type="button"
                                 onClick={() => setActiveTab('products')}
-                                className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                                className={`tap-target min-h-11 flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
                                     activeTab === 'products'
                                         ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm'
                                         : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
@@ -129,7 +137,7 @@ const Favorites = () => {
                             <button
                                 type="button"
                                 onClick={() => setActiveTab('supermarkets')}
-                                className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                                className={`tap-target min-h-11 flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
                                     activeTab === 'supermarkets'
                                         ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm'
                                         : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'

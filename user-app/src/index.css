@@ -2,7 +2,49 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  :root {
+    --brand-50:  #eef2ff;
+    --brand-100: #e0e7ff;
+    --brand-400: #818cf8;
+    --brand-500: #6366f1;
+    --brand-600: #4f46e5; /* Indigo */
+    --brand-700: #4338ca;
+    --accent-500: #8b5cf6;
+    --accent-600: #7c3aed; /* Violet */
+    --mint-500:  #2dd4bf; /* Accent Mint */
+    --slate-850: #1e293b; /* Dark Slate */
+    --soft-gray: #f8fafc; /* Soft Gray */
+  }
+
+  ::selection {
+    background-color: #818cf8; /* brand-400 */
+    color: #fff;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
 @layer utilities {
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .pb-safe {
+    padding-bottom: calc(env(safe-area-inset-bottom) + 5rem);
+  }
+
+  .pb-safe-nav {
+    padding-bottom: calc(env(safe-area-inset-bottom) + 1rem);
+  }
+
+  .tap-target {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
   .animate-pulse-soft {
     animation: pulse-soft 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }

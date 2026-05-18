@@ -25,7 +25,7 @@ const getIconFromCategoryName = (categoryName) => {
     return CATEGORY_ICON_ELEMENTS.default;
 };
 
-const useCategoriesStore = create((set, get) => ({
+const useCategoriesStore = create((set) => ({
     categories: [],
     loading: false,
     error: null,

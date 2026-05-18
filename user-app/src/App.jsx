@@ -46,7 +46,7 @@ const ProtectedRoute = ({ children }) => {
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#F5F5F7] dark:bg-black">
-        <div className="w-12 h-12 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin"></div>
+        <div className="w-12 h-12 border-4 border-brand-600/20 border-t-brand-600 rounded-full animate-spin"></div>
         <p className="mt-4 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Authenticating</p>
       </div>
     );

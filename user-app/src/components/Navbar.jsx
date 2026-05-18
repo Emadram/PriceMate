@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { FiUser, FiLogOut, FiMoon, FiSun, FiMenu, FiX, FiGlobe, FiDollarSign, FiHome, FiSearch, FiCamera, FiHeart } from 'react-icons/fi';
+import { FiUser, FiLogOut, FiMoon, FiSun, FiGlobe, FiHome, FiSearch, FiCamera, FiHeart } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
 import useAuthStore from '../stores/authStore';
 import useCurrencyStore from '../stores/currencyStore';
@@ -14,7 +14,6 @@ const Navbar = () => {
     const { theme, toggleTheme } = useThemeStore();
     const navigate = useNavigate();
     const location = useLocation();
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isCurrencyMenuOpen, setIsCurrencyMenuOpen] = useState(false);
 
     useEffect(() => {
@@ -95,7 +94,7 @@ const Navbar = () => {
                                 <div className="flex items-center gap-2">
                                     <Link
                                         to="/profile"
-                                        className="flex items-center gap-2.5 pl-2.5 pr-1.5 py-1.5 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl hover:border-blue-500/50 transition-all shadow-sm group"
+                                        className="flex items-center gap-2.5 pl-2.5 pr-1.5 py-1.5 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl hover:border-brand-500/50 transition-all shadow-sm group"
                                     >
                                             <div className="w-10 h-10 bg-brand-100 dark:bg-brand-900/50 rounded-xl flex items-center justify-center text-brand-600 dark:text-brand-500 font-black group-hover:scale-95 transition-transform overflow-hidden">
                                             {user.name?.charAt(0).toUpperCase()}
@@ -134,19 +133,19 @@ const Navbar = () => {
                         <div className="flex items-center md:hidden gap-2">
                              <button
                                 onClick={toggleCurrency}
-                                className={`p-2.5 text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl shadow-sm transition-all ${isCurrencyMenuOpen ? 'bg-brand-50 dark:bg-brand-900/30 text-brand-600 !border-brand-200' : ''}`}
+                                className={`tap-target h-11 min-w-11 px-2.5 flex items-center justify-center text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl shadow-sm transition-all ${isCurrencyMenuOpen ? 'bg-brand-50 dark:bg-brand-900/30 text-brand-600 !border-brand-200' : ''}`}
                             >
                                 <span className="text-[10px] font-black uppercase">{currency}</span>
                             </button>
                              <button
                                 onClick={toggleLanguage}
-                                className="p-2.5 text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl shadow-sm"
+                                className="tap-target h-11 w-11 flex items-center justify-center text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl shadow-sm"
                             >
                                 <span className="text-[10px] font-black uppercase">{i18n.resolvedLanguage || i18n.language}</span>
                             </button>
                             <button
                                 onClick={toggleTheme}
-                                className="p-2.5 text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl shadow-sm"
+                                className="tap-target h-11 w-11 flex items-center justify-center text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl shadow-sm"
                             >
                                 {theme === 'dark' ? <FiSun size={20} /> : <FiMoon size={20} />}
                             </button>
@@ -180,17 +179,23 @@ const Navbar = () => {
             </nav>
 
             {/* Mobile Bottom Navigation */}
-            <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg border-t border-gray-100 dark:border-gray-800 px-6 py-4 shadow-soft">
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg border-t border-gray-100 dark:border-gray-800 px-6 py-4 pb-safe-nav shadow-soft">
                 <div className="flex justify-between items-center max-w-md mx-auto">
                     <NavItem to="/" icon={FiHome} label={t('home')} currentPath={location.pathname} />
                     <NavItem to="/search" icon={FiSearch} label={t('search')} currentPath={location.pathname} />
                     <Link
                         to="/scan"
-                        className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-soft -mt-10 relative border-8 border-white dark:border-gray-900 active:scale-90 transition-all duration-300"
+                        className="w-16 h-16 bg-brand-600 rounded-2xl flex items-center justify-center text-white shadow-soft -mt-10 relative border-8 border-white dark:border-gray-900 active:scale-90 transition-all duration-300"
                     >
                         <FiCamera size={28} strokeWidth={2.5} />
                     </Link>
-                    <NavItem to="/favorites" icon={FiHeart} label={t('favorites')} currentPath={location.pathname} />
+                    <NavItem
+                        to="/favorites"
+                        icon={FiHeart}
+                        label={t('favorites')}
+                        currentPath={location.pathname}
+                        state={{ from: location.pathname }}
+                    />
                     <NavItem to="/profile" icon={FiUser} label={t('profile')} currentPath={location.pathname} />
                 </div>
             </div>
@@ -198,16 +203,18 @@ const Navbar = () => {
     );
 };
 
-const NavItem = ({ to, icon: Icon, label, currentPath }) => {
+const NavItem = ({ to, icon, label, currentPath, state }) => {
+    const IconComponent = icon;
     const isActive = currentPath === to;
     return (
         <Link
             to={to}
-            className={`flex flex-col items-center justify-center gap-1.5 transition-all active:scale-90 ${
+            state={state}
+            className={`tap-target min-h-11 min-w-11 px-2 flex flex-col items-center justify-center gap-1.5 transition-all active:scale-90 ${
                 isActive ? 'text-brand-600 dark:text-brand-500' : 'text-gray-400 dark:text-gray-500'
             }`}
         >
-            <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />
+            <IconComponent size={22} strokeWidth={isActive ? 2.5 : 2} />
             <span className={`text-[10px] font-semibold tracking-tight ${isActive ? 'opacity-100' : 'opacity-80'}`}>
                 {label}
             </span>
