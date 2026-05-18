@@ -101,6 +101,10 @@ const useProductsStore = create((set, get) => ({
             };
 
             // Add optional fields
+            if (data.brand) {
+                payload.brand = String(data.brand).trim();
+            }
+
             if (data.description) {
                 payload.description = data.description;
             }
@@ -147,6 +151,10 @@ const useProductsStore = create((set, get) => ({
             };
 
             // Add optional fields
+            if (data.brand) {
+                payload.brand = String(data.brand).trim();
+            }
+
             if (data.description) {
                 payload.description = data.description;
             }

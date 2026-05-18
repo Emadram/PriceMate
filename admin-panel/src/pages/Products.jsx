@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FiPackage, FiEdit2, FiTrash2, FiPlus, FiChevronUp, FiChevronDown, FiX, FiSearch, FiFilter } from 'react-icons/fi';
 import useProductsStore from '../stores/productsStore';
@@ -24,8 +24,12 @@ const Products = () => {
     const [showModal, setShowModal] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
     const [uploading, setUploading] = useState(false);
+    const [offLookup, setOffLookup] = useState({ loading: false, error: '', results: [] });
+    const offAbortRef = useRef(null);
+    const [useOffImage, setUseOffImage] = useState(true);
     const [formData, setFormData] = useState({
         name: '',
+        brand: '',
         barcode: '',
         imageUrl: '',
         description: '',
@@ -43,6 +47,93 @@ const Products = () => {
     const [sortConfig, setSortConfig] = useState({ key: null, direction: 'ascending' });
     const [lastUpdated, setLastUpdated] = useState(null);
     const [isFresh, setIsFresh] = useState(false);
+
+    const resetOffLookup = () => setOffLookup({ loading: false, error: '', results: [] });
+
+    const normalizeOffResult = (product) => {
+        if (!product) return null;
+        const barcode = String(product.code || '').trim();
+        if (!barcode) return null;
+        const name =
+            product.product_name ||
+            product.product_name_en ||
+            product.product_name_tr ||
+            product.generic_name ||
+            '';
+        if (!name) return null;
+        const brand = (product.brands || '').split(',')[0]?.trim() || '';
+        const imageUrl = product.image_front_url || product.image_url || '';
+        const description =
+            product.generic_name ||
+            product.generic_name_en ||
+            product.generic_name_tr ||
+            product.categories ||
+            '';
+        return {
+            barcode,
+            name,
+            brand,
+            imageUrl,
+            description: String(description || '').trim(),
+        };
+    };
+
+    const handleOffLookup = useCallback(async () => {
+        const query = String(formData.name || '').trim();
+        if (query.length < 3) {
+            setOffLookup({ loading: false, error: 'Enter at least 3 characters.', results: [] });
+            return;
+        }
+
+        if (offAbortRef.current) {
+            offAbortRef.current.abort();
+        }
+
+        const controller = new AbortController();
+        offAbortRef.current = controller;
+        setOffLookup({ loading: true, error: '', results: [] });
+
+        try {
+            const response = await fetch(
+                `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=5`,
+                { signal: controller.signal }
+            );
+
+            if (!response.ok) {
+                throw new Error('Open Food Facts lookup failed.');
+            }
+
+            const data = await response.json();
+            const products = Array.isArray(data?.products) ? data.products : [];
+            const results = products
+                .map(normalizeOffResult)
+                .filter(Boolean);
+
+            setOffLookup({
+                loading: false,
+                error: results.length ? '' : 'No barcode matches found.',
+                results,
+            });
+        } catch (error) {
+            if (error.name === 'AbortError') return;
+            console.error('OFF barcode lookup failed:', error);
+            setOffLookup({ loading: false, error: 'Barcode lookup failed. Try again.', results: [] });
+        }
+    }, [formData.name]);
+
+    const applyOffCandidate = (candidate) => {
+        setFormData((prev) => ({
+            ...prev,
+            barcode: candidate.barcode || prev.barcode,
+            imageUrl: useOffImage
+                ? (candidate.imageUrl || prev.imageUrl || '')
+                : (prev.imageUrl || ''),
+            name: prev.name || candidate.name || prev.name,
+            brand: prev.brand || candidate.brand || '',
+            description: prev.description || candidate.description || '',
+        }));
+        resetOffLookup();
+    };
 
     const refreshData = useCallback(async () => {
         await Promise.all([
@@ -63,6 +154,12 @@ const Products = () => {
         const timer = setTimeout(() => setIsFresh(false), 1200);
         return () => clearTimeout(timer);
     }, [lastUpdated]);
+
+    useEffect(() => {
+        if (!showModal && offAbortRef.current) {
+            offAbortRef.current.abort();
+        }
+    }, [showModal]);
 
     useEffect(() => {
         const channels = [
@@ -112,8 +209,11 @@ const Products = () => {
 
         setShowModal(false);
         setEditingProduct(null);
+        resetOffLookup();
+        setUseOffImage(true);
         setFormData({
             name: '',
+            brand: '',
             barcode: '',
             imageUrl: '',
             description: '',
@@ -129,12 +229,15 @@ const Products = () => {
 
     const handleEdit = (product) => {
         setEditingProduct(product);
+        resetOffLookup();
+        setUseOffImage(!product.imageUrl);
         const catId = product.categoryId && typeof product.categoryId === 'object'
             ? product.categoryId.$id
             : product.categoryId;
 
         setFormData({
             name: product.name,
+            brand: product.brand || '',
             barcode: product.barcode,
             imageUrl: product.imageUrl || '',
             description: product.description || '',
@@ -170,6 +273,7 @@ const Products = () => {
         const searchLower = searchTerm.toLowerCase();
         return (
             product.name?.toLowerCase().includes(searchLower) ||
+            product.brand?.toLowerCase().includes(searchLower) ||
             product.barcode?.toLowerCase().includes(searchLower) ||
             product.description?.toLowerCase().includes(searchLower) ||
             getCategoryName(product).toLowerCase().includes(searchLower)
@@ -245,7 +349,13 @@ const Products = () => {
                         </div>
                     </div>
                     <button
-                        onClick={() => { setEditingProduct(null); setShowModal(true); setFormData({ name: '', barcode: '', imageUrl: '', description: '', stockQuantity: 0, categoryId: '', supermarkets: '', sugarsPer100g: '', sodiumMgPer100g: '', ingredientsText: '', nutritionSource: '' }); }}
+                        onClick={() => {
+                            setEditingProduct(null);
+                            resetOffLookup();
+                            setUseOffImage(true);
+                            setShowModal(true);
+                            setFormData({ name: '', brand: '', barcode: '', imageUrl: '', description: '', stockQuantity: 0, categoryId: '', supermarkets: '', sugarsPer100g: '', sodiumMgPer100g: '', ingredientsText: '', nutritionSource: '' });
+                        }}
                         className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl flex items-center gap-2 transition-all shadow-lg shadow-blue-500/20 active:scale-95 text-sm font-black uppercase tracking-widest"
                     >
                         <FiPlus size={20} className="stroke-[3]" /> Add Product
@@ -436,7 +546,17 @@ const Products = () => {
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Barcode / SKU</label>
+                                            <div className="flex items-center justify-between">
+                                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Barcode / SKU</label>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleOffLookup}
+                                                    disabled={offLookup.loading}
+                                                    className="text-[10px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-700 disabled:opacity-50"
+                                                >
+                                                    {offLookup.loading ? 'Searching...' : 'Find Barcode'}
+                                                </button>
+                                            </div>
                                             <input
                                                 type="text"
                                                 value={formData.barcode}
@@ -445,6 +565,55 @@ const Products = () => {
                                                 placeholder="Scan or type barcode..."
                                                 required
                                             />
+                                            {offLookup.error && (
+                                                <p className="text-[11px] text-red-600 font-semibold">{offLookup.error}</p>
+                                            )}
+                                            {offLookup.results.length > 0 && (
+                                                <div className="mt-2 rounded-2xl border border-blue-100 dark:border-blue-900/60 bg-blue-50/40 dark:bg-blue-900/20 p-3 space-y-2">
+                                                    <div className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Open Food Facts matches</div>
+                                                    {offLookup.results.map((hit) => (
+                                                        <button
+                                                            key={hit.barcode}
+                                                            type="button"
+                                                            onClick={() => applyOffCandidate(hit)}
+                                                            className="w-full text-left p-2 rounded-xl bg-white/70 dark:bg-gray-900/60 hover:bg-white dark:hover:bg-gray-900 border border-transparent hover:border-blue-200 dark:hover:border-blue-800 transition"
+                                                        >
+                                                            <div className="text-xs font-bold text-gray-900 dark:text-white truncate">{hit.name}</div>
+                                                            <div className="flex items-center justify-between text-[10px] text-gray-500 dark:text-gray-400">
+                                                                <span className="font-mono">#{hit.barcode}</span>
+                                                                {hit.brand && <span className="truncate max-w-[120px]">{hit.brand}</span>}
+                                                            </div>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Brand</label>
+                                            <input
+                                                type="text"
+                                                value={formData.brand}
+                                                onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                                                className="w-full bg-gray-50 dark:bg-gray-900 border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-blue-500/20 outline-none text-gray-900 dark:text-white font-bold transition-all"
+                                                placeholder="Brand name..."
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Use OFF image</label>
+                                            <label className="flex items-center gap-3 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={useOffImage}
+                                                    onChange={(e) => setUseOffImage(e.target.checked)}
+                                                    className="h-4 w-4 accent-blue-600"
+                                                />
+                                                <span className="text-xs font-bold text-gray-700 dark:text-gray-200">
+                                                    Apply OFF image when selecting a match
+                                                </span>
+                                            </label>
                                         </div>
                                     </div>
 
