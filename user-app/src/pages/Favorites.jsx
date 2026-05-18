@@ -75,7 +75,7 @@ const Favorites = () => {
 
     return (
         <div className="min-h-screen bg-[#F5F5F7] dark:bg-black transition-colors pb-safe">
-            <header className="bg-white/80 dark:bg-black/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 dark:border-white/5 p-4">
+            <header className="pt-safe bg-white/80 dark:bg-black/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 dark:border-white/5 p-4">
                 <div className="max-w-4xl mx-auto flex items-center justify-between">
                     <BackButton to={backTarget} />
                     <h1 className="text-xl font-black text-gray-900 dark:text-white flex items-center gap-2">
@@ -171,7 +171,7 @@ const Favorites = () => {
                                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Heart a product on its price comparison page.</p>
                                     <Link
                                         to="/"
-                                        className="text-sm font-black text-brand-600 dark:text-brand-500 uppercase tracking-widest"
+                                        className="tap-target inline-flex items-center justify-center px-3 py-2 rounded-full text-sm font-black text-brand-600 dark:text-brand-500 uppercase tracking-widest"
                                     >
                                         Browse products
                                     </Link>

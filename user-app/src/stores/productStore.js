@@ -106,13 +106,20 @@ const useProductStore = create((set, get) => ({
             let prices = [];
 
             if (response.documents.length === 0) {
-                // Fallback to Global OpenFoodFacts API
-                const globalProduct = await productUtils.fetchGlobalProduct(barcode);
-                if (!globalProduct) {
-                    set({ loading: false, error: 'Product not found in local or global database' });
-                    return null;
+                const cachedOff = await productUtils.fetchOffCacheByBarcode(barcode);
+                if (cachedOff) {
+                    const normalizedCache = productUtils.normalizeOffCacheDoc(cachedOff);
+                    product = productUtils.normalizeProduct(normalizedCache);
+                } else {
+                    // Fallback to Global OpenFoodFacts API
+                    const globalProduct = await productUtils.fetchGlobalProductWithRetries(barcode);
+                    if (!globalProduct) {
+                        set({ loading: false, error: 'Product not found in local or global database' });
+                        return null;
+                    }
+                    product = productUtils.normalizeProduct(globalProduct);
+                    await productUtils.saveOffCacheFromProduct(globalProduct, barcode);
                 }
-                product = productUtils.normalizeProduct(globalProduct);
             } else {
                 product = response.documents[0];
                 const fetchPrices = async (attribute) => db.prices.list(

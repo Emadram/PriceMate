@@ -59,7 +59,8 @@ export const APPWRITE_CONFIG = {
         USER_PROFILES: import.meta.env.VITE_APPWRITE_COLLECTION_USER_PROFILES || 'user_profiles',
         FAVORITES: import.meta.env.VITE_APPWRITE_COLLECTION_FAVORITES || 'favorites',
         ANNOUNCEMENTS: import.meta.env.VITE_APPWRITE_COLLECTION_ANNOUNCEMENTS || 'announcements',
-        CHAT_HISTORY: import.meta.env.VITE_APPWRITE_COLLECTION_CHAT_HISTORY || 'chat_history'
+        CHAT_HISTORY: import.meta.env.VITE_APPWRITE_COLLECTION_CHAT_HISTORY || 'chat_history',
+        OFF_CACHE: import.meta.env.VITE_APPWRITE_COLLECTION_OFF_CACHE || 'off_cache'
     }
 };
 
@@ -126,6 +127,11 @@ export const db = {
         list: (queries) => dbAction.list(COLLECTIONS.CHAT_HISTORY, queries),
         create: (data) => dbAction.create(COLLECTIONS.CHAT_HISTORY, data),
         delete: (id) => dbAction.delete(COLLECTIONS.CHAT_HISTORY, id),
+    },
+    offCache: {
+        list: (queries) => dbAction.list(COLLECTIONS.OFF_CACHE, queries),
+        create: (data) => dbAction.create(COLLECTIONS.OFF_CACHE, data),
+        update: (id, data) => dbAction.update(COLLECTIONS.OFF_CACHE, id, data),
     }
 };
 

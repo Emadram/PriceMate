@@ -10,6 +10,15 @@ const CACHE_TTL = {
     search: 30 * 1000,
     similar: 60 * 1000
 };
+const OFF_CACHE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+const OFF_MEMORY_TTL_MS = 5 * 60 * 1000;
+const OFF_SEARCH_TTL_MS = 2 * 60 * 1000;
+const OFF_API_BASE = 'https://world.openfoodfacts.org';
+const OFF_DEBUG = import.meta.env.VITE_OFF_DEBUG === 'true';
+
+const logOffDebug = (...args) => {
+    if (OFF_DEBUG) console.info('[OFF]', ...args);
+};
 
 const getCachedValue = (key) => {
     const entry = cacheStore.get(key);
@@ -37,27 +46,51 @@ const withInflight = async (key, fetcher) => {
     return promise;
 };
 
+const getOffCacheTimestamp = (doc) => doc?.sourceUpdatedAt || doc?.$updatedAt || doc?.$createdAt || '';
+
+const isOffCacheFresh = (doc) => {
+    if (!doc) return false;
+    const stamp = getOffCacheTimestamp(doc);
+    if (!stamp) return true;
+    const ms = Date.parse(stamp);
+    if (!Number.isFinite(ms)) return true;
+    return Date.now() - ms <= OFF_CACHE_TTL_MS;
+};
+
 /**
  * Fetch product details from OpenFoodFacts API (Global Fallback)
  * @param {string} barcode
  * @returns {Promise<Object|null>}
  */
 export const fetchGlobalProduct = async (barcode) => {
-    try {
-        const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${encodeURIComponent(barcode)}.json`);
-        const data = await response.json();
-
-        if (data.status === 1) {
-            return {
-                ...data.product,
-                is_global: true,
-            };
-        }
-        return null;
-    } catch (error) {
-        console.error('Error fetching global product:', error);
-        return null;
+    if (!barcode) return null;
+    const cacheKey = `off:barcode:${barcode}`;
+    const cached = getCachedValue(cacheKey);
+    if (cached) {
+        logOffDebug('memory-hit', { kind: 'barcode', barcode });
+        return cached;
     }
+
+    return withInflight(cacheKey, async () => {
+        try {
+            logOffDebug('api-fetch', { kind: 'barcode', barcode });
+            const response = await fetch(`${OFF_API_BASE}/api/v0/product/${encodeURIComponent(barcode)}.json`);
+            const data = await response.json();
+
+            if (data.status === 1) {
+                const product = {
+                    ...data.product,
+                    is_global: true,
+                };
+                setCachedValue(cacheKey, product, OFF_MEMORY_TTL_MS);
+                return product;
+            }
+            return null;
+        } catch (error) {
+            console.error('Error fetching global product:', error);
+            return null;
+        }
+    });
 };
 
 /** Try common barcode variants for OFF (leading zeros, EAN-12→13). */
@@ -79,11 +112,14 @@ const collectBarcodeVariants = (raw) => {
 };
 
 export const fetchGlobalProductWithRetries = async (barcode) => {
-    for (const variant of collectBarcodeVariants(barcode)) {
-        const product = await fetchGlobalProduct(variant);
-        if (product) return product;
-    }
-    return null;
+    if (!barcode) return null;
+    return withInflight(`off:barcode:variants:${barcode}`, async () => {
+        for (const variant of collectBarcodeVariants(barcode)) {
+            const product = await fetchGlobalProduct(variant);
+            if (product) return product;
+        }
+        return null;
+    });
 };
 
 const normalizeIngredientsPayload = (product, fallbackBarcode) => {
@@ -161,11 +197,242 @@ const normalizeIngredientsPayload = (product, fallbackBarcode) => {
     };
 };
 
+const normalizeOffCacheRecord = (product, fallbackBarcode) => {
+    if (!product) return null;
+    const barcode = product.code || product.barcode || fallbackBarcode || '';
+    const name = product.product_name || product.name || product.productName || 'Unknown Product';
+    const brand = product.brands || product.brand || '';
+    const imageUrl = product.image_url || product.image_front_url || product.imageUrl || product.image || '';
+    const categories = product.categories || (Array.isArray(product.categories_tags) ? product.categories_tags.join(',') : '');
+    const ingredientsText = product.ingredients_text || product.ingredients_text_en || product.ingredients_text_tr || '';
+    const allergensTags = Array.isArray(product.allergens_tags) ? product.allergens_tags : [];
+    const allergens = allergensTags
+        .map((tag) => tag.replace(/^[a-z]{2}:/, '').replace(/_/g, ' ').trim())
+        .filter(Boolean);
+    const nutriments = product.nutriments ? JSON.stringify(product.nutriments) : '';
+    const sourceUrl = barcode ? `https://world.openfoodfacts.org/product/${barcode}` : 'https://world.openfoodfacts.org';
+    const sourceLang = product.lang || product.lc || '';
+    const updatedAt = product.last_modified_t
+        ? new Date(product.last_modified_t * 1000).toISOString()
+        : new Date().toISOString();
+
+    return {
+        barcode,
+        name,
+        brand,
+        imageUrl,
+        categories,
+        ingredientsText,
+        allergens,
+        nutriments,
+        sourceUrl,
+        sourceLang,
+        source: 'OpenFoodFacts',
+        sourceUpdatedAt: updatedAt,
+    };
+};
+
+export const normalizeOffCacheDoc = (doc) => {
+    if (!doc) return null;
+    return {
+        ...doc,
+        barcode: doc.barcode || doc.$id || '',
+        name: doc.name || doc.productName || 'Unknown Product',
+        brand: doc.brand || '',
+        imageUrl: doc.imageUrl || doc.image || '',
+        categories: doc.categories || doc.category || '',
+        is_global: true,
+        is_off_cache: true,
+        prices: [],
+    };
+};
+
+export const ingredientPayloadFromOffCache = (doc) => {
+    if (!doc) return null;
+    const ingredientsText = doc.ingredientsText || '';
+    const allergens = Array.isArray(doc.allergens)
+        ? doc.allergens
+        : (doc.allergens ? [doc.allergens] : []);
+    let nutriments = {};
+    if (doc.nutriments) {
+        try {
+            nutriments = typeof doc.nutriments === 'string' ? JSON.parse(doc.nutriments) : doc.nutriments;
+        } catch {
+            nutriments = {};
+        }
+    }
+
+    const payload = normalizeIngredientsPayload(
+        {
+            code: doc.barcode,
+            product_name: doc.name,
+            brands: doc.brand,
+            ingredients_text: ingredientsText,
+            allergens_tags: allergens,
+            nutriments,
+        },
+        doc.barcode
+    );
+
+    return {
+        ...payload,
+        source: 'OpenFoodFacts',
+        sourceUrl: doc.sourceUrl || payload.sourceUrl,
+    };
+};
+
+export const fetchOffCacheByBarcode = async (barcode) => {
+    if (!barcode) return null;
+    try {
+        const res = await db.offCache.list([
+            Query.equal('barcode', String(barcode)),
+            Query.limit(1)
+        ]);
+        const doc = res.documents[0] || null;
+        if (doc && isOffCacheFresh(doc)) {
+            logOffDebug('appwrite-hit', { kind: 'barcode', barcode });
+            return doc;
+        }
+        if (doc) {
+            logOffDebug('appwrite-stale', { kind: 'barcode', barcode });
+        }
+        return null;
+    } catch (error) {
+        console.warn('OFF cache lookup failed:', error?.message || error);
+        return null;
+    }
+};
+
+export const searchOffCacheByName = async (name, limit = 5) => {
+    const term = String(name || '').trim();
+    if (!term) return [];
+    try {
+        const res = await db.offCache.list([
+            Query.search('name', term),
+            Query.limit(limit)
+        ]);
+        const docs = res.documents || [];
+        const fresh = docs.filter((doc) => isOffCacheFresh(doc));
+        if (fresh.length > 0) {
+            logOffDebug('appwrite-hit', { kind: 'name', query: term, hits: fresh.length });
+        }
+        return fresh;
+    } catch (error) {
+        console.warn('OFF cache name search failed:', error?.message || error);
+        return [];
+    }
+};
+
+export const fetchOffCacheSnapshot = async (limit = 30) => {
+    try {
+        const res = await db.offCache.list([
+            Query.limit(limit),
+            Query.orderDesc('$updatedAt')
+        ]);
+        const docs = res.documents || [];
+        return docs.filter((doc) => isOffCacheFresh(doc));
+    } catch (error) {
+        console.warn('OFF cache snapshot failed:', error?.message || error);
+        return [];
+    }
+};
+
+const saveOffCacheRecord = async (record) => {
+    if (!record || !record.barcode) return null;
+    try {
+        const existing = await db.offCache.list([
+            Query.equal('barcode', record.barcode),
+            Query.limit(1)
+        ]);
+        const current = existing.documents?.[0];
+        if (current?.$id) {
+            await db.offCache.update(current.$id, record);
+            return current.$id;
+        }
+        const created = await db.offCache.create(record);
+        return created?.$id || null;
+    } catch (error) {
+        console.warn('OFF cache save failed:', error?.message || error);
+        return null;
+    }
+};
+
+export const saveOffCacheFromProduct = async (product, fallbackBarcode) => {
+    const record = normalizeOffCacheRecord(product, fallbackBarcode);
+    return saveOffCacheRecord(record);
+};
+
+export const saveOffCacheFromIngredientPayload = async (payload) => {
+    if (!payload) return null;
+    const record = normalizeOffCacheRecord(
+        {
+            code: payload.barcode,
+            product_name: payload.name,
+            brands: payload.brand,
+            ingredients_text: payload.ingredientsText,
+            allergens_tags: payload.allergens || [],
+            nutriments: payload.nutriments || {},
+        },
+        payload.barcode
+    );
+    return saveOffCacheRecord(record);
+};
+
+export const resolveOffCacheProductForIngredients = async (userMessage) => {
+    const empty = { product: null, barcode: '', name: '' };
+    const trimmed = String(userMessage || '').trim();
+    if (!trimmed) return empty;
+
+    const barcodeMatch = trimmed.match(/\b(\d{8,14})\b/);
+    if (barcodeMatch) {
+        const doc = await fetchOffCacheByBarcode(barcodeMatch[1]);
+        if (doc) {
+            return {
+                product: doc,
+                barcode: doc.barcode || barcodeMatch[1],
+                name: doc.name || '',
+            };
+        }
+    }
+
+    const candidates = await searchOffCacheByName(trimmed, 5);
+    const best = candidates.find((d) => (d.name || '').toLowerCase().includes(trimmed.toLowerCase())) || candidates[0];
+    if (best) {
+        return {
+            product: best,
+            barcode: best.barcode || '',
+            name: best.name || '',
+        };
+    }
+
+    return empty;
+};
+
 export const fetchIngredientsByBarcode = async (barcode) => {
     if (!barcode) return null;
-    const product = await fetchGlobalProductWithRetries(barcode);
-    if (!product) return null;
-    return normalizeIngredientsPayload(product, barcode);
+    const cacheKey = `off:ingredients:${barcode}`;
+    const cachedPayload = getCachedValue(cacheKey);
+    if (cachedPayload) {
+        logOffDebug('memory-hit', { kind: 'ingredients', barcode });
+        return cachedPayload;
+    }
+
+    return withInflight(cacheKey, async () => {
+        const cached = await fetchOffCacheByBarcode(barcode);
+        if (cached) {
+            const payload = ingredientPayloadFromOffCache(cached);
+            logOffDebug('appwrite-hit', { kind: 'ingredients', barcode });
+            setCachedValue(cacheKey, payload, OFF_MEMORY_TTL_MS);
+            return payload;
+        }
+        const product = await fetchGlobalProductWithRetries(barcode);
+        if (!product) return null;
+        const payload = normalizeIngredientsPayload(product, barcode);
+        await saveOffCacheFromProduct(product, barcode);
+        logOffDebug('api-fetch', { kind: 'ingredients', barcode });
+        setCachedValue(cacheKey, payload, OFF_MEMORY_TTL_MS);
+        return payload;
+    });
 };
 
 /**
@@ -299,22 +566,45 @@ export const resolveCatalogProductForIngredients = async (userMessage) => {
 };
 
 export const searchIngredientsByName = async (name) => {
-    if (!name) return null;
-    try {
-        const response = await fetch(
-            `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(name)}&search_simple=1&action=process&json=1&page_size=5`
-        );
-        const data = await response.json();
-        const products = Array.isArray(data?.products) ? data.products : [];
-        if (products.length === 0) return null;
-
-        const normalizedQuery = name.toLowerCase();
-        const bestMatch = products.find((p) => (p.product_name || '').toLowerCase().includes(normalizedQuery)) || products[0];
-        return normalizeIngredientsPayload(bestMatch);
-    } catch (error) {
-        console.error('Error searching OpenFoodFacts by name:', error);
-        return null;
+    const term = String(name || '').trim();
+    if (!term) return null;
+    const cacheKey = `off:search:${term.toLowerCase()}`;
+    const cached = getCachedValue(cacheKey);
+    if (cached) {
+        logOffDebug('memory-hit', { kind: 'search', query: term });
+        return cached;
     }
+
+    return withInflight(cacheKey, async () => {
+        const cachedHits = await searchOffCacheByName(term, 3);
+        if (cachedHits.length > 0) {
+            const payload = ingredientPayloadFromOffCache(cachedHits[0]);
+            if (payload) {
+                logOffDebug('appwrite-hit', { kind: 'search', query: term });
+                setCachedValue(cacheKey, payload, OFF_SEARCH_TTL_MS);
+                return payload;
+            }
+        }
+        try {
+            logOffDebug('api-fetch', { kind: 'search', query: term });
+            const response = await fetch(
+                `${OFF_API_BASE}/cgi/search.pl?search_terms=${encodeURIComponent(term)}&search_simple=1&action=process&json=1&page_size=5`
+            );
+            const data = await response.json();
+            const products = Array.isArray(data?.products) ? data.products : [];
+            if (products.length === 0) return null;
+
+            const normalizedQuery = term.toLowerCase();
+            const bestMatch = products.find((p) => (p.product_name || '').toLowerCase().includes(normalizedQuery)) || products[0];
+            const payload = normalizeIngredientsPayload(bestMatch);
+            await saveOffCacheFromProduct(bestMatch, payload?.barcode);
+            setCachedValue(cacheKey, payload, OFF_SEARCH_TTL_MS);
+            return payload;
+        } catch (error) {
+            console.error('Error searching OpenFoodFacts by name:', error);
+            return null;
+        }
+    });
 };
 
 // Helper to safely get ID from a relationship field (which could be an object, array, or string ID)

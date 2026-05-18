@@ -3,7 +3,18 @@ import { FiX, FiSend, FiMessageSquare, FiLoader, FiExternalLink, FiPackage, FiSh
 import OpenAI from "openai";
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { fetchProducts, fetchAllPrices, fetchIngredientsByBarcode, searchIngredientsByName, resolveCatalogProductForIngredients, ingredientPayloadFromAppwriteProduct } from '../utils/productUtils';
+import {
+    fetchProducts,
+    fetchAllPrices,
+    fetchIngredientsByBarcode,
+    searchIngredientsByName,
+    resolveCatalogProductForIngredients,
+    ingredientPayloadFromAppwriteProduct,
+    fetchOffCacheSnapshot,
+    normalizeOffCacheDoc,
+    resolveOffCacheProductForIngredients,
+    ingredientPayloadFromOffCache,
+} from '../utils/productUtils';
 import useCurrencyStore from '../stores/currencyStore';
 import useAuthStore from '../stores/authStore';
 import useChatStore, { CHAT_ERROR_MISSING_CONVERSATION_ID } from '../stores/chatStore';
@@ -144,7 +155,7 @@ const buildRankedProductContextLines = (products, userHint) => {
     scored.sort((a, b) => b.score - a.score);
     const picked = scored.filter((x) => x.score > 0).slice(0, 25).map((x) => x.p);
     const list = picked.length > 0 ? picked : products.slice(0, 15);
-    return list
+        return list
         .map((p) => {
             const category = Array.isArray(p.categoryId)
                 ? p.categoryId[0]?.categoryName
@@ -158,7 +169,8 @@ const buildRankedProductContextLines = (products, userHint) => {
                 })
                 .join(', ');
             const barcodeTag = p.barcode || p.code || p.$id || '';
-            return `- [BARCODE:${barcodeTag}] ${p.name || p.productName}: [${category}] ${priceDetails || 'No current price'}`;
+            const sourceTag = p.is_off_cache || p.is_global ? 'OpenFoodFacts' : 'PriceMate';
+            return `- [SOURCE:${sourceTag}] [BARCODE:${barcodeTag}] ${p.name || p.productName}: [${category}] ${priceDetails || 'No current price'}`;
         })
         .join('\n');
 };
@@ -254,9 +266,10 @@ const AIChatBox = ({ isOpen, onClose }) => {
     useEffect(() => {
         const loadContext = async () => {
             try {
-                const [products, prices] = await Promise.all([
+                const [products, prices, offCache] = await Promise.all([
                     fetchProducts(50), 
-                    fetchAllPrices()
+                    fetchAllPrices(),
+                    fetchOffCacheSnapshot(20)
                 ]);
                 
                 // Keep the structural product list for the component to use
@@ -268,7 +281,12 @@ const AIChatBox = ({ isOpen, onClose }) => {
                     return { ...p, prices: productPrices };
                 });
 
-                setFullProductList(productsWithData);
+                const offCacheProducts = (offCache || [])
+                    .map((doc) => normalizeOffCacheDoc(doc))
+                    .filter(Boolean)
+                    .map((p) => ({ ...p, prices: [] }));
+
+                setFullProductList([...productsWithData, ...offCacheProducts]);
             } catch (error) {
                 console.error("Error loading chat context:", error);
             }
@@ -286,7 +304,7 @@ const AIChatBox = ({ isOpen, onClose }) => {
             .toLowerCase()
             .replace(/[^a-z0-9ğüşöçı]/gi, '');
 
-    const findProductMatch = (message) => {
+    const findProductMatch = (message, extraCandidates = []) => {
         const lowered = message.toLowerCase();
         let best = null;
         let bestLength = 0;
@@ -299,7 +317,10 @@ const AIChatBox = ({ isOpen, onClose }) => {
             }
         };
 
-        fullProductList.forEach((product) => {
+        const primaryList = fullProductList;
+        const secondaryList = Array.isArray(extraCandidates) ? extraCandidates : [];
+
+        primaryList.forEach((product) => {
             const rawName = product.name || product.productName || '';
             const name = rawName.toLowerCase();
             if (!name) return;
@@ -315,13 +336,31 @@ const AIChatBox = ({ isOpen, onClose }) => {
             }
         });
 
+        if (!best && secondaryList.length > 0) {
+            secondaryList.forEach((product) => {
+                const rawName = product.name || product.productName || '';
+                const name = rawName.toLowerCase();
+                if (!name) return;
+
+                if (lowered.includes(name)) {
+                    consider(product, name.length);
+                    return;
+                }
+
+                const nName = normalizeProductKey(rawName);
+                if (nName.length >= 4 && nMsg.includes(nName)) {
+                    consider(product, nName.length);
+                }
+            });
+        }
+
         if (!best && /\bcoke\b/i.test(lowered)) {
             const cokeMatch =
-                fullProductList.find((p) => {
+                primaryList.find((p) => {
                     const n = normalizeProductKey(p.name || p.productName || '');
                     return n.includes('coca') && n.includes('cola');
                 }) ||
-                fullProductList.find((p) =>
+                primaryList.find((p) =>
                     normalizeProductKey(p.name || p.productName || '').includes('coca')
                 );
             if (cokeMatch) best = cokeMatch;
@@ -668,15 +707,17 @@ const AIChatBox = ({ isOpen, onClose }) => {
         const barcodeFromMessage = extractBarcode(userMessage);
         const productMatch = findProductMatch(userMessage);
         const catalog = await resolveCatalogProductForIngredients(userMessage);
-        const mergedProductProfile = productMatch || catalog.product;
+        const offCache = await resolveOffCacheProductForIngredients(userMessage);
+        const mergedProductProfile = productMatch || catalog.product || offCache.product;
         const effectiveBarcode =
             barcodeFromMessage ||
             catalog.catalogBarcode ||
+            offCache.barcode ||
             productMatch?.barcode ||
             productMatch?.code ||
             '';
         const catalogDisplayName =
-            catalog.catalogName || productMatch?.name || productMatch?.productName || '';
+            catalog.catalogName || offCache.name || productMatch?.name || productMatch?.productName || '';
 
         // Use store to add user message
         if (user?.$id) {
@@ -709,7 +750,10 @@ const AIChatBox = ({ isOpen, onClose }) => {
                 return;
             }
 
-            let ingredientPayload = ingredientPayloadFromAppwriteProduct(catalog.product) || null;
+            let ingredientPayload =
+                ingredientPayloadFromAppwriteProduct(catalog.product) ||
+                ingredientPayloadFromOffCache(offCache.product) ||
+                null;
 
             if (!ingredientPayload && effectiveBarcode) {
                 ingredientPayload = await fetchIngredientsByBarcode(effectiveBarcode);

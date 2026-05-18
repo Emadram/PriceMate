@@ -174,7 +174,7 @@ const Login = () => {
 
                 <p className="mt-10 text-center text-[14px] text-gray-500 font-medium">
                     Don't have an account?{' '}
-                    <Link to="/register" className="font-black text-brand-600 dark:text-brand-500 hover:text-black dark:hover:text-white transition-colors uppercase tracking-widest text-[11px] ml-1">
+                    <Link to="/register" className="tap-target inline-flex items-center justify-center px-2 py-1 rounded-lg font-black text-brand-600 dark:text-brand-500 hover:text-black dark:hover:text-white transition-colors uppercase tracking-widest text-[11px] ml-1">
                         Create one
                     </Link>
                 </p>

@@ -31,7 +31,7 @@ const ProductDetails = () => {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-50 pb-safe">
+            <div className="min-h-screen bg-gray-50 pb-safe pt-safe">
                 <div className="bg-white px-6 pt-10 pb-8 rounded-b-[3rem] shadow-sm mb-6">
                     <div className="max-w-4xl mx-auto">
                         <div className="w-10 h-10 rounded-full bg-gray-100 animate-pulse" />
@@ -48,7 +48,7 @@ const ProductDetails = () => {
 
     if (error || !product) {
         return (
-            <div className="min-h-screen bg-gray-50 pb-safe">
+            <div className="min-h-screen bg-gray-50 pb-safe pt-safe">
                 <div className="bg-white px-6 pt-10 pb-8 rounded-b-[3rem] shadow-sm mb-6">
                     <div className="max-w-4xl mx-auto flex items-center">
                         <BackButton label="Go Back" className="-ml-2" />
@@ -81,7 +81,7 @@ const ProductDetails = () => {
     const imageSrc = imageFailed ? '' : (product.imageUrl || product.image || fallbackImageUrl);
 
     return (
-        <div className="min-h-screen bg-gray-50 pb-safe">
+        <div className="min-h-screen bg-gray-50 pb-safe pt-safe">
             {/* Header Info */}
             <div className="bg-white px-6 pt-10 pb-8 rounded-b-[3rem] shadow-sm mb-6">
                 <div className="max-w-4xl mx-auto flex items-center">

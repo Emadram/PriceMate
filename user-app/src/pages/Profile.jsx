@@ -60,7 +60,7 @@ const Profile = () => {
 
     return (
         <div className="min-h-screen bg-[#F5F5F7] dark:bg-black text-gray-900 dark:text-gray-100 pb-safe">
-            <header className="bg-white/80 dark:bg-black/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 dark:border-white/5 p-4">
+            <header className="pt-safe bg-white/80 dark:bg-black/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 dark:border-white/5 p-4">
                 <div className="max-w-4xl mx-auto flex items-center justify-between">
                     <BackButton to="/" />
                     <h1 className="text-xl font-black text-gray-900 dark:text-white flex items-center gap-2">
