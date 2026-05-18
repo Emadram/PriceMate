@@ -74,7 +74,7 @@ const Login = () => {
 
             <div className="sm:mx-auto sm:w-full sm:max-w-md relative">
                 <div className="flex justify-center mb-8">
-                    <div className="w-16 h-16 bg-brand-600 rounded-[2rem] flex items-center justify-center shadow-xl shadow-brand-500/20 active:scale-95 transition-transform cursor-pointer">
+                    <div className="w-16 h-16 bg-brand-600 dark:bg-brand-700 rounded-[2rem] flex items-center justify-center shadow-xl shadow-brand-500/20 dark:shadow-brand-900/40 active:scale-95 transition-transform cursor-pointer">
                         <span className="text-white font-black text-3xl tracking-tighter">P</span>
                     </div>
                 </div>
@@ -135,7 +135,7 @@ const Login = () => {
                                 <label htmlFor="password" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">
                                     Password
                                 </label>
-                                <Link to="/forgot-password" className="tap-target inline-flex items-center justify-center px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest text-brand-600 hover:text-brand-700">
+                                <Link to="/forgot-password" className="tap-target inline-flex items-center justify-center px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300">
                                     Forgot?
                                 </Link>
                             </div>
@@ -158,7 +158,7 @@ const Login = () => {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full flex items-center justify-center gap-2 py-4 px-4 bg-brand-600 text-white rounded-[1.5rem] text-[15px] font-black uppercase tracking-[0.2em] hover:bg-black dark:hover:bg-white dark:hover:text-black active:scale-[0.98] transition-all focus:outline-none disabled:opacity-50 disabled:active:scale-100 shadow-xl shadow-brand-500/20"
+                            className="w-full flex items-center justify-center gap-2 py-4 px-4 bg-brand-600 dark:bg-brand-700 text-white rounded-[1.5rem] text-[15px] font-black uppercase tracking-[0.2em] hover:bg-black dark:hover:bg-brand-600 active:scale-[0.98] transition-all focus:outline-none disabled:opacity-50 disabled:active:scale-100 shadow-xl shadow-brand-500/20 dark:shadow-brand-900/40"
                         >
                             {loading ? (
                                 <Loader2 className="h-5 w-5 animate-spin" />
@@ -174,7 +174,7 @@ const Login = () => {
 
                 <p className="mt-10 text-center text-[14px] text-gray-500 font-medium">
                     Don't have an account?{' '}
-                    <Link to="/register" className="tap-target inline-flex items-center justify-center px-2 py-1 rounded-lg font-black text-brand-600 dark:text-brand-500 hover:text-black dark:hover:text-white transition-colors uppercase tracking-widest text-[11px] ml-1">
+                    <Link to="/register" className="tap-target inline-flex items-center justify-center px-2 py-1 rounded-lg font-black text-brand-600 dark:text-brand-400 hover:text-black dark:hover:text-brand-300 transition-colors uppercase tracking-widest text-[11px] ml-1">
                         Create one
                     </Link>
                 </p>

@@ -15,6 +15,7 @@ const OFF_MEMORY_TTL_MS = 5 * 60 * 1000;
 const OFF_SEARCH_TTL_MS = 2 * 60 * 1000;
 const OFF_API_BASE = 'https://world.openfoodfacts.org';
 const OFF_DEBUG = import.meta.env.VITE_OFF_DEBUG === 'true';
+const OFF_RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
 
 const logOffDebug = (...args) => {
     if (OFF_DEBUG) console.info('[OFF]', ...args);
@@ -46,6 +47,52 @@ const withInflight = async (key, fetcher) => {
     return promise;
 };
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const parseRetryAfterMs = (value) => {
+    if (!value) return null;
+    const seconds = Number(value);
+    if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
+    const dateMs = Date.parse(value);
+    if (Number.isFinite(dateMs)) return Math.max(0, dateMs - Date.now());
+    return null;
+};
+
+const fetchWithBackoff = async (url, options = {}, config = {}) => {
+    const {
+        retries = 2,
+        baseDelayMs = 400,
+        maxDelayMs = 2000,
+    } = config;
+
+    for (let attempt = 0; attempt <= retries; attempt += 1) {
+        try {
+            const response = await fetch(url, options);
+            if (response.ok || !OFF_RETRY_STATUSES.has(response.status) || attempt === retries) {
+                return response;
+            }
+
+            const retryAfterMs = parseRetryAfterMs(response.headers.get('Retry-After'));
+            const backoffMs = retryAfterMs ?? Math.min(
+                baseDelayMs * (2 ** attempt) * (0.75 + Math.random() * 0.5),
+                maxDelayMs
+            );
+            logOffDebug('api-backoff', { status: response.status, delayMs: Math.round(backoffMs), attempt: attempt + 1 });
+            await sleep(backoffMs);
+        } catch (error) {
+            if (attempt === retries) return null;
+            const backoffMs = Math.min(
+                baseDelayMs * (2 ** attempt) * (0.75 + Math.random() * 0.5),
+                maxDelayMs
+            );
+            logOffDebug('api-backoff', { status: 'network', delayMs: Math.round(backoffMs), attempt: attempt + 1 });
+            await sleep(backoffMs);
+        }
+    }
+
+    return null;
+};
+
 const getOffCacheTimestamp = (doc) => doc?.sourceUpdatedAt || doc?.$updatedAt || doc?.$createdAt || '';
 
 const isOffCacheFresh = (doc) => {
@@ -74,7 +121,10 @@ export const fetchGlobalProduct = async (barcode) => {
     return withInflight(cacheKey, async () => {
         try {
             logOffDebug('api-fetch', { kind: 'barcode', barcode });
-            const response = await fetch(`${OFF_API_BASE}/api/v0/product/${encodeURIComponent(barcode)}.json`);
+            const response = await fetchWithBackoff(
+                `${OFF_API_BASE}/api/v0/product/${encodeURIComponent(barcode)}.json`
+            );
+            if (!response?.ok) return null;
             const data = await response.json();
 
             if (data.status === 1) {
@@ -587,9 +637,10 @@ export const searchIngredientsByName = async (name) => {
         }
         try {
             logOffDebug('api-fetch', { kind: 'search', query: term });
-            const response = await fetch(
+            const response = await fetchWithBackoff(
                 `${OFF_API_BASE}/cgi/search.pl?search_terms=${encodeURIComponent(term)}&search_simple=1&action=process&json=1&page_size=5`
             );
+            if (!response?.ok) return null;
             const data = await response.json();
             const products = Array.isArray(data?.products) ? data.products : [];
             if (products.length === 0) return null;

@@ -142,7 +142,7 @@ const Home = () => {
                             <div className="flex items-center gap-2 w-full md:w-auto p-2 md:p-0">
                                 <button
                                     type="submit"
-                                    className="flex-1 md:flex-none bg-brand-600 hover:bg-brand-700 text-white px-8 py-4 rounded-2xl transition-all duration-300 shadow-lg shadow-brand-500/25 font-bold tracking-tight text-base active:scale-95"
+                                    className="flex-1 md:flex-none bg-brand-600 hover:bg-brand-700 dark:bg-brand-700 dark:hover:bg-brand-600 text-white px-8 py-4 rounded-2xl transition-all duration-300 shadow-lg shadow-brand-500/25 dark:shadow-brand-900/40 font-bold tracking-tight text-base active:scale-95"
                                 >
                                     {t('search')}
                                 </button>
@@ -160,7 +160,7 @@ const Home = () => {
                         </div>
                         <button 
                             onClick={() => navigate('/search')}
-                            className="tap-target flex items-center gap-1 text-xs font-bold text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-900/20 px-3 py-2 rounded-full transition-all"
+                            className="tap-target flex items-center gap-1 text-xs font-bold text-brand-600 hover:bg-brand-50 dark:text-brand-400 dark:hover:text-brand-300 dark:hover:bg-brand-900/20 px-3 py-2 rounded-full transition-all"
                         >
                             {t('view_all', 'View All')}
                             <FiChevronRight size={14} />
@@ -192,7 +192,7 @@ const Home = () => {
                         {!loading && categories.length > 11 && (
                             <button 
                                 onClick={() => navigate('/search')}
-                                className="flex-shrink-0 w-[6.75rem] h-[6.75rem] sm:w-auto sm:aspect-square sm:min-h-0 sm:h-auto flex flex-col items-center justify-center p-4 sm:p-6 bg-brand-600 border border-brand-500 rounded-[1.5rem] sm:rounded-[2rem] shadow-soft hover:shadow-xl hover:translate-y-[-4px] transition-all group snap-center"
+                                className="flex-shrink-0 w-[6.75rem] h-[6.75rem] sm:w-auto sm:aspect-square sm:min-h-0 sm:h-auto flex flex-col items-center justify-center p-4 sm:p-6 bg-brand-600 dark:bg-brand-800 border border-brand-500 dark:border-brand-700 rounded-[1.5rem] sm:rounded-[2rem] shadow-soft dark:shadow-brand-900/40 hover:shadow-xl hover:translate-y-[-4px] transition-all group snap-center"
                             >
                                 <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-white/10 flex items-center justify-center text-xl sm:text-2xl text-white group-hover:scale-110 transition-transform">
                                     <FiChevronRight />
@@ -207,9 +207,9 @@ const Home = () => {
                 <section className="animate-in slide-in-from-bottom-10 duration-700 delay-450">
                     <button
                         onClick={() => navigate('/scan')}
-                        className="w-full group relative bg-black dark:bg-brand-600 rounded-[1.75rem] sm:rounded-[2.5rem] p-6 sm:p-8 md:p-12 overflow-hidden shadow-2xl transition-all active:scale-[0.99]"
+                        className="w-full group relative bg-black dark:bg-brand-800 dark:hover:bg-brand-700 rounded-[1.75rem] sm:rounded-[2.5rem] p-6 sm:p-8 md:p-12 overflow-hidden shadow-2xl dark:shadow-brand-900/40 transition-all active:scale-[0.99]"
                     >
-                        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-brand-400 opacity-20 blur-3xl rounded-full transition-transform group-hover:translate-x-12"></div>
+                        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-brand-400/30 dark:bg-brand-500/10 blur-3xl rounded-full transition-transform group-hover:translate-x-12"></div>
                         <div className="relative flex flex-col items-center gap-4 sm:gap-6 md:flex-row md:items-center md:gap-8 text-left">
                             <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 bg-white/10 backdrop-blur-xl border border-white/20 rounded-[1.5rem] sm:rounded-[2rem] flex items-center justify-center shadow-2xl group-hover:rotate-6 transition-transform">
                                 <FiCamera className="w-8 h-8 sm:w-10 sm:h-10 text-white" strokeWidth={2.5} />
@@ -218,7 +218,7 @@ const Home = () => {
                                 <h3 className="text-xl sm:text-2xl md:text-4xl font-black text-white leading-tight tracking-tight">
                                     {t('scan_barcode')}
                                 </h3>
-                                <p className="text-brand-100/60 text-sm md:text-lg font-medium mt-2">
+                                <p className="text-brand-100/60 dark:text-brand-100/50 text-sm md:text-lg font-medium mt-2">
                                     {t('compare_live_prices', 'Instant price comparison at your fingertips')}
                                 </p>
                             </div>
