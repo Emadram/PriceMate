@@ -109,8 +109,7 @@ const Dashboard = () => {
                     (offset, limit) => db.products.list([
                         Query.limit(limit),
                         Query.offset(offset),
-                        Query.orderDesc('$createdAt'),
-                        Query.select(['$id', '$createdAt', 'supermarkets', 'supermarkets.$id'])
+                        Query.orderDesc('$createdAt')
                     ]),
                     'products for charts'
                 ),
@@ -368,7 +367,7 @@ const Dashboard = () => {
                                     </span>
                                 </div>
                             </div>
-                            <div className="flex-1 w-full -ml-4">
+                            <div className="flex-1 w-full min-h-[240px] min-w-0 -ml-4">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <AreaChart data={priceTrendsData}>
                                         <defs>
@@ -396,7 +395,7 @@ const Dashboard = () => {
                                 <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tight">Market Distribution</h3>
                                 <p className="text-[10px] text-gray-400 uppercase tracking-[0.2em] font-black">Products per Market</p>
                             </div>
-                            <div className="flex-1 w-full">
+                            <div className="flex-1 w-full min-h-[240px] min-w-0">
                                 {marketChartData.length === 0 ? (
                                     <div className="h-full flex flex-col items-center justify-center text-center px-6">
                                         <div className="w-16 h-16 rounded-2xl bg-gray-50 dark:bg-gray-900 flex items-center justify-center text-gray-300 dark:text-gray-600 mb-4">

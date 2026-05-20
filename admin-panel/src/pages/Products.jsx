@@ -5,7 +5,7 @@ import useProductsStore from '../stores/productsStore';
 import useCategoriesStore from '../stores/categoriesStore';
 import useSupermarketsStore from '../stores/supermarketsStore';
 import Sidebar from '../components/Sidebar';
-import { client, DATABASE_ID, COLLECTIONS } from '../lib/appwrite';
+import { client, DATABASE_ID, COLLECTIONS, functions } from '../lib/appwrite';
 
 const Products = () => {
     const { 
@@ -47,8 +47,73 @@ const Products = () => {
     const [sortConfig, setSortConfig] = useState({ key: null, direction: 'ascending' });
     const [lastUpdated, setLastUpdated] = useState(null);
     const [isFresh, setIsFresh] = useState(false);
+    const OFF_RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
+    const OFF_PROXY_FUNCTION_ID = import.meta.env.VITE_APPWRITE_FUNCTION_OFF_PROXY || '';
 
     const resetOffLookup = () => setOffLookup({ loading: false, error: '', results: [] });
+
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    const parseRetryAfterMs = (value) => {
+        if (!value) return null;
+        const seconds = Number(value);
+        if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
+        const dateMs = Date.parse(value);
+        if (Number.isFinite(dateMs)) return Math.max(0, dateMs - Date.now());
+        return null;
+    };
+
+    const fetchWithBackoff = async (url, options = {}, config = {}) => {
+        const {
+            retries = 2,
+            baseDelayMs = 400,
+            maxDelayMs = 2000,
+        } = config;
+        const signal = options?.signal;
+
+        for (let attempt = 0; attempt <= retries; attempt += 1) {
+            if (signal?.aborted) return null;
+            try {
+                const response = await fetch(url, options);
+                if (response.ok || !OFF_RETRY_STATUSES.has(response.status) || attempt === retries) {
+                    return response;
+                }
+
+                const retryAfterMs = parseRetryAfterMs(response.headers.get('Retry-After'));
+                const backoffMs = retryAfterMs ?? Math.min(
+                    baseDelayMs * (2 ** attempt) * (0.75 + Math.random() * 0.5),
+                    maxDelayMs
+                );
+                await sleep(backoffMs);
+            } catch (error) {
+                if (signal?.aborted) return null;
+                if (attempt === retries) return null;
+                const backoffMs = Math.min(
+                    baseDelayMs * (2 ** attempt) * (0.75 + Math.random() * 0.5),
+                    maxDelayMs
+                );
+                await sleep(backoffMs);
+            }
+        }
+
+        return null;
+    };
+
+    const callOffProxy = async (payload) => {
+        if (!OFF_PROXY_FUNCTION_ID) return null;
+        try {
+            const execution = await functions.createExecution(
+                OFF_PROXY_FUNCTION_ID,
+                JSON.stringify(payload),
+                false
+            );
+            if (!execution?.response) return null;
+            return JSON.parse(execution.response);
+        } catch (error) {
+            console.error('OFF proxy error:', error);
+            return { ok: false, status: 0, error: 'Proxy error' };
+        }
+    };
 
     const normalizeOffResult = (product) => {
         if (!product) return null;
@@ -94,16 +159,37 @@ const Products = () => {
         setOffLookup({ loading: true, error: '', results: [] });
 
         try {
-            const response = await fetch(
-                `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=5`,
-                { signal: controller.signal }
-            );
+            let data = null;
 
-            if (!response.ok) {
-                throw new Error('Open Food Facts lookup failed.');
+            if (OFF_PROXY_FUNCTION_ID) {
+                const proxyResult = await callOffProxy({ kind: 'search', query, pageSize: 5 });
+                if (!proxyResult) {
+                    setOffLookup({ loading: false, error: 'Open Food Facts proxy failed.', results: [] });
+                    return;
+                }
+                if (!proxyResult.ok) {
+                    const statusNote = proxyResult.status ? ` (${proxyResult.status})` : '';
+                    setOffLookup({ loading: false, error: `Open Food Facts proxy error${statusNote}.`, results: [] });
+                    return;
+                }
+                data = proxyResult.data;
+            } else {
+                const response = await fetchWithBackoff(
+                    `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=5`,
+                    { signal: controller.signal }
+                );
+
+                if (!response) {
+                    setOffLookup({ loading: false, error: 'Open Food Facts is temporarily unavailable.', results: [] });
+                    return;
+                }
+
+                if (!response.ok) {
+                    throw new Error(`Open Food Facts lookup failed (${response.status}).`);
+                }
+
+                data = await response.json();
             }
-
-            const data = await response.json();
             const products = Array.isArray(data?.products) ? data.products : [];
             const results = products
                 .map(normalizeOffResult)

@@ -1,4 +1,4 @@
-import { db, Query, COLLECTIONS } from '../lib/appwrite';
+import { db, Query, COLLECTIONS, functions } from '../lib/appwrite';
 
 const cacheStore = new Map();
 const inflightRequests = new Map();
@@ -15,10 +15,27 @@ const OFF_MEMORY_TTL_MS = 5 * 60 * 1000;
 const OFF_SEARCH_TTL_MS = 2 * 60 * 1000;
 const OFF_API_BASE = 'https://world.openfoodfacts.org';
 const OFF_DEBUG = import.meta.env.VITE_OFF_DEBUG === 'true';
+const OFF_PROXY_FUNCTION_ID = import.meta.env.VITE_APPWRITE_FUNCTION_OFF_PROXY || '';
 const OFF_RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
 
 const logOffDebug = (...args) => {
     if (OFF_DEBUG) console.info('[OFF]', ...args);
+};
+
+const callOffProxy = async (payload) => {
+    if (!OFF_PROXY_FUNCTION_ID) return null;
+    try {
+        const execution = await functions.createExecution(
+            OFF_PROXY_FUNCTION_ID,
+            JSON.stringify(payload),
+            false
+        );
+        if (!execution?.response) return null;
+        return JSON.parse(execution.response);
+    } catch (error) {
+        logOffDebug('proxy-error', { message: error?.message || String(error) });
+        return { ok: false, status: 0, error: 'Proxy error' };
+    }
 };
 
 const getCachedValue = (key) => {
@@ -121,6 +138,21 @@ export const fetchGlobalProduct = async (barcode) => {
     return withInflight(cacheKey, async () => {
         try {
             logOffDebug('api-fetch', { kind: 'barcode', barcode });
+            if (OFF_PROXY_FUNCTION_ID) {
+                const proxyResult = await callOffProxy({ kind: 'barcode', barcode });
+                if (!proxyResult?.ok) return null;
+                const data = proxyResult.data;
+                if (data?.status === 1) {
+                    const product = {
+                        ...data.product,
+                        is_global: true,
+                    };
+                    setCachedValue(cacheKey, product, OFF_MEMORY_TTL_MS);
+                    return product;
+                }
+                return null;
+            }
+
             const response = await fetchWithBackoff(
                 `${OFF_API_BASE}/api/v0/product/${encodeURIComponent(barcode)}.json`
             );
@@ -637,11 +669,18 @@ export const searchIngredientsByName = async (name) => {
         }
         try {
             logOffDebug('api-fetch', { kind: 'search', query: term });
-            const response = await fetchWithBackoff(
-                `${OFF_API_BASE}/cgi/search.pl?search_terms=${encodeURIComponent(term)}&search_simple=1&action=process&json=1&page_size=5`
-            );
-            if (!response?.ok) return null;
-            const data = await response.json();
+            let data = null;
+            if (OFF_PROXY_FUNCTION_ID) {
+                const proxyResult = await callOffProxy({ kind: 'search', query: term, pageSize: 5 });
+                if (!proxyResult?.ok) return null;
+                data = proxyResult.data;
+            } else {
+                const response = await fetchWithBackoff(
+                    `${OFF_API_BASE}/cgi/search.pl?search_terms=${encodeURIComponent(term)}&search_simple=1&action=process&json=1&page_size=5`
+                );
+                if (!response?.ok) return null;
+                data = await response.json();
+            }
             const products = Array.isArray(data?.products) ? data.products : [];
             if (products.length === 0) return null;
 
