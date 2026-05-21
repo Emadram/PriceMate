@@ -11,6 +11,7 @@ import { Vector as VectorLayer } from 'ol/layer';
 import { Vector as VectorSource } from 'ol/source';
 import { Style, Icon } from 'ol/style';
 import { hasValidLatLon } from '../utils/productUtils';
+import { resolveCenter as resolveCenterUtil } from './storeMapUtils';
 
 const StoreMap = ({ lat, lon, zoom = 15, height = "300px", supermarkets = [], center: centerProp }) => {
   const mapRef = useRef();
@@ -18,26 +19,9 @@ const StoreMap = ({ lat, lon, zoom = 15, height = "300px", supermarkets = [], ce
   const resolvedSupermarkets = Array.isArray(supermarkets) ? supermarkets : [];
 
   const resolveCenter = () => {
-    if (centerProp && hasValidLatLon(centerProp[0], centerProp[1])) {
-      return fromLonLat([parseFloat(centerProp[1]), parseFloat(centerProp[0])]);
-    }
-
-    if (hasValidLatLon(lat, lon)) {
-      return fromLonLat([parseFloat(lon), parseFloat(lat)]);
-    }
-
-    const validMarkers = resolvedSupermarkets.filter((s) => hasValidLatLon(s.latitude, s.longitude));
-    if (validMarkers.length === 0) return null;
-    if (validMarkers.length === 1) {
-      return fromLonLat([
-        parseFloat(validMarkers[0].longitude),
-        parseFloat(validMarkers[0].latitude)
-      ]);
-    }
-
-    const averageLat = validMarkers.reduce((sum, marker) => sum + parseFloat(marker.latitude), 0) / validMarkers.length;
-    const averageLon = validMarkers.reduce((sum, marker) => sum + parseFloat(marker.longitude), 0) / validMarkers.length;
-    return fromLonLat([averageLon, averageLat]);
+    const center = resolveCenterUtil({ lat, lon, centerProp, supermarkets: resolvedSupermarkets });
+    if (!center) return null;
+    return fromLonLat([Number(center.longitude), Number(center.latitude)]);
   };
 
   const buildMarkerFeature = (supermarket) => {
@@ -71,6 +55,7 @@ const StoreMap = ({ lat, lon, zoom = 15, height = "300px", supermarkets = [], ce
     [lat, lon, zoom, centerProp, supermarkets]
   );
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const centerCoords = resolveCenter();
     if (!centerCoords) {

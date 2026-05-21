@@ -96,7 +96,7 @@ const fetchWithBackoff = async (url, options = {}, config = {}) => {
             );
             logOffDebug('api-backoff', { status: response.status, delayMs: Math.round(backoffMs), attempt: attempt + 1 });
             await sleep(backoffMs);
-        } catch (error) {
+        } catch {
             if (attempt === retries) return null;
             const backoffMs = Math.min(
                 baseDelayMs * (2 ** attempt) * (0.75 + Math.random() * 0.5),

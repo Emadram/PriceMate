@@ -54,7 +54,8 @@ const useUserLocation = () => {
     useEffect(() => {
         if (!hasGeo) return;
 
-        requestLocation();
+        // Call in a microtask to avoid setState in the render/effect body warning
+        const t = setTimeout(() => requestLocation(), 0);
 
         // Watch for changes so distance updates if the user moves.
         const watchId = navigator.geolocation.watchPosition(handleSuccess, handleError, {
@@ -63,7 +64,10 @@ const useUserLocation = () => {
             maximumAge: 0
         });
 
-        return () => navigator.geolocation.clearWatch(watchId);
+        return () => {
+            clearTimeout(t);
+            navigator.geolocation.clearWatch(watchId);
+        };
     }, [hasGeo, handleError, handleSuccess, requestLocation]);
 
     return { location, error, loading, retry: requestLocation };

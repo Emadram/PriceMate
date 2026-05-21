@@ -95,7 +95,8 @@ const SupermarketProfile = () => {
     }, [loadSupermarketData]);
 
     useEffect(() => {
-        setIsBranchDropdownOpen(false);
+        const t = setTimeout(() => setIsBranchDropdownOpen(false), 0);
+        return () => clearTimeout(t);
     }, [id]);
 
     if (loading) {
