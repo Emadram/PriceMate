@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import useFreshIndicator from '../hooks/useFreshIndicator';
 import { Link } from 'react-router-dom';
 import { FiPackage, FiEdit2, FiTrash2, FiPlus, FiChevronUp, FiChevronDown, FiX, FiSearch, FiFilter } from 'react-icons/fi';
 import SortIcon from '../components/SortIcon';
@@ -47,7 +48,7 @@ const Products = () => {
     const [filterCategory, setFilterCategory] = useState('');
     const [sortConfig, setSortConfig] = useState({ key: null, direction: 'ascending' });
     const [lastUpdated, setLastUpdated] = useState(null);
-    const [isFresh, setIsFresh] = useState(false);
+    const isFresh = useFreshIndicator(lastUpdated);
     const OFF_RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
     const OFF_PROXY_FUNCTION_ID = import.meta.env.VITE_APPWRITE_FUNCTION_OFF_PROXY || '';
 
@@ -86,7 +87,7 @@ const Products = () => {
                     maxDelayMs
                 );
                 await sleep(backoffMs);
-            } catch (error) {
+            } catch {
                 if (signal?.aborted) return null;
                 if (attempt === retries) return null;
                 const backoffMs = Math.min(
@@ -236,12 +237,7 @@ const Products = () => {
         return () => clearTimeout(t);
     }, [refreshData]);
 
-    useEffect(() => {
-        if (!lastUpdated) return;
-        const t0 = setTimeout(() => setIsFresh(true), 0);
-        const timer = setTimeout(() => setIsFresh(false), 1200);
-        return () => { clearTimeout(t0); clearTimeout(timer); };
-    }, [lastUpdated]);
+    // `isFresh` indicator handled by useFreshIndicator to avoid rapid flicker
 
     useEffect(() => {
         if (!showModal && offAbortRef.current) {

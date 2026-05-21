@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import useFreshIndicator from '../hooks/useFreshIndicator';
 import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiX, FiClock, FiRefreshCw } from 'react-icons/fi';
 import Sidebar from '../components/Sidebar';
 import usePriceHistoryStore from '../stores/priceHistoryStore';
@@ -16,7 +17,7 @@ const PriceHistory = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [syncing, setSyncing] = useState(false);
     const [lastUpdated, setLastUpdated] = useState(null);
-    const [isFresh, setIsFresh] = useState(false);
+    const isFresh = useFreshIndicator(lastUpdated);
 
     const [formData, setFormData] = useState({
         priceId: '',
@@ -42,12 +43,7 @@ const PriceHistory = () => {
         return () => clearTimeout(t);
     }, [refreshData]);
 
-    useEffect(() => {
-        if (!lastUpdated) return;
-        const t0 = setTimeout(() => setIsFresh(true), 0);
-        const timer = setTimeout(() => setIsFresh(false), 1200);
-        return () => { clearTimeout(t0); clearTimeout(timer); };
-    }, [lastUpdated]);
+    // `isFresh` indicator handled by useFreshIndicator to avoid rapid flicker
 
     useEffect(() => {
         const channels = [

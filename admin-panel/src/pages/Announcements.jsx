@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import useFreshIndicator from '../hooks/useFreshIndicator';
 import { FiPlus, FiEdit2, FiTrash2, FiBell, FiCheckCircle, FiXCircle, FiZap, FiAlertTriangle, FiInfo } from 'react-icons/fi';
 import useAnnouncementsStore from '../stores/announcementsStore';
 import Sidebar from '../components/Sidebar';
@@ -21,7 +22,7 @@ const Announcements = () => {
         active: true
     });
     const [lastUpdated, setLastUpdated] = useState(null);
-    const [isFresh, setIsFresh] = useState(false);
+    const isFresh = useFreshIndicator(lastUpdated);
 
     const refreshData = useCallback(async () => {
         await fetchAnnouncements();
@@ -41,12 +42,7 @@ const Announcements = () => {
         return () => unsubscribe();
     }, [refreshData]);
 
-    useEffect(() => {
-        if (!lastUpdated) return;
-        const t0 = setTimeout(() => setIsFresh(true), 0);
-        const timer = setTimeout(() => setIsFresh(false), 1200);
-        return () => { clearTimeout(t0); clearTimeout(timer); };
-    }, [lastUpdated]);
+    // `isFresh` indicator handled by useFreshIndicator to avoid rapid flicker
 
     const handleSubmit = async (e) => {
         e.preventDefault();

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import useFreshIndicator from '../hooks/useFreshIndicator';
 import { useNavigate } from 'react-router-dom';
 import { FiMessageSquare, FiUser, FiClock, FiSearch, FiChevronRight, FiTrash2 } from 'react-icons/fi';
 import { useChatHistoryStore, groupMessagesByThread } from '../stores/chatHistoryStore';
@@ -10,7 +11,7 @@ const ChatHistory = () => {
     const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState('');
     const [lastUpdated, setLastUpdated] = useState(null);
-    const [isFresh, setIsFresh] = useState(false);
+    const isFresh = useFreshIndicator(lastUpdated);
 
     const refreshData = useCallback(async () => {
         await fetchHistory();
@@ -30,12 +31,7 @@ const ChatHistory = () => {
         return () => unsubscribe();
     }, [refreshData]);
 
-    useEffect(() => {
-        if (!lastUpdated) return;
-        const t0 = setTimeout(() => setIsFresh(true), 0);
-        const timer = setTimeout(() => setIsFresh(false), 1200);
-        return () => { clearTimeout(t0); clearTimeout(timer); };
-    }, [lastUpdated]);
+    // `isFresh` indicator handled by useFreshIndicator to avoid rapid flicker
 
     const userSessions = Object.entries(groupedHistory || {}).map(([uid, messages]) => {
         const lastMsg = messages[messages.length - 1] || {};

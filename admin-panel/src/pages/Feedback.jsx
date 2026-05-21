@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import useFreshIndicator from '../hooks/useFreshIndicator';
 import { Link } from 'react-router-dom';
 import { FiMessageSquare, FiTrash2, FiEye, FiCheckCircle, FiClock, FiAlertTriangle, FiArrowLeft, FiFilter, FiSearch, FiX } from 'react-icons/fi';
 import SortIcon from '../components/SortIcon';
@@ -13,7 +14,7 @@ const Feedback = () => {
     const [filterStatus, setFilterStatus] = useState('all');
     const [sortConfig, setSortConfig] = useState({ key: '$createdAt', direction: 'descending' });
     const [lastUpdated, setLastUpdated] = useState(null);
-    const [isFresh, setIsFresh] = useState(false);
+    const isFresh = useFreshIndicator(lastUpdated);
 
     const refreshData = useCallback(async () => {
         await fetchFeedback();
@@ -33,12 +34,7 @@ const Feedback = () => {
         return () => unsubscribe();
     }, [refreshData]);
 
-    useEffect(() => {
-        if (!lastUpdated) return;
-        const t0 = setTimeout(() => setIsFresh(true), 0);
-        const timer = setTimeout(() => setIsFresh(false), 1200);
-        return () => { clearTimeout(t0); clearTimeout(timer); };
-    }, [lastUpdated]);
+    // `isFresh` indicator handled by useFreshIndicator to avoid rapid flicker
 
     const handleDelete = async (id) => {
         if (confirm('Are you sure you want to delete this record?')) {

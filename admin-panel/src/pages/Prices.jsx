@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import useFreshIndicator from '../hooks/useFreshIndicator';
 import { Link } from 'react-router-dom';
 import { FiDollarSign, FiPlus, FiTrash2, FiChevronUp, FiChevronDown, FiEdit2, FiX, FiSearch, FiFilter, FiArrowLeft, FiShoppingBag } from 'react-icons/fi';
 import SortIcon from '../components/SortIcon';
@@ -22,7 +23,7 @@ const Prices = () => {
         deletePrice 
     } = usePricesStore();
     const { products, fetchProducts } = useProductsStore();
-    const { supermarkets: _supermarkets, fetchSupermarkets } = useSupermarketsStore();
+    const { supermarkets, fetchSupermarkets } = useSupermarketsStore();
     const adminUser = useAdminAuthStore((state) => state.user);
 
     const [showModal, setShowModal] = useState(false);
@@ -41,7 +42,7 @@ const Prices = () => {
     const [filterSupermarket, setFilterSupermarket] = useState('');
     const [sortConfig, setSortConfig] = useState({ key: null, direction: 'ascending' });
     const [lastUpdated, setLastUpdated] = useState(null);
-    const [isFresh, setIsFresh] = useState(false);
+    const isFresh = useFreshIndicator(lastUpdated);
 
     const refreshData = useCallback(async () => {
         await Promise.all([
@@ -57,12 +58,7 @@ const Prices = () => {
         return () => clearTimeout(t);
     }, [refreshData]);
 
-    useEffect(() => {
-        if (!lastUpdated) return;
-        const t0 = setTimeout(() => setIsFresh(true), 0);
-        const timer = setTimeout(() => setIsFresh(false), 1200);
-        return () => { clearTimeout(t0); clearTimeout(timer); };
-    }, [lastUpdated]);
+    // `isFresh` indicator handled by useFreshIndicator to avoid rapid flicker
 
     useEffect(() => {
         const channels = [

@@ -10,6 +10,7 @@ import {
 } from 'recharts';
 import useAdminAuthStore from '../stores/adminAuthStore';
 import { useEffect, useState, useMemo } from 'react';
+import useFreshIndicator from '../hooks/useFreshIndicator';
 import { client, DATABASE_ID, COLLECTIONS, Query, db } from '../lib/appwrite';
 import Sidebar from '../components/Sidebar';
 
@@ -33,7 +34,7 @@ const Dashboard = () => {
     const [rawPrices, setRawPrices] = useState([]);
     const [rawSupermarkets, setRawSupermarkets] = useState([]);
     const [lastUpdated, setLastUpdated] = useState(null);
-    const [isFresh, setIsFresh] = useState(false);
+    const isFresh = useFreshIndicator(lastUpdated);
 
     const fetchAll = async (listFn, label) => {
         const limit = 100;
@@ -256,12 +257,7 @@ const Dashboard = () => {
         };
     }, [fetchStats]);
 
-    useEffect(() => {
-        if (!lastUpdated) return;
-        const t0 = setTimeout(() => setIsFresh(true), 0);
-        const timer = setTimeout(() => setIsFresh(false), 1200);
-        return () => { clearTimeout(t0); clearTimeout(timer); };
-    }, [lastUpdated]);
+    // `isFresh` indicator handled by useFreshIndicator to avoid rapid flicker
 
     const handleLogout = async () => {
         await logout();
@@ -371,8 +367,9 @@ const Dashboard = () => {
                                 </div>
                             </div>
                             <div className="flex-1 w-full min-h-[240px] min-w-0 -ml-4">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <AreaChart data={priceTrendsData}>
+                                <div className="w-full h-full min-h-[240px]">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <AreaChart data={priceTrendsData}>
                                         <defs>
                                             <linearGradient id="colorSearches" x1="0" y1="0" x2="0" y2="1">
                                                 <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3}/>
@@ -388,7 +385,8 @@ const Dashboard = () => {
                                         />
                                         <Area type="monotone" dataKey="updates" stroke="#3B82F6" fillOpacity={1} fill="url(#colorSearches)" strokeWidth={4} dot={{fill: '#3B82F6', strokeWidth: 2, r: 4}} activeDot={{r: 6, strokeWidth: 0}} />
                                     </AreaChart>
-                                </ResponsiveContainer>
+                                    </ResponsiveContainer>
+                                </div>
                             </div>
                         </div>
 
@@ -409,8 +407,9 @@ const Dashboard = () => {
                                     </div>
                                 ) : (
                                     <>
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <BarChart data={marketChartData} layout="vertical" margin={{left: -20}}>
+                                        <div className="w-full h-full min-h-[240px]">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <BarChart data={marketChartData} layout="vertical" margin={{left: -20}}>
                                                 <XAxis type="number" hide />
                                                 <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fontSize: 11, fill: '#475569', fontWeight: 800}} width={100} />
                                                 <Tooltip cursor={{fill: 'transparent'}} contentStyle={{backgroundColor: '#fff', color: '#000'}} />
@@ -419,8 +418,9 @@ const Dashboard = () => {
                                                         <Cell key={`cell-${index}`} fill={entry.color} />
                                                     ))}
                                                 </Bar>
-                                            </BarChart>
-                                        </ResponsiveContainer>
+                                                </BarChart>
+                                            </ResponsiveContainer>
+                                        </div>
                                         <div className="mt-6 space-y-3">
                                             {marketChartData.map((market, i) => (
                                                 <div key={i} className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-gray-500">
@@ -471,7 +471,8 @@ const Dashboard = () => {
     );
 };
 
-const MetricCard = ({ title, value, icon: Icon, trend, isUp, color, loading }) => {
+const MetricCard = ({ title, value, icon, trend, isUp, color, loading }) => {
+    const IconComponent = icon;
     const colorMap = {
         blue: 'text-blue-600 bg-blue-50 border-blue-100 dark:bg-blue-900/30 dark:border-blue-800',
         emerald: 'text-emerald-600 bg-emerald-50 border-emerald-100 dark:bg-emerald-900/30 dark:border-emerald-800',
@@ -482,10 +483,10 @@ const MetricCard = ({ title, value, icon: Icon, trend, isUp, color, loading }) =
     return (
         <div className="bg-white dark:bg-gray-800 p-7 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm relative group overflow-hidden transition-all hover:scale-[1.02] hover:shadow-xl">
             <div className="absolute -top-4 -right-4 p-4 opacity-[0.03] group-hover:scale-150 transition-transform duration-500">
-                <Icon size={120} />
+                <IconComponent size={120} />
             </div>
             <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 border-2 ${colorMap[color]}`}>
-                <Icon size={26} strokeWidth={2.5} />
+                <IconComponent size={26} strokeWidth={2.5} />
             </div>
             <h4 className="text-gray-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2">{title}</h4>
             <div className="flex items-baseline gap-3">
@@ -502,7 +503,8 @@ const MetricCard = ({ title, value, icon: Icon, trend, isUp, color, loading }) =
     );
 };
 
-const QuickStatus = ({ title, value, subText, icon: Icon, color, onClick }) => {
+const QuickStatus = ({ title, value, subText, icon, color, onClick }) => {
+    const IconComponent = icon;
     const colorMap = {
         blue: 'bg-blue-600 shadow-blue-500/30',
         amber: 'bg-amber-500 shadow-amber-500/30',
@@ -515,7 +517,7 @@ const QuickStatus = ({ title, value, subText, icon: Icon, color, onClick }) => {
             className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm flex items-center gap-6 group hover:translate-y-[-6px] transition-all text-left w-full"
         >
             <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center text-white shadow-2xl transition-transform group-hover:rotate-12 ${colorMap[color]}`}>
-                <Icon size={28} strokeWidth={2.5} />
+                <IconComponent size={28} strokeWidth={2.5} />
             </div>
             <div>
                 <h4 className="text-2xl font-black text-gray-900 dark:text-white leading-none mb-1.5 group-hover:text-blue-600 transition-colors">{value}</h4>
