@@ -319,7 +319,7 @@ const PriceComparison = () => {
         return sorted;
     }, [prices, sortBy, supermarketIdParam]);
 
-    const [showMapForIndex, setShowMapForIndex] = useState(null);
+    const [showMapForPriceId, setShowMapForPriceId] = useState(null);
 
     const getCategoryName = () => {
         const cat = product?.categoryId;
@@ -639,7 +639,7 @@ const PriceComparison = () => {
                         </div>
                     ) : (
                         <div className="space-y-4">
-                            {sortedPrices.map((priceEntry, index) => {
+                                {sortedPrices.map((priceEntry) => {
                                     const supermarket = getSupermarketFromPrice(priceEntry);
                                     const supermarketId = typeof supermarket === 'string' ? supermarket : supermarket?.$id;
                                     const supermarketName = typeof supermarket === 'object' ? supermarket?.name : 'Store';
@@ -652,6 +652,7 @@ const PriceComparison = () => {
                                     const normalizedStatus = normalizeStockStatus(priceEntry.stockStatus);
                                     const priceCurrency = getPriceCurrency(priceEntry);
                                     const convertedPrice = convert(priceEntry.price, priceCurrency);
+                                    const isMapVisible = showMapForPriceId === priceEntry.$id;
                                     
                                     const updatedAtValue = getPriceTimestamp(priceEntry);
                                     const updatedAt = updatedAtValue ? new Date(updatedAtValue) : new Date();
@@ -757,15 +758,15 @@ const PriceComparison = () => {
                                                                 onClick={(e) => {
                                                                     e.preventDefault();
                                                                     e.stopPropagation();
-                                                                    setShowMapForIndex(showMapForIndex === index ? null : index);
+                                                                    setShowMapForPriceId(isMapVisible ? null : priceEntry.$id);
                                                                 }}
                                                                         className={`tap-target h-8 w-8 rounded-full flex items-center justify-center transition-all ${
-                                                                    showMapForIndex === index
+                                                                    isMapVisible
                                                                         ? 'bg-brand-600 text-white'
                                                                         : 'bg-gray-900/70 text-white hover:bg-brand-600'
                                                                 }`}
-                                                                title={showMapForIndex === index ? 'Hide Map' : 'Show Map'}
-                                                                aria-label={showMapForIndex === index ? 'Hide Map' : 'Show Map'}
+                                                                title={isMapVisible ? 'Hide Map' : 'Show Map'}
+                                                                aria-label={isMapVisible ? 'Hide Map' : 'Show Map'}
                                                             >
                                                                 <FiMapPin size={10} />
                                                             </button>
@@ -777,7 +778,7 @@ const PriceComparison = () => {
                                                 </summary>
                                                 <div className="mt-4 space-y-4">
                                                     {/* Local Map showing branches - only when toggled */}
-                                                        {showMapForIndex === index && hasCoordinates && (
+                                                        {isMapVisible && hasCoordinates && (
                                                         <div className="h-44 rounded-2xl overflow-hidden shadow-inner border border-gray-100 dark:border-gray-800/50 animate-in zoom-in-95 duration-300">
                                                             <StoreMap 
                                                                 supermarkets={[supermarket]} 

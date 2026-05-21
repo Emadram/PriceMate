@@ -94,6 +94,10 @@ const SupermarketProfile = () => {
         return () => clearTimeout(timeoutId);
     }, [loadSupermarketData]);
 
+    useEffect(() => {
+        setIsBranchDropdownOpen(false);
+    }, [id]);
+
     if (loading) {
         return (
             <div className="min-h-screen bg-white dark:bg-[#0A0A0B] flex items-center justify-center">

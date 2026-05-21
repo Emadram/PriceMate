@@ -15,6 +15,48 @@ import { hasValidLatLon } from '../utils/productUtils';
 const StoreMap = ({ lat, lon, zoom = 15, height = "300px", supermarkets = [], center: centerProp }) => {
   const mapRef = useRef();
   const mapElement = useRef();
+  const resolvedSupermarkets = Array.isArray(supermarkets) ? supermarkets : [];
+
+  const resolveCenter = () => {
+    if (centerProp && hasValidLatLon(centerProp[0], centerProp[1])) {
+      return fromLonLat([parseFloat(centerProp[1]), parseFloat(centerProp[0])]);
+    }
+
+    if (hasValidLatLon(lat, lon)) {
+      return fromLonLat([parseFloat(lon), parseFloat(lat)]);
+    }
+
+    const validMarkers = resolvedSupermarkets.filter((s) => hasValidLatLon(s.latitude, s.longitude));
+    if (validMarkers.length === 0) return null;
+    if (validMarkers.length === 1) {
+      return fromLonLat([
+        parseFloat(validMarkers[0].longitude),
+        parseFloat(validMarkers[0].latitude)
+      ]);
+    }
+
+    const averageLat = validMarkers.reduce((sum, marker) => sum + parseFloat(marker.latitude), 0) / validMarkers.length;
+    const averageLon = validMarkers.reduce((sum, marker) => sum + parseFloat(marker.longitude), 0) / validMarkers.length;
+    return fromLonLat([averageLon, averageLat]);
+  };
+
+  const buildMarkerFeature = (supermarket) => {
+    if (!hasValidLatLon(supermarket.latitude, supermarket.longitude)) return null;
+    const feature = new Feature({
+      geometry: new Point(fromLonLat([parseFloat(supermarket.longitude), parseFloat(supermarket.latitude)])),
+      name: supermarket.name || supermarket.branchName || 'Store'
+    });
+    feature.setStyle(
+      new Style({
+        image: new Icon({
+          anchor: [0.5, 1],
+          src: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+          scale: 0.06,
+        }),
+      })
+    );
+    return feature;
+  };
 
   const mapInputsKey = useMemo(
     () =>
@@ -30,41 +72,24 @@ const StoreMap = ({ lat, lon, zoom = 15, height = "300px", supermarkets = [], ce
   );
 
   useEffect(() => {
-    // Determine center
-    let centerCoords;
-    if (centerProp && hasValidLatLon(centerProp[0], centerProp[1])) {
-        centerCoords = fromLonLat([parseFloat(centerProp[1]), parseFloat(centerProp[0])]);
-    } else if (hasValidLatLon(lat, lon)) {
-        centerCoords = fromLonLat([parseFloat(lon), parseFloat(lat)]);
-    } else if (supermarkets.length > 0 && hasValidLatLon(supermarkets[0].latitude, supermarkets[0].longitude)) {
-        centerCoords = fromLonLat([parseFloat(supermarkets[0].longitude), parseFloat(supermarkets[0].latitude)]);
-    } else {
+    const centerCoords = resolveCenter();
+    if (!centerCoords) {
       return;
     }
 
-    // Marker features
+    if (mapRef.current) {
+      mapRef.current.setTarget(null);
+      mapRef.current.dispose?.();
+      mapRef.current = null;
+    }
+
     const features = [];
     
-    // Add markers for supermarkets array if provided
-    if (supermarkets.length > 0) {
-        supermarkets.forEach(s => {
-            if (hasValidLatLon(s.latitude, s.longitude)) {
-                const feat = new Feature({
-                    geometry: new Point(fromLonLat([parseFloat(s.longitude), parseFloat(s.latitude)])),
-                    name: s.name
-                });
-                feat.setStyle(
-                    new Style({
-                        image: new Icon({
-                            anchor: [0.5, 1],
-                            src: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
-                            scale: 0.06,
-                        }),
-                    })
-                );
-                features.push(feat);
-            }
-        });
+    if (resolvedSupermarkets.length > 0) {
+      resolvedSupermarkets.forEach((supermarket) => {
+        const feature = buildMarkerFeature(supermarket);
+        if (feature) features.push(feature);
+      });
     } else if (hasValidLatLon(lat, lon)) {
         // Fallback to single lat/lon
         const marker = new Feature({
@@ -112,7 +137,7 @@ const StoreMap = ({ lat, lon, zoom = 15, height = "300px", supermarkets = [], ce
         mapRef.current.setTarget(null);
       }
     };
-  }, [mapInputsKey, lat, lon, zoom, centerProp, supermarkets]);
+  }, [mapInputsKey, lat, lon, zoom, centerProp, resolvedSupermarkets]);
 
   return (
     <div
