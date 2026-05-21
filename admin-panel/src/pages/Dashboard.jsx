@@ -9,7 +9,7 @@ import {
     CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell 
 } from 'recharts';
 import useAdminAuthStore from '../stores/adminAuthStore';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import useFreshIndicator from '../hooks/useFreshIndicator';
 import { client, DATABASE_ID, COLLECTIONS, Query, db } from '../lib/appwrite';
 import Sidebar from '../components/Sidebar';
@@ -35,8 +35,11 @@ const Dashboard = () => {
     const [rawSupermarkets, setRawSupermarkets] = useState([]);
     const [lastUpdated, setLastUpdated] = useState(null);
     const isFresh = useFreshIndicator(lastUpdated);
+    const inFlightRef = useRef(false);
+    const subscriptionRefreshTimerRef = useRef(null);
+    const lastUpdatedMsRef = useRef(0);
 
-    const fetchAll = async (listFn, label) => {
+    const fetchAll = useCallback(async (listFn, label) => {
         const limit = 100;
         const documents = [];
         let offset = 0;
@@ -55,10 +58,12 @@ const Dashboard = () => {
         }
 
         return documents;
-    };
+    }, []);
 
-    const fetchStats = async () => {
-        setLoading(true);
+    const fetchStats = useCallback(async ({ showLoader = false } = {}) => {
+        if (inFlightRef.current) return;
+        inFlightRef.current = true;
+        if (showLoader) setLoading(true);
         try {
             const safeList = async (listFn, label) => {
                 try {
@@ -148,12 +153,18 @@ const Dashboard = () => {
                 announcements: announcementsRes.total || 0,
                 chats: chatsRes.total || 0
             });
-            setLastUpdated(new Date().toISOString());
+            const now = Date.now();
+            if (now - lastUpdatedMsRef.current >= 1500) {
+                setLastUpdated(new Date(now).toISOString());
+                lastUpdatedMsRef.current = now;
+            }
         } catch (error) {
             console.error('Error fetching dashboard stats:', error);
+        } finally {
+            if (showLoader) setLoading(false);
+            inFlightRef.current = false;
         }
-        setLoading(false);
-    };
+    }, [fetchAll]);
 
     const getWeeklyTrend = (items = [], dateField = '$createdAt') => {
         if (!items.length) return null;
@@ -238,7 +249,7 @@ const Dashboard = () => {
     }, [rawPrices]);
 
     useEffect(() => {
-        const t = setTimeout(() => fetchStats(), 0);
+        const t = setTimeout(() => fetchStats({ showLoader: true }), 0);
         const channels = [
             `databases.${DATABASE_ID}.collections.${COLLECTIONS.PRODUCTS}.documents`,
             `databases.${DATABASE_ID}.collections.${COLLECTIONS.PRICES}.documents`,
@@ -249,10 +260,19 @@ const Dashboard = () => {
             `databases.${DATABASE_ID}.collections.${COLLECTIONS.CHAT_HISTORY}.documents`
         ];
         const unsubscribe = client.subscribe(channels, () => {
-            setTimeout(() => fetchStats(), 0);
+            if (subscriptionRefreshTimerRef.current) {
+                clearTimeout(subscriptionRefreshTimerRef.current);
+            }
+            subscriptionRefreshTimerRef.current = setTimeout(() => {
+                fetchStats({ showLoader: false });
+                subscriptionRefreshTimerRef.current = null;
+            }, 900);
         });
         return () => {
             clearTimeout(t);
+            if (subscriptionRefreshTimerRef.current) {
+                clearTimeout(subscriptionRefreshTimerRef.current);
+            }
             unsubscribe();
         };
     }, [fetchStats]);
@@ -293,7 +313,7 @@ const Dashboard = () => {
                         </div>
                         <div className="flex items-center gap-2">
                             <button 
-                                onClick={fetchStats}
+                                onClick={() => fetchStats({ showLoader: true })}
                                 className="p-2.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-2xl transition-all active:scale-95 border border-gray-200 dark:border-gray-600 shadow-sm"
                                 title="Sync Data"
                             >

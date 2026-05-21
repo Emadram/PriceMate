@@ -9,6 +9,9 @@ import useSupermarketsStore from '../stores/supermarketsStore';
 import Sidebar from '../components/Sidebar';
 import { client, DATABASE_ID, COLLECTIONS, functions } from '../lib/appwrite';
 
+const OFF_RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
+const OFF_PROXY_FUNCTION_ID = import.meta.env.VITE_APPWRITE_FUNCTION_OFF_PROXY || '';
+
 const Products = () => {
     const { 
         products, 
@@ -49,23 +52,20 @@ const Products = () => {
     const [sortConfig, setSortConfig] = useState({ key: null, direction: 'ascending' });
     const [lastUpdated, setLastUpdated] = useState(null);
     const isFresh = useFreshIndicator(lastUpdated);
-    const OFF_RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
-    const OFF_PROXY_FUNCTION_ID = import.meta.env.VITE_APPWRITE_FUNCTION_OFF_PROXY || '';
-
     const resetOffLookup = () => setOffLookup({ loading: false, error: '', results: [] });
 
-    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const sleep = useCallback((ms) => new Promise((resolve) => setTimeout(resolve, ms)), []);
 
-    const parseRetryAfterMs = (value) => {
+    const parseRetryAfterMs = useCallback((value) => {
         if (!value) return null;
         const seconds = Number(value);
         if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
         const dateMs = Date.parse(value);
         if (Number.isFinite(dateMs)) return Math.max(0, dateMs - Date.now());
         return null;
-    };
+    }, []);
 
-    const fetchWithBackoff = async (url, options = {}, config = {}) => {
+    const fetchWithBackoff = useCallback(async (url, options = {}, config = {}) => {
         const {
             retries = 2,
             baseDelayMs = 400,
@@ -99,9 +99,9 @@ const Products = () => {
         }
 
         return null;
-    };
+    }, [parseRetryAfterMs, sleep]);
 
-    const callOffProxy = async (payload) => {
+    const callOffProxy = useCallback(async (payload) => {
         if (!OFF_PROXY_FUNCTION_ID) return null;
         try {
             const execution = await functions.createExecution(
@@ -115,7 +115,7 @@ const Products = () => {
             console.error('OFF proxy error:', error);
             return { ok: false, status: 0, error: 'Proxy error' };
         }
-    };
+    }, []);
 
     const normalizeOffResult = (product) => {
         if (!product) return null;
@@ -207,7 +207,7 @@ const Products = () => {
             console.error('OFF barcode lookup failed:', error);
             setOffLookup({ loading: false, error: 'Barcode lookup failed. Try again.', results: [] });
         }
-    }, [formData.name]);
+    }, [callOffProxy, fetchWithBackoff, formData.name]);
 
     const applyOffCandidate = (candidate) => {
         setFormData((prev) => ({
