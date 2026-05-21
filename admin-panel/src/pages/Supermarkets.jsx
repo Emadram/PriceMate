@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FiPlus, FiEdit2, FiTrash2, FiMapPin, FiPhone, FiMail, FiChevronUp, FiChevronDown, FiX, FiSearch, FiShoppingBag } from 'react-icons/fi';
+import SortIcon from '../components/SortIcon';
 import useSupermarketsStore from '../stores/supermarketsStore';
 import Sidebar from '../components/Sidebar';
 import { validateSupermarketCoordinates } from '../utils/coordinateValidation';
