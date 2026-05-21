@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FiPackage, FiEdit2, FiTrash2, FiPlus, FiChevronUp, FiChevronDown, FiX, FiSearch, FiFilter } from 'react-icons/fi';
+import SortIcon from '../components/SortIcon';
 import useProductsStore from '../stores/productsStore';
 import useCategoriesStore from '../stores/categoriesStore';
 import useSupermarketsStore from '../stores/supermarketsStore';
@@ -19,7 +20,7 @@ const Products = () => {
         uploadProductImage 
     } = useProductsStore();
     const { categories, fetchCategories } = useCategoriesStore();
-    const { supermarkets, fetchSupermarkets } = useSupermarketsStore();
+    const { supermarkets: _supermarkets, fetchSupermarkets } = useSupermarketsStore();
 
     const [showModal, setShowModal] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
@@ -231,14 +232,15 @@ const Products = () => {
     }, [fetchProducts, fetchCategories, fetchSupermarkets, page]);
 
     useEffect(() => {
-        refreshData();
+        const t = setTimeout(() => refreshData(), 0);
+        return () => clearTimeout(t);
     }, [refreshData]);
 
     useEffect(() => {
         if (!lastUpdated) return;
-        setIsFresh(true);
+        const t0 = setTimeout(() => setIsFresh(true), 0);
         const timer = setTimeout(() => setIsFresh(false), 1200);
-        return () => clearTimeout(timer);
+        return () => { clearTimeout(t0); clearTimeout(timer); };
     }, [lastUpdated]);
 
     useEffect(() => {
@@ -255,7 +257,7 @@ const Products = () => {
         ];
 
         const unsubscribe = client.subscribe(channels, () => {
-            refreshData();
+            setTimeout(() => refreshData(), 0);
         });
 
         return () => unsubscribe();
@@ -403,10 +405,7 @@ const Products = () => {
         setSortConfig({ key, direction });
     };
 
-    const SortIcon = ({ columnKey }) => {
-        if (sortConfig.key !== columnKey) return null;
-        return sortConfig.direction === 'ascending' ? <FiChevronUp className="inline ml-1" /> : <FiChevronDown className="inline ml-1" />;
-    };
+    // SortIcon hoisted to ../components/SortIcon
 
     return (
         <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex">
@@ -488,25 +487,25 @@ const Products = () => {
                                             className="px-8 py-5 text-left text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] cursor-pointer hover:text-blue-600 transition-colors"
                                             onClick={() => requestSort('name')}
                                         >
-                                            Product Details <SortIcon columnKey="name" />
+                                            Product Details <SortIcon columnKey="name" currentKey={sortConfig.key} direction={sortConfig.direction} />
                                         </th>
                                         <th
                                             className="px-8 py-5 text-left text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] cursor-pointer hover:text-blue-600 transition-colors"
                                             onClick={() => requestSort('barcode')}
                                         >
-                                            Identification <SortIcon columnKey="barcode" />
+                                            Identification <SortIcon columnKey="barcode" currentKey={sortConfig.key} direction={sortConfig.direction} />
                                         </th>
                                         <th
                                             className="px-8 py-5 text-left text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] cursor-pointer hover:text-blue-600 transition-colors"
                                             onClick={() => requestSort('category')}
                                         >
-                                            Category <SortIcon columnKey="category" />
+                                            Category <SortIcon columnKey="category" currentKey={sortConfig.key} direction={sortConfig.direction} />
                                         </th>
                                         <th
                                             className="px-8 py-5 text-left text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] cursor-pointer hover:text-blue-600 transition-colors"
                                             onClick={() => requestSort('stockQuantity')}
                                         >
-                                            Stock <SortIcon columnKey="stockQuantity" />
+                                            Stock <SortIcon columnKey="stockQuantity" currentKey={sortConfig.key} direction={sortConfig.direction} />
                                         </th>
                                         <th className="px-8 py-5 text-right text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em]">Actions</th>
                                     </tr>

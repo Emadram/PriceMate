@@ -29,22 +29,23 @@ const Announcements = () => {
     }, [fetchAnnouncements]);
 
     useEffect(() => {
-        refreshData();
+        const t = setTimeout(() => refreshData(), 0);
+        return () => clearTimeout(t);
     }, [refreshData]);
 
     useEffect(() => {
         const channel = `databases.${DATABASE_ID}.collections.${COLLECTIONS.ANNOUNCEMENTS}.documents`;
         const unsubscribe = client.subscribe(channel, () => {
-            refreshData();
+            setTimeout(() => refreshData(), 0);
         });
         return () => unsubscribe();
     }, [refreshData]);
 
     useEffect(() => {
         if (!lastUpdated) return;
-        setIsFresh(true);
+        const t0 = setTimeout(() => setIsFresh(true), 0);
         const timer = setTimeout(() => setIsFresh(false), 1200);
-        return () => clearTimeout(timer);
+        return () => { clearTimeout(t0); clearTimeout(timer); };
     }, [lastUpdated]);
 
     const handleSubmit = async (e) => {

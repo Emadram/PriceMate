@@ -38,14 +38,15 @@ const PriceHistory = () => {
     }, [fetchHistory, fetchProducts, fetchSupermarkets]);
 
     useEffect(() => {
-        refreshData();
+        const t = setTimeout(() => refreshData(), 0);
+        return () => clearTimeout(t);
     }, [refreshData]);
 
     useEffect(() => {
         if (!lastUpdated) return;
-        setIsFresh(true);
+        const t0 = setTimeout(() => setIsFresh(true), 0);
         const timer = setTimeout(() => setIsFresh(false), 1200);
-        return () => clearTimeout(timer);
+        return () => { clearTimeout(t0); clearTimeout(timer); };
     }, [lastUpdated]);
 
     useEffect(() => {
@@ -56,7 +57,7 @@ const PriceHistory = () => {
         ];
 
         const unsubscribe = client.subscribe(channels, () => {
-            refreshData();
+            setTimeout(() => refreshData(), 0);
         });
 
         return () => unsubscribe();

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FiTag, FiEdit2, FiTrash2, FiPlus, FiChevronUp, FiChevronDown, FiArrowLeft, FiSearch } from 'react-icons/fi';
+import { FiTag, FiEdit2, FiTrash2, FiPlus, FiArrowLeft, FiSearch } from 'react-icons/fi';
+import SortIcon from '../components/SortIcon';
 import useCategoriesStore from '../stores/categoriesStore';
 import Sidebar from '../components/Sidebar';
 import { CATEGORY_ICON_ELEMENTS, CATEGORY_ICON_KEYS } from '../constants/categoryIconMap';
@@ -90,10 +91,7 @@ const Categories = () => {
         setSortConfig({ key, direction });
     };
 
-    const SortIcon = ({ columnKey }) => {
-        if (sortConfig.key !== columnKey) return null;
-        return sortConfig.direction === 'ascending' ? <FiChevronUp className="inline ml-1" /> : <FiChevronDown className="inline ml-1" />;
-    };
+    // SortIcon is hoisted to ../components/SortIcon
 
     return (
         <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -150,7 +148,7 @@ const Categories = () => {
                                             className="px-8 py-5 text-[10px] font-black text-gray-400 dark:text-gray-400 uppercase tracking-[0.2em] cursor-pointer hover:text-blue-600 transition-colors"
                                             onClick={() => requestSort('categoryName')}
                                         >
-                                            Classification <SortIcon columnKey="categoryName" />
+                                            Classification <SortIcon columnKey="categoryName" currentKey={sortConfig.key} direction={sortConfig.direction} />
                                         </th>
                                         <th className="px-8 py-5 text-[10px] font-black text-gray-400 dark:text-gray-400 uppercase tracking-[0.2em]">Iconic Identifier</th>
                                         <th className="px-8 py-5 text-[10px] font-black text-gray-400 dark:text-gray-400 uppercase tracking-[0.2em] text-right">Actions</th>

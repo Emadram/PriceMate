@@ -30,7 +30,8 @@ const Supermarkets = () => {
     const [sortConfig, setSortConfig] = useState({ key: null, direction: 'ascending' });
 
     useEffect(() => {
-        fetchSupermarkets();
+        const t = setTimeout(() => fetchSupermarkets(), 0);
+        return () => clearTimeout(t);
     }, [fetchSupermarkets]);
 
     const filteredSupermarkets = supermarkets.filter(sm => 
@@ -142,10 +143,7 @@ const Supermarkets = () => {
         setSortConfig({ key, direction });
     };
 
-    const SortIcon = ({ columnKey }) => {
-        if (sortConfig.key !== columnKey) return null;
-        return sortConfig.direction === 'ascending' ? <FiChevronUp className="inline ml-1" /> : <FiChevronDown className="inline ml-1" />;
-    };
+    // SortIcon hoisted to ../components/SortIcon
 
     return (
         <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex">
@@ -188,13 +186,13 @@ const Supermarkets = () => {
                                             className="px-8 py-5 text-left text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] cursor-pointer hover:text-blue-600 transition-colors"
                                             onClick={() => requestSort('name')}
                                         >
-                                            Supermarket <SortIcon columnKey="name" />
+                                            Supermarket <SortIcon columnKey="name" currentKey={sortConfig.key} direction={sortConfig.direction} />
                                         </th>
                                         <th
                                             className="px-8 py-5 text-left text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] cursor-pointer hover:text-blue-600 transition-colors"
                                             onClick={() => requestSort('address')}
                                         >
-                                            Contact <SortIcon columnKey="address" />
+                                            Contact <SortIcon columnKey="address" currentKey={sortConfig.key} direction={sortConfig.direction} />
                                         </th>
                                         <th className="px-8 py-5 text-left text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em]">Coordinates</th>
                                         <th className="px-8 py-5 text-right text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em]">Actions</th>
@@ -452,7 +450,7 @@ const Supermarkets = () => {
                                 </button>
                                 <button
                                     type="submit"
-                                    disabled={uploading || !!validateCoordinates(formData.latitude, formData.longitude)}
+                                    disabled={uploading || !!validateSupermarketCoordinates(formData.latitude, formData.longitude)}
                                     className="flex-1 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-50"
                                 >
                                     {editing ? 'Update' : 'Create'}

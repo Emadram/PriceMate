@@ -237,7 +237,7 @@ const Dashboard = () => {
     }, [rawPrices]);
 
     useEffect(() => {
-        fetchStats();
+        const t = setTimeout(() => fetchStats(), 0);
         const channels = [
             `databases.${DATABASE_ID}.collections.${COLLECTIONS.PRODUCTS}.documents`,
             `databases.${DATABASE_ID}.collections.${COLLECTIONS.PRICES}.documents`,
@@ -248,16 +248,19 @@ const Dashboard = () => {
             `databases.${DATABASE_ID}.collections.${COLLECTIONS.CHAT_HISTORY}.documents`
         ];
         const unsubscribe = client.subscribe(channels, () => {
-            fetchStats();
+            setTimeout(() => fetchStats(), 0);
         });
-        return () => unsubscribe();
-    }, []);
+        return () => {
+            clearTimeout(t);
+            unsubscribe();
+        };
+    }, [fetchStats]);
 
     useEffect(() => {
         if (!lastUpdated) return;
-        setIsFresh(true);
+        const t0 = setTimeout(() => setIsFresh(true), 0);
         const timer = setTimeout(() => setIsFresh(false), 1200);
-        return () => clearTimeout(timer);
+        return () => { clearTimeout(t0); clearTimeout(timer); };
     }, [lastUpdated]);
 
     const handleLogout = async () => {

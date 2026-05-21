@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FiDollarSign, FiPlus, FiTrash2, FiChevronUp, FiChevronDown, FiEdit2, FiX, FiSearch, FiFilter, FiArrowLeft, FiShoppingBag } from 'react-icons/fi';
+import SortIcon from '../components/SortIcon';
 import usePricesStore from '../stores/pricesStore';
 import useProductsStore from '../stores/productsStore';
 import useSupermarketsStore from '../stores/supermarketsStore';
@@ -21,7 +22,7 @@ const Prices = () => {
         deletePrice 
     } = usePricesStore();
     const { products, fetchProducts } = useProductsStore();
-    const { supermarkets, fetchSupermarkets } = useSupermarketsStore();
+    const { supermarkets: _supermarkets, fetchSupermarkets } = useSupermarketsStore();
     const adminUser = useAdminAuthStore((state) => state.user);
 
     const [showModal, setShowModal] = useState(false);
@@ -52,14 +53,15 @@ const Prices = () => {
     }, [fetchPrices, fetchProducts, fetchSupermarkets, page]);
 
     useEffect(() => {
-        refreshData();
+        const t = setTimeout(() => refreshData(), 0);
+        return () => clearTimeout(t);
     }, [refreshData]);
 
     useEffect(() => {
         if (!lastUpdated) return;
-        setIsFresh(true);
+        const t0 = setTimeout(() => setIsFresh(true), 0);
         const timer = setTimeout(() => setIsFresh(false), 1200);
-        return () => clearTimeout(timer);
+        return () => { clearTimeout(t0); clearTimeout(timer); };
     }, [lastUpdated]);
 
     useEffect(() => {
@@ -70,7 +72,7 @@ const Prices = () => {
         ];
 
         const unsubscribe = client.subscribe(channels, () => {
-            refreshData();
+            setTimeout(() => refreshData(), 0);
         });
 
         return () => unsubscribe();
@@ -83,7 +85,8 @@ const Prices = () => {
 
     useEffect(() => {
         if (adminUser) {
-            setFormData(prev => ({ ...prev, userId: adminUser.$id }));
+            const t = setTimeout(() => setFormData(prev => ({ ...prev, userId: adminUser.$id })), 0);
+            return () => clearTimeout(t);
         }
     }, [adminUser]);
 
@@ -211,10 +214,7 @@ const Prices = () => {
         setSortConfig({ key, direction });
     };
 
-    const SortIcon = ({ columnKey }) => {
-        if (sortConfig.key !== columnKey) return null;
-        return sortConfig.direction === 'ascending' ? <FiChevronUp className="inline ml-1" /> : <FiChevronDown className="inline ml-1" />;
-    };
+    // SortIcon hoisted to ../components/SortIcon
 
     return (
         <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -308,7 +308,7 @@ const Prices = () => {
                                                 onClick={() => requestSort('product')}
                                             >
                                                 <div className="flex items-center gap-2">
-                                                    Product <SortIcon columnKey="product" />
+                                                    Product <SortIcon columnKey="product" currentKey={sortConfig.key} direction={sortConfig.direction} />
                                                 </div>
                                             </th>
                                             <th
@@ -316,7 +316,7 @@ const Prices = () => {
                                                 onClick={() => requestSort('supermarket')}
                                             >
                                                 <div className="flex items-center gap-2">
-                                                    Store Node <SortIcon columnKey="supermarket" />
+                                                    Store Node <SortIcon columnKey="supermarket" currentKey={sortConfig.key} direction={sortConfig.direction} />
                                                 </div>
                                             </th>
                                             <th
@@ -324,7 +324,7 @@ const Prices = () => {
                                                 onClick={() => requestSort('price')}
                                             >
                                                 <div className="flex items-center gap-2">
-                                                    Last Trade <SortIcon columnKey="price" />
+                                                    Last Trade <SortIcon columnKey="price" currentKey={sortConfig.key} direction={sortConfig.direction} />
                                                 </div>
                                             </th>
                                             <th className="px-8 py-5 text-[10px] font-black text-gray-400 dark:text-gray-400 uppercase tracking-[0.2em]">Provenance</th>

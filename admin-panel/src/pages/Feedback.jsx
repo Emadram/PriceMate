@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FiMessageSquare, FiTrash2, FiChevronUp, FiChevronDown, FiEye, FiCheckCircle, FiClock, FiAlertTriangle, FiArrowLeft, FiFilter, FiSearch, FiX } from 'react-icons/fi';
+import { FiMessageSquare, FiTrash2, FiEye, FiCheckCircle, FiClock, FiAlertTriangle, FiArrowLeft, FiFilter, FiSearch, FiX } from 'react-icons/fi';
+import SortIcon from '../components/SortIcon';
 import useFeedbackStore from '../stores/feedbackStore';
 import Sidebar from '../components/Sidebar';
 import { client, DATABASE_ID, COLLECTIONS } from '../lib/appwrite';
@@ -20,22 +21,23 @@ const Feedback = () => {
     }, [fetchFeedback]);
 
     useEffect(() => {
-        refreshData();
+        const t = setTimeout(() => refreshData(), 0);
+        return () => clearTimeout(t);
     }, [refreshData]);
 
     useEffect(() => {
         const channel = `databases.${DATABASE_ID}.collections.${COLLECTIONS.FEEDBACK}.documents`;
         const unsubscribe = client.subscribe(channel, () => {
-            refreshData();
+            setTimeout(() => refreshData(), 0);
         });
         return () => unsubscribe();
     }, [refreshData]);
 
     useEffect(() => {
         if (!lastUpdated) return;
-        setIsFresh(true);
+        const t0 = setTimeout(() => setIsFresh(true), 0);
         const timer = setTimeout(() => setIsFresh(false), 1200);
-        return () => clearTimeout(timer);
+        return () => { clearTimeout(t0); clearTimeout(timer); };
     }, [lastUpdated]);
 
     const handleDelete = async (id) => {
@@ -90,10 +92,7 @@ const Feedback = () => {
         setSortConfig({ key, direction });
     };
 
-    const SortIcon = ({ columnKey }) => {
-        if (sortConfig.key !== columnKey) return null;
-        return sortConfig.direction === 'ascending' ? <FiChevronUp className="inline ml-1" /> : <FiChevronDown className="inline ml-1" />;
-    };
+    // SortIcon hoisted to ../components/SortIcon
 
     return (
         <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
@@ -159,13 +158,13 @@ const Feedback = () => {
                                         <tr className="bg-gray-50/50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-700">
                                             <th onClick={() => requestSort('type')} className="px-8 py-6 cursor-pointer group">
                                                 <div className="flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
-                                                    Classification <SortIcon columnKey="type" />
+                                                    Classification <SortIcon columnKey="type" currentKey={sortConfig.key} direction={sortConfig.direction} />
                                                 </div>
                                             </th>
                                             <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Report Details</th>
                                             <th onClick={() => requestSort('status')} className="px-8 py-6 cursor-pointer group text-center">
                                                 <div className="flex items-center justify-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
-                                                    Status <SortIcon columnKey="status" />
+                                                    Status <SortIcon columnKey="status" currentKey={sortConfig.key} direction={sortConfig.direction} />
                                                 </div>
                                             </th>
                                             <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Actions</th>
