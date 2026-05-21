@@ -4,11 +4,28 @@ import { FiPlus, FiEdit2, FiTrash2, FiMapPin, FiPhone, FiMail, FiChevronUp, FiCh
 import useSupermarketsStore from '../stores/supermarketsStore';
 import Sidebar from '../components/Sidebar';
 
+const validateCoordinates = (latitude, longitude) => {
+    const lat = Number(latitude);
+    const lon = Number(longitude);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+        return 'Enter valid numeric latitude and longitude.';
+    }
+    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+        return 'Latitude must be between -90 and 90, longitude between -180 and 180.';
+    }
+    if (lat === 0 && lon === 0) {
+        return 'Coordinates (0, 0) are not allowed. Set the real store location.';
+    }
+    return '';
+};
+
 const Supermarkets = () => {
     const { supermarkets, loading, fetchSupermarkets, deleteSupermarket, uploadSupermarketLogo } = useSupermarketsStore();
     const [showModal, setShowModal] = useState(false);
     const [editing, setEditing] = useState(null);
     const [uploading, setUploading] = useState(false);
+    const [coordinateError, setCoordinateError] = useState('');
 
     const [formData, setFormData] = useState({
         name: '',
@@ -58,41 +75,37 @@ const Supermarkets = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         const store = useSupermarketsStore.getState();
-        const lat = parseFloat(formData.latitude);
-        const lon = parseFloat(formData.longitude);
-        if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-            alert('Enter valid numeric latitude and longitude.');
-            return;
-        }
-        if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
-            alert('Latitude must be between -90 and 90, longitude between -180 and 180.');
-            return;
-        }
-        if (lat === 0 && lon === 0) {
-            alert('Coordinates (0, 0) are not allowed—they look like a placeholder. Set the real store location.');
+        const nextCoordinateError = validateCoordinates(formData.latitude, formData.longitude);
+        if (nextCoordinateError) {
+            setCoordinateError(nextCoordinateError);
             return;
         }
         const data = {
             ...formData,
-            latitude: lat,
-            longitude: lon,
+            latitude: Number(formData.latitude),
+            longitude: Number(formData.longitude),
             isParent: formData.isParent,
             parentId: formData.isParent ? null : formData.parentId
         };
 
-        if (editing) {
-            await store.updateSupermarket(editing.$id, data);
-        } else {
-            await store.addSupermarket(data);
+        const saved = editing
+            ? await store.updateSupermarket(editing.$id, data)
+            : await store.addSupermarket(data);
+
+        if (!saved) {
+            setCoordinateError(useSupermarketsStore.getState().error || nextCoordinateError || 'Unable to save supermarket.');
+            return;
         }
 
         setShowModal(false);
         setEditing(null);
+        setCoordinateError('');
         resetForm();
     };
 
     const resetForm = () => {
         setFormData({ name: '', brand: '', branchName: '', latitude: '', longitude: '', address: '', phoneNumber: '', email: '', icon: '', isParent: false, parentId: '' });
+        setCoordinateError('');
     };
 
     const handleEdit = (supermarket) => {
@@ -110,6 +123,7 @@ const Supermarkets = () => {
             isParent: supermarket.isParent || false,
             parentId: supermarket.parentId || ''
         });
+        setCoordinateError('');
         setShowModal(true);
     };
 
@@ -230,8 +244,14 @@ const Supermarkets = () => {
                                                 <div className="text-[10px] text-gray-400 dark:text-gray-500 flex items-center gap-2 font-black uppercase tracking-widest"><FiPhone className="text-gray-300" /> {item.phoneNumber || 'No Contact'}</div>
                                             </td>
                                             <td className="px-8 py-6 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 font-mono text-xs">
-                                                <span className="bg-gray-50/80 dark:bg-gray-900/80 px-3 py-1.5 rounded-xl border border-gray-100 dark:border-gray-800 font-black">
-                                                    {Number.isFinite(Number(item.latitude)) && Number.isFinite(Number(item.longitude))
+                                                <span className={`px-3 py-1.5 rounded-xl border font-black ${
+                                                    validateCoordinates(item.latitude, item.longitude)
+                                                        ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-800 text-amber-700 dark:text-amber-300'
+                                                        : 'bg-gray-50/80 dark:bg-gray-900/80 border-gray-100 dark:border-gray-800 text-gray-700 dark:text-gray-300'
+                                                }`}>
+                                                    {validateCoordinates(item.latitude, item.longitude)
+                                                        ? 'Needs location fix'
+                                                        : Number.isFinite(Number(item.latitude)) && Number.isFinite(Number(item.longitude))
                                                         ? `${Number(item.latitude).toFixed(4)}, ${Number(item.longitude).toFixed(4)}`
                                                         : '—'}
                                                 </span>
@@ -377,7 +397,10 @@ const Supermarkets = () => {
                                         type="number"
                                         step="any"
                                         value={formData.latitude}
-                                        onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
+                                        onChange={(e) => {
+                                            setFormData({ ...formData, latitude: e.target.value });
+                                            setCoordinateError('');
+                                        }}
                                         className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                                         required
                                     />
@@ -388,12 +411,20 @@ const Supermarkets = () => {
                                         type="number"
                                         step="any"
                                         value={formData.longitude}
-                                        onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
+                                        onChange={(e) => {
+                                            setFormData({ ...formData, longitude: e.target.value });
+                                            setCoordinateError('');
+                                        }}
                                         className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                                         required
                                     />
                                 </div>
                             </div>
+                            {coordinateError && (
+                                <p className="text-sm font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-2xl px-4 py-3">
+                                    {coordinateError}
+                                </p>
+                            )}
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Address</label>
@@ -436,7 +467,7 @@ const Supermarkets = () => {
                                 </button>
                                 <button
                                     type="submit"
-                                    disabled={uploading}
+                                    disabled={uploading || !!validateCoordinates(formData.latitude, formData.longitude)}
                                     className="flex-1 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-50"
                                 >
                                     {editing ? 'Update' : 'Create'}

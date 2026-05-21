@@ -40,6 +40,7 @@ const useSupermarketsStore = create((set) => ({
     addSupermarket: async (data) => {
         set({ loading: true, error: null });
         try {
+            guardCoordinates(data);
             await db.supermarkets.create({
                 name: data.name,
                 brand: data.brand || null,
@@ -66,6 +67,7 @@ const useSupermarketsStore = create((set) => ({
     updateSupermarket: async (id, data) => {
         set({ loading: true, error: null });
         try {
+            guardCoordinates(data);
             await db.supermarkets.update(id, {
                 name: data.name,
                 brand: data.brand || null,
@@ -102,5 +104,26 @@ const useSupermarketsStore = create((set) => ({
         }
     }
 }));
+
+const validateSupermarketCoordinates = (latitude, longitude) => {
+    const lat = Number(latitude);
+    const lon = Number(longitude);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+        return 'Invalid coordinates: latitude and longitude must be numeric.';
+    }
+    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+        return 'Invalid coordinates: latitude must be between -90 and 90 and longitude between -180 and 180.';
+    }
+    if (lat === 0 && lon === 0) {
+        return 'Invalid coordinates: (0, 0) is a placeholder and cannot be saved.';
+    }
+    return '';
+};
+
+const guardCoordinates = (data) => {
+    const error = validateSupermarketCoordinates(data.latitude, data.longitude);
+    if (error) throw new Error(error);
+};
 
 export default useSupermarketsStore;
