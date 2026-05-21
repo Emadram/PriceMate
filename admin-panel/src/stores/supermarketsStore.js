@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { db, storage, getAppwriteConfig } from '../lib/appwrite';
 import { ID } from 'appwrite';
+import { validateSupermarketCoordinates } from '../utils/coordinateValidation';
 
 const { endpoint: APPWRITE_ENDPOINT, projectId: APPWRITE_PROJECT_ID } = getAppwriteConfig();
 const SUPERMARKETS_LOGO_BUCKET = import.meta.env.VITE_APPWRITE_BUCKET_SUPERMARKET_LOGOS || 'supermarkets-logo';
@@ -105,25 +106,10 @@ const useSupermarketsStore = create((set) => ({
     }
 }));
 
-const validateSupermarketCoordinates = (latitude, longitude) => {
-    const lat = Number(latitude);
-    const lon = Number(longitude);
-
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-        return 'Invalid coordinates: latitude and longitude must be numeric.';
-    }
-    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
-        return 'Invalid coordinates: latitude must be between -90 and 90 and longitude between -180 and 180.';
-    }
-    if (lat === 0 && lon === 0) {
-        return 'Invalid coordinates: (0, 0) is a placeholder and cannot be saved.';
-    }
-    return '';
-};
-
 const guardCoordinates = (data) => {
     const error = validateSupermarketCoordinates(data.latitude, data.longitude);
     if (error) throw new Error(error);
 };
 
 export default useSupermarketsStore;
+export { validateSupermarketCoordinates };

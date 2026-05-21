@@ -3,22 +3,7 @@ import { Link } from 'react-router-dom';
 import { FiPlus, FiEdit2, FiTrash2, FiMapPin, FiPhone, FiMail, FiChevronUp, FiChevronDown, FiX, FiSearch, FiShoppingBag } from 'react-icons/fi';
 import useSupermarketsStore from '../stores/supermarketsStore';
 import Sidebar from '../components/Sidebar';
-
-const validateCoordinates = (latitude, longitude) => {
-    const lat = Number(latitude);
-    const lon = Number(longitude);
-
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-        return 'Enter valid numeric latitude and longitude.';
-    }
-    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
-        return 'Latitude must be between -90 and 90, longitude between -180 and 180.';
-    }
-    if (lat === 0 && lon === 0) {
-        return 'Coordinates (0, 0) are not allowed. Set the real store location.';
-    }
-    return '';
-};
+import { validateSupermarketCoordinates } from '../utils/coordinateValidation';
 
 const Supermarkets = () => {
     const { supermarkets, loading, fetchSupermarkets, deleteSupermarket, uploadSupermarketLogo } = useSupermarketsStore();
@@ -75,7 +60,7 @@ const Supermarkets = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         const store = useSupermarketsStore.getState();
-        const nextCoordinateError = validateCoordinates(formData.latitude, formData.longitude);
+        const nextCoordinateError = validateSupermarketCoordinates(formData.latitude, formData.longitude);
         if (nextCoordinateError) {
             setCoordinateError(nextCoordinateError);
             return;
@@ -245,11 +230,11 @@ const Supermarkets = () => {
                                             </td>
                                             <td className="px-8 py-6 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 font-mono text-xs">
                                                 <span className={`px-3 py-1.5 rounded-xl border font-black ${
-                                                    validateCoordinates(item.latitude, item.longitude)
+                                                    validateSupermarketCoordinates(item.latitude, item.longitude)
                                                         ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-800 text-amber-700 dark:text-amber-300'
                                                         : 'bg-gray-50/80 dark:bg-gray-900/80 border-gray-100 dark:border-gray-800 text-gray-700 dark:text-gray-300'
                                                 }`}>
-                                                    {validateCoordinates(item.latitude, item.longitude)
+                                                    {validateSupermarketCoordinates(item.latitude, item.longitude)
                                                         ? 'Needs location fix'
                                                         : Number.isFinite(Number(item.latitude)) && Number.isFinite(Number(item.longitude))
                                                         ? `${Number(item.latitude).toFixed(4)}, ${Number(item.longitude).toFixed(4)}`

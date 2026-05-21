@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateDistance, getRelationshipId, hasValidLatLon, normalizeProduct } from './productUtils';
+import { buildDirectionsUrl, calculateDistance, getRelationshipId, hasValidLatLon, normalizeProduct } from './productUtils';
 
 describe('productUtils', () => {
     describe('hasValidLatLon', () => {
@@ -28,6 +28,18 @@ describe('productUtils', () => {
             expect(dist).not.toBe(null);
             expect(parseFloat(dist)).toBeGreaterThan(100);
             expect(parseFloat(dist)).toBeLessThan(120);
+        });
+    });
+
+    describe('buildDirectionsUrl', () => {
+        it('builds a Google Maps directions link for valid coordinates', () => {
+            expect(buildDirectionsUrl(41.0082, 28.9784)).toBe(
+                'https://www.google.com/maps/dir/?api=1&destination=41.0082%2C28.9784'
+            );
+        });
+
+        it('returns an empty string for invalid coordinates', () => {
+            expect(buildDirectionsUrl(91, 0)).toBe('');
         });
     });
 

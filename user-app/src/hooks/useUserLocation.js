@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
  * Hook to get and track user's current geolocation.
  * @returns {Object} { location, error, loading }
  */
-const getGeoErrorMessage = (err) => {
+export const getGeoErrorMessage = (err) => {
     if (!err) return 'Location is unavailable right now.';
 
     switch (err.code) {
