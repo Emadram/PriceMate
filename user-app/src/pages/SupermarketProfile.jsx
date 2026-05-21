@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { 
     fetchSupermarketById, 
     fetchPricesBySupermarket, 
+    buildDirectionsUrl,
     calculateDistance, 
     resolveRelatedSupermarkets,
     isStoreOpen,
@@ -333,10 +334,24 @@ const SupermarketProfile = () => {
                     <div className="mt-8 space-y-4">
                         <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
                             <div className="flex gap-2">
-                                <button className="tap-target inline-flex items-center gap-2 px-5 py-3 bg-black dark:bg-white text-white dark:text-black rounded-2xl text-sm font-semibold hover:opacity-90 active:scale-95 transition-all w-full md:w-auto">
-                                    <ExternalLink size={16} />
-                                    Get Directions
-                                </button>
+                                    <a
+                                        href={buildDirectionsUrl(supermarket.latitude, supermarket.longitude)}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className={`tap-target inline-flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-semibold active:scale-95 transition-all w-full md:w-auto ${
+                                            storeGeoOk
+                                                ? 'bg-black dark:bg-white text-white dark:text-black hover:opacity-90'
+                                                : 'bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-500 pointer-events-none'
+                                        }`}
+                                        aria-disabled={!storeGeoOk}
+                                        title={storeGeoOk ? 'Get Directions' : 'Directions unavailable for this store'}
+                                        onClick={(e) => {
+                                            if (!storeGeoOk) e.preventDefault();
+                                        }}
+                                    >
+                                        <ExternalLink size={16} />
+                                        Get Directions
+                                    </a>
                                 {user && (
                                 <button
                                     onClick={handleReportClick}

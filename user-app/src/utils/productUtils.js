@@ -110,6 +110,11 @@ const fetchWithBackoff = async (url, options = {}, config = {}) => {
     return null;
 };
 
+export const buildDirectionsUrl = (latitude, longitude) => {
+    if (!hasValidLatLon(latitude, longitude)) return '';
+    return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${latitude},${longitude}`)}`;
+};
+
 const getOffCacheTimestamp = (doc) => doc?.sourceUpdatedAt || doc?.$updatedAt || doc?.$createdAt || '';
 
 const isOffCacheFresh = (doc) => {

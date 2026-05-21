@@ -7,7 +7,7 @@ import {
     FiCalendar, FiTag, FiPlusCircle, FiAlertTriangle, FiInfo 
 } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
-import { calculateDistance, hasValidLatLon, fetchSimilarProductsByCategory, fetchPricesForProducts, getRelationshipId, normalizeProduct } from '../utils/productUtils';
+import { buildDirectionsUrl, calculateDistance, hasValidLatLon, fetchSimilarProductsByCategory, fetchPricesForProducts, getRelationshipId, normalizeProduct } from '../utils/productUtils';
 import Navbar from '../components/Navbar';
 import PriceHistoryChart from '../components/PriceHistoryChart';
 import AddPriceModal from '../components/AddPriceModal';
@@ -701,7 +701,7 @@ const PriceComparison = () => {
                                                     <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                                                         {hasCoordinates ? (
                                                             <a
-                                                                href={`https://www.google.com/maps/dir/?api=1&destination=${supermarket.latitude},${supermarket.longitude}`}
+                                                                href={buildDirectionsUrl(supermarket.latitude, supermarket.longitude)}
                                                                 target="_blank"
                                                                 rel="noopener noreferrer"
                                                                 className="tap-target inline-flex items-center gap-1.5 text-xs font-semibold text-brand-600 dark:text-brand-500 hover:text-brand-700"
