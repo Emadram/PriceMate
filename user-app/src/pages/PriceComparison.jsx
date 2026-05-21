@@ -105,7 +105,7 @@ const StockBranch = ({ name, status, price, distance, t, currencyLabel, supermar
 const PriceComparison = () => {
     const { t } = useTranslation();
     const { convert, getCurrencySymbol } = useCurrencyStore();
-    const { location: userLocation } = useUserLocation();
+    const { location: userLocation, error: locationError, loading: locationLoading, retry: retryLocation } = useUserLocation();
     const { barcode } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
@@ -415,6 +415,22 @@ const PriceComparison = () => {
                 <div className="flex items-center">
                     <BackButton label="Go Back" onClick={handleBack} />
                 </div>
+                {locationError && (
+                    <div className="rounded-3xl border border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/10 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div className="min-w-0">
+                            <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">Distance view is limited</p>
+                            <p className="text-xs text-amber-800/90 dark:text-amber-100/80">{locationError}</p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={retryLocation}
+                            disabled={locationLoading}
+                            className="shrink-0 inline-flex items-center justify-center rounded-2xl bg-amber-600 px-4 py-2 text-xs font-bold uppercase tracking-widest text-white transition-opacity disabled:opacity-60"
+                        >
+                            Try Again
+                        </button>
+                    </div>
+                )}
                 {/* Product Info Card - Modern & Mobile Friendly */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl md:rounded-[2.5rem] shadow-xl overflow-hidden border border-gray-100 dark:border-gray-700">
                     <div className="p-3 sm:p-6 md:p-10">

@@ -32,7 +32,7 @@ const SupermarketProfile = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const { t } = useTranslation();
-    const { location } = useUserLocation();
+    const { location, error: locationError, loading: locationLoading, retry: retryLocation } = useUserLocation();
     const { convert, getCurrencySymbol } = useCurrencyStore();
     const [supermarket, setSupermarket] = useState(null);
     const [branches, setBranches] = useState([]);
@@ -145,6 +145,25 @@ const SupermarketProfile = () => {
                     <BackButton label="Go Back" onClick={() => navigate(-1)} />
                 </div>
             </div>
+
+            {locationError && (
+                <div className="max-w-4xl mx-auto px-4 mb-4">
+                    <div className="rounded-3xl border border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/10 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div className="min-w-0">
+                            <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">Map location is limited</p>
+                            <p className="text-xs text-amber-800/90 dark:text-amber-100/80">{locationError}</p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={retryLocation}
+                            disabled={locationLoading}
+                            className="shrink-0 inline-flex items-center justify-center rounded-2xl bg-amber-600 px-4 py-2 text-xs font-bold uppercase tracking-widest text-white transition-opacity disabled:opacity-60"
+                        >
+                            Try Again
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Profile Content */}
             <div className="max-w-4xl mx-auto px-4 sm:px-6 mt-4 sm:mt-6 relative z-10">
