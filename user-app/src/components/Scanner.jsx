@@ -309,7 +309,7 @@ const Scanner = ({ onDetected, paused = false }) => {
     }, [paused]);
 
     return (
-        <div className="relative w-full h-64 bg-black rounded-lg overflow-hidden">
+        <div className="relative w-full h-[48vh] sm:h-64 md:h-80 lg:h-96 bg-black rounded-lg overflow-hidden">
             <video
                 ref={videoRef}
                 className="w-full h-full object-cover"
