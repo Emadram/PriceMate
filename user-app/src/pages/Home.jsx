@@ -207,7 +207,7 @@ const Home = () => {
                 <section className="animate-in slide-in-from-bottom-10 duration-700 delay-450">
                     <button
                         onClick={() => navigate('/scan')}
-                        className="w-full group relative bg-black dark:bg-brand-800 dark:hover:bg-brand-700 rounded-[1.75rem] sm:rounded-[2.5rem] p-6 sm:p-8 md:p-12 overflow-hidden shadow-2xl dark:shadow-brand-900/40 transition-all active:scale-[0.99]"
+                        className="tap-target w-full group relative bg-black dark:bg-brand-800 dark:hover:bg-brand-700 rounded-[1.75rem] sm:rounded-[2.5rem] p-6 sm:p-8 md:p-12 overflow-hidden shadow-2xl dark:shadow-brand-900/40 transition-all active:scale-[0.99]"
                     >
                         <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-brand-400/30 dark:bg-brand-500/10 blur-3xl rounded-full transition-transform group-hover:translate-x-12"></div>
                         <div className="relative flex flex-col items-center gap-4 sm:gap-6 md:flex-row md:items-center md:gap-8 text-left">
@@ -228,7 +228,7 @@ const Home = () => {
                                 </div>
                             </div>
                             <div className="md:hidden mt-2">
-                                <span className="px-6 py-2.5 bg-white text-black text-sm font-bold rounded-full">
+                                <span className="tap-target px-6 py-2.5 bg-white text-black text-sm font-bold rounded-full">
                                     {t('start_scanning', 'Start Scanning')}
                                 </span>
                             </div>

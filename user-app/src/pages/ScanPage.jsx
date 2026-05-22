@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Scanner from '../components/Scanner';
+import { fetchGlobalProductWithRetries } from '../utils/productUtils';
+
+const prefetchInflight = new Map();
 import BackButton from '../components/BackButton';
 
 const ScanPage = () => {
@@ -9,6 +12,20 @@ const ScanPage = () => {
 
     const handleDetected = (code) => {
         setScannedCode(code);
+
+        // Kick off a background prefetch for faster navigation and to warm caches.
+        if (!code) return;
+        if (prefetchInflight.has(code)) return;
+        const p = (async () => {
+            try {
+                await fetchGlobalProductWithRetries(code);
+            } catch (e) {
+                // swallow; best-effort
+            } finally {
+                prefetchInflight.delete(code);
+            }
+        })();
+        prefetchInflight.set(code, p);
     };
 
     return (

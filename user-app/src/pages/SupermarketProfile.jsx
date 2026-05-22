@@ -34,6 +34,7 @@ const SupermarketProfile = () => {
     const navigate = useNavigate();
     const { t } = useTranslation();
     const { location, error: locationError, loading: locationLoading, retry: retryLocation } = useUserLocation();
+    const [showRoute, setShowRoute] = useState(false);
     const { convert, getCurrencySymbol } = useCurrencyStore();
     const [supermarket, setSupermarket] = useState(null);
     const [branches, setBranches] = useState([]);
@@ -339,24 +340,36 @@ const SupermarketProfile = () => {
                     <div className="mt-8 space-y-4">
                         <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
                             <div className="flex gap-2">
-                                    <a
-                                        href={buildDirectionsUrl(supermarket.latitude, supermarket.longitude)}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className={`tap-target inline-flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-semibold active:scale-95 transition-all w-full md:w-auto ${
-                                            storeGeoOk
-                                                ? 'bg-black dark:bg-white text-white dark:text-black hover:opacity-90'
-                                                : 'bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-500 pointer-events-none'
-                                        }`}
-                                        aria-disabled={!storeGeoOk}
-                                        title={storeGeoOk ? 'Get Directions' : 'Directions unavailable for this store'}
-                                        onClick={(e) => {
-                                            if (!storeGeoOk) e.preventDefault();
-                                        }}
-                                    >
-                                        <ExternalLink size={16} />
-                                        Get Directions
-                                    </a>
+                                    <div className="flex items-center gap-2">
+                                        <a
+                                            href={buildDirectionsUrl(supermarket.latitude, supermarket.longitude)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className={`tap-target inline-flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-semibold active:scale-95 transition-all w-full md:w-auto ${
+                                                storeGeoOk
+                                                    ? 'bg-black dark:bg-white text-white dark:text-black hover:opacity-90'
+                                                    : 'bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-500 pointer-events-none'
+                                            }`}
+                                            aria-disabled={!storeGeoOk}
+                                            title={storeGeoOk ? 'Get Directions' : 'Directions unavailable for this store'}
+                                            onClick={(e) => {
+                                                if (!storeGeoOk) e.preventDefault();
+                                            }}
+                                        >
+                                            <ExternalLink size={16} />
+                                            Get Directions
+                                        </a>
+
+                                        {user && location && hasValidLatLon(location.latitude, location.longitude) && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowRoute((s) => !s)}
+                                                className={`tap-target inline-flex items-center gap-2 px-4 py-3 rounded-2xl text-sm font-semibold active:scale-95 transition-all ${showRoute ? 'bg-gray-200 dark:bg-gray-700 text-gray-900' : 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white'}`}
+                                            >
+                                                {showRoute ? 'Hide Route' : 'Show Route'}
+                                            </button>
+                                        )}
+                                    </div>
                                 {user && (
                                 <button
                                     onClick={handleReportClick}
@@ -399,6 +412,8 @@ const SupermarketProfile = () => {
                                     center={[supermarket.latitude, supermarket.longitude]} 
                                     zoom={15}
                                     height="100%"
+                                    directionsFrom={showRoute ? location : null}
+                                    directionsTo={showRoute ? { latitude: supermarket.latitude, longitude: supermarket.longitude } : null}
                                 />
                             ) : (
                                 <div className="h-full flex flex-col items-center justify-center bg-gray-50 dark:bg-[#1C1C1E] px-6 text-center">
