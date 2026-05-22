@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import Navbar from '../components/Navbar';
 import { FiSearch, FiCamera, FiChevronRight, FiPackage, FiZap, FiBell, FiInfo, FiAlertTriangle } from 'react-icons/fi';
 import useAnnouncementStore from '../stores/announcementStore';
 import useCategoriesStore from '../stores/categoriesStore';
@@ -86,8 +85,6 @@ const Home = () => {
 
     return (
         <div className="min-h-screen bg-[#F5F5F7] dark:bg-gray-950 pb-safe md:pb-12 text-gray-900 dark:text-gray-100 selection:bg-brand-500/30 transition-colors">
-            <Navbar />
-
             <main className="max-w-5xl mx-auto px-4 pt-3 md:pt-8 space-y-6 sm:space-y-8 md:space-y-12 animate-in fade-in duration-700">
                 {/* Header Section */}
                 <header className="px-1 md:px-0 space-y-3">

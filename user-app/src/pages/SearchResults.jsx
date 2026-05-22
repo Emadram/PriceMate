@@ -6,7 +6,6 @@ import { fetchPricesForProducts, searchProducts, fetchCategories, normalizeProdu
 import ProductCard from '../components/ProductCard';
 import { ProductCardSkeleton } from '../components/SkeletonLoaders';
 import BackButton from '../components/BackButton';
-import Navbar from '../components/Navbar';
 
 const SearchResults = () => {
     const { t } = useTranslation();
@@ -130,8 +129,6 @@ const SearchResults = () => {
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-safe md:pb-8">
-            <Navbar />
-            
             {/* Extended Header for Search Context */}
             <div className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 md:sticky md:top-16 z-30">
                 <div className="max-w-5xl mx-auto px-4 py-4 md:py-6">

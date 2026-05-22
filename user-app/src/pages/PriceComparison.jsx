@@ -8,7 +8,6 @@ import {
 } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
 import { buildDirectionsUrl, calculateDistance, hasValidLatLon, fetchSimilarProductsByCategory, fetchPricesForProducts, getRelationshipId, normalizeProduct } from '../utils/productUtils';
-import Navbar from '../components/Navbar';
 import PriceHistoryChart from '../components/PriceHistoryChart';
 import AddPriceModal from '../components/AddPriceModal';
 import ReportModal from '../components/ReportModal';
@@ -410,8 +409,6 @@ const PriceComparison = () => {
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-safe md:pb-12">
-            <Navbar />
-            
             <main className="max-w-4xl mx-auto px-4 pt-2 pb-6 md:py-8 space-y-4 md:space-y-8">
                 <div className="flex items-center">
                     <BackButton label="Go Back" onClick={handleBack} />

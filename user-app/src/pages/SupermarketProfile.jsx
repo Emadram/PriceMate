@@ -20,7 +20,6 @@ import {
 } from '../utils/productUtils';
 import ReportModal from '../components/ReportModal';
 import StoreMap from '../components/StoreMap';
-import Navbar from '../components/Navbar';
 import BackButton from '../components/BackButton';
 import FavoriteHeartButton from '../components/FavoriteHeartButton';
 import CategoryIconLabel from '../components/CategoryIconLabel';
@@ -147,8 +146,6 @@ const SupermarketProfile = () => {
 
     return (
         <div className="min-h-screen bg-[#FDFDFD] dark:bg-[#0A0A0B] pb-safe">
-            <Navbar />
-
             <div className="max-w-4xl mx-auto px-4 py-4">
                 <div className="flex items-center">
                     <BackButton label="Go Back" onClick={() => navigate(-1)} />
