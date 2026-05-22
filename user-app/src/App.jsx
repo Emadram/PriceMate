@@ -22,6 +22,7 @@ import FeedbackPage from './pages/FeedbackPage';
 import PriceComparison from './pages/PriceComparison';
 import SupermarketProfile from './pages/SupermarketProfile';
 import FloatingAIChatLauncher from './components/FloatingAIChatLauncher';
+import PageTransition from './components/PageTransition';
 
 const AUTH_ROUTE_PREFIXES = ['/login', '/register', '/verify-email', '/forgot-password', '/reset-password'];
 
@@ -127,6 +128,7 @@ function App() {
         }}
       />
       <AppShell>
+      <PageTransition>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
@@ -161,6 +163,7 @@ function App() {
           }
         />
       </Routes>
+      </PageTransition>
       </AppShell>
     </Router>
   );
