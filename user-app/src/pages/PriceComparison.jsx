@@ -409,21 +409,21 @@ const PriceComparison = () => {
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-safe md:pb-12">
-            <main className="max-w-4xl mx-auto px-4 pt-2 pb-6 md:py-8 space-y-4 md:space-y-8">
+            <main className="max-w-4xl mx-auto px-3 sm:px-4 pt-2 pb-6 md:py-8 space-y-3 md:space-y-8">
                 <div className="flex items-center">
                     <BackButton label="Go Back" onClick={handleBack} />
                 </div>
                 {locationError && (
-                    <div className="rounded-3xl border border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/10 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="rounded-3xl border border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/10 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
                         <div className="min-w-0">
-                            <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">Distance view is limited</p>
-                            <p className="text-xs text-amber-800/90 dark:text-amber-100/80">{locationError}</p>
+                            <p className="text-xs sm:text-sm font-semibold text-amber-900 dark:text-amber-200">Distance view is limited</p>
+                            <p className="text-[11px] sm:text-xs text-amber-800/90 dark:text-amber-100/80 leading-snug">{locationError}</p>
                         </div>
                         <button
                             type="button"
                             onClick={retryLocation}
                             disabled={locationLoading}
-                            className="shrink-0 inline-flex items-center justify-center rounded-2xl bg-amber-600 px-4 py-2 text-xs font-bold uppercase tracking-widest text-white transition-opacity disabled:opacity-60"
+                            className="shrink-0 inline-flex items-center justify-center rounded-2xl bg-amber-600 px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-white transition-opacity disabled:opacity-60"
                         >
                             Try Again
                         </button>
@@ -434,31 +434,31 @@ const PriceComparison = () => {
                     <div className="p-3 sm:p-6 md:p-10">
                         <div className="flex flex-col md:flex-row gap-4 sm:gap-6 md:gap-8 items-center md:items-start text-center md:text-left">
                             {/* Product Image */}
-                            <div className="w-[7.5rem] h-[7.5rem] sm:w-36 sm:h-36 md:w-56 md:h-56 lg:w-64 lg:h-64 bg-gray-50 dark:bg-gray-900 rounded-2xl md:rounded-[3rem] flex items-center justify-center flex-shrink-0 overflow-hidden shadow-inner border border-gray-100 dark:border-gray-800/50 relative group">
+                            <div className="w-[6.75rem] h-[6.75rem] sm:w-36 sm:h-36 md:w-56 md:h-56 lg:w-64 lg:h-64 bg-gray-50 dark:bg-gray-900 rounded-2xl md:rounded-[3rem] flex items-center justify-center flex-shrink-0 overflow-hidden shadow-inner border border-gray-100 dark:border-gray-800/50 relative group">
                                 {product.imageUrl ? (
                                     <img
                                         src={product.imageUrl}
                                         alt={product.name}
-                                        className="w-full h-full object-contain p-3 sm:p-6 md:p-8 transition-transform group-hover:scale-110 duration-500"
+                                        className="w-full h-full object-contain p-2.5 sm:p-6 md:p-8 transition-transform group-hover:scale-110 duration-500"
                                     />
                                 ) : (
-                                    <FiPackage className="text-gray-300 text-4xl sm:text-6xl" />
+                                    <FiPackage className="text-gray-300 text-3xl sm:text-6xl" />
                                 )}
                             </div>
 
                             {/* Product Details */}
-                            <div className="flex-1 space-y-3 sm:space-y-4 md:space-y-5 w-full max-w-full">
+                            <div className="flex-1 space-y-2.5 sm:space-y-4 md:space-y-5 w-full max-w-full">
                                 <div className="space-y-2">
                                     <div className="flex items-center justify-center md:justify-start gap-2 flex-wrap">
-                                        <span className="bg-brand-600/10 text-brand-600 dark:text-brand-500 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-brand-600/20">
+                                        <span className="bg-brand-600/10 text-brand-600 dark:text-brand-500 text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest border border-brand-600/20">
                                             {getCategoryName()}
                                         </span>
                                         {product.stockQuantity > 0 && (
-                                            <span className="bg-green-600/10 text-green-600 dark:text-green-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-green-600/20">
+                                            <span className="bg-green-600/10 text-green-600 dark:text-green-400 text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest border border-green-600/20">
                                                 In Stock
                                             </span>
                                         )}
-                                        <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border ${
+                                        <span className={`text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest border ${
                                             typeof product.stockQuantity === 'number' && product.stockQuantity <= 0
                                                 ? 'bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800'
                                                 : typeof product.stockQuantity === 'number' && product.stockQuantity <= 5
@@ -469,7 +469,7 @@ const PriceComparison = () => {
                                         </span>
                                     </div>
                                     <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
-                                        <h2 className="flex-1 min-w-0 text-lg sm:text-2xl md:text-4xl lg:text-5xl font-black text-gray-900 dark:text-white tracking-tighter leading-tight text-center md:text-left">
+                                        <h2 className="flex-1 min-w-0 text-xl sm:text-2xl md:text-4xl lg:text-5xl font-black text-gray-900 dark:text-white tracking-tighter leading-tight text-center md:text-left">
                                             {product.name}
                                         </h2>
                                         <div className="flex items-center justify-center md:justify-end gap-2 sm:gap-3 shrink-0">
@@ -477,7 +477,7 @@ const PriceComparison = () => {
                                                 <button
                                                     type="button"
                                                     onClick={() => setIsReportModalOpen(true)}
-                                                    className="inline-flex items-center gap-2 text-[10px] sm:text-xs font-bold text-gray-400 hover:text-red-500 transition-colors uppercase tracking-widest border border-gray-100 dark:border-gray-700 hover:border-red-100 dark:hover:border-red-900/30 px-3 sm:px-4 py-2 rounded-xl bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm shadow-sm"
+                                                    className="inline-flex items-center gap-2 text-[9px] sm:text-xs font-bold text-gray-400 hover:text-red-500 transition-colors uppercase tracking-widest border border-gray-100 dark:border-gray-700 hover:border-red-100 dark:hover:border-red-900/30 px-2.5 sm:px-4 py-2 rounded-xl bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm shadow-sm"
                                                 >
                                                     <FiAlertTriangle size={14} />
                                                     Report
@@ -505,7 +505,7 @@ const PriceComparison = () => {
                         )}
                         
                         {product.description && (
-                                    <p className="text-sm md:text-base text-gray-500 dark:text-gray-400 leading-relaxed max-w-xl font-medium italic">
+                                    <p className="text-xs sm:text-sm md:text-base text-gray-500 dark:text-gray-400 leading-relaxed max-w-xl font-medium italic">
                                         "{product.description}"
                                     </p>
                                 )}

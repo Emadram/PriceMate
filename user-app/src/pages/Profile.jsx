@@ -70,24 +70,24 @@ const Profile = () => {
 
     return (
         <div className="min-h-screen bg-[#F5F5F7] dark:bg-black text-gray-900 dark:text-gray-100 pb-safe">
-            <header className="pt-safe bg-white/80 dark:bg-black/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 dark:border-white/5 p-4">
+            <header className="pt-safe bg-white/80 dark:bg-black/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 dark:border-white/5 px-4 py-3">
                 <div className="max-w-4xl mx-auto flex items-center justify-between">
                     <BackButton to="/" />
-                    <h1 className="text-xl font-black text-gray-900 dark:text-white flex items-center gap-2">
-                        <FiUser className="text-brand-600" />
+                    <h1 className="text-base sm:text-xl font-black text-gray-900 dark:text-white flex items-center gap-2">
+                        <FiUser className="text-brand-600" size={18} />
                         {t('profile')}
                     </h1>
-                    <div className="w-10" />
+                    <div className="w-8 sm:w-10" />
                 </div>
             </header>
 
-            <div className="max-w-md mx-auto px-6 pt-6">
+            <div className="max-w-md mx-auto px-5 sm:px-6 pt-5 sm:pt-6">
                 {/* Profile Top Section */}
-                <div className="flex flex-col items-center text-center mb-12">
-                    <div className="h-24 w-24 bg-white dark:bg-gray-900 rounded-[2rem] flex items-center justify-center text-brand-600 dark:text-brand-500 text-3xl font-black shadow-soft mb-6 border border-gray-100 dark:border-gray-800">
+                <div className="flex flex-col items-center text-center mb-10 sm:mb-12">
+                    <div className="h-20 w-20 sm:h-24 sm:w-24 bg-white dark:bg-gray-900 rounded-[2rem] flex items-center justify-center text-brand-600 dark:text-brand-500 text-2xl sm:text-3xl font-black shadow-soft mb-4 sm:mb-6 border border-gray-100 dark:border-gray-800">
                         {initials}
                     </div>
-                    <h1 className="text-3xl font-black tracking-tight mb-1">
+                    <h1 className="text-2xl sm:text-3xl font-black tracking-tight mb-1">
                         {user.name}
                     </h1>
                     <p className="text-gray-400 dark:text-gray-500 text-[10px] font-black uppercase tracking-widest">

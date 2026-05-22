@@ -131,16 +131,16 @@ const SearchResults = () => {
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-safe md:pb-8">
             {/* Extended Header for Search Context */}
             <div className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 md:sticky md:top-16 z-30">
-                <div className="max-w-5xl mx-auto px-4 py-4 md:py-6">
-                    <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
-                        <div className="flex items-center justify-between md:justify-start gap-4 flex-shrink-0">
+                <div className="max-w-5xl mx-auto px-3 sm:px-4 py-3 md:py-6">
+                    <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-6">
+                        <div className="flex items-center justify-between md:justify-start gap-3 md:gap-4 flex-shrink-0">
                             <BackButton to="/" label="Back to Home" />
-                            <h1 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white tracking-tighter">
+                            <h1 className="text-lg sm:text-xl md:text-2xl font-black text-gray-900 dark:text-white tracking-tighter">
                                 {t('results')}
                             </h1>
                             <div className="md:hidden">
                                 {products.length > 0 && (
-                                    <span className="bg-brand-600/10 text-brand-600 dark:text-brand-500 text-[10px] font-black px-2 py-1 rounded-lg uppercase tracking-widest">
+                                    <span className="bg-brand-600/10 text-brand-600 dark:text-brand-500 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">
                                         {products.length} Items
                                     </span>
                                 )}
@@ -154,9 +154,9 @@ const SearchResults = () => {
                                     value={searchInput}
                                     onChange={(e) => setSearchInput(e.target.value)}
                                     placeholder={t('search_placeholder')}
-                                    className="w-full min-h-11 pl-5 pr-12 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-brand-500 transition text-sm font-bold shadow-inner"
+                                    className="w-full min-h-11 pl-4 pr-11 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-brand-500 transition text-sm font-bold shadow-inner"
                                 />
-                                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-accent-500 group-focus-within:scale-110 transition-transform">
+                                <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-accent-500 group-focus-within:scale-110 transition-transform">
                                     <FiSearch size={18} className="stroke-[2.5]" />
                                 </div>
                             </div>
@@ -164,7 +164,7 @@ const SearchResults = () => {
                                 <select
                                     value={selectedCategory}
                                     onChange={(e) => setSelectedCategory(e.target.value)}
-                                    className="flex-1 md:flex-none min-h-11 px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 transition text-[10px] font-black uppercase tracking-widest min-w-[120px] appearance-none text-center shadow-inner"
+                                    className="flex-1 md:flex-none min-h-11 px-3 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 transition text-[9px] font-black uppercase tracking-widest min-w-[120px] appearance-none text-center shadow-inner"
                                 >
                                     <option value="">ALL CATEGORIES</option>
                                     {categories.map((cat) => (
@@ -175,7 +175,7 @@ const SearchResults = () => {
                                 </select>
                                 <button
                                     type="submit"
-                                    className="tap-target min-h-11 bg-brand-600 text-white px-6 md:px-8 py-3 rounded-xl hover:bg-black transition shadow-lg shadow-brand-500/20 font-black text-[10px] uppercase tracking-widest active:scale-95"
+                                    className="tap-target min-h-11 bg-brand-600 text-white px-5 md:px-8 py-3 rounded-xl hover:bg-black transition shadow-lg shadow-brand-500/20 font-black text-[9px] uppercase tracking-widest active:scale-95"
                                 >
                                     {t('search')}
                                 </button>
@@ -186,12 +186,12 @@ const SearchResults = () => {
             </div>
 
             <main className="max-w-5xl mx-auto px-4 py-6 md:py-8">
-                <div className="mb-6 md:mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="mb-5 md:mb-8 flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
                     <div className="space-y-1">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">Browsing</p>
-                        <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white">
+                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.28em]">Browsing</p>
+                        <h2 className="text-base sm:text-lg md:text-xl font-bold text-gray-900 dark:text-white leading-tight">
                             {query ? `Results for "${query}"` : 'All Available Products'}
-                            {categoryIdFromUrl && <span className="ml-3 text-[10px] bg-brand-600 text-white px-2 py-0.5 rounded-full uppercase tracking-widest font-black">Filtered</span>}
+                            {categoryIdFromUrl && <span className="ml-2 text-[9px] bg-brand-600 text-white px-2 py-0.5 rounded-full uppercase tracking-widest font-black align-middle">Filtered</span>}
                         </h2>
                     </div>
                     

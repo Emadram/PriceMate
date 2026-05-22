@@ -122,15 +122,15 @@ const Navbar = () => {
             </nav>
 
             {/* Mobile Bottom Navigation */}
-            <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg border-t border-gray-100 dark:border-gray-800 px-6 py-4 pb-safe-nav shadow-soft">
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 mx-2 mb-2 rounded-t-[1.75rem] bg-white/96 dark:bg-gray-900/96 backdrop-blur-xl border border-gray-100/80 dark:border-gray-800/80 px-4 py-3 pb-safe-nav shadow-[0_-12px_30px_rgba(0,0,0,0.08)]">
                 <div className="flex justify-between items-center max-w-md mx-auto">
                     <NavItem to="/" icon={FiHome} label={t('home')} currentPath={location.pathname} />
                     <NavItem to="/search" icon={FiSearch} label={t('search')} currentPath={location.pathname} />
                     <Link
                         to="/scan"
-                        className="w-16 h-16 bg-brand-600 rounded-2xl flex items-center justify-center text-white shadow-soft -mt-10 relative border-8 border-white dark:border-gray-900 active:scale-90 transition-all duration-300"
+                        className="w-15 h-15 bg-brand-600 rounded-[1.35rem] flex items-center justify-center text-white shadow-soft -mt-9 relative border-[6px] border-white dark:border-gray-900 active:scale-90 transition-all duration-300"
                     >
-                        <FiCamera size={28} strokeWidth={2.5} />
+                        <FiCamera size={26} strokeWidth={2.5} />
                     </Link>
                     <NavItem
                         to="/favorites"
@@ -153,16 +153,16 @@ const NavItem = ({ to, icon, label, currentPath, state }) => {
         <Link
                 to={to}
                 state={state}
-                className={`tap-target min-h-11 min-w-11 px-2 flex flex-col items-center justify-center gap-1.5 transition-colors duration-200 ease-out ${
+                className={`tap-target min-h-11 min-w-11 px-1.5 flex flex-col items-center justify-center gap-1 transition-colors duration-200 ease-out ${
                     isActive ? 'text-brand-600 dark:text-brand-500' : 'text-gray-400 dark:text-gray-500'
                 }`}
             >
-            <IconComponent size={22} strokeWidth={isActive ? 2.5 : 2} />
-            <span className={`text-[10px] font-semibold tracking-tight ${isActive ? 'opacity-100' : 'opacity-80'}`}>
+            <IconComponent size={21} strokeWidth={isActive ? 2.5 : 2} />
+            <span className={`text-[9px] font-semibold tracking-tight uppercase ${isActive ? 'opacity-100' : 'opacity-80'}`}>
                 {label}
             </span>
-            <span className="block mt-2 h-2 w-full">
-                <span className={`mx-auto block h-[2px] w-6 origin-center transform transition-transform duration-200 ease-out rounded-full ${isActive ? 'bg-brand-600 scale-x-100' : 'bg-transparent scale-x-0'}`} />
+            <span className="block mt-1.5 h-1.5 w-full">
+                <span className={`mx-auto block h-[2px] w-5 origin-center transform transition-transform duration-200 ease-out rounded-full ${isActive ? 'bg-brand-600 scale-x-100' : 'bg-transparent scale-x-0'}`} />
             </span>
         </Link>
     );
