@@ -203,6 +203,14 @@ const resources = {
       "ai_chat_numbered": "sohbet-{{n}}",
       "ai_chat_thread_empty": "Başlamak için aşağıya bir mesaj yazın.",
       "ai_chat_placeholder_no_thread": "Önce «Yeni» ile sohbet oluşturun…",
+      "route_loading": "Yol hesaplanıyor...",
+      "route_open_in_maps": "Google Haritalar'da Aç",
+      "route_turn_by_turn": "Adım Adım",
+      "route_no_steps": "Adım adım talimat bulunamadı",
+      "route_loading": "Routing...",
+      "route_open_in_maps": "Open in Google Maps",
+      "route_turn_by_turn": "Turn-by-turn",
+      "route_no_steps": "No turn-by-turn steps available",
       "chat_error_schema_conversation_id": "Veritabanınızda sohbet alanı eksik. Appwrite Konsolu: veritabanınız → chat_history koleksiyonu → Öznitelikler → conversationId adında İsteğe bağlı Metin (String, ~64 karakter) ekleyin. Ardından tekrar gönderin.",
       "chat_error_dismiss": "Kapat"
     }
