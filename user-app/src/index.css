@@ -63,3 +63,9 @@
     50% { transform: translateY(-10px); }
   }
 }
+
+/* Premium Dark Mode Map Styling */
+.dark .map-dark-invert .map-tiles {
+  filter: invert(0.92) hue-rotate(180deg) brightness(0.92) contrast(1.12);
+}
+

@@ -449,7 +449,7 @@ const PriceComparison = () => {
                             </div>
 
                             {/* Product Details */}
-                            <div className="flex-1 space-y-3 sm:space-y-4 md:space-y-5 w-full max-w-full">
+                            <div className="flex-1 space-y-3 sm:space-y-4 md:space-y-5 w-full max-w-full relative">
                                 <div className="space-y-2">
                                     <div className="flex items-center justify-center md:justify-start gap-2 flex-wrap">
                                         <span className="bg-brand-600/10 text-brand-600 dark:text-brand-500 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-brand-600/20">
@@ -484,7 +484,7 @@ const PriceComparison = () => {
 
                         {user && (
                         <>
-                        <div className="flex justify-center md:justify-start">
+                        <div className="flex justify-end md:absolute md:right-0 md:top-0 md:z-10 md:mt-0 mt-2">
                             <button
                                 type="button"
                                 onClick={() => setIsReportModalOpen(true)}

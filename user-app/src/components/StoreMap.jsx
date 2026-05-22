@@ -167,6 +167,7 @@ const StoreMap = ({ lat, lon, zoom = 15, height = "300px", supermarkets = [], ce
       layers: [
         new TileLayer({
           source: new OSM(), // OpenStreetMap source (Free)
+          className: 'map-tiles',
         }),
         vectorLayer,
       ],
@@ -242,23 +243,25 @@ const StoreMap = ({ lat, lon, zoom = 15, height = "300px", supermarkets = [], ce
       <div 
         ref={mapElement} 
         style={{ width: '100%', height: '100%' }}
-        className="bg-gray-50 dark:bg-gray-900"
+        className="bg-gray-50 dark:bg-gray-900 map-dark-invert"
       />
-      <div ref={routeOverlayRef} className="absolute top-3 right-3 bg-white/90 dark:bg-gray-900/80 backdrop-blur px-3 py-2 rounded text-sm text-gray-700 dark:text-gray-200 shadow-md" style={{ display: 'none', zIndex: 60 }} />
-      <div className="absolute top-3 left-3 z-60 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setShowSteps((s) => !s)}
-          className="tap-target inline-flex items-center gap-2 px-3 py-2 rounded-2xl bg-white/90 dark:bg-gray-900/80 backdrop-blur text-sm font-semibold shadow-md"
-        >
-          {routingLoading ? (
-            <svg className="w-4 h-4 animate-spin text-gray-600" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" strokeLinecap="round"/></svg>
-          ) : (
-            <MapPin className="w-4 h-4 text-brand-600" />
-          )}
-          <span className="text-xs">{routingLoading ? 'Routing...' : 'Route'}</span>
-        </button>
-      </div>
+      <div ref={routeOverlayRef} className="absolute top-3 right-3 bg-white/90 dark:bg-gray-900/85 backdrop-blur px-3 py-2 rounded-2xl text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-200 shadow-md border border-gray-100 dark:border-white/5" style={{ display: 'none', zIndex: 60 }} />
+      {directionsFrom && directionsTo && (
+        <div className="absolute top-3 left-3 z-60 flex items-center gap-2 animate-in fade-in zoom-in duration-300">
+          <button
+            type="button"
+            onClick={() => setShowSteps((s) => !s)}
+            className="tap-target inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white/90 dark:bg-gray-900/85 backdrop-blur text-xs sm:text-sm font-semibold shadow-md border border-gray-100 dark:border-white/5 active:scale-95 transition-all"
+          >
+            {routingLoading ? (
+              <svg className="w-3.5 h-3.5 animate-spin text-gray-600 dark:text-gray-400" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" strokeLinecap="round"/></svg>
+            ) : (
+              <MapPin className="w-3.5 h-3.5 text-brand-600 dark:text-brand-400" />
+            )}
+            <span className="text-xs">{routingLoading ? t('loading') : t('route_turn_by_turn')}</span>
+          </button>
+        </div>
+      )}
 
       {showSteps && (
         <div className="absolute left-3 bottom-3 right-3 max-h-72 overflow-auto bg-white dark:bg-gray-900/95 backdrop-blur rounded-2xl p-3 shadow-lg z-60">

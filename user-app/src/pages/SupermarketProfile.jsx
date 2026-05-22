@@ -361,11 +361,25 @@ const SupermarketProfile = () => {
                                             {t('get_directions')}
                                         </a>
 
-                                        {user && location && hasValidLatLon(location.latitude, location.longitude) && (
+                                        {locationLoading && !location && (
+                                            <button
+                                                type="button"
+                                                disabled
+                                                className="tap-target inline-flex items-center gap-2 px-4 py-3 rounded-2xl text-sm font-semibold opacity-75 bg-white dark:bg-gray-900 text-gray-400 dark:text-gray-500 border border-gray-100 dark:border-white/5 cursor-not-allowed"
+                                            >
+                                                <svg className="w-4 h-4 animate-spin text-brand-600 dark:text-brand-400" viewBox="0 0 24 24">
+                                                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" strokeLinecap="round" className="opacity-25" />
+                                                    <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" className="opacity-75" />
+                                                </svg>
+                                                {t('loading')}
+                                            </button>
+                                        )}
+
+                                        {location && hasValidLatLon(location.latitude, location.longitude) && (
                                             <button
                                                 type="button"
                                                 onClick={() => setShowRoute((s) => !s)}
-                                                className={`tap-target inline-flex items-center gap-2 px-4 py-3 rounded-2xl text-sm font-semibold active:scale-95 transition-all ${showRoute ? 'bg-gray-200 dark:bg-gray-700 text-gray-900' : 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white'}`}
+                                                className={`tap-target inline-flex items-center gap-2 px-4 py-3 rounded-2xl text-sm font-semibold active:scale-95 transition-all border border-gray-100 dark:border-white/5 shadow-soft hover:shadow-soft-lg ${showRoute ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white' : 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white'}`}
                                             >
                                                 {showRoute ? 'Hide Preview' : t('preview_route')}
                                             </button>
@@ -402,9 +416,8 @@ const SupermarketProfile = () => {
                 <div className="mt-8 sm:mt-12 space-y-8 sm:space-y-12">
                     {/* Map Section */}
                     <section className="space-y-4 sm:space-y-6">
-                        <div className="flex items-center justify-between px-2">
+                        <div className="flex items-center px-2">
                             <h2 className="text-xl sm:text-2xl font-bold dark:text-white tracking-tight">Location</h2>
-                            <span className="text-xs sm:text-sm font-medium text-gray-400">Tap to expand map</span>
                         </div>
                         <div className="rounded-2xl sm:rounded-[2.5rem] overflow-hidden shadow-soft border border-gray-100 dark:border-white/5 h-52 sm:h-64 relative group">
                             {storeGeoOk ? (
