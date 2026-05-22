@@ -28,6 +28,7 @@ import useFavoritesStore from '../stores/favoritesStore';
 import useAuthStore from '../stores/authStore';
 import useUserLocation from '../hooks/useUserLocation';
 import useCurrencyStore from '../stores/currencyStore';
+import StarRating from '../components/StarRating';
 
 const SupermarketProfile = () => {
     const { id } = useParams();
@@ -302,9 +303,9 @@ const SupermarketProfile = () => {
                         <div className="bg-gray-50 dark:bg-[#1C1C1E] p-3 sm:p-4 rounded-xl sm:rounded-2xl">
                             <p className="text-[10px] sm:text-[11px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest mb-1">Rating</p>
                             {ratingValue !== null && ratingValue !== undefined ? (
-                                <div className="flex items-center gap-1">
+                                <div className="flex items-center gap-2">
+                                    <StarRating value={ratingValue} size={16} />
                                     <p className="text-lg sm:text-xl font-bold dark:text-white">{ratingValue}</p>
-                                    <Star size={14} className="fill-yellow-400 text-yellow-400" />
                                     {reviewsCount !== null && reviewsCount !== undefined && (
                                         <span className="text-[10px] text-gray-400 font-medium ml-1">({reviewsCount})</span>
                                     )}

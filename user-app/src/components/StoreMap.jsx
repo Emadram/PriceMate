@@ -18,21 +18,20 @@ import { MapPin, ArrowRight, ArrowLeft, ArrowUp, RotateCcw } from 'lucide-react'
 import { hasValidLatLon } from '../utils/productUtils';
 import { resolveCenter as resolveCenterUtil } from './storeMapUtils';
 
-// Simple in-memory route cache
-const routeCache = new Map();
+// routing uses shared `fetchRoute` util; local cache removed
 
 const StoreMap = ({ lat, lon, zoom = 15, height = "300px", supermarkets = [], center: centerProp, directionsFrom = null, directionsTo = null }) => {
   const { t } = useTranslation();
   const mapRef = useRef();
   const mapElement = useRef();
   const routeOverlayRef = useRef(null);
-  const resolvedSupermarkets = Array.isArray(supermarkets) ? supermarkets : [];
+  const resolvedSupermarkets = React.useMemo(() => (Array.isArray(supermarkets) ? supermarkets : []), [supermarkets]);
 
-  const resolveCenter = () => {
+  const resolveCenter = React.useCallback(() => {
     const center = resolveCenterUtil({ lat, lon, centerProp, supermarkets: resolvedSupermarkets });
     if (!center) return null;
     return fromLonLat([Number(center.longitude), Number(center.latitude)]);
-  };
+  }, [lat, lon, centerProp, resolvedSupermarkets]);
 
   const buildMarkerFeature = (supermarket) => {
     if (!hasValidLatLon(supermarket.latitude, supermarket.longitude)) return null;
@@ -65,43 +64,7 @@ const StoreMap = ({ lat, lon, zoom = 15, height = "300px", supermarkets = [], ce
     return layer;
   };
 
-  const fetchRouteGeoJSON = async (fromLon, fromLat, toLon, toLat, retries = 2) => {
-    const key = `${fromLon},${fromLat}:${toLon},${toLat}`;
-    if (routeCache.has(key)) return routeCache.get(key);
-
-    const url = `https://router.project-osrm.org/route/v1/driving/${fromLon},${fromLat};${toLon},${toLat}?overview=full&geometries=geojson&steps=false`;
-
-    for (let attempt = 0; attempt <= retries; attempt += 1) {
-      try {
-        const resp = await fetch(url, { cache: 'no-cache' });
-        if (!resp.ok) {
-          if (attempt === retries) throw new Error(`OSRM ${resp.status}`);
-          await new Promise((r) => setTimeout(r, 200 * Math.pow(2, attempt) + Math.random() * 100));
-          continue;
-        }
-        const json = await resp.json();
-        if (json && json.routes && json.routes[0] && json.routes[0].geometry) {
-          const out = {
-            geojson: json.routes[0].geometry,
-            distance: json.routes[0].distance,
-            duration: json.routes[0].duration
-          };
-          routeCache.set(key, out);
-          // keep small cache
-          if (routeCache.size > 200) {
-            const firstKey = routeCache.keys().next().value;
-            routeCache.delete(firstKey);
-          }
-          return out;
-        }
-        throw new Error('No route');
-      } catch (err) {
-        if (attempt === retries) throw err;
-        await new Promise((r) => setTimeout(r, 200 * Math.pow(2, attempt) + Math.random() * 100));
-      }
-    }
-    throw new Error('Route fetch failed');
-  };
+  // fetchRouteGeoJSON removed — use shared `fetchRoute` util (fetchRoute handles retries and parsing)
 
   const mapInputsKey = useMemo(
     () =>
@@ -116,9 +79,9 @@ const StoreMap = ({ lat, lon, zoom = 15, height = "300px", supermarkets = [], ce
     [lat, lon, zoom, centerProp, supermarkets]
   );
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  
+
   useEffect(() => {
-    let routeLoading = false;
     const centerCoords = resolveCenter();
     if (!centerCoords) {
       return;
@@ -182,7 +145,6 @@ const StoreMap = ({ lat, lon, zoom = 15, height = "300px", supermarkets = [], ce
     if (directionsFrom && directionsTo && hasValidLatLon(directionsFrom.latitude, directionsFrom.longitude) && hasValidLatLon(directionsTo.latitude, directionsTo.longitude)) {
       (async () => {
         try {
-          routeLoading = true;
           setRoutingLoading(true);
           const fromLon = Number(directionsFrom.longitude);
           const fromLat = Number(directionsFrom.latitude);
@@ -197,7 +159,9 @@ const StoreMap = ({ lat, lon, zoom = 15, height = "300px", supermarkets = [], ce
           try {
             const extent = routeLayer.getSource().getExtent();
             initialMap.getView().fit(extent, { padding: [40, 40, 120, 40], duration: 500 });
-          } catch {}
+          } catch {
+            // ignore fit errors
+          }
           // attach route info overlay
           mapRef.current.__routeInfo = { distance: route.distance, duration: route.duration };
           if (routeOverlayRef.current) {
@@ -215,9 +179,7 @@ const StoreMap = ({ lat, lon, zoom = 15, height = "300px", supermarkets = [], ce
         } catch (err) {
           // ignore route failures - it's best-effort
           console.warn('Route fetch failed', err);
-        }
-        finally {
-          routeLoading = false;
+        } finally {
           setRoutingLoading(false);
         }
       })();
@@ -230,7 +192,7 @@ const StoreMap = ({ lat, lon, zoom = 15, height = "300px", supermarkets = [], ce
         mapRef.current.setTarget(null);
       }
     };
-  }, [mapInputsKey, lat, lon, zoom, centerProp, resolvedSupermarkets]);
+  }, [mapInputsKey, lat, lon, zoom, centerProp, resolvedSupermarkets, directionsFrom, directionsTo, resolveCenter, t]);
 
   const [routingLoading, setRoutingLoading] = useState(false);
   const [showSteps, setShowSteps] = useState(false);

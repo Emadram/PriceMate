@@ -7,7 +7,7 @@ import Sidebar from '../components/Sidebar';
 import { validateSupermarketCoordinates } from '../utils/coordinateValidation';
 
 const Supermarkets = () => {
-    const { supermarkets, loading, fetchSupermarkets, deleteSupermarket, uploadSupermarketLogo } = useSupermarketsStore();
+    const { supermarkets, loading, fetchSupermarkets, deleteSupermarket, uploadSupermarketLogo, setSupermarketStatus } = useSupermarketsStore();
     const [showModal, setShowModal] = useState(false);
     const [editing, setEditing] = useState(null);
     const [uploading, setUploading] = useState(false);
@@ -260,6 +260,18 @@ const Supermarkets = () => {
                                                     </button>
                                                     <button onClick={() => handleDelete(item.$id)} className="p-3 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-2xl transition-all active:scale-95 border border-transparent hover:border-red-100 dark:hover:border-red-800/50">
                                                         <FiTrash2 size={18} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-6 whitespace-nowrap text-right text-sm font-medium">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <button
+                                                        onClick={async () => {
+                                                            const newStatus = (item.status || 'open') === 'open' ? 'close' : 'open';
+                                                            await setSupermarketStatus(item.$id, newStatus);
+                                                        }}
+                                                        className={`px-3 py-2 rounded-2xl font-bold text-sm transition-colors ${((item.status||'open') === 'open') ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                                                        {((item.status||'open') === 'open') ? 'Open' : 'Closed'}
                                                     </button>
                                                 </div>
                                             </td>

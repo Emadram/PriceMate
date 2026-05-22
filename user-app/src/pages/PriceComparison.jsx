@@ -23,44 +23,7 @@ import useProductStore from '../stores/productStore';
 import useFavoritesStore from '../stores/favoritesStore';
 import useCurrencyStore from '../stores/currencyStore';
 import useUserLocation from '../hooks/useUserLocation';
-
-// Small star rating renderer supporting half-stars at .5 increments
-const StarRating = ({ value, size = 14 }) => {
-    if (value === null || value === undefined) return null;
-    const stars = [];
-    for (let i = 1; i <= 5; i++) {
-        const fillType = value >= i ? 'full' : value >= i - 0.5 ? 'half' : 'empty';
-        const key = `star-${i}-${value}`;
-        if (fillType === 'full') {
-            stars.push(
-                <svg key={key} width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className="text-yellow-400">
-                    <path d="M12 .587l3.668 7.431 8.2 1.192-5.934 5.787 1.402 8.168L12 18.896l-7.336 3.969 1.402-8.168L.132 9.21l8.2-1.192z" />
-                </svg>
-            );
-        } else if (fillType === 'half') {
-            // half star using linearGradient
-            const gradId = `grad-${i}-${Math.round(value * 10)}`;
-            stars.push(
-                <svg key={key} width={size} height={size} viewBox="0 0 24 24" className="text-yellow-400">
-                    <defs>
-                        <linearGradient id={gradId} x1="0" x2="1">
-                            <stop offset="50%" stopColor="#F59E0B" />
-                            <stop offset="50%" stopColor="transparent" />
-                        </linearGradient>
-                    </defs>
-                    <path d="M12 .587l3.668 7.431 8.2 1.192-5.934 5.787 1.402 8.168L12 18.896l-7.336 3.969 1.402-8.168L.132 9.21l8.2-1.192z" fill={`url(#${gradId})`} stroke="#F59E0B" />
-                </svg>
-            );
-        } else {
-            stars.push(
-                <svg key={key} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" className="text-yellow-400">
-                    <path d="M12 .587l3.668 7.431 8.2 1.192-5.934 5.787 1.402 8.168L12 18.896l-7.336 3.969 1.402-8.168L.132 9.21l8.2-1.192z" />
-                </svg>
-            );
-        }
-    }
-    return <div className="flex items-center gap-1 text-sm">{stars}</div>;
-};
+import StarRating from '../components/StarRating';
 
 const normalizeStockStatus = (status) => {
     if (!status) return 'in_stock';

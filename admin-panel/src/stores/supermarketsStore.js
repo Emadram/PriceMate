@@ -60,6 +60,7 @@ const useSupermarketsStore = create((set) => ({
                 icon: data.icon || null,
                 isParent: data.isParent || false,
                 parentId: data.parentId || null,
+                status: data.status || 'open',
                 googleMapsUrl: data.googleMapsUrl || null,
                 rating: normalizeOptionalNumber(data.rating, Number.parseFloat),
                 reviewsCount: normalizeOptionalNumber(data.reviewsCount, (value) => Number.parseInt(value, 10))
@@ -90,6 +91,7 @@ const useSupermarketsStore = create((set) => ({
                 icon: data.icon || null,
                 isParent: data.isParent || false,
                 parentId: data.parentId || null,
+                status: data.status ?? undefined,
                 googleMapsUrl: data.googleMapsUrl || null,
                 rating: normalizeOptionalNumber(data.rating, Number.parseFloat),
                 reviewsCount: normalizeOptionalNumber(data.reviewsCount, (value) => Number.parseInt(value, 10))
@@ -99,6 +101,20 @@ const useSupermarketsStore = create((set) => ({
             return true;
         } catch (error) {
             console.error('Update supermarket error:', error);
+            set({ error: error.message, loading: false });
+            return false;
+        }
+    },
+
+    setSupermarketStatus: async (id, status) => {
+        set({ loading: true, error: null });
+        try {
+            await db.supermarkets.update(id, { status });
+            await useSupermarketsStore.getState().fetchSupermarkets();
+            set({ loading: false });
+            return true;
+        } catch (error) {
+            console.error('Set supermarket status error:', error);
             set({ error: error.message, loading: false });
             return false;
         }

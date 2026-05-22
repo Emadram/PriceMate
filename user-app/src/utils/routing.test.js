@@ -22,7 +22,7 @@ const sampleOsrmResponse = {
 
 describe('routing.fetchRoute', () => {
   beforeEach(() => {
-    global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve(sampleOsrmResponse) }));
+    globalThis.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve(sampleOsrmResponse) }));
   });
   afterEach(() => {
     vi.restoreAllMocks();

@@ -18,10 +18,10 @@ const ScanPage = () => {
         if (prefetchInflight.has(code)) return;
         const p = (async () => {
             try {
-                await fetchGlobalProductWithRetries(code);
-            } catch (e) {
-                // swallow; best-effort
-            } finally {
+                    await fetchGlobalProductWithRetries(code);
+                } catch {
+                    // swallow; best-effort
+                } finally {
                 prefetchInflight.delete(code);
             }
         })();

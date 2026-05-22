@@ -32,7 +32,7 @@ export const fetchRoute = async (fromLon, fromLat, toLon, toLat, retries = 2) =>
               });
             });
           });
-        } catch (e) {
+        } catch {
           // ignore
         }
 
