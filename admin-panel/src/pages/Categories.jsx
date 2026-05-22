@@ -159,10 +159,7 @@ const Categories = () => {
                                         <tr key={category.$id} className="hover:bg-blue-50/20 dark:hover:bg-blue-900/10 transition-colors group">
                                             <td className="px-8 py-6 whitespace-nowrap">
                                                 <div className="flex items-center">
-                                                    <div className="flex-shrink-0 h-14 w-14 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-900/40 rounded-[1.5rem] flex items-center justify-center text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800/30 group-hover:scale-105 transition-transform">
-                                                        <FiTag size={24} className="stroke-[2.5]" />
-                                                    </div>
-                                                    <div className="ml-5">
+                                                    <div className="ml-0">
                                                         <div className="text-base font-black text-gray-900 dark:text-white uppercase tracking-tight">
                                                             {category.categoryName}
                                                         </div>

@@ -25,7 +25,9 @@ const Supermarkets = () => {
         icon: '',
         isParent: false,
         parentId: '',
-        googleMapsUrl: ''
+        googleMapsUrl: '',
+        rating: '',
+        reviewsCount: ''
     });
 
     const [searchTerm, setSearchTerm] = useState('');
@@ -68,12 +70,19 @@ const Supermarkets = () => {
             setCoordinateError(nextCoordinateError);
             return;
         }
+        const parseOptionalNumber = (value, parser) => {
+            if (value === '' || value === null || value === undefined) return null;
+            const parsed = parser(value);
+            return Number.isFinite(parsed) ? parsed : null;
+        };
         const data = {
             ...formData,
             latitude: Number(formData.latitude),
             longitude: Number(formData.longitude),
             isParent: formData.isParent,
-            parentId: formData.isParent ? null : formData.parentId
+            parentId: formData.isParent ? null : formData.parentId,
+            rating: parseOptionalNumber(formData.rating, Number.parseFloat),
+            reviewsCount: parseOptionalNumber(formData.reviewsCount, (value) => Number.parseInt(value, 10))
         };
 
         const saved = editing
@@ -92,7 +101,7 @@ const Supermarkets = () => {
     };
 
     const resetForm = () => {
-        setFormData({ name: '', brand: '', branchName: '', latitude: '', longitude: '', address: '', phoneNumber: '', email: '', icon: '', isParent: false, parentId: '', googleMapsUrl: '' });
+        setFormData({ name: '', brand: '', branchName: '', latitude: '', longitude: '', address: '', phoneNumber: '', email: '', icon: '', isParent: false, parentId: '', googleMapsUrl: '', rating: '', reviewsCount: '' });
         setCoordinateError('');
     };
 
@@ -110,7 +119,9 @@ const Supermarkets = () => {
             icon: supermarket.icon || '',
             isParent: supermarket.isParent || false,
             parentId: supermarket.parentId || '',
-            googleMapsUrl: supermarket.googleMapsUrl || ''
+            googleMapsUrl: supermarket.googleMapsUrl || '',
+            rating: supermarket.rating ?? '',
+            reviewsCount: supermarket.reviewsCount ?? supermarket.reviewCount ?? ''
         });
         setCoordinateError('');
         setShowModal(true);
@@ -431,6 +442,34 @@ const Supermarkets = () => {
                                     onChange={(e) => setFormData({ ...formData, googleMapsUrl: e.target.value })}
                                     className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                                 />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Rating</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="5"
+                                        step="0.1"
+                                        placeholder="4.5"
+                                        value={formData.rating}
+                                        onChange={(e) => setFormData({ ...formData, rating: e.target.value })}
+                                        className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Review Count</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="1"
+                                        placeholder="128"
+                                        value={formData.reviewsCount}
+                                        onChange={(e) => setFormData({ ...formData, reviewsCount: e.target.value })}
+                                        className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                    />
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">

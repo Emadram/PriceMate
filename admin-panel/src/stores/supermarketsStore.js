@@ -6,6 +6,12 @@ import { validateSupermarketCoordinates } from '../utils/coordinateValidation';
 const { endpoint: APPWRITE_ENDPOINT, projectId: APPWRITE_PROJECT_ID } = getAppwriteConfig();
 const SUPERMARKETS_LOGO_BUCKET = import.meta.env.VITE_APPWRITE_BUCKET_SUPERMARKET_LOGOS || 'supermarkets-logo';
 
+const normalizeOptionalNumber = (value, parser) => {
+    if (value === '' || value === null || value === undefined) return null;
+    const parsed = parser(value);
+    return Number.isFinite(parsed) ? parsed : null;
+};
+
 const useSupermarketsStore = create((set) => ({
     supermarkets: [],
     loading: false,
@@ -54,7 +60,9 @@ const useSupermarketsStore = create((set) => ({
                 icon: data.icon || null,
                 isParent: data.isParent || false,
                 parentId: data.parentId || null,
-                googleMapsUrl: data.googleMapsUrl || null
+                googleMapsUrl: data.googleMapsUrl || null,
+                rating: normalizeOptionalNumber(data.rating, Number.parseFloat),
+                reviewsCount: normalizeOptionalNumber(data.reviewsCount, (value) => Number.parseInt(value, 10))
             });
             await useSupermarketsStore.getState().fetchSupermarkets();
             set({ loading: false });
@@ -82,7 +90,9 @@ const useSupermarketsStore = create((set) => ({
                 icon: data.icon || null,
                 isParent: data.isParent || false,
                 parentId: data.parentId || null,
-                googleMapsUrl: data.googleMapsUrl || null
+                googleMapsUrl: data.googleMapsUrl || null,
+                rating: normalizeOptionalNumber(data.rating, Number.parseFloat),
+                reviewsCount: normalizeOptionalNumber(data.reviewsCount, (value) => Number.parseInt(value, 10))
             });
             await useSupermarketsStore.getState().fetchSupermarkets();
             set({ loading: false });
