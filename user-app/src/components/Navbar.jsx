@@ -218,8 +218,8 @@ const NavItem = ({ to, icon, label, currentPath, state }) => {
             <span className={`text-[10px] font-semibold tracking-tight ${isActive ? 'opacity-100' : 'opacity-80'}`}>
                 {label}
             </span>
-            <span className="block mt-1 h-2 w-full">
-                <span className={`mx-auto block rounded-full w-1.5 h-1.5 transition-all duration-200 ${isActive ? 'bg-brand-600 scale-100' : 'bg-transparent scale-75'}`} />
+            <span className="block mt-2 h-2 w-full">
+                <span className={`mx-auto block h-[2px] w-6 origin-center transform transition-transform duration-200 ease-out rounded-full ${isActive ? 'bg-brand-600 scale-x-100' : 'bg-transparent scale-x-0'}`} />
             </span>
         </Link>
     );
