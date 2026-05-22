@@ -5,6 +5,7 @@ import { useState } from 'react';
 import useCurrencyStore from '../stores/currencyStore';
 import useAuthStore from '../stores/authStore';
 import ReportModal from '../components/ReportModal';
+import StarRating from './StarRating';
 import CategoryIconLabel from '../components/CategoryIconLabel';
 
 const ProductCard = ({ product, prices = [] }) => {
@@ -140,6 +141,15 @@ const ProductCard = ({ product, prices = [] }) => {
                                 <span>{prices.length} {prices.length === 1 ? t('supermarket') : t('supermarket') + 's'}</span>
                             </div>
                         )}
+                        {/* Compact star-only rating for mobile-first UI */}
+                        {(() => {
+                            const ratingValue = product.rating ?? product.avgRating ?? product.averageRating ?? null;
+                            return ratingValue !== null && ratingValue !== undefined ? (
+                                <div className="ml-2 sm:ml-4 flex items-center">
+                                    <StarRating value={ratingValue} size={12} />
+                                </div>
+                            ) : null;
+                        })()}
                     </div>
                 </div>
                 </div>
