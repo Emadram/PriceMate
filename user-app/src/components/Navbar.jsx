@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { FiUser, FiLogOut, FiMoon, FiSun, FiGlobe, FiHome, FiSearch, FiCamera, FiHeart } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
@@ -14,15 +14,10 @@ const Navbar = () => {
     const { theme, toggleTheme } = useThemeStore();
     const navigate = useNavigate();
     const location = useLocation();
-    const [isCurrencyMenuOpen, setIsCurrencyMenuOpen] = useState(false);
 
     useEffect(() => {
         fetchRates();
     }, [fetchRates]);
-
-    const toggleCurrency = () => {
-        setIsCurrencyMenuOpen(!isCurrencyMenuOpen);
-    };
 
     const toggleLanguage = () => {
         const currentLang = i18n.resolvedLanguage || i18n.language;
@@ -37,7 +32,7 @@ const Navbar = () => {
 
     return (
         <>
-            <nav className="pt-safe bg-white/80 dark:bg-gray-800/80 backdrop-blur-md shadow-sm sticky top-0 z-50 transition-colors duration-200 border-b border-gray-100 dark:border-gray-700">
+            <nav className="hidden md:block pt-safe bg-white/80 dark:bg-gray-800/80 backdrop-blur-md shadow-sm sticky top-0 z-50 transition-colors duration-200 border-b border-gray-100 dark:border-gray-700">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between h-16">
                         {/* Logo */}
@@ -122,60 +117,8 @@ const Navbar = () => {
                             )}
                         </div>
 
-                        {/* Mobile Logo Only Center */}
-                        <div className="md:hidden flex flex-1 justify-center items-center -mr-16">
-                            <span className="font-black text-xl text-gray-900 dark:text-white tracking-tighter">
-                                PriceMate
-                            </span>
-                        </div>
-
-                        {/* Mobile Actions Right */}
-                        <div className="flex items-center md:hidden gap-2">
-                             <button
-                                onClick={toggleCurrency}
-                                className={`tap-target h-11 min-w-11 px-2.5 flex items-center justify-center text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl shadow-sm transition-all ${isCurrencyMenuOpen ? 'bg-brand-50 dark:bg-brand-900/30 text-brand-600 !border-brand-200' : ''}`}
-                            >
-                                <span className="text-[10px] font-black uppercase">{currency}</span>
-                            </button>
-                             <button
-                                onClick={toggleLanguage}
-                                className="tap-target h-11 w-11 flex items-center justify-center text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl shadow-sm"
-                            >
-                                <span className="text-[10px] font-black uppercase">{i18n.resolvedLanguage || i18n.language}</span>
-                            </button>
-                            <button
-                                onClick={toggleTheme}
-                                className="tap-target h-11 w-11 flex items-center justify-center text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl shadow-sm"
-                            >
-                                {theme === 'dark' ? <FiSun size={20} /> : <FiMoon size={20} />}
-                            </button>
-                        </div>
                     </div>
                 </div>
-
-                {/* Mobile Currency Quick Select Drawer */}
-                {isCurrencyMenuOpen && (
-                    <div className="md:hidden border-t border-gray-100 dark:border-gray-700 bg-gray-50/90 dark:bg-gray-900/90 backdrop-blur-sm animate-in slide-in-from-top duration-300 overflow-hidden">
-                        <div className="px-4 py-3 flex items-center justify-between gap-2">
-                            {['TRY', 'USD', 'EUR', 'GBP'].map((curr) => (
-                                <button
-                                    key={curr}
-                                    onClick={() => {
-                                        setCurrency(curr);
-                                        setIsCurrencyMenuOpen(false);
-                                    }}
-                                    className={`flex-1 py-3 text-xs font-black rounded-2xl transition-all ${
-                                        currency === curr 
-                                            ? 'bg-white dark:bg-gray-800 text-brand-600 dark:text-brand-500 shadow-sm border border-brand-100 dark:border-brand-900/50' 
-                                            : 'text-gray-500 dark:text-gray-400 border border-transparent'
-                                    }`}
-                                >
-                                    {curr}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                )}
             </nav>
 
             {/* Mobile Bottom Navigation */}

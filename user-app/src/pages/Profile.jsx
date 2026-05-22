@@ -2,12 +2,16 @@ import { useState, useEffect } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import useAuthStore from '../stores/authStore';
-import { FiHeart, FiMessageSquare, FiShield, FiChevronRight, FiLogOut, FiUser } from 'react-icons/fi';
+import useCurrencyStore from '../stores/currencyStore';
+import useThemeStore from '../stores/themeStore';
+import { FiHeart, FiMessageSquare, FiShield, FiChevronRight, FiLogOut, FiUser, FiMoon, FiSun, FiGlobe } from 'react-icons/fi';
 import BackButton from '../components/BackButton';
 
 const Profile = () => {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const { user, logout, updateProfileName, updatePasswordWhileLoggedIn } = useAuthStore();
+    const { currency, setCurrency } = useCurrencyStore();
+    const { theme, toggleTheme } = useThemeStore();
 
     const [displayName, setDisplayName] = useState('');
     const [nameSaving, setNameSaving] = useState(false);
@@ -31,6 +35,12 @@ const Profile = () => {
         .slice(0, 2) || 'U';
 
     const joinDate = new Date(user.$createdAt).getFullYear();
+
+    const toggleLanguage = () => {
+        const currentLang = i18n.resolvedLanguage || i18n.language;
+        const newLang = currentLang === 'tr' ? 'en' : 'tr';
+        i18n.changeLanguage(newLang);
+    };
 
     const handleSaveName = async (e) => {
         e.preventDefault();
@@ -124,6 +134,50 @@ const Profile = () => {
 
                     {/* Account Info */}
                     <div className="bg-white dark:bg-gray-900 rounded-[2.5rem] p-6 shadow-soft border border-gray-100/50 dark:border-gray-800/50 space-y-6">
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-2 mb-1">
+                                <FiGlobe size={12} className="text-brand-600" />
+                                <span className="text-[10px] uppercase font-black tracking-widest text-gray-400">{t('preferences', 'Preferences')}</span>
+                            </div>
+
+                            <div>
+                                <span className="text-[10px] uppercase font-black tracking-widest text-gray-400 mb-2 block">{t('currency', 'Currency')}</span>
+                                <div className="grid grid-cols-4 gap-2">
+                                    {['TRY', 'USD', 'EUR', 'GBP'].map((curr) => (
+                                        <button
+                                            key={curr}
+                                            type="button"
+                                            onClick={() => setCurrency(curr)}
+                                            className={`tap-target min-h-11 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border ${currency === curr ? 'bg-black dark:bg-white text-white dark:text-black border-black dark:border-white' : 'bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'}`}
+                                        >
+                                            {curr}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <button
+                                    type="button"
+                                    onClick={toggleLanguage}
+                                    className="tap-target min-h-11 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 text-gray-700 dark:text-gray-200 text-xs font-black uppercase tracking-widest"
+                                >
+                                    {(i18n.resolvedLanguage || i18n.language) === 'en' ? 'English' : 'Turkce'}
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={toggleTheme}
+                                    className="tap-target min-h-11 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 text-gray-700 dark:text-gray-200 text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2"
+                                >
+                                    {theme === 'dark' ? <FiSun size={14} /> : <FiMoon size={14} />}
+                                    <span>{theme === 'dark' ? t('light_mode', 'Light') : t('dark_mode', 'Dark')}</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="h-px bg-gray-100/50 dark:bg-gray-800/50" />
+
                         <div>
                             <span className="text-[10px] uppercase font-black tracking-widest text-gray-400 mb-1 block">Email Address</span>
                             <span className="font-bold text-sm tracking-tight">{user.email}</span>
