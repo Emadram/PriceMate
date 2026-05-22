@@ -23,6 +23,7 @@ import PriceComparison from './pages/PriceComparison';
 import SupermarketProfile from './pages/SupermarketProfile';
 import FloatingAIChatLauncher from './components/FloatingAIChatLauncher';
 import PageTransition from './components/PageTransition';
+import Navbar from './components/Navbar';
 
 const AUTH_ROUTE_PREFIXES = ['/login', '/register', '/verify-email', '/forgot-password', '/reset-password'];
 
@@ -31,9 +32,13 @@ const AppShell = ({ children }) => {
   const hideAiLauncher = AUTH_ROUTE_PREFIXES.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`)
   );
+  const hideGlobalNav = AUTH_ROUTE_PREFIXES.some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`)
+  );
 
   return (
     <>
+      {!hideGlobalNav && <Navbar />}
       {children}
       {!hideAiLauncher && <FloatingAIChatLauncher />}
     </>

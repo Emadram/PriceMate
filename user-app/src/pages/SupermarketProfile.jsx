@@ -20,7 +20,6 @@ import {
 } from '../utils/productUtils';
 import ReportModal from '../components/ReportModal';
 import StoreMap from '../components/StoreMap';
-import Navbar from '../components/Navbar';
 import BackButton from '../components/BackButton';
 import FavoriteHeartButton from '../components/FavoriteHeartButton';
 import CategoryIconLabel from '../components/CategoryIconLabel';
@@ -147,8 +146,6 @@ const SupermarketProfile = () => {
 
     return (
         <div className="min-h-screen bg-[#FDFDFD] dark:bg-[#0A0A0B] pb-safe">
-            <Navbar />
-
             <div className="max-w-4xl mx-auto px-4 py-4">
                 <div className="flex items-center">
                     <BackButton label="Go Back" onClick={() => navigate(-1)} />
@@ -175,9 +172,9 @@ const SupermarketProfile = () => {
             )}
 
             {/* Profile Content */}
-            <div className="max-w-4xl mx-auto px-4 sm:px-6 mt-4 sm:mt-6 relative z-10">
+            <div className="max-w-4xl mx-auto px-3 sm:px-6 mt-3 sm:mt-6 relative z-10">
                 <div className="relative bg-white dark:bg-[#121214] rounded-2xl sm:rounded-[2.5rem] shadow-soft p-4 sm:p-6 md:p-8 border border-gray-100 dark:border-white/5 transition-colors">
-                    <div className="absolute top-6 right-6 flex gap-2">
+                    <div className="absolute top-4 right-4 sm:top-6 sm:right-6 flex gap-2">
                         <button className="tap-target h-11 w-11 bg-gray-50 dark:bg-white/5 hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black rounded-full flex items-center justify-center text-gray-500 dark:text-gray-300 transition-all active:scale-90">
                             <Share2 size={18} />
                         </button>
@@ -191,26 +188,26 @@ const SupermarketProfile = () => {
                             }
                         />
                     </div>
-                    <div className="flex flex-col md:flex-row items-start md:items-end gap-4 sm:gap-6 md:gap-8">
+                    <div className="flex flex-col md:flex-row items-start md:items-end gap-3 sm:gap-6 md:gap-8">
                         {/* Logo / Icon */}
-                        <div className="w-24 h-24 sm:w-28 sm:h-32 md:w-32 md:h-32 bg-white dark:bg-[#1C1C1E] rounded-[1.5rem] sm:rounded-[2.2rem] shadow-2xl p-3 sm:p-4 flex items-center justify-center flex-shrink-0 border border-gray-50 dark:border-white/5 overflow-hidden ring-4 sm:ring-8 ring-white dark:ring-[#121214]">
+                        <div className="w-20 h-20 sm:w-28 sm:h-32 md:w-32 md:h-32 bg-white dark:bg-[#1C1C1E] rounded-[1.4rem] sm:rounded-[2.2rem] shadow-2xl p-2.5 sm:p-4 flex items-center justify-center flex-shrink-0 border border-gray-50 dark:border-white/5 overflow-hidden ring-4 sm:ring-8 ring-white dark:ring-[#121214]">
                             {supermarket.icon || supermarket.logoUrl ? (
                                 <img src={supermarket.icon || supermarket.logoUrl} alt={supermarket.name} className="w-full h-full object-contain" />
                             ) : (
-                                <ShoppingBag className="text-gray-300 w-10 h-10 sm:w-12 sm:h-12" />
+                                <ShoppingBag className="text-gray-300 w-8 h-8 sm:w-12 sm:h-12" />
                             )}
                         </div>
 
                         {/* Store Info Header */}
-                        <div className="flex-1 w-full space-y-4">
-                            <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex-1 w-full space-y-3 sm:space-y-4">
+                            <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
                                 {supermarket.isVerified && (
-                                    <span className="bg-brand-50 dark:bg-brand-500/10 text-brand-600 dark:text-brand-500 text-[11px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full border border-brand-100 dark:border-brand-500/20">
+                                    <span className="bg-brand-50 dark:bg-brand-500/10 text-brand-600 dark:text-brand-500 text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full border border-brand-100 dark:border-brand-500/20">
                                         Verified Partner
                                     </span>
                                 )}
                                 {distance && (
-                                    <span className="bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400 text-[12px] font-medium px-2.5 py-1 rounded-full">
+                                    <span className="bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400 text-[11px] font-medium px-2.5 py-1 rounded-full">
                                         {distance} away
                                     </span>
                                 )}
@@ -218,7 +215,7 @@ const SupermarketProfile = () => {
                             
                             <div className="space-y-1 relative">
                                 <div className="flex items-center gap-3">
-                                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 dark:text-white tracking-tight">
+                                    <h1 className="text-xl sm:text-3xl md:text-4xl font-bold text-gray-900 dark:text-white tracking-tight leading-tight">
                                         {supermarket.name}
                                     </h1>
                                     
@@ -250,11 +247,11 @@ const SupermarketProfile = () => {
                                                             <MapPin size={16} className="mt-0.5 text-brand-600 dark:text-brand-500" />
                                                             <div className="flex-1 min-w-0">
                                                                 <p className="text-[10px] font-bold text-brand-600 dark:text-brand-500 uppercase tracking-wider mb-0.5">Current</p>
-                                                                <p className="text-[14px] font-semibold text-gray-900 dark:text-white line-clamp-1">
+                                                                <p className="text-[13px] sm:text-[14px] font-semibold text-gray-900 dark:text-white line-clamp-1">
                                                                     {supermarket.branchName ? `${supermarket.name} — ${supermarket.branchName}` : supermarket.address || 'This branch'}
                                                                 </p>
                                                                 {distance && (
-                                                                    <p className="text-[12px] text-gray-500">{distance} away</p>
+                                                                    <p className="text-[11px] sm:text-[12px] text-gray-500">{distance} away</p>
                                                                 )}
                                                             </div>
                                                         </div>
@@ -270,11 +267,11 @@ const SupermarketProfile = () => {
                                                             >
                                                                 <MapPin size={16} className="mt-0.5 text-gray-400 group-hover:text-black dark:group-hover:text-white" />
                                                                 <div>
-                                                                    <p className="text-[14px] font-semibold text-gray-900 dark:text-white line-clamp-1">
+                                                                    <p className="text-[13px] sm:text-[14px] font-semibold text-gray-900 dark:text-white line-clamp-1">
                                                                         {branch.branchName ? `${branch.name || supermarket.name} — ${branch.branchName}` : branch.address || 'Branch'}
                                                                     </p>
                                                                     {userGeoOk && hasValidLatLon(branch.latitude, branch.longitude) && (
-                                                                        <p className="text-[12px] text-gray-500">{calculateDistance(location.latitude, location.longitude, branch.latitude, branch.longitude)} km away</p>
+                                                                        <p className="text-[11px] sm:text-[12px] text-gray-500">{calculateDistance(location.latitude, location.longitude, branch.latitude, branch.longitude)} km away</p>
                                                                     )}
                                                                 </div>
                                                                 <ChevronRight size={14} className="ml-auto mt-1 text-gray-300 group-hover:text-black dark:group-hover:text-white" />
@@ -295,27 +292,27 @@ const SupermarketProfile = () => {
                     </div>
 
                     {/* Quick Stats / Action Bar */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3 md:gap-4 mt-6 sm:mt-10 pt-6 sm:pt-8 border-t border-gray-50 dark:border-white/5">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3 md:gap-4 mt-5 sm:mt-10 pt-5 sm:pt-8 border-t border-gray-50 dark:border-white/5">
                         <div className="bg-gray-50 dark:bg-[#1C1C1E] p-3 sm:p-4 rounded-xl sm:rounded-2xl">
-                            <p className="text-[10px] sm:text-[11px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest mb-1">Products</p>
-                            <p className="text-lg sm:text-xl font-bold dark:text-white">{products.length}</p>
+                            <p className="text-[9px] sm:text-[11px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest mb-1">Products</p>
+                            <p className="text-base sm:text-xl font-bold dark:text-white">{products.length}</p>
                         </div>
                         <div className="bg-gray-50 dark:bg-[#1C1C1E] p-3 sm:p-4 rounded-xl sm:rounded-2xl">
-                            <p className="text-[10px] sm:text-[11px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest mb-1">Rating</p>
+                            <p className="text-[9px] sm:text-[11px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest mb-1">Rating</p>
                             {ratingValue !== null && ratingValue !== undefined ? (
                                 <div className="flex items-center gap-2">
-                                    <StarRating value={ratingValue} size={16} />
-                                    <p className="text-lg sm:text-xl font-bold dark:text-white">{ratingValue}</p>
+                                    <StarRating value={ratingValue} size={14} />
+                                    <p className="text-base sm:text-xl font-bold dark:text-white">{ratingValue}</p>
                                     {reviewsCount !== null && reviewsCount !== undefined && (
                                         <span className="text-[10px] text-gray-400 font-medium ml-1">({reviewsCount})</span>
                                     )}
                                 </div>
                             ) : (
-                                <p className="text-sm font-semibold text-gray-400 pt-1">No ratings yet</p>
+                                <p className="text-xs sm:text-sm font-semibold text-gray-400 pt-1">No ratings yet</p>
                             )}
                         </div>
                         <div className="bg-gray-50 dark:bg-[#1C1C1E] p-3 sm:p-4 rounded-xl sm:rounded-2xl">
-                            <p className="text-[10px] sm:text-[11px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest mb-1">Status</p>
+                            <p className="text-[9px] sm:text-[11px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest mb-1">Status</p>
                             <div className="flex items-center gap-1.5 pt-1">
                                 {isOpen ? (
                                     <>
@@ -331,8 +328,8 @@ const SupermarketProfile = () => {
                             </div>
                         </div>
                         <div className="bg-gray-50 dark:bg-[#1C1C1E] p-3 sm:p-4 rounded-xl sm:rounded-2xl">
-                            <p className="text-[10px] sm:text-[11px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest mb-1">Last Update</p>
-                            <p className="text-xs sm:text-sm font-semibold dark:text-white pt-1">
+                            <p className="text-[9px] sm:text-[11px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest mb-1">Last Update</p>
+                            <p className="text-[11px] sm:text-sm font-semibold dark:text-white pt-1 leading-snug">
                                 {lastUpdateValue ? formatLastUpdate(lastUpdateValue) : 'No updates yet'}
                             </p>
                         </div>

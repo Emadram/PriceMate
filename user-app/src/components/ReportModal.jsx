@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { FiX, FiAlertTriangle, FiCheckCircle, FiLoader } from 'react-icons/fi';
 import { db } from '../lib/appwrite';
+import useAuthStore from '../stores/authStore';
 
 const ReportModal = ({ isOpen, onClose, targetName, targetType = 'supermarket', targetId }) => {
+    const user = useAuthStore((state) => state.user);
     const [step, setStep] = useState(1);
     const [selectedReason, setSelectedReason] = useState('');
     const [details, setDetails] = useState('');
@@ -37,6 +39,7 @@ const ReportModal = ({ isOpen, onClose, targetName, targetType = 'supermarket', 
         try {
             await db.feedback.create(
                 {
+                    userId: user?.$id,
                     targetId: targetId || 'unknown',
                     targetType,
                     targetName,

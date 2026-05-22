@@ -2,12 +2,16 @@ import { useState, useEffect } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import useAuthStore from '../stores/authStore';
-import { FiHeart, FiMessageSquare, FiShield, FiChevronRight, FiLogOut, FiUser } from 'react-icons/fi';
+import useCurrencyStore from '../stores/currencyStore';
+import useThemeStore from '../stores/themeStore';
+import { FiHeart, FiMessageSquare, FiShield, FiChevronRight, FiLogOut, FiUser, FiMoon, FiSun, FiGlobe } from 'react-icons/fi';
 import BackButton from '../components/BackButton';
 
 const Profile = () => {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const { user, logout, updateProfileName, updatePasswordWhileLoggedIn } = useAuthStore();
+    const { currency, setCurrency } = useCurrencyStore();
+    const { theme, toggleTheme } = useThemeStore();
 
     const [displayName, setDisplayName] = useState('');
     const [nameSaving, setNameSaving] = useState(false);
@@ -31,6 +35,12 @@ const Profile = () => {
         .slice(0, 2) || 'U';
 
     const joinDate = new Date(user.$createdAt).getFullYear();
+
+    const toggleLanguage = () => {
+        const currentLang = i18n.resolvedLanguage || i18n.language;
+        const newLang = currentLang === 'tr' ? 'en' : 'tr';
+        i18n.changeLanguage(newLang);
+    };
 
     const handleSaveName = async (e) => {
         e.preventDefault();
@@ -60,24 +70,24 @@ const Profile = () => {
 
     return (
         <div className="min-h-screen bg-[#F5F5F7] dark:bg-black text-gray-900 dark:text-gray-100 pb-safe">
-            <header className="pt-safe bg-white/80 dark:bg-black/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 dark:border-white/5 p-4">
+            <header className="pt-safe bg-white/80 dark:bg-black/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 dark:border-white/5 px-4 py-3">
                 <div className="max-w-4xl mx-auto flex items-center justify-between">
                     <BackButton to="/" />
-                    <h1 className="text-xl font-black text-gray-900 dark:text-white flex items-center gap-2">
-                        <FiUser className="text-brand-600" />
+                    <h1 className="text-base sm:text-xl font-black text-gray-900 dark:text-white flex items-center gap-2">
+                        <FiUser className="text-brand-600" size={18} />
                         {t('profile')}
                     </h1>
-                    <div className="w-10" />
+                    <div className="w-8 sm:w-10" />
                 </div>
             </header>
 
-            <div className="max-w-md mx-auto px-6 pt-6">
+            <div className="max-w-md mx-auto px-5 sm:px-6 pt-5 sm:pt-6">
                 {/* Profile Top Section */}
-                <div className="flex flex-col items-center text-center mb-12">
-                    <div className="h-24 w-24 bg-white dark:bg-gray-900 rounded-[2rem] flex items-center justify-center text-brand-600 dark:text-brand-500 text-3xl font-black shadow-soft mb-6 border border-gray-100 dark:border-gray-800">
+                <div className="flex flex-col items-center text-center mb-10 sm:mb-12">
+                    <div className="h-20 w-20 sm:h-24 sm:w-24 bg-white dark:bg-gray-900 rounded-[2rem] flex items-center justify-center text-brand-600 dark:text-brand-500 text-2xl sm:text-3xl font-black shadow-soft mb-4 sm:mb-6 border border-gray-100 dark:border-gray-800">
                         {initials}
                     </div>
-                    <h1 className="text-3xl font-black tracking-tight mb-1">
+                    <h1 className="text-2xl sm:text-3xl font-black tracking-tight mb-1">
                         {user.name}
                     </h1>
                     <p className="text-gray-400 dark:text-gray-500 text-[10px] font-black uppercase tracking-widest">
@@ -124,6 +134,50 @@ const Profile = () => {
 
                     {/* Account Info */}
                     <div className="bg-white dark:bg-gray-900 rounded-[2.5rem] p-6 shadow-soft border border-gray-100/50 dark:border-gray-800/50 space-y-6">
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-2 mb-1">
+                                <FiGlobe size={12} className="text-brand-600" />
+                                <span className="text-[10px] uppercase font-black tracking-widest text-gray-400">{t('preferences', 'Preferences')}</span>
+                            </div>
+
+                            <div>
+                                <span className="text-[10px] uppercase font-black tracking-widest text-gray-400 mb-2 block">{t('currency', 'Currency')}</span>
+                                <div className="grid grid-cols-4 gap-2">
+                                    {['TRY', 'USD', 'EUR', 'GBP'].map((curr) => (
+                                        <button
+                                            key={curr}
+                                            type="button"
+                                            onClick={() => setCurrency(curr)}
+                                            className={`tap-target min-h-11 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border ${currency === curr ? 'bg-black dark:bg-white text-white dark:text-black border-black dark:border-white' : 'bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'}`}
+                                        >
+                                            {curr}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <button
+                                    type="button"
+                                    onClick={toggleLanguage}
+                                    className="tap-target min-h-11 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 text-gray-700 dark:text-gray-200 text-xs font-black uppercase tracking-widest"
+                                >
+                                    {(i18n.resolvedLanguage || i18n.language) === 'en' ? 'English' : 'Turkce'}
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={toggleTheme}
+                                    className="tap-target min-h-11 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 text-gray-700 dark:text-gray-200 text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2"
+                                >
+                                    {theme === 'dark' ? <FiSun size={14} /> : <FiMoon size={14} />}
+                                    <span>{theme === 'dark' ? t('light_mode', 'Light') : t('dark_mode', 'Dark')}</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="h-px bg-gray-100/50 dark:bg-gray-800/50" />
+
                         <div>
                             <span className="text-[10px] uppercase font-black tracking-widest text-gray-400 mb-1 block">Email Address</span>
                             <span className="font-bold text-sm tracking-tight">{user.email}</span>
