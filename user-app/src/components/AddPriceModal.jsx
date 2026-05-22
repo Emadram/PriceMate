@@ -72,7 +72,7 @@ const AddPriceModal = ({ isOpen, onClose, product }) => {
             
             {/* Modal */}
             <div className="relative bg-white dark:bg-gray-900 w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in slide-in-from-bottom-5 duration-300">
-                <div className="p-8">
+                <div className="p-8 pb-safe-nav">
                     {/* Header */}
                     <div className="flex items-center justify-between mb-8">
                         <div>

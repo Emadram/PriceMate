@@ -844,8 +844,8 @@ const PriceComparison = () => {
 
             {/* Quick actions only when coming from scanner */}
             {fromScan && (
-                <div className="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur border-t border-gray-200 dark:border-gray-700 z-40">
-                    <div className="max-w-4xl mx-auto px-4 py-3 pb-safe-nav flex gap-3">
+                <div className="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur border-t border-gray-200 dark:border-gray-700 z-40 pb-safe-nav">
+                    <div className="max-w-4xl mx-auto px-4 py-3 flex gap-3">
                         <button
                             onClick={handleGoHome}
                             aria-label="Go to home page"
