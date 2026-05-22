@@ -60,7 +60,10 @@ const supermarkets = [
         latitude: 41.0082,
         longitude: 28.9784,
         address: 'Istiklal Cad. 1, Istanbul',
-        icon: 'store'
+        icon: 'store',
+        googleMapsUrl: 'https://maps.google.com/?q=41.0082,28.9784',
+        rating: 4.5,
+        reviewsCount: 128
     },
     {
         name: 'GreenGrocer',
@@ -68,7 +71,10 @@ const supermarkets = [
         latitude: 39.9334,
         longitude: 32.8597,
         address: 'Ataturk Bulv. 10, Ankara',
-        icon: 'store'
+        icon: 'store',
+        googleMapsUrl: 'https://maps.google.com/?q=39.9334,32.8597',
+        rating: 3.5,
+        reviewsCount: 42
     }
 ];
 
