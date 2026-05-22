@@ -8,6 +8,7 @@ import useCategoriesStore from '../stores/categoriesStore';
 import { fetchProducts, fetchPricesForProducts, normalizeProduct } from '../utils/productUtils';
 import ProductCard from '../components/ProductCard';
 import { ProductCardSkeleton } from '../components/SkeletonLoaders';
+import MarketsSection from '../components/MarketsSection';
 
 const Home = () => {
     const { t } = useTranslation();
@@ -290,6 +291,8 @@ const Home = () => {
                         </div>
                     )}
                 </section>
+                
+                <MarketsSection />
             </main>
         </div>
     );
