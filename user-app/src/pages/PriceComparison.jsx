@@ -449,7 +449,7 @@ const PriceComparison = () => {
                             </div>
 
                             {/* Product Details */}
-                            <div className="flex-1 space-y-3 sm:space-y-4 md:space-y-5 w-full max-w-full relative">
+                            <div className="flex-1 space-y-3 sm:space-y-4 md:space-y-5 w-full max-w-full">
                                 <div className="space-y-2">
                                     <div className="flex items-center justify-center md:justify-start gap-2 flex-wrap">
                                         <span className="bg-brand-600/10 text-brand-600 dark:text-brand-500 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-brand-600/20">
@@ -470,30 +470,32 @@ const PriceComparison = () => {
                                             {typeof product.stockQuantity === 'number' ? `${product.stockQuantity} Units` : 'Stock count unavailable'}
                                         </span>
                                     </div>
-                                    <div className="flex items-start justify-center md:justify-start gap-3">
+                                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
                                         <h2 className="flex-1 min-w-0 text-lg sm:text-2xl md:text-4xl lg:text-5xl font-black text-gray-900 dark:text-white tracking-tighter leading-tight text-center md:text-left">
                                             {product.name}
                                         </h2>
-                                        <FavoriteHeartButton
-                                            className="mt-1"
-                                            pressed={isProductFavorite(product.$id)}
-                                            onClick={handleFavoriteClick}
-                                        />
+                                        <div className="flex items-center justify-center md:justify-end gap-2 sm:gap-3 shrink-0">
+                                            {user && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsReportModalOpen(true)}
+                                                    className="inline-flex items-center gap-2 text-[10px] sm:text-xs font-bold text-gray-400 hover:text-red-500 transition-colors uppercase tracking-widest border border-gray-100 dark:border-gray-700 hover:border-red-100 dark:hover:border-red-900/30 px-3 sm:px-4 py-2 rounded-xl bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm shadow-sm"
+                                                >
+                                                    <FiAlertTriangle size={14} />
+                                                    Report
+                                                </button>
+                                            )}
+                                            <FavoriteHeartButton
+                                                className="shrink-0"
+                                                pressed={isProductFavorite(product.$id)}
+                                                onClick={handleFavoriteClick}
+                                            />
+                                        </div>
                                     </div>
                                 </div>
 
                         {user && (
                         <>
-                        <div className="flex justify-end md:absolute md:right-0 md:top-0 md:z-10 md:mt-0 mt-2">
-                            <button
-                                type="button"
-                                onClick={() => setIsReportModalOpen(true)}
-                                className="inline-flex items-center gap-2 text-xs font-bold text-gray-400 hover:text-red-500 transition-colors uppercase tracking-widest border border-gray-100 dark:border-gray-700 hover:border-red-100 dark:hover:border-red-900/30 px-4 py-2 rounded-xl bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm shadow-sm"
-                            >
-                                <FiAlertTriangle size={14} />
-                                Report Issue with this product
-                            </button>
-                        </div>
                         <ReportModal 
                             isOpen={isReportModalOpen} 
                             onClose={() => setIsReportModalOpen(false)} 
