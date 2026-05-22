@@ -208,12 +208,12 @@ const NavItem = ({ to, icon, label, currentPath, state }) => {
     const isActive = currentPath === to;
     return (
         <Link
-            to={to}
-            state={state}
-            className={`tap-target min-h-11 min-w-11 px-2 flex flex-col items-center justify-center gap-1.5 transition-all active:scale-90 ${
-                isActive ? 'text-brand-600 dark:text-brand-500' : 'text-gray-400 dark:text-gray-500'
-            }`}
-        >
+                to={to}
+                state={state}
+                className={`tap-target min-h-11 min-w-11 px-2 flex flex-col items-center justify-center gap-1.5 transform-gpu transition-transform duration-200 ease-out ${
+                    isActive ? 'text-brand-600 dark:text-brand-500 -translate-y-1 scale-105' : 'text-gray-400 dark:text-gray-500'
+                }`}
+            >
             <IconComponent size={22} strokeWidth={isActive ? 2.5 : 2} />
             <span className={`text-[10px] font-semibold tracking-tight ${isActive ? 'opacity-100' : 'opacity-80'}`}>
                 {label}
