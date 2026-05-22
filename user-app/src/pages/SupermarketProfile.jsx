@@ -128,6 +128,7 @@ const SupermarketProfile = () => {
 
     const userGeoOk = location && hasValidLatLon(location.latitude, location.longitude);
     const storeGeoOk = hasValidLatLon(supermarket.latitude, supermarket.longitude);
+    const hasDirections = storeGeoOk || (supermarket.googleMapsUrl && supermarket.googleMapsUrl.trim());
     const distance = userGeoOk && storeGeoOk
         ? calculateDistance(location.latitude, location.longitude, supermarket.latitude, supermarket.longitude)
         : null;
@@ -342,22 +343,22 @@ const SupermarketProfile = () => {
                             <div className="flex gap-2">
                                     <div className="flex items-center gap-2">
                                         <a
-                                            href={buildDirectionsUrl(supermarket.latitude, supermarket.longitude)}
+                                            href={buildDirectionsUrl(supermarket.latitude, supermarket.longitude, supermarket.googleMapsUrl)}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className={`tap-target inline-flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-semibold active:scale-95 transition-all w-full md:w-auto ${
-                                                storeGeoOk
+                                                hasDirections
                                                     ? 'bg-black dark:bg-white text-white dark:text-black hover:opacity-90'
                                                     : 'bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-500 pointer-events-none'
                                             }`}
-                                            aria-disabled={!storeGeoOk}
-                                            title={storeGeoOk ? 'Get Directions' : 'Directions unavailable for this store'}
+                                            aria-disabled={!hasDirections}
+                                            title={hasDirections ? t('get_directions') : 'Directions unavailable for this store'}
                                             onClick={(e) => {
-                                                if (!storeGeoOk) e.preventDefault();
+                                                if (!hasDirections) e.preventDefault();
                                             }}
                                         >
                                             <ExternalLink size={16} />
-                                            Get Directions
+                                            {t('get_directions')}
                                         </a>
 
                                         {user && location && hasValidLatLon(location.latitude, location.longitude) && (
@@ -366,7 +367,7 @@ const SupermarketProfile = () => {
                                                 onClick={() => setShowRoute((s) => !s)}
                                                 className={`tap-target inline-flex items-center gap-2 px-4 py-3 rounded-2xl text-sm font-semibold active:scale-95 transition-all ${showRoute ? 'bg-gray-200 dark:bg-gray-700 text-gray-900' : 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white'}`}
                                             >
-                                                {showRoute ? 'Hide Route' : 'Show Route'}
+                                                {showRoute ? 'Hide Preview' : t('preview_route')}
                                             </button>
                                         )}
                                     </div>

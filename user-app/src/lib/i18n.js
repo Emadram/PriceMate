@@ -29,7 +29,8 @@ const resources = {
       "out_of_stock": "Out of Stock",
       "price_history": "Price History",
       "available_stores": "Available Stores",
-      "get_directions": "Get Directions",
+      "get_directions": "Open in Google Maps",
+      "preview_route": "Preview Route",
       "trends": "Trends",
       "personalized_deals": "Personalized deals for you",
       "view_all": "View All",
@@ -102,7 +103,10 @@ const resources = {
       "ai_chat_thread_empty": "Send a message below to begin.",
       "ai_chat_placeholder_no_thread": "Create a chat with “New” first…",
       "chat_error_schema_conversation_id": "Your Appwrite database is missing the optional chat attribute. In Appwrite Console: open your database → chat_history collection → Attributes → create a String attribute named conversationId (not required, length ~64). Then save again.",
-      "chat_error_dismiss": "Dismiss"
+      "chat_error_dismiss": "Dismiss",
+      "route_loading": "Loading Route...",
+      "route_turn_by_turn": "Turn-by-turn",
+      "route_no_steps": "No turn-by-turn steps available"
     }
   },
   tr: {
@@ -131,7 +135,8 @@ const resources = {
       "out_of_stock": "Stokta Yok",
       "price_history": "Fiyat Geçmişi",
       "available_stores": "Mevcut Mağazalar",
-      "get_directions": "Yol Tarifi Al",
+      "get_directions": "Google Haritalar'da Aç",
+      "preview_route": "Rotayı Önizle",
       "trends": "Trendler",
       "personalized_deals": "Sizin için seçilen fırsatlar",
       "view_all": "Tümünü Gör",
@@ -207,10 +212,6 @@ const resources = {
       "route_open_in_maps": "Google Haritalar'da Aç",
       "route_turn_by_turn": "Adım Adım",
       "route_no_steps": "Adım adım talimat bulunamadı",
-      "route_loading": "Routing...",
-      "route_open_in_maps": "Open in Google Maps",
-      "route_turn_by_turn": "Turn-by-turn",
-      "route_no_steps": "No turn-by-turn steps available",
       "chat_error_schema_conversation_id": "Veritabanınızda sohbet alanı eksik. Appwrite Konsolu: veritabanınız → chat_history koleksiyonu → Öznitelikler → conversationId adında İsteğe bağlı Metin (String, ~64 karakter) ekleyin. Ardından tekrar gönderin.",
       "chat_error_dismiss": "Kapat"
     }

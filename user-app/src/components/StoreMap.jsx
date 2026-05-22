@@ -22,9 +22,10 @@ import { resolveCenter as resolveCenterUtil } from './storeMapUtils';
 const routeCache = new Map();
 
 const StoreMap = ({ lat, lon, zoom = 15, height = "300px", supermarkets = [], center: centerProp, directionsFrom = null, directionsTo = null }) => {
+  const { t } = useTranslation();
   const mapRef = useRef();
   const mapElement = useRef();
-    const routeOverlayRef = useRef(null);
+  const routeOverlayRef = useRef(null);
   const resolvedSupermarkets = Array.isArray(supermarkets) ? supermarkets : [];
 
   const resolveCenter = () => {
@@ -177,8 +178,6 @@ const StoreMap = ({ lat, lon, zoom = 15, height = "300px", supermarkets = [], ce
     });
 
     // If directions props are provided, attempt to render a route layer
-    const { t } = useTranslation();
-
     if (directionsFrom && directionsTo && hasValidLatLon(directionsFrom.latitude, directionsFrom.longitude) && hasValidLatLon(directionsTo.latitude, directionsTo.longitude)) {
       (async () => {
         try {

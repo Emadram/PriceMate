@@ -1,14 +1,7 @@
-const routeCache = new Map();
-
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-export const clearRouteCache = () => {
-  routeCache.clear();
-};
-
 export const fetchRoute = async (fromLon, fromLat, toLon, toLat, retries = 2) => {
-  const key = `${fromLon},${fromLat}:${toLon},${toLat}`;
-  if (routeCache.has(key)) return routeCache.get(key);
+  // Always fetch fresh route; no client-side caching to prefer external map providers.
 
   // Use OSRM public server (best-effort). Include steps=true for turn-by-turn.
   const url = `https://router.project-osrm.org/route/v1/driving/${fromLon},${fromLat};${toLon},${toLat}?overview=full&geometries=geojson&steps=true`;
@@ -43,18 +36,12 @@ export const fetchRoute = async (fromLon, fromLat, toLon, toLat, retries = 2) =>
           // ignore
         }
 
-        const out = {
+        return {
           geojson: route.geometry,
           distance: route.distance,
           duration: route.duration,
           steps,
         };
-        routeCache.set(key, out);
-        if (routeCache.size > 200) {
-          const k = routeCache.keys().next().value;
-          routeCache.delete(k);
-        }
-        return out;
       }
       throw new Error('No route');
     } catch (err) {

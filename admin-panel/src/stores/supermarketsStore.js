@@ -53,7 +53,8 @@ const useSupermarketsStore = create((set) => ({
                 email: data.email || null,
                 icon: data.icon || null,
                 isParent: data.isParent || false,
-                parentId: data.parentId || null
+                parentId: data.parentId || null,
+                googleMapsUrl: data.googleMapsUrl || null
             });
             await useSupermarketsStore.getState().fetchSupermarkets();
             set({ loading: false });
@@ -80,7 +81,8 @@ const useSupermarketsStore = create((set) => ({
                 email: data.email || null,
                 icon: data.icon || null,
                 isParent: data.isParent || false,
-                parentId: data.parentId || null
+                parentId: data.parentId || null,
+                googleMapsUrl: data.googleMapsUrl || null
             });
             await useSupermarketsStore.getState().fetchSupermarkets();
             set({ loading: false });

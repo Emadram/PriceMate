@@ -1,111 +1,9 @@
 const ROUTER_BASE = 'https://router.project-osrm.org';
 
-// Simple in-memory cache + inflight dedupe for the Appwrite function
-class SimpleCache {
-    constructor(limit = 1000) {
-        this.limit = limit;
-        this.map = new Map();
-    }
-    get(k) {
-        const e = this.map.get(k);
-        if (!e) return undefined;
-        if (e.expires && Date.now() > e.expires) {
-            this.map.delete(k);
-            return undefined;
-        }
-        // refresh
-        this.map.delete(k);
-        this.map.set(k, e);
-        return e.value;
-    }
-    set(k, v, ttlMs = 0) {
-        const expires = ttlMs > 0 ? Date.now() + ttlMs : null;
-        this.map.delete(k);
-        this.map.set(k, { value: v, expires });
-        if (this.map.size > this.limit) {
-            const first = this.map.keys().next().value;
-            this.map.delete(first);
-        }
-    }
-}
-
-const cache = new SimpleCache(2000);
+// inflight dedupe for the Appwrite function
 const inflight = new Map();
 
-// Optional Appwrite persistent cache
-let appwriteClient = null;
-let appwriteDB = null;
-let AppwriteQuery = null;
-const ROUTE_PERSIST_TTL = Number(process.env.ROUTE_CACHE_TTL_MS || 1000 * 60 * 60); // default 1 hour
-
-const initAppwrite = () => {
-    if (appwriteClient) return;
-    const endpoint = process.env.APPWRITE_ENDPOINT || process.env.APPWRITE_FUNCTION_ENDPOINT;
-    const project = process.env.APPWRITE_PROJECT || process.env.APPWRITE_FUNCTION_PROJECT;
-    const apiKey = process.env.APPWRITE_API_KEY || process.env.APPWRITE_FUNCTION_API_KEY;
-    const databaseId = process.env.APPWRITE_DATABASE_ID || process.env.APPWRITE_FUNCTION_DATABASE_ID;
-    const collectionId = process.env.APPWRITE_ROUTE_COLLECTION_ID || process.env.APPWRITE_FUNCTION_ROUTE_COLLECTION_ID;
-    if (!endpoint || !project || !apiKey || !databaseId || !collectionId) return;
-    try {
-        const { Client, Databases, Query } = require('node-appwrite');
-        const client = new Client();
-        client.setEndpoint(endpoint).setProject(project).setKey(apiKey);
-        const databases = new Databases(client);
-        appwriteClient = { client, databaseId, collectionId };
-        appwriteDB = databases;
-        AppwriteQuery = Query;
-    } catch (e) {
-        // ignore if node-appwrite not available in environment
-    }
-};
-
-const fetchPersistent = async (key, log) => {
-    try {
-        initAppwrite();
-        if (!appwriteDB || !AppwriteQuery) return null;
-        const { databaseId, collectionId } = appwriteClient;
-        const res = await appwriteDB.listDocuments(databaseId, collectionId, [AppwriteQuery.equal('key', key), AppwriteQuery.limit(1)]);
-        const doc = res.documents && res.documents[0];
-        if (!doc) return null;
-        // Check freshness by $updatedAt
-        const updated = Date.parse(doc.$updatedAt || doc.$createdAt || Date.now());
-        if (!Number.isFinite(updated)) return null;
-        if (Date.now() - updated > ROUTE_PERSIST_TTL) {
-            log && log(`osrm-proxy: persistent cache stale for ${key}`);
-            return null;
-        }
-        log && log(`osrm-proxy: persistent cache hit ${key}`);
-        return doc.payload || null;
-    } catch (e) {
-        // ignore persistent cache errors
-        return null;
-    }
-};
-
-const savePersistent = async (key, payload, log) => {
-    try {
-        initAppwrite();
-        if (!appwriteDB || !AppwriteQuery) return;
-        const { databaseId, collectionId } = appwriteClient;
-        // Try find existing document
-        const res = await appwriteDB.listDocuments(databaseId, collectionId, [AppwriteQuery.equal('key', key), AppwriteQuery.limit(1)]);
-        const doc = res.documents && res.documents[0];
-        if (doc && doc.$id) {
-            try {
-                await appwriteDB.updateDocument(databaseId, collectionId, doc.$id, { key, payload });
-                log && log(`osrm-proxy: persistent cache updated ${key}`);
-                return;
-            } catch (e) {
-                // fallback to create
-            }
-        }
-        const id = `${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
-        await appwriteDB.createDocument(databaseId, collectionId, id, { key, payload }, ['role:all'], ['role:all']);
-        log && log(`osrm-proxy: persistent cache saved ${key}`);
-    } catch (e) {
-        // ignore errors
-    }
-};
+// No persistent caching — we prefer external direction providers (Google Maps) and fresh fetches.
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -162,11 +60,6 @@ module.exports = async ({ req, res, log, error }) => {
         }
 
         const key = `${fromLon},${fromLat}:${toLon},${toLat}`;
-        const cached = cache.get(key);
-        if (cached) {
-            log(`osrm-proxy: cache hit ${key}`);
-            return res.json({ ok: true, status: 200, data: cached }, 200);
-        }
 
         if (inflight.has(key)) {
             log(`osrm-proxy: dedupe wait ${key}`);
@@ -186,7 +79,7 @@ module.exports = async ({ req, res, log, error }) => {
                 if (!resp) throw new Error('No response from OSRM');
                 const json = await resp.json();
                 if (!json || !json.routes || !json.routes[0]) throw new Error('No route');
-                cache.set(key, json, 1000 * 60 * 60); // 1 hour
+                // No caching: return fresh route (we prefer external map providers like Google Maps)
                 return json;
             } catch (err) {
                 throw err;

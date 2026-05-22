@@ -110,7 +110,8 @@ const fetchWithBackoff = async (url, options = {}, config = {}) => {
     return null;
 };
 
-export const buildDirectionsUrl = (latitude, longitude) => {
+export const buildDirectionsUrl = (latitude, longitude, googleMapsUrl = null) => {
+    if (googleMapsUrl && googleMapsUrl.trim()) return googleMapsUrl.trim();
     if (!hasValidLatLon(latitude, longitude)) return '';
     return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${latitude},${longitude}`)}`;
 };

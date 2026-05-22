@@ -24,7 +24,8 @@ const Supermarkets = () => {
         email: '',
         icon: '',
         isParent: false,
-        parentId: ''
+        parentId: '',
+        googleMapsUrl: ''
     });
 
     const [searchTerm, setSearchTerm] = useState('');
@@ -91,7 +92,7 @@ const Supermarkets = () => {
     };
 
     const resetForm = () => {
-        setFormData({ name: '', brand: '', branchName: '', latitude: '', longitude: '', address: '', phoneNumber: '', email: '', icon: '', isParent: false, parentId: '' });
+        setFormData({ name: '', brand: '', branchName: '', latitude: '', longitude: '', address: '', phoneNumber: '', email: '', icon: '', isParent: false, parentId: '', googleMapsUrl: '' });
         setCoordinateError('');
     };
 
@@ -108,7 +109,8 @@ const Supermarkets = () => {
             email: supermarket.email || '',
             icon: supermarket.icon || '',
             isParent: supermarket.isParent || false,
-            parentId: supermarket.parentId || ''
+            parentId: supermarket.parentId || '',
+            googleMapsUrl: supermarket.googleMapsUrl || ''
         });
         setCoordinateError('');
         setShowModal(true);
@@ -260,7 +262,7 @@ const Supermarkets = () => {
 
             {showModal && (
                 <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[1000]">
-                    <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] max-w-lg w-full p-10 shadow-2xl border border-gray-100 dark:border-gray-700 animate-in zoom-in-95 duration-200">
+                    <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] max-w-lg w-full p-10 shadow-2xl border border-gray-100 dark:border-gray-700 animate-in zoom-in-95 duration-200 max-h-[95vh] overflow-y-auto custom-scrollbar">
                         <div className="flex justify-between items-center mb-8">
                             <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight uppercase">{editing ? 'Edit Store' : 'Add Store'}</h2>
                             <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-900 transition-colors bg-gray-50 dark:bg-gray-900 p-2 rounded-xl"><FiX size={20} /></button>
@@ -417,6 +419,17 @@ const Supermarkets = () => {
                                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                                     className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                                     rows="2"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Google Maps URL</label>
+                                <input
+                                    type="url"
+                                    placeholder="https://maps.google.com/?q=..."
+                                    value={formData.googleMapsUrl}
+                                    onChange={(e) => setFormData({ ...formData, googleMapsUrl: e.target.value })}
+                                    className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                                 />
                             </div>
 

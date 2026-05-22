@@ -41,6 +41,10 @@ describe('productUtils', () => {
         it('returns an empty string for invalid coordinates', () => {
             expect(buildDirectionsUrl(91, 0)).toBe('');
         });
+
+        it('uses googleMapsUrl if provided', () => {
+            expect(buildDirectionsUrl(41.0082, 28.9784, 'https://maps.google.com/test')).toBe('https://maps.google.com/test');
+        });
     });
 
     describe('getRelationshipId', () => {

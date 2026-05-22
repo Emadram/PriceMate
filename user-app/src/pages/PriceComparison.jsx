@@ -647,6 +647,11 @@ const PriceComparison = () => {
                                     const hasCoordinates =
                                         typeof supermarket === 'object' &&
                                         hasValidLatLon(supermarket?.latitude, supermarket?.longitude);
+                                    const hasDirections =
+                                        hasCoordinates ||
+                                        (typeof supermarket === 'object' &&
+                                            supermarket?.googleMapsUrl &&
+                                            supermarket?.googleMapsUrl.trim());
                                     const isSelectedContext = supermarketIdParam && supermarketId === supermarketIdParam;
                                     const isLowest = getLowestPrice()?.$id === priceEntry.$id;
                                     const normalizedStatus = normalizeStockStatus(priceEntry.stockStatus);
@@ -700,13 +705,13 @@ const PriceComparison = () => {
                                                     )}
 
                                                     <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                                                        {hasCoordinates ? (
+                                                        {hasDirections ? (
                                                             <a
-                                                                href={buildDirectionsUrl(supermarket.latitude, supermarket.longitude)}
+                                                                href={buildDirectionsUrl(supermarket.latitude, supermarket.longitude, supermarket.googleMapsUrl)}
                                                                 target="_blank"
                                                                 rel="noopener noreferrer"
                                                                 className="tap-target inline-flex items-center gap-1.5 text-xs font-semibold text-brand-600 dark:text-brand-500 hover:text-brand-700"
-                                                                title="Get Directions"
+                                                                title={t('get_directions')}
                                                                 onClick={(e) => e.stopPropagation()}
                                                             >
                                                                 <FiNavigation size={12} />

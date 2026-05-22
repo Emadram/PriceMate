@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { fetchRoute, clearRouteCache } from './routing';
+import { fetchRoute } from './routing';
 
 const sampleOsrmResponse = {
   code: 'Ok',
@@ -23,7 +23,6 @@ const sampleOsrmResponse = {
 describe('routing.fetchRoute', () => {
   beforeEach(() => {
     global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve(sampleOsrmResponse) }));
-    clearRouteCache();
   });
   afterEach(() => {
     vi.restoreAllMocks();
