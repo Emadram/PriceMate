@@ -120,12 +120,12 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [] }) => {
 
     return (
         <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[85%] p-3 rounded-2xl ${
+            <div className={`max-w-[92%] sm:max-w-[85%] px-3.5 py-2.5 sm:p-3 rounded-[1.25rem] ${
                 msg.role === 'user' 
                     ? 'bg-brand-600 text-white rounded-tr-none shadow-md' 
                     : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 shadow-sm border border-gray-100 dark:border-gray-700 rounded-tl-none'
             }`}>
-                <div className="text-sm leading-relaxed whitespace-pre-wrap">
+                <div className="text-[15px] sm:text-sm leading-6 whitespace-pre-wrap">
                     {renderContent(msg.content)}
                 </div>
             </div>
@@ -200,6 +200,18 @@ const AIChatBox = ({ isOpen, onClose }) => {
     const [mobileListOpen, setMobileListOpen] = useState(false);
     const [fullProductList, setFullProductList] = useState([]);
     const messagesEndRef = useRef(null);
+
+    const mobileQuickPrompts = [
+        t('ai_chat_prompt_cheapest', 'Find the cheapest option'),
+        t('ai_chat_prompt_compare', 'Compare these products'),
+        t('ai_chat_prompt_ingredients', 'Check ingredients for me'),
+        t('ai_chat_prompt_premium', 'Show premium choices'),
+    ];
+
+    const beginNewConversation = () => {
+        startNewConversation();
+        setMobileListOpen(false);
+    };
 
     const maxChatIndex = conversationSummaries.reduce(
         (m, s) => Math.max(m, s.chatIndex ?? 0),
@@ -967,10 +979,10 @@ const AIChatBox = ({ isOpen, onClose }) => {
                     <button
                         type="button"
                         onClick={() => {
-                            startNewConversation();
+                            beginNewConversation();
                             afterPick?.();
                         }}
-                        className="w-full flex items-center justify-center gap-1 py-2 rounded-lg bg-brand-600 text-white text-[10px] font-black uppercase tracking-wide"
+                        className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-brand-600 text-white text-[10px] font-black uppercase tracking-wide shadow-sm"
                     >
                         <FiPlus size={14} />
                         {t('ai_chat_new_short')}
@@ -1040,35 +1052,49 @@ const AIChatBox = ({ isOpen, onClose }) => {
                 aria-hidden="true"
             />
             <div className="fixed inset-x-0 bottom-0 z-[2000] flex h-[min(92dvh,760px)] flex-col overflow-hidden rounded-t-[2rem] border border-gray-200 bg-white shadow-2xl animate-in slide-in-from-bottom-4 duration-300 dark:border-gray-700 dark:bg-gray-800 sm:inset-auto sm:bottom-4 sm:right-4 sm:h-[min(640px,90vh)] sm:w-[400px] sm:rounded-2xl md:w-[448px] sm:border sm:shadow-2xl sm:slide-in-from-bottom-5 sm:slide-in-from-right">
-            <div className="p-4 sm:p-5 bg-brand-600 dark:bg-brand-700 text-white flex justify-between items-center shrink-0 shadow-md gap-2">
-                <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className="border-b border-black/5 bg-gradient-to-r from-brand-600 via-brand-600 to-brand-700 px-4 py-3 text-white shadow-md shrink-0 sm:px-5 sm:py-4">
+                <div className="flex items-start gap-3 min-w-0">
                     {user && (
                         <button
                             type="button"
-                            className="sm:hidden p-2 hover:bg-white/20 rounded-xl shrink-0"
+                            className="sm:hidden mt-0.5 p-2.5 rounded-2xl bg-white/10 backdrop-blur-sm shrink-0 active:scale-95"
                             onClick={() => setMobileListOpen(true)}
                             aria-label={t('ai_chat_chats')}
                         >
                             <FiMessageSquare size={20} />
                         </button>
                     )}
-                    <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm shrink-0 hidden sm:flex">
+                    <div className="hidden sm:flex w-8 h-8 bg-white/20 rounded-2xl items-center justify-center backdrop-blur-sm shrink-0">
                         <FiMessageSquare className="text-xl" />
                     </div>
-                    <div className="min-w-0">
-                        <span className="font-bold block text-sm truncate">PriceMate AI</span>
-                        <span className="text-[10px] opacity-80 uppercase tracking-widest font-black truncate block">
-                            Powered by Gemini
-                        </span>
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 min-w-0">
+                            <span className="font-black block text-sm sm:text-[15px] truncate">PriceMate AI</span>
+                            <span className="hidden sm:inline-flex text-[9px] uppercase tracking-[0.22em] font-black bg-white/15 px-2 py-0.5 rounded-full">
+                                Powered by Gemini
+                            </span>
+                        </div>
+                        <p className="mt-1 text-[11px] text-white/80 leading-relaxed hidden sm:block">
+                            Ask for cheaper picks, compare products, or check ingredients instantly.
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                        <button
+                            type="button"
+                            onClick={beginNewConversation}
+                            className="sm:hidden rounded-full bg-white text-brand-700 px-3.5 py-2 text-[11px] font-black uppercase tracking-widest shadow-sm active:scale-95"
+                        >
+                            {t('ai_chat_new_short')}
+                        </button>
+                        <button
+                            onClick={onClose}
+                            className="p-2.5 hover:bg-white/15 rounded-2xl transition-all active:scale-95 shrink-0"
+                            aria-label={t('ai_chat_close')}
+                        >
+                            <FiX size={24} />
+                        </button>
                     </div>
                 </div>
-                <button
-                    onClick={onClose}
-                    className="p-2 hover:bg-white/20 rounded-xl transition-all active:scale-95 shrink-0"
-                    aria-label={t('ai_chat_close')}
-                >
-                    <FiX size={24} />
-                </button>
             </div>
 
             <div className="flex flex-1 min-h-0">
@@ -1081,26 +1107,28 @@ const AIChatBox = ({ isOpen, onClose }) => {
                 <div className="flex flex-col flex-1 min-w-0 min-h-0 relative">
                     {user && mobileListOpen && (
                         <div className="absolute inset-0 z-20 flex flex-col sm:hidden bg-white dark:bg-gray-800">
-                            <div className="flex items-center gap-2 p-3 border-b border-gray-200 dark:border-gray-700 shrink-0">
+                            <div className="flex items-center gap-2 p-3 border-b border-gray-200 dark:border-gray-700 shrink-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm">
                                 <button
                                     type="button"
                                     onClick={() => setMobileListOpen(false)}
-                                    className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+                                    className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700"
                                     aria-label={t('ai_chat_back')}
                                 >
                                     <FiChevronLeft size={22} />
                                 </button>
-                                <span className="font-bold text-sm">{t('ai_chat_chats')}</span>
+                                <span className="font-black text-sm uppercase tracking-widest text-gray-700 dark:text-gray-200">
+                                    {t('ai_chat_chats')}
+                                </span>
                             </div>
                             <div className="flex-1 min-h-0 overflow-hidden">{renderConversationList(() => setMobileListOpen(false))}</div>
                         </div>
                     )}
 
-                    <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-gray-900 min-h-0">
+                    <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 bg-gray-50 dark:bg-gray-900 min-h-0">
                         {!user && (
-                            <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/30 text-center">
-                                <p className="text-xs text-amber-700 dark:text-amber-300">
-                                    Log in to save your chat history and get personalized recommendations!
+                            <div className="p-4 rounded-[1.5rem] bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/30 text-center">
+                                <p className="text-xs sm:text-sm text-amber-700 dark:text-amber-300 leading-relaxed">
+                                    Log in to save your chat history and get personalized recommendations.
                                 </p>
                             </div>
                         )}
@@ -1110,8 +1138,47 @@ const AIChatBox = ({ isOpen, onClose }) => {
                                     <FiLoader className="animate-spin text-brand-600" />
                                 </div>
                             ) : (
-                                <div className="p-6 text-center text-sm text-gray-600 dark:text-gray-400 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 mx-auto max-w-sm">
-                                    {t('ai_chat_idle_hint')}
+                                <div className="mx-auto w-full max-w-md space-y-4 pt-2">
+                                    <div className="rounded-[1.75rem] bg-gradient-to-br from-brand-600 via-brand-600 to-brand-700 p-5 text-white shadow-xl shadow-brand-600/20">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-11 w-11 rounded-2xl bg-white/15 flex items-center justify-center backdrop-blur-sm shrink-0">
+                                                <FiMessageSquare size={22} />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <h2 className="text-lg font-black tracking-tight">Start a new chat</h2>
+                                                <p className="text-white/80 text-xs sm:text-sm mt-0.5 leading-relaxed">
+                                                    Ask for cheaper picks, compare products, or check ingredients instantly.
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={beginNewConversation}
+                                            className="mt-4 w-full rounded-2xl bg-white text-brand-700 py-3 text-xs font-black uppercase tracking-widest shadow-sm"
+                                        >
+                                            {t('ai_chat_new_short')}
+                                        </button>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {mobileQuickPrompts.map((prompt) => (
+                                            <button
+                                                key={prompt}
+                                                type="button"
+                                                onClick={() => {
+                                                    beginNewConversation();
+                                                    setInput(prompt);
+                                                }}
+                                                className="min-h-14 rounded-2xl border border-gray-200 bg-white px-3 py-2 text-left text-[11px] font-bold text-gray-700 shadow-sm transition active:scale-[0.98] dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                                            >
+                                                {prompt}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    <div className="rounded-[1.5rem] border border-dashed border-gray-200 bg-white p-4 text-center text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
+                                        {t('ai_chat_idle_hint')}
+                                    </div>
                                 </div>
                             )
                         )}
@@ -1149,7 +1216,7 @@ const AIChatBox = ({ isOpen, onClose }) => {
                     </div>
 
                     {user && chatWriteError && (
-                        <div className="shrink-0 px-4 py-2 bg-red-50 dark:bg-red-900/20 border-t border-red-100 dark:border-red-800/40 flex gap-2 items-start justify-between">
+                        <div className="shrink-0 px-4 py-2.5 bg-red-50 dark:bg-red-900/20 border-t border-red-100 dark:border-red-800/40 flex gap-2 items-start justify-between">
                             <p className="text-xs text-red-800 dark:text-red-200 flex-1 leading-relaxed">
                                 {chatWriteError === CHAT_ERROR_MISSING_CONVERSATION_ID
                                     ? t('chat_error_schema_conversation_id')
@@ -1168,9 +1235,9 @@ const AIChatBox = ({ isOpen, onClose }) => {
 
                     <form
                         onSubmit={handleSend}
-                        className="p-4 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 shrink-0"
+                        className="p-4 sm:p-5 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 shrink-0"
                     >
-                        <div className="relative flex items-center gap-2">
+                        <div className="relative flex items-end gap-2">
                             <input
                                 type="text"
                                 value={input}
@@ -1183,14 +1250,14 @@ const AIChatBox = ({ isOpen, onClose }) => {
                                           : t('ai_chat_input_placeholder')
                                 }
                                 disabled={isLoading || !user || !activeConversationId}
-                                className="flex-1 bg-gray-50 dark:bg-gray-900 border-none rounded-xl py-3 px-4 text-sm focus:ring-2 focus:ring-brand-500 transition-all dark:text-white disabled:opacity-50"
+                                className="flex-1 min-h-12 bg-gray-50 dark:bg-gray-900 border-none rounded-[1.25rem] py-3.5 px-4 text-[15px] focus:ring-2 focus:ring-brand-500 transition-all dark:text-white disabled:opacity-50"
                             />
                             <button
                                 type="submit"
                                 disabled={
                                     !input.trim() || isLoading || !user || !activeConversationId
                                 }
-                                className="bg-brand-600 hover:bg-brand-700 text-white p-3 rounded-xl transition-all active:scale-90 disabled:opacity-50 disabled:active:scale-100 shadow-lg shadow-brand-200 dark:shadow-none"
+                                className="min-h-12 min-w-12 bg-brand-600 hover:bg-brand-700 text-white px-4 rounded-[1.15rem] transition-all active:scale-90 disabled:opacity-50 disabled:active:scale-100 shadow-lg shadow-brand-200 dark:shadow-none flex items-center justify-center"
                             >
                                 <FiSend />
                             </button>
