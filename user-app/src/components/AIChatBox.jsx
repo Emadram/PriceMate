@@ -1033,7 +1033,13 @@ const AIChatBox = ({ isOpen, onClose }) => {
     };
 
     return (
-        <div className="fixed inset-0 sm:inset-auto sm:bottom-4 sm:right-4 sm:w-[400px] md:w-[448px] sm:h-[min(640px,90vh)] h-full bg-white dark:bg-gray-800 sm:rounded-2xl shadow-2xl flex flex-col z-[2000] border border-gray-200 dark:border-gray-700 overflow-hidden animate-in sm:slide-in-from-bottom-5 slide-in-from-right duration-300">
+        <>
+            <div
+                className="fixed inset-0 z-[1990] bg-black/40 backdrop-blur-[2px] sm:hidden"
+                onClick={onClose}
+                aria-hidden="true"
+            />
+            <div className="fixed inset-x-0 bottom-0 z-[2000] flex h-[min(92dvh,760px)] flex-col overflow-hidden rounded-t-[2rem] border border-gray-200 bg-white shadow-2xl animate-in slide-in-from-bottom-4 duration-300 dark:border-gray-700 dark:bg-gray-800 sm:inset-auto sm:bottom-4 sm:right-4 sm:h-[min(640px,90vh)] sm:w-[400px] sm:rounded-2xl md:w-[448px] sm:border sm:shadow-2xl sm:slide-in-from-bottom-5 sm:slide-in-from-right">
             <div className="p-4 sm:p-5 bg-brand-600 dark:bg-brand-700 text-white flex justify-between items-center shrink-0 shadow-md gap-2">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                     {user && (
@@ -1193,6 +1199,7 @@ const AIChatBox = ({ isOpen, onClose }) => {
                 </div>
             </div>
         </div>
+        </>
     );
 };
 
