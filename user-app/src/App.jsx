@@ -37,7 +37,7 @@ const AppShell = ({ children }) => {
   const hideGlobalNav = AUTH_ROUTE_PREFIXES.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`)
   );
-  const mobileTopPadding = hideGlobalNav ? '' : 'pt-14 md:pt-0';
+  const mobileTopPadding = hideGlobalNav ? '' : 'pt-20';
 
   return (
     <>

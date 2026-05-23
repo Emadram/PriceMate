@@ -25,6 +25,7 @@ const StoreMap = ({ lat, lon, zoom = 15, height = "300px", supermarkets = [], ce
   const mapRef = useRef();
   const mapElement = useRef();
   const routeOverlayRef = useRef(null);
+  const routeLayerRef = useRef(null);
   const resolvedSupermarkets = React.useMemo(() => (Array.isArray(supermarkets) ? supermarkets : []), [supermarkets]);
 
   const resolveCenter = React.useCallback(() => {
@@ -141,50 +142,6 @@ const StoreMap = ({ lat, lon, zoom = 15, height = "300px", supermarkets = [], ce
       controls: [], // Minimalist - no bulky controls
     });
 
-    // If directions props are provided, attempt to render a route layer
-    if (directionsFrom && directionsTo && hasValidLatLon(directionsFrom.latitude, directionsFrom.longitude) && hasValidLatLon(directionsTo.latitude, directionsTo.longitude)) {
-      (async () => {
-        try {
-          setRoutingLoading(true);
-          const fromLon = Number(directionsFrom.longitude);
-          const fromLat = Number(directionsFrom.latitude);
-          const toLon = Number(directionsTo.longitude);
-          const toLat = Number(directionsTo.latitude);
-          const route = await fetchRoute(fromLon, fromLat, toLon, toLat);
-          if (!route || !route.geojson) return;
-          const routeFeatureCollection = { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: route.geojson, properties: {} }] };
-          const routeLayer = buildRouteLayer(routeFeatureCollection, { color: '#0ea5e9', width: 5 });
-          initialMap.addLayer(routeLayer);
-          // zoom to route extent
-          try {
-            const extent = routeLayer.getSource().getExtent();
-            initialMap.getView().fit(extent, { padding: [40, 40, 120, 40], duration: 500 });
-          } catch {
-            // ignore fit errors
-          }
-          // attach route info overlay
-          mapRef.current.__routeInfo = { distance: route.distance, duration: route.duration };
-          if (routeOverlayRef.current) {
-            const km = (route.distance / 1000).toFixed(1);
-            const mins = Math.round(route.duration / 60);
-            const gmaps = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(fromLat + ',' + fromLon)}&destination=${encodeURIComponent(toLat + ',' + toLon)}&travelmode=driving`;
-            routeOverlayRef.current.innerHTML = `Route: ${km} km • ${mins} min <a href="${gmaps}" target="_blank" rel="noreferrer" class="ml-2 font-bold text-brand-600">${t('route_open_in_maps', 'Open in Google Maps')}</a>`;
-            routeOverlayRef.current.style.display = 'block';
-          }
-
-          // Populate a step panel if steps exist
-          if (route.steps && route.steps.length > 0) {
-            mapRef.current.__routeSteps = route.steps;
-          }
-        } catch (err) {
-          // ignore route failures - it's best-effort
-          console.warn('Route fetch failed', err);
-        } finally {
-          setRoutingLoading(false);
-        }
-      })();
-    }
-
     mapRef.current = initialMap;
 
     return () => {
@@ -192,7 +149,86 @@ const StoreMap = ({ lat, lon, zoom = 15, height = "300px", supermarkets = [], ce
         mapRef.current.setTarget(null);
       }
     };
-  }, [mapInputsKey, lat, lon, zoom, centerProp, resolvedSupermarkets, directionsFrom, directionsTo, resolveCenter, t]);
+  }, [mapInputsKey, lat, lon, zoom, centerProp, resolvedSupermarkets, resolveCenter]);
+
+  useEffect(() => {
+    const clearRoute = () => {
+      if (routeLayerRef.current && mapRef.current) {
+        mapRef.current.removeLayer(routeLayerRef.current);
+      }
+      routeLayerRef.current = null;
+      if (mapRef.current) {
+        mapRef.current.__routeInfo = null;
+        mapRef.current.__routeSteps = [];
+      }
+      if (routeOverlayRef.current) {
+        routeOverlayRef.current.innerHTML = '';
+        routeOverlayRef.current.style.display = 'none';
+      }
+    };
+
+    if (!mapRef.current) return;
+
+    if (!directionsFrom || !directionsTo || !hasValidLatLon(directionsFrom.latitude, directionsFrom.longitude) || !hasValidLatLon(directionsTo.latitude, directionsTo.longitude)) {
+      setRoutingLoading(false);
+      setShowSteps(false);
+      clearRoute();
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadRoute = async () => {
+      try {
+        setRoutingLoading(true);
+        setShowSteps(false);
+        clearRoute();
+
+        const fromLon = Number(directionsFrom.longitude);
+        const fromLat = Number(directionsFrom.latitude);
+        const toLon = Number(directionsTo.longitude);
+        const toLat = Number(directionsTo.latitude);
+        const route = await fetchRoute(fromLon, fromLat, toLon, toLat);
+        if (cancelled || !route || !route.geojson || !mapRef.current) return;
+
+        const routeFeatureCollection = { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: route.geojson, properties: {} }] };
+        const routeLayer = buildRouteLayer(routeFeatureCollection, { color: '#0ea5e9', width: 5 });
+        routeLayerRef.current = routeLayer;
+        mapRef.current.addLayer(routeLayer);
+
+        try {
+          const extent = routeLayer.getSource().getExtent();
+          mapRef.current.getView().fit(extent, { padding: [40, 40, 120, 40], duration: 500 });
+        } catch {
+          // ignore fit errors
+        }
+
+        mapRef.current.__routeInfo = { distance: route.distance, duration: route.duration };
+        if (routeOverlayRef.current) {
+          const km = (route.distance / 1000).toFixed(1);
+          const mins = Math.round(route.duration / 60);
+          const gmaps = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(fromLat + ',' + fromLon)}&destination=${encodeURIComponent(toLat + ',' + toLon)}&travelmode=driving`;
+          routeOverlayRef.current.innerHTML = `Route: ${km} km • ${mins} min <a href="${gmaps}" target="_blank" rel="noreferrer" class="ml-2 font-bold text-brand-600">${t('route_open_in_maps', 'Open in Google Maps')}</a>`;
+          routeOverlayRef.current.style.display = 'block';
+        }
+
+        if (route.steps && route.steps.length > 0) {
+          mapRef.current.__routeSteps = route.steps;
+        }
+      } catch (err) {
+        console.warn('Route fetch failed', err);
+        clearRoute();
+      } finally {
+        if (!cancelled) setRoutingLoading(false);
+      }
+    };
+
+    loadRoute();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [directionsFrom, directionsTo, t]);
 
   const [routingLoading, setRoutingLoading] = useState(false);
   const [showSteps, setShowSteps] = useState(false);

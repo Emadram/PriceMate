@@ -38,9 +38,10 @@ const Navbar = () => {
 
     return (
         <>
-            <div className="md:hidden fixed top-0 left-0 right-0 z-50 pt-safe">
-                <div className="mx-2 rounded-b-[1.4rem] bg-white/96 dark:bg-gray-900/96 backdrop-blur-xl border border-gray-100/80 dark:border-gray-800/80 px-4 py-3 shadow-[0_8px_24px_rgba(0,0,0,0.06)]">
-                    <Link to="/" className="flex items-center justify-center gap-2 min-w-0">
+            {/* Top mobile header: show logo here (visible) and make background dark in dark mode */}
+            <div className="md:hidden fixed top-0 left-0 right-0 z-9999 pt-safe">
+                <div className="mx-2 px-4 py-3 bg-transparent dark:bg-gray-900/95 rounded-b-[1.4rem] backdrop-blur-xl border-b border-gray-800/20">
+                        <Link to="/" className="flex items-center justify-center gap-2 min-w-0">
                         <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-600 text-white font-black text-sm shadow-sm shadow-brand-500/25 shrink-0">
                             P
                         </div>
@@ -49,12 +50,12 @@ const Navbar = () => {
                 </div>
             </div>
 
-            <nav className="hidden md:block pt-safe bg-white/80 dark:bg-gray-800/80 backdrop-blur-md shadow-sm sticky top-0 z-50 transition-colors duration-200 border-b border-gray-100 dark:border-gray-700">
+                <nav className="hidden md:block fixed top-0 left-0 right-0 pt-safe z-9999 bg-transparent dark:bg-gray-900/95 backdrop-blur-md transition-colors duration-200">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between h-16">
                         {/* Logo */}
                         <div className="flex items-center">
-                            <Link to="/" className="flex-shrink-0 flex items-center gap-2 group">
+                                <Link to="/" className="flex-shrink-0 flex items-center gap-2 group">
                                 <div className="w-10 h-10 bg-brand-600 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-lg shadow-brand-500/30 group-hover:scale-105 transition-transform">
                                     P
                                 </div>
@@ -139,7 +140,7 @@ const Navbar = () => {
             </nav>
 
             {/* Mobile Bottom Navigation */}
-            <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 mx-2 mb-2 rounded-t-[1.75rem] bg-white/96 dark:bg-gray-900/96 backdrop-blur-xl border border-gray-100/80 dark:border-gray-800/80 px-4 py-3 pb-safe-nav shadow-[0_-12px_30px_rgba(0,0,0,0.08)]">
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-9998 mx-2 mb-2 px-4 py-3 pb-safe-nav bg-transparent dark:bg-gray-900/95 rounded-t-[1.75rem] backdrop-blur-md">
                 <div className="flex justify-between items-center max-w-md mx-auto">
                     <NavItem to="/" icon={FiHome} label={t('home')} currentPath={location.pathname} onTap={tapFeedback} />
                     <NavItem to="/search" icon={FiSearch} label={t('search')} currentPath={location.pathname} onTap={tapFeedback} />
@@ -174,9 +175,8 @@ const NavItem = ({ to, icon, label, currentPath, state, onTap }) => {
                 state={state}
                 onClick={onTap}
                 className={`tap-target min-h-11 min-w-11 px-1.5 flex flex-col items-center justify-center gap-1 transition-colors duration-200 ease-out ${
-                    isActive ? 'text-brand-600 dark:text-brand-500' : 'text-gray-400 dark:text-gray-500'
-                }`}
-            >
+                    isActive ? 'text-brand-600 dark:text-brand-500' : 'text-gray-400 dark:text-gray-200'
+                }`}> 
             <IconComponent size={21} strokeWidth={isActive ? 2.5 : 2} />
             <span className={`text-[9px] font-semibold tracking-tight uppercase ${isActive ? 'opacity-100' : 'opacity-80'}`}>
                 {label}

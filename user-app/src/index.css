@@ -27,6 +27,19 @@
   }
 }
 
+@layer base {
+  body {
+    background-color: var(--soft-gray);
+    color: #0f172a;
+    min-height: 100vh;
+  }
+
+  .dark body {
+    background-color: #020617;
+    color: #e6eef8;
+  }
+}
+
 @layer utilities {
   .pt-safe {
     padding-top: env(safe-area-inset-top);
@@ -44,6 +57,12 @@
     min-width: 44px;
     min-height: 44px;
   }
+
+  /* small helper to ensure z-60 utility exists */
+  .z-60 { z-index: 60; }
+  /* high z-index helpers used by fixed navbar/logo */
+  .z-9998 { z-index: 9998; }
+  .z-9999 { z-index: 9999; }
 
   .animate-pulse-soft {
     animation: pulse-soft 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;

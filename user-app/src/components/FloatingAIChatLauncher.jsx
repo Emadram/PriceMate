@@ -9,13 +9,29 @@ const FloatingAIChatLauncher = () => {
 
     // Track whether the mobile splash is present so we can visually attach the launcher
     const [attachedToSplash, setAttachedToSplash] = useState(false);
+    // Hide the launcher while the splash is visible to avoid overlap
+    const [hideWhileSplash, setHideWhileSplash] = useState(false);
 
     useEffect(() => {
         if (typeof document === 'undefined') return undefined;
 
         const detect = () => {
             const splash = document.getElementById('pricemate-mobile-splash');
-            setAttachedToSplash(!!splash && splash.getAttribute('aria-hidden') !== 'true');
+            const exists = !!splash;
+            // Consider splash visible if it exists and has bounding rects / is not hidden
+            let visible = false;
+            try {
+                if (splash) {
+                    const rects = splash.getClientRects();
+                    const style = window.getComputedStyle(splash);
+                    visible = rects.length > 0 && style.visibility !== 'hidden' && parseFloat(style.opacity || '1') > 0;
+                }
+            } catch (e) {
+                visible = exists;
+            }
+
+            setAttachedToSplash(exists && visible);
+            setHideWhileSplash(exists && visible);
         };
 
         detect();
@@ -65,7 +81,7 @@ const FloatingAIChatLauncher = () => {
     return (
         <>
             <div id="pricemate-ai-launcher" className={wrapperClass}>
-                {!isOpen && (
+                {!isOpen && !hideWhileSplash && (
                     <button
                         type="button"
                         onClick={() => setIsOpen(true)}

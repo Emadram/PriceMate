@@ -1,15 +1,32 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FiX, FiAlertTriangle, FiCheckCircle, FiLoader } from 'react-icons/fi';
 import { db } from '../lib/appwrite';
 import useAuthStore from '../stores/authStore';
 
-const ReportModal = ({ isOpen, onClose, targetName, targetType = 'supermarket', targetId }) => {
+const ReportModal = ({ isOpen, onClose, targetName, targetType = 'supermarket' }) => {
     const user = useAuthStore((state) => state.user);
     const [step, setStep] = useState(1);
     const [selectedReason, setSelectedReason] = useState('');
     const [details, setDetails] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState(null);
+    const closeTimerRef = useRef(null);
+
+    useEffect(() => {
+        if (isOpen) {
+            setStep(1);
+            setSelectedReason('');
+            setDetails('');
+            setError(null);
+            setIsSubmitting(false);
+        }
+    }, [isOpen, targetName, targetType]);
+
+    useEffect(() => () => {
+        if (closeTimerRef.current) {
+            window.clearTimeout(closeTimerRef.current);
+        }
+    }, []);
 
     if (!isOpen) return null;
 
@@ -31,19 +48,33 @@ const ReportModal = ({ isOpen, onClose, targetName, targetType = 'supermarket', 
 
     const reasons = targetType === 'product' ? productReasons : marketReasons;
 
+    const closeModal = () => {
+        if (closeTimerRef.current) {
+            window.clearTimeout(closeTimerRef.current);
+            closeTimerRef.current = null;
+        }
+        setStep(1);
+        setSelectedReason('');
+        setDetails('');
+        setError(null);
+        setIsSubmitting(false);
+        onClose();
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsSubmitting(true);
         setError(null);
 
+        const message = [selectedReason, details.trim()].filter(Boolean).join(' - ');
+
         try {
             await db.feedback.create(
                 {
                     userId: user?.$id,
-                    targetId: targetId || 'unknown',
-                    targetType,
                     targetName,
                     reason: selectedReason,
+                    message,
                     details,
                     status: 'pending',
                     createdAt: new Date().toISOString()
@@ -51,11 +82,8 @@ const ReportModal = ({ isOpen, onClose, targetName, targetType = 'supermarket', 
             );
 
             setStep(2);
-            setTimeout(() => {
-                onClose();
-                setStep(1);
-                setSelectedReason('');
-                setDetails('');
+            closeTimerRef.current = window.setTimeout(() => {
+                closeModal();
             }, 3000);
 
         } catch (err) {
@@ -77,7 +105,7 @@ const ReportModal = ({ isOpen, onClose, targetName, targetType = 'supermarket', 
                         Report Issue
                     </h3>
                     <button
-                        onClick={onClose}
+                        onClick={closeModal}
                         className="tap-target h-11 w-11 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 transition"
                     >
                         <FiX size={24} />

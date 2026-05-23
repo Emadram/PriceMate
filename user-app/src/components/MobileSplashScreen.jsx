@@ -6,6 +6,7 @@ const MobileSplashScreen = () => {
     const [phase, setPhase] = useState('hidden');
     const [isDark, setIsDark] = useState(false);
     const [isPageLoaded, setIsPageLoaded] = useState(false);
+    const SCROLL_KEY_PREFIX = 'pricemate-scroll:';
 
     useEffect(() => {
         if (typeof window === 'undefined') return undefined;
@@ -16,6 +17,11 @@ const MobileSplashScreen = () => {
         }
 
         sessionStorage.setItem(MOBILE_SPLASH_KEY, '1');
+        // save current scroll for the current path so we can restore it after the splash
+        try {
+            const path = window.location.pathname || '/';
+            sessionStorage.setItem(`${SCROLL_KEY_PREFIX}${path}`, String(window.scrollY || window.pageYOffset || 0));
+        } catch (e) {}
         setIsDark(
             document.documentElement.classList.contains('dark') ||
                 window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -47,10 +53,23 @@ const MobileSplashScreen = () => {
 
         document.body.style.overflow = 'hidden';
         document.documentElement.style.overflow = 'hidden';
+        // Ensure we start at the top while the splash is visible
+        try {
+            window.scrollTo(0, 0);
+        } catch (e) {}
 
         return () => {
             document.body.style.overflow = previousBodyOverflow;
             document.documentElement.style.overflow = previousHtmlOverflow;
+            // restore stored scroll for this path (if any)
+            try {
+                const path = window.location.pathname || '/';
+                const stored = sessionStorage.getItem(`${SCROLL_KEY_PREFIX}${path}`);
+                if (stored !== null) {
+                    const pos = parseInt(stored, 10) || 0;
+                    window.setTimeout(() => window.scrollTo(0, pos), 30);
+                }
+            } catch (e) {}
         };
     }, [phase]);
 
@@ -58,7 +77,8 @@ const MobileSplashScreen = () => {
         return null;
     }
 
-    const overlayTone = isDark ? 'bg-slate-950 text-white' : 'bg-white text-slate-950';
+    // Use transparent overlay in light mode to avoid a solid white band at the top
+    const overlayTone = isDark ? 'bg-slate-950 text-white' : 'bg-transparent text-slate-950';
     const surfaceTone = 'from-brand-500 via-brand-600 to-brand-700';
     const mutedTone = isDark ? 'text-white/65' : 'text-slate-500';
     const promptTone = isDark ? 'text-brand-300' : 'text-brand-600';
@@ -70,7 +90,7 @@ const MobileSplashScreen = () => {
             className={`fixed inset-0 z-[2600] flex items-center justify-center overflow-hidden transition-all duration-500 ${overlayTone} ${shouldFade ? 'opacity-0 scale-[1.03]' : 'opacity-100'}`}
             aria-hidden="true"
         >
-            <div className={`absolute inset-0 ${isDark ? 'bg-[radial-gradient(circle_at_top,rgba(79,70,229,0.22),transparent_36%),linear-gradient(180deg,rgba(2,6,23,0.98),rgba(15,23,42,0.98))]' : 'bg-[radial-gradient(circle_at_top,rgba(99,102,241,0.16),transparent_36%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.98))]'}`} />
+            <div className={`absolute inset-0 ${isDark ? 'bg-[radial-gradient(circle_at_top,rgba(79,70,229,0.22),transparent_36%),linear-gradient(180deg,rgba(2,6,23,0.98),rgba(15,23,42,0.98))]' : 'bg-[radial-gradient(circle_at_top,rgba(99,102,241,0.16),transparent_36%),linear-gradient(180deg,rgba(255,255,255,0),rgba(255,255,255,0))]'}`} />
             <div className="relative flex w-full max-w-sm flex-col items-center px-8 text-center touch-none">
                 <div className="relative mb-8 flex h-32 w-32 items-center justify-center">
                     <div className={`absolute inset-0 rounded-[2rem] bg-gradient-to-br ${surfaceTone} shadow-[0_24px_80px_rgba(79,70,229,0.35)]`} />
