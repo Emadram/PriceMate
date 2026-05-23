@@ -123,6 +123,12 @@ const Navbar = () => {
 
             {/* Mobile Bottom Navigation */}
             <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 mx-2 mb-2 rounded-t-[1.75rem] bg-white/96 dark:bg-gray-900/96 backdrop-blur-xl border border-gray-100/80 dark:border-gray-800/80 px-4 py-3 pb-safe-nav shadow-[0_-12px_30px_rgba(0,0,0,0.08)]">
+                <div className="mb-2 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-[0.28em] text-gray-500 dark:text-gray-400">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-brand-600 text-[10px] text-white shadow-sm shadow-brand-500/25">
+                        P
+                    </span>
+                    <span>PriceMate</span>
+                </div>
                 <div className="flex justify-between items-center max-w-md mx-auto">
                     <NavItem to="/" icon={FiHome} label={t('home')} currentPath={location.pathname} />
                     <NavItem to="/search" icon={FiSearch} label={t('search')} currentPath={location.pathname} />

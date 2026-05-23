@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { FiSearch, FiCamera, FiChevronRight, FiPackage, FiZap, FiBell, FiInfo, FiAlertTriangle } from 'react-icons/fi';
+import { FiSearch, FiCamera, FiChevronRight, FiPackage, FiZap, FiBell, FiInfo, FiAlertTriangle, FiHeart, FiMessageSquare, FiClock } from 'react-icons/fi';
 import useAnnouncementStore from '../stores/announcementStore';
 import useCategoriesStore from '../stores/categoriesStore';
+import useNavHistoryStore from '../stores/navHistoryStore';
 import { fetchProducts, fetchPricesForProducts, normalizeProduct } from '../utils/productUtils';
 import ProductCard from '../components/ProductCard';
 import { ProductCardSkeleton } from '../components/SkeletonLoaders';
@@ -22,6 +23,26 @@ const Home = () => {
     const [marketInsights, setMarketInsights] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const navigationStack = useNavHistoryStore((state) => state.stack);
+
+    const recentRoute = navigationStack.length > 0 ? navigationStack[navigationStack.length - 1] : null;
+
+    const getRecentRouteLabel = (route) => {
+        if (!route) return 'Start with a scan';
+        if (route.startsWith('/price-comparison/')) return 'Continue price comparison';
+        if (route.startsWith('/product/')) return 'Continue product details';
+        if (route.startsWith('/supermarket/')) return 'Continue store page';
+        if (route.startsWith('/search')) return 'Continue browsing';
+        if (route.startsWith('/favorites')) return 'Open favorites';
+        if (route.startsWith('/profile')) return 'Back to profile';
+        if (route.startsWith('/scan')) return 'Continue scanning';
+        return 'Continue where you left off';
+    };
+
+    const getRecentRouteAction = (route) => {
+        if (!route) return '/scan';
+        return route;
+    };
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -146,6 +167,95 @@ const Home = () => {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </section>
+
+                {/* Mobile Quick Access */}
+                <section className="md:hidden space-y-3 animate-in slide-in-from-bottom-6 duration-700 delay-200">
+                    <div className="rounded-[1.75rem] bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-soft p-4 space-y-3">
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-black uppercase tracking-[0.35em] text-gray-400">Quick Access</p>
+                                <h3 className="mt-1 text-base font-black tracking-tight text-gray-900 dark:text-white">Your last step</h3>
+                            </div>
+                            <div className="h-10 w-10 rounded-2xl bg-brand-50 dark:bg-brand-900/20 flex items-center justify-center text-brand-600 dark:text-brand-500">
+                                <FiClock size={18} />
+                            </div>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => navigate(getRecentRouteAction(recentRoute))}
+                            className="w-full rounded-2xl border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-3 text-left transition active:scale-[0.99]"
+                        >
+                            <div className="flex items-center justify-between gap-3">
+                                <div className="min-w-0">
+                                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-600/70 dark:text-brand-400/80">Recent</p>
+                                    <p className="mt-1 text-sm font-bold text-gray-900 dark:text-white truncate">
+                                        {getRecentRouteLabel(recentRoute)}
+                                    </p>
+                                </div>
+                                <FiChevronRight className="shrink-0 text-gray-400" size={18} />
+                            </div>
+                        </button>
+
+                        <div className="grid grid-cols-2 gap-2.5">
+                            <button
+                                type="button"
+                                onClick={() => navigate('/scan')}
+                                className="tap-target min-h-14 rounded-2xl bg-brand-600 text-white px-4 py-3 flex items-center gap-3 shadow-lg shadow-brand-500/20 active:scale-[0.98]"
+                            >
+                                <span className="h-9 w-9 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+                                    <FiCamera size={18} />
+                                </span>
+                                <span className="flex-1 text-left min-w-0">
+                                    <span className="block text-[10px] font-black uppercase tracking-[0.3em] text-white/70">Scan</span>
+                                    <span className="block text-sm font-black leading-none mt-1">Now</span>
+                                </span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => navigate('/search')}
+                                className="tap-target min-h-14 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-4 py-3 flex items-center gap-3 shadow-sm active:scale-[0.98]"
+                            >
+                                <span className="h-9 w-9 rounded-xl bg-gray-50 dark:bg-gray-900 flex items-center justify-center shrink-0 text-brand-600 dark:text-brand-500">
+                                    <FiSearch size={18} />
+                                </span>
+                                <span className="flex-1 text-left min-w-0">
+                                    <span className="block text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">Search</span>
+                                    <span className="block text-sm font-black leading-none mt-1 text-gray-900 dark:text-white">Products</span>
+                                </span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => navigate('/favorites')}
+                                className="tap-target min-h-14 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-4 py-3 flex items-center gap-3 shadow-sm active:scale-[0.98]"
+                            >
+                                <span className="h-9 w-9 rounded-xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center shrink-0 text-red-500">
+                                    <FiHeart size={18} />
+                                </span>
+                                <span className="flex-1 text-left min-w-0">
+                                    <span className="block text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">Saved</span>
+                                    <span className="block text-sm font-black leading-none mt-1 text-gray-900 dark:text-white">Favorites</span>
+                                </span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => document.querySelector('[aria-label="Open AI Assistant"]')?.click()}
+                                className="tap-target min-h-14 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-4 py-3 flex items-center gap-3 shadow-sm active:scale-[0.98]"
+                            >
+                                <span className="h-9 w-9 rounded-xl bg-brand-50 dark:bg-brand-900/20 flex items-center justify-center shrink-0 text-brand-600 dark:text-brand-500">
+                                    <FiMessageSquare size={18} />
+                                </span>
+                                <span className="flex-1 text-left min-w-0">
+                                    <span className="block text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">AI</span>
+                                    <span className="block text-sm font-black leading-none mt-1 text-gray-900 dark:text-white">Assistant</span>
+                                </span>
+                            </button>
+                        </div>
                     </div>
                 </section>
 
