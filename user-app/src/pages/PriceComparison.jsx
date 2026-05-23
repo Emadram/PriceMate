@@ -281,6 +281,38 @@ const PriceComparison = () => {
         fetchProductByBarcode(barcode);
     };
 
+    const handleShareClick = async () => {
+        const shareUrl = window.location.href;
+        const shareTitle = product?.name || 'PriceMate';
+        const shareText = product?.name
+            ? `${product.name} on PriceMate`
+            : 'Check this product on PriceMate';
+
+        try {
+            if (navigator.share) {
+                await navigator.share({
+                    title: shareTitle,
+                    text: shareText,
+                    url: shareUrl,
+                });
+                return;
+            }
+
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(shareUrl);
+                toast.success('Link copied to clipboard');
+                return;
+            }
+
+            window.prompt('Copy this link', shareUrl);
+        } catch (error) {
+            if (error?.name !== 'AbortError') {
+                console.error('Share failed:', error);
+                toast.error('Could not share this page right now');
+            }
+        }
+    };
+
     const sortedPrices = useMemo(() => {
         let sorted = [...prices];
         const hasDistance = sorted.some((item) => item.distance !== null && item.distance !== undefined);
@@ -473,6 +505,16 @@ const PriceComparison = () => {
                                             {product.name}
                                         </h2>
                                         <div className="flex items-center justify-center md:justify-end gap-2 sm:gap-3 shrink-0">
+                                            <button
+                                                type="button"
+                                                onClick={handleShareClick}
+                                                className="inline-flex items-center gap-2 text-[9px] sm:text-xs font-bold text-gray-400 hover:text-brand-600 transition-colors uppercase tracking-widest border border-gray-100 dark:border-gray-700 hover:border-brand-100 dark:hover:border-brand-900/30 px-2.5 sm:px-4 py-2 rounded-xl bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm shadow-sm"
+                                                aria-label="Share product"
+                                                title="Share product"
+                                            >
+                                                <FiShare2 size={14} />
+                                                Share
+                                            </button>
                                             {user && (
                                                 <button
                                                     type="button"

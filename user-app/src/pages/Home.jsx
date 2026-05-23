@@ -5,6 +5,7 @@ import { FiChevronRight, FiPackage, FiZap, FiBell, FiInfo, FiAlertTriangle, FiCl
 import useAnnouncementStore from '../stores/announcementStore';
 import useCategoriesStore from '../stores/categoriesStore';
 import useNavHistoryStore from '../stores/navHistoryStore';
+import useFavoritesStore from '../stores/favoritesStore';
 import { fetchProducts, fetchPricesForProducts, normalizeProduct } from '../utils/productUtils';
 import ProductCard from '../components/ProductCard';
 import { ProductCardSkeleton } from '../components/SkeletonLoaders';
@@ -17,6 +18,7 @@ const Home = () => {
     // Stores
     const { categories, fetchCategories, getIconForCategory, loading: categoriesLoading } = useCategoriesStore();
     const fetchActiveAnnouncements = useAnnouncementStore(state => state.fetchActiveAnnouncements);
+    const favoriteProductIds = useFavoritesStore((state) => state.favoriteProducts);
 
     const [featuredProducts, setFeaturedProducts] = useState([]);
     const [marketInsights, setMarketInsights] = useState([]);
@@ -110,17 +112,54 @@ const Home = () => {
             setMarketInsights(announcementInsights);
 
             // Normalize
-            const normalizedProducts = products.map(p => 
-                normalizeProduct(p, batchPrices)
+            const normalizedProducts = products.map((p) => normalizeProduct(p, batchPrices));
+
+            const favoriteCategoryIds = new Set(
+                normalizedProducts
+                    .filter((product) => favoriteProductIds.includes(product.$id))
+                    .flatMap((product) => {
+                        const categoryId = product.categoryId;
+                        if (Array.isArray(categoryId)) {
+                            return categoryId.map((item) => item?.$id).filter(Boolean);
+                        }
+                        return categoryId?.$id ? [categoryId.$id] : [];
+                    })
             );
 
-            setFeaturedProducts(normalizedProducts);
+            const scoreProduct = (product) => {
+                let score = 0;
+
+                if (favoriteProductIds.includes(product.$id)) {
+                    score += 100;
+                }
+
+                const productCategoryId = Array.isArray(product.categoryId)
+                    ? product.categoryId[0]?.$id
+                    : product.categoryId?.$id;
+
+                if (productCategoryId && favoriteCategoryIds.has(productCategoryId)) {
+                    score += 20;
+                }
+
+                const priceCount = Array.isArray(product.prices) ? product.prices.length : 0;
+                score += Math.min(priceCount, 5);
+
+                return score;
+            };
+
+            const personalizedProducts = [...normalizedProducts].sort((a, b) => {
+                const scoreDiff = scoreProduct(b) - scoreProduct(a);
+                if (scoreDiff !== 0) return scoreDiff;
+                return String(a.name || a.productName || '').localeCompare(String(b.name || b.productName || ''), undefined, { sensitivity: 'base' });
+            });
+
+            setFeaturedProducts(personalizedProducts.slice(0, 4));
         } catch (error) {
             console.error('Error loading data:', error);
             setError('Failed to load products. Please check your connection.');
         }
         setLoading(false);
-    }, [fetchActiveAnnouncements, fetchCategories]);
+    }, [fetchActiveAnnouncements, fetchCategories, favoriteProductIds]);
 
     useEffect(() => {
         loadData();
@@ -294,7 +333,7 @@ const Home = () => {
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 md:gap-6 lg:gap-8 px-1 pb-10">
-                            {featuredProducts.map((product) => (
+                            {featuredProducts.slice(0, 4).map((product) => (
                                 <ProductCard
                                     key={product.$id}
                                     product={product}

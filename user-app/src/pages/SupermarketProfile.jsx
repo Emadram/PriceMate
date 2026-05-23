@@ -63,6 +63,37 @@ const SupermarketProfile = () => {
         setIsReportModalOpen(true);
     };
 
+    const handleShareClick = async () => {
+        const shareUrl = window.location.href;
+        const shareText = supermarket?.name
+            ? `${supermarket.name} on PriceMate`
+            : 'Check this supermarket on PriceMate';
+
+        try {
+            if (navigator.share) {
+                await navigator.share({
+                    title: supermarket?.name || 'PriceMate',
+                    text: shareText,
+                    url: shareUrl,
+                });
+                return;
+            }
+
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(shareUrl);
+                alert('Link copied to clipboard');
+                return;
+            }
+
+            window.prompt('Copy this link', shareUrl);
+        } catch (error) {
+            if (error?.name !== 'AbortError') {
+                console.error('Share failed:', error);
+                alert('Could not share this page right now.');
+            }
+        }
+    };
+
     const loadSupermarketData = useCallback(async () => {
         setLoading(true);
         try {
@@ -175,7 +206,13 @@ const SupermarketProfile = () => {
             <div className="max-w-4xl mx-auto px-3 sm:px-6 mt-3 sm:mt-6 relative z-10">
                 <div className="relative bg-white dark:bg-[#121214] rounded-2xl sm:rounded-[2.5rem] shadow-soft p-4 sm:p-6 md:p-8 border border-gray-100 dark:border-white/5 transition-colors">
                     <div className="absolute top-4 right-4 sm:top-6 sm:right-6 flex gap-2">
-                        <button className="tap-target h-11 w-11 bg-gray-50 dark:bg-white/5 hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black rounded-full flex items-center justify-center text-gray-500 dark:text-gray-300 transition-all active:scale-90">
+                        <button
+                            type="button"
+                            onClick={handleShareClick}
+                            className="tap-target h-11 w-11 bg-gray-50 dark:bg-white/5 hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black rounded-full flex items-center justify-center text-gray-500 dark:text-gray-300 transition-all active:scale-90"
+                            aria-label="Share supermarket"
+                            title="Share supermarket"
+                        >
                             <Share2 size={18} />
                         </button>
                         <FavoriteHeartButton
