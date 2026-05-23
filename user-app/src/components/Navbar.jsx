@@ -30,6 +30,12 @@ const Navbar = () => {
         navigate('/login');
     };
 
+    const tapFeedback = () => {
+        if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+            navigator.vibrate(10);
+        }
+    };
+
     return (
         <>
             <nav className="hidden md:block pt-safe bg-white/80 dark:bg-gray-800/80 backdrop-blur-md shadow-sm sticky top-0 z-50 transition-colors duration-200 border-b border-gray-100 dark:border-gray-700">
@@ -130,10 +136,11 @@ const Navbar = () => {
                     <span>PriceMate</span>
                 </div>
                 <div className="flex justify-between items-center max-w-md mx-auto">
-                    <NavItem to="/" icon={FiHome} label={t('home')} currentPath={location.pathname} />
-                    <NavItem to="/search" icon={FiSearch} label={t('search')} currentPath={location.pathname} />
+                    <NavItem to="/" icon={FiHome} label={t('home')} currentPath={location.pathname} onTap={tapFeedback} />
+                    <NavItem to="/search" icon={FiSearch} label={t('search')} currentPath={location.pathname} onTap={tapFeedback} />
                     <Link
                         to="/scan"
+                        onClick={tapFeedback}
                         className="w-15 h-15 bg-brand-600 rounded-[1.35rem] flex items-center justify-center text-white shadow-soft -mt-9 relative border-[6px] border-white dark:border-gray-900 active:scale-90 transition-all duration-300"
                     >
                         <FiCamera size={26} strokeWidth={2.5} />
@@ -144,21 +151,23 @@ const Navbar = () => {
                         label={t('favorites')}
                         currentPath={location.pathname}
                         state={{ from: location.pathname }}
+                        onTap={tapFeedback}
                     />
-                    <NavItem to="/profile" icon={FiUser} label={t('profile')} currentPath={location.pathname} />
+                    <NavItem to="/profile" icon={FiUser} label={t('profile')} currentPath={location.pathname} onTap={tapFeedback} />
                 </div>
             </div>
         </>
     );
 };
 
-const NavItem = ({ to, icon, label, currentPath, state }) => {
+const NavItem = ({ to, icon, label, currentPath, state, onTap }) => {
     const IconComponent = icon;
     const isActive = currentPath === to;
     return (
         <Link
                 to={to}
                 state={state}
+                onClick={onTap}
                 className={`tap-target min-h-11 min-w-11 px-1.5 flex flex-col items-center justify-center gap-1 transition-colors duration-200 ease-out ${
                     isActive ? 'text-brand-600 dark:text-brand-500' : 'text-gray-400 dark:text-gray-500'
                 }`}

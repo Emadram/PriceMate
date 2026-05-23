@@ -135,12 +135,12 @@ const SearchResults = () => {
                     <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-6">
                         <div className="flex items-center justify-between md:justify-start gap-3 md:gap-4 flex-shrink-0">
                             <BackButton to="/" label="Back to Home" />
-                            <h1 className="text-lg sm:text-xl md:text-2xl font-black text-gray-900 dark:text-white tracking-tighter">
+                            <h1 className="text-base sm:text-xl md:text-2xl font-black text-gray-900 dark:text-white tracking-tighter">
                                 {t('results')}
                             </h1>
                             <div className="md:hidden">
                                 {products.length > 0 && (
-                                    <span className="bg-brand-600/10 text-brand-600 dark:text-brand-500 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">
+                                    <span className="bg-brand-600/10 text-brand-600 dark:text-brand-500 text-[9px] font-black px-2 py-1 rounded-full uppercase tracking-widest">
                                         {products.length} Items
                                     </span>
                                 )}
@@ -154,7 +154,7 @@ const SearchResults = () => {
                                     value={searchInput}
                                     onChange={(e) => setSearchInput(e.target.value)}
                                     placeholder={t('search_placeholder')}
-                                    className="w-full min-h-11 pl-4 pr-11 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-brand-500 transition text-sm font-bold shadow-inner"
+                                    className="w-full min-h-11 pl-4 pr-11 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-brand-500 transition text-sm font-bold shadow-inner"
                                 />
                                 <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-accent-500 group-focus-within:scale-110 transition-transform">
                                     <FiSearch size={18} className="stroke-[2.5]" />
@@ -164,7 +164,7 @@ const SearchResults = () => {
                                 <select
                                     value={selectedCategory}
                                     onChange={(e) => setSelectedCategory(e.target.value)}
-                                    className="flex-1 md:flex-none min-h-11 px-3 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 transition text-[9px] font-black uppercase tracking-widest min-w-[120px] appearance-none text-center shadow-inner"
+                                    className="flex-1 md:flex-none min-h-11 px-3 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 transition text-[9px] font-black uppercase tracking-widest min-w-[120px] appearance-none text-center shadow-inner"
                                 >
                                     <option value="">ALL CATEGORIES</option>
                                     {categories.map((cat) => (
@@ -175,7 +175,7 @@ const SearchResults = () => {
                                 </select>
                                 <button
                                     type="submit"
-                                    className="tap-target min-h-11 bg-brand-600 text-white px-5 md:px-8 py-3 rounded-xl hover:bg-black transition shadow-lg shadow-brand-500/20 font-black text-[9px] uppercase tracking-widest active:scale-95"
+                                    className="tap-target min-h-11 bg-brand-600 text-white px-5 md:px-8 py-3 rounded-2xl hover:bg-black transition shadow-lg shadow-brand-500/20 font-black text-[9px] uppercase tracking-widest active:scale-95"
                                 >
                                     {t('search')}
                                 </button>
@@ -186,17 +186,18 @@ const SearchResults = () => {
             </div>
 
             <main className="max-w-5xl mx-auto px-4 py-6 md:py-8">
-                <div className="mb-5 md:mb-8 flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
+                <div className="mb-4 md:mb-8 flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
                     <div className="space-y-1">
                         <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.28em]">Browsing</p>
-                        <h2 className="text-base sm:text-lg md:text-xl font-bold text-gray-900 dark:text-white leading-tight">
+                        <h2 className="text-sm sm:text-lg md:text-xl font-bold text-gray-900 dark:text-white leading-tight">
                             {query ? `Results for "${query}"` : 'All Available Products'}
                             {categoryIdFromUrl && <span className="ml-2 text-[9px] bg-brand-600 text-white px-2 py-0.5 rounded-full uppercase tracking-widest font-black align-middle">Filtered</span>}
                         </h2>
                     </div>
                     
                     {!loading && products.length > 0 && (
-                        <div className="flex items-center gap-3">
+                        <>
+                        <div className="hidden md:flex items-center gap-3">
                             <div className="relative group">
                                 <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-gray-400">
                                     <FiFilter size={14} />
@@ -220,6 +221,38 @@ const SearchResults = () => {
                                 <p className="text-sm font-bold text-brand-600 dark:text-brand-500">{products.length} items</p>
                             </div>
                         </div>
+
+                        <div className="md:hidden rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-800 p-2 shadow-sm">
+                            <div className="flex items-center justify-between gap-2 px-1 pb-2">
+                                <span className="text-[9px] font-black uppercase tracking-[0.28em] text-gray-400">Sort</span>
+                                <span className="text-[9px] font-black uppercase tracking-[0.28em] text-brand-600/70 dark:text-brand-500/70">{products.length} items</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                {[
+                                    ['relevance', 'Relevance'],
+                                    ['price-asc', 'Low to High'],
+                                    ['price-desc', 'High to Low'],
+                                    ['name', 'A to Z'],
+                                ].map(([value, label]) => {
+                                    const active = sortBy === value;
+                                    return (
+                                        <button
+                                            key={value}
+                                            type="button"
+                                            onClick={() => setSortBy(value)}
+                                            className={`tap-target min-h-11 rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-widest transition ${
+                                                active
+                                                    ? 'bg-brand-600 text-white shadow-md shadow-brand-500/20'
+                                                    : 'bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-300'
+                                            }`}
+                                        >
+                                            {label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                        </>
                     )}
                 </div>
 
@@ -230,12 +263,14 @@ const SearchResults = () => {
                         ))}
                     </div>
                 ) : products.length === 0 ? (
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-12 text-center">
-                        <FiSearch className="text-gray-400 text-6xl mx-auto mb-4" />
-                        <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-2 uppercase tracking-tight">
+                    <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-soft p-8 sm:p-12 text-center border border-gray-100 dark:border-gray-700">
+                        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+                            <FiSearch className="text-gray-400 text-3xl" />
+                        </div>
+                        <h2 className="text-lg sm:text-xl font-bold text-gray-800 dark:text-white mb-2 uppercase tracking-tight">
                             {t('no_results')}
                         </h2>
-                        <p className="text-gray-600 dark:text-gray-400 mb-6 font-medium">
+                        <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-6 font-medium">
                             {t('try_different_search')}
                         </p>
                         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">

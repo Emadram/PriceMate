@@ -25,6 +25,12 @@ const Home = () => {
     const [error, setError] = useState(null);
     const navigationStack = useNavHistoryStore((state) => state.stack);
 
+    const tapFeedback = () => {
+        if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+            navigator.vibrate(10);
+        }
+    };
+
     const recentRoute = navigationStack.length > 0 ? navigationStack[navigationStack.length - 1] : null;
 
     const getRecentRouteLabel = (route) => {
@@ -42,6 +48,31 @@ const Home = () => {
     const getRecentRouteAction = (route) => {
         if (!route) return '/scan';
         return route;
+    };
+
+    const openRecentRoute = () => {
+        tapFeedback();
+        navigate(getRecentRouteAction(recentRoute));
+    };
+
+    const openScan = () => {
+        tapFeedback();
+        navigate('/scan');
+    };
+
+    const openSearch = () => {
+        tapFeedback();
+        navigate('/search');
+    };
+
+    const openFavorites = () => {
+        tapFeedback();
+        navigate('/favorites');
+    };
+
+    const openAI = () => {
+        tapFeedback();
+        document.querySelector('[aria-label="Open AI Assistant"]')?.click();
     };
 
     const loadData = useCallback(async () => {
@@ -185,8 +216,8 @@ const Home = () => {
 
                         <button
                             type="button"
-                            onClick={() => navigate(getRecentRouteAction(recentRoute))}
-                            className="w-full rounded-2xl border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-3 text-left transition active:scale-[0.99]"
+                            onClick={openRecentRoute}
+                            className="w-full rounded-2xl border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-3 text-left transition active:scale-[0.98] active:shadow-sm"
                         >
                             <div className="flex items-center justify-between gap-3">
                                 <div className="min-w-0">
@@ -202,8 +233,8 @@ const Home = () => {
                         <div className="grid grid-cols-2 gap-2.5">
                             <button
                                 type="button"
-                                onClick={() => navigate('/scan')}
-                                className="tap-target min-h-14 rounded-2xl bg-brand-600 text-white px-4 py-3 flex items-center gap-3 shadow-lg shadow-brand-500/20 active:scale-[0.98]"
+                                onClick={openScan}
+                                className="tap-target min-h-14 rounded-2xl bg-brand-600 text-white px-4 py-3 flex items-center gap-3 shadow-lg shadow-brand-500/20 active:scale-[0.96] transition-transform"
                             >
                                 <span className="h-9 w-9 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
                                     <FiCamera size={18} />
@@ -216,8 +247,8 @@ const Home = () => {
 
                             <button
                                 type="button"
-                                onClick={() => navigate('/search')}
-                                className="tap-target min-h-14 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-4 py-3 flex items-center gap-3 shadow-sm active:scale-[0.98]"
+                                onClick={openSearch}
+                                className="tap-target min-h-14 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-4 py-3 flex items-center gap-3 shadow-sm active:scale-[0.96] transition-transform"
                             >
                                 <span className="h-9 w-9 rounded-xl bg-gray-50 dark:bg-gray-900 flex items-center justify-center shrink-0 text-brand-600 dark:text-brand-500">
                                     <FiSearch size={18} />
@@ -230,8 +261,8 @@ const Home = () => {
 
                             <button
                                 type="button"
-                                onClick={() => navigate('/favorites')}
-                                className="tap-target min-h-14 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-4 py-3 flex items-center gap-3 shadow-sm active:scale-[0.98]"
+                                onClick={openFavorites}
+                                className="tap-target min-h-14 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-4 py-3 flex items-center gap-3 shadow-sm active:scale-[0.96] transition-transform"
                             >
                                 <span className="h-9 w-9 rounded-xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center shrink-0 text-red-500">
                                     <FiHeart size={18} />
@@ -244,8 +275,8 @@ const Home = () => {
 
                             <button
                                 type="button"
-                                onClick={() => document.querySelector('[aria-label="Open AI Assistant"]')?.click()}
-                                className="tap-target min-h-14 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-4 py-3 flex items-center gap-3 shadow-sm active:scale-[0.98]"
+                                onClick={openAI}
+                                className="tap-target min-h-14 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-4 py-3 flex items-center gap-3 shadow-sm active:scale-[0.96] transition-transform"
                             >
                                 <span className="h-9 w-9 rounded-xl bg-brand-50 dark:bg-brand-900/20 flex items-center justify-center shrink-0 text-brand-600 dark:text-brand-500">
                                     <FiMessageSquare size={18} />

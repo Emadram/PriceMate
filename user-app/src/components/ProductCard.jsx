@@ -47,21 +47,21 @@ const ProductCard = ({ product, prices = [] }) => {
         <div className="relative group">
             <Link
                 to={`/price-comparison/${productKey}`}
-                className="group block bg-white dark:bg-gray-800 rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-soft hover:shadow-soft-lg hover:-translate-y-1 transition-all duration-300 border border-transparent hover:border-gray-100 dark:hover:border-gray-700 overflow-hidden"
+                className="group block bg-white dark:bg-gray-800 rounded-2xl sm:rounded-3xl p-2.5 sm:p-4 shadow-soft hover:shadow-soft-lg hover:-translate-y-1 transition-all duration-300 border border-transparent hover:border-gray-100 dark:hover:border-gray-700 overflow-hidden"
             >
-                <div className="flex items-center gap-3 sm:gap-4 md:gap-5">
+                <div className="flex items-center gap-2.5 sm:gap-4 md:gap-5">
                 {/* Product Image Wrapper */}
-                <div className="relative w-[4.75rem] h-[4.75rem] sm:w-24 sm:h-24 md:w-28 md:h-28 bg-gray-50 dark:bg-gray-900 rounded-xl sm:rounded-2xl flex items-center justify-center flex-shrink-0 overflow-hidden">
+                <div className="relative w-[4.25rem] h-[4.25rem] sm:w-24 sm:h-24 md:w-28 md:h-28 bg-gray-50 dark:bg-gray-900 rounded-xl sm:rounded-2xl flex items-center justify-center flex-shrink-0 overflow-hidden">
                     {imageUrl && !imageFailed ? (
                         <img
                             src={imageUrl}
                             alt={product.name}
-                            className="w-[3.75rem] h-[3.75rem] sm:w-20 sm:h-20 md:w-24 md:h-24 object-contain mix-blend-multiply dark:mix-blend-normal transform group-hover:scale-110 transition-transform duration-500"
+                            className="w-[3.35rem] h-[3.35rem] sm:w-20 sm:h-20 md:w-24 md:h-24 object-contain mix-blend-multiply dark:mix-blend-normal transform group-hover:scale-110 transition-transform duration-500"
                             onError={() => setImageFailed(true)}
                             loading="lazy"
                         />
                     ) : (
-                        <FiPackage className="text-gray-300 text-2xl sm:text-3xl" />
+                        <FiPackage className="text-gray-300 text-xl sm:text-3xl" />
                     )}
 
                     {/* Global Badge */}
@@ -73,11 +73,11 @@ const ProductCard = ({ product, prices = [] }) => {
                 </div>
 
                 {/* Content Area */}
-                <div className="flex-1 min-w-0 flex flex-col h-full py-1">
+                <div className="flex-1 min-w-0 flex flex-col h-full py-0.5 sm:py-1">
                     <div className="mb-auto">
-                        <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start justify-between gap-2.5 sm:gap-3">
                             <div className="flex flex-col min-w-0 flex-1">
-                                <h3 className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base md:text-lg truncate group-hover:text-brand-600 transition-colors leading-tight">
+                                <h3 className="font-semibold text-gray-900 dark:text-white text-[13px] sm:text-base md:text-lg truncate group-hover:text-brand-600 transition-colors leading-tight">
                                     {product.name}
                                 </h3>
                                 {product.is_global && (
@@ -92,17 +92,17 @@ const ProductCard = ({ product, prices = [] }) => {
                                     e.stopPropagation();
                                     setIsReportOpen(true);
                                 }}
-                                className="tap-target shrink-0 flex h-11 w-11 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 shadow-sm transition-all hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-400 dark:hover:bg-red-500/25"
+                                className="tap-target shrink-0 flex h-10 w-10 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 shadow-sm transition-all hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-400 dark:hover:bg-red-500/25"
                                 title="Report Issue"
                                 aria-label="Report issue"
                             >
-                                <FiAlertTriangle className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                                <FiAlertTriangle className="w-3.5 h-3.5 sm:w-[18px] sm:h-[18px]" />
                             </button>
                             )}
                         </div>
 
-                        <div className="flex flex-col gap-1 mt-1.5">
-                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1.5">
+                        <div className="flex flex-col gap-1 mt-1.25">
+                            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 mt-1.25">
                                 <CategoryIconLabel categoryId={product.categoryId} fallbackName={categoryName} />
                                 {product.brand && (
                                     <>
@@ -111,19 +111,19 @@ const ProductCard = ({ product, prices = [] }) => {
                                     </>
                                 )}
                             </div>
-                            <span className="text-[10px] text-green-600 dark:text-green-400 font-bold flex items-center gap-1 uppercase tracking-tight">
-                                <FiClock size={10} /> {freshnessText}
+                            <span className="text-[9px] sm:text-[10px] text-green-600 dark:text-green-400 font-bold flex items-center gap-1 uppercase tracking-tight truncate">
+                                <FiClock size={10} /> <span className="truncate">{freshnessText}</span>
                             </span>
                         </div>
                     </div>
 
                     {/* Footer / Price Section */}
-                    <div className="flex items-end justify-between mt-3 sm:mt-4 gap-2">
+                    <div className="flex flex-col gap-2.5 mt-3 sm:mt-4 sm:flex-row sm:items-end sm:justify-between">
                         {lowestPrice ? (
                             <div className="flex flex-col min-w-0">
                                 <span className="text-[9px] sm:text-[10px] uppercase font-bold tracking-widest text-gray-400 mb-0.5">{t('starting_from')}</span>
                                 <div className="flex items-baseline gap-1">
-                                        <span className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white leading-none">
+                                        <span className="text-[1.05rem] sm:text-xl font-bold text-gray-900 dark:text-white leading-none">
                                         {convert(lowestPrice.price, 'TRY')}
                                     </span>
                                     <span className="text-xs sm:text-sm font-medium text-gray-400">TRY</span>
@@ -136,7 +136,7 @@ const ProductCard = ({ product, prices = [] }) => {
                         )}
                         
                         {prices.length > 0 && (
-                            <div className="flex items-center gap-1 text-[10px] sm:text-xs font-semibold text-brand-600 dark:text-brand-500 bg-brand-50 dark:bg-brand-900/30 px-2 py-1 sm:px-3 sm:py-1.5 rounded-full border border-brand-100 dark:border-brand-800/30 shrink-0">
+                            <div className="flex w-full sm:w-auto items-center justify-center gap-1 text-[10px] sm:text-xs font-semibold text-brand-600 dark:text-brand-500 bg-brand-50 dark:bg-brand-900/30 px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-full border border-brand-100 dark:border-brand-800/30 shrink-0">
                                 <FiShoppingBag className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                                 <span>{prices.length} {prices.length === 1 ? t('supermarket') : t('supermarket') + 's'}</span>
                             </div>
@@ -145,7 +145,7 @@ const ProductCard = ({ product, prices = [] }) => {
                         {(() => {
                             const ratingValue = product.rating ?? product.avgRating ?? product.averageRating ?? null;
                             return ratingValue !== null && ratingValue !== undefined ? (
-                                <div className="ml-2 sm:ml-4 flex items-center">
+                                <div className="flex items-center sm:ml-4">
                                     <StarRating value={ratingValue} size={12} />
                                 </div>
                             ) : null;
