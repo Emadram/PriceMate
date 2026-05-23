@@ -975,19 +975,6 @@ const AIChatBox = ({ isOpen, onClose }) => {
         if (!user?.$id) return null;
         return (
             <div className="flex flex-col h-full min-h-0 bg-gray-100 dark:bg-gray-900/80">
-                <div className="p-2 border-b border-gray-200 dark:border-gray-700 shrink-0">
-                    <button
-                        type="button"
-                        onClick={() => {
-                            beginNewConversation();
-                            afterPick?.();
-                        }}
-                        className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-brand-600 text-white text-[10px] font-black uppercase tracking-wide shadow-sm"
-                    >
-                        <FiPlus size={14} />
-                        {t('ai_chat_new_short')}
-                    </button>
-                </div>
                 <div className="flex-1 overflow-y-auto p-1 space-y-1">
                     {summariesLoading && conversationRows.length === 0 ? (
                         <div className="flex justify-center p-4">
@@ -1053,11 +1040,11 @@ const AIChatBox = ({ isOpen, onClose }) => {
             />
             <div className="fixed inset-x-0 bottom-0 z-[2000] flex h-[min(92dvh,760px)] flex-col overflow-hidden rounded-t-[2rem] border border-gray-200 bg-white shadow-2xl animate-in slide-in-from-bottom-4 duration-300 dark:border-gray-700 dark:bg-gray-800 sm:inset-auto sm:bottom-4 sm:right-4 sm:h-[min(640px,90vh)] sm:w-[400px] sm:rounded-2xl md:w-[448px] sm:border sm:shadow-2xl sm:slide-in-from-bottom-5 sm:slide-in-from-right">
             <div className="border-b border-black/5 bg-gradient-to-r from-brand-600 via-brand-600 to-brand-700 px-4 py-3 text-white shadow-md shrink-0 sm:px-5 sm:py-4">
-                <div className="flex items-start gap-3 min-w-0">
+                <div className="flex items-center gap-3 min-w-0">
                     {user && (
                         <button
                             type="button"
-                            className="sm:hidden mt-0.5 p-2.5 rounded-2xl bg-white/10 backdrop-blur-sm shrink-0 active:scale-95"
+                            className="sm:hidden p-2.5 rounded-2xl bg-white/10 backdrop-blur-sm shrink-0 active:scale-95"
                             onClick={() => setMobileListOpen(true)}
                             aria-label={t('ai_chat_chats')}
                         >
@@ -1067,9 +1054,11 @@ const AIChatBox = ({ isOpen, onClose }) => {
                     <div className="hidden sm:flex w-8 h-8 bg-white/12 rounded-2xl items-center justify-center backdrop-blur-sm shrink-0">
                         <FiCpu className="text-xl text-white/85" />
                     </div>
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 min-w-0">
-                            <span className="font-black block text-sm sm:text-[15px] truncate">PriceMate AI</span>
+                    <div className="flex-1 min-w-0 flex flex-col justify-center">
+                        <div className="flex items-center gap-2 min-w-0 leading-none">
+                            <span className="font-black block text-sm sm:text-[15px] truncate">
+                                PriceMate AI
+                            </span>
                             <span className="hidden sm:inline-flex text-[9px] uppercase tracking-[0.22em] font-black bg-white/15 px-2 py-0.5 rounded-full">
                                 Powered by Gemini
                             </span>
@@ -1079,13 +1068,6 @@ const AIChatBox = ({ isOpen, onClose }) => {
                         </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                        <button
-                            type="button"
-                            onClick={beginNewConversation}
-                            className="sm:hidden rounded-full bg-white text-brand-700 px-3.5 py-2 text-[11px] font-black uppercase tracking-widest shadow-sm active:scale-95"
-                        >
-                            {t('ai_chat_new_short')}
-                        </button>
                         <button
                             onClick={onClose}
                             className="p-2.5 hover:bg-white/15 rounded-2xl transition-all active:scale-95 shrink-0"
@@ -1119,6 +1101,16 @@ const AIChatBox = ({ isOpen, onClose }) => {
                                 <span className="font-black text-sm uppercase tracking-widest text-gray-700 dark:text-gray-200">
                                     {t('ai_chat_chats')}
                                 </span>
+                                <div className="ml-auto">
+                                    <button
+                                        type="button"
+                                        onClick={() => { beginNewConversation(); setMobileListOpen(false); }}
+                                        className="p-2 rounded-xl bg-brand-600 text-white hover:bg-brand-700"
+                                        aria-label={t('ai_chat_new')}
+                                    >
+                                        <FiPlus size={18} />
+                                    </button>
+                                </div>
                             </div>
                             <div className="flex-1 min-h-0 overflow-hidden">{renderConversationList(() => setMobileListOpen(false))}</div>
                         </div>
@@ -1151,13 +1143,7 @@ const AIChatBox = ({ isOpen, onClose }) => {
                                                 </p>
                                             </div>
                                         </div>
-                                        <button
-                                            type="button"
-                                            onClick={beginNewConversation}
-                                            className="mt-4 w-full rounded-2xl bg-white text-brand-700 py-3 text-xs font-black uppercase tracking-widest shadow-sm"
-                                        >
-                                            {t('ai_chat_new_short')}
-                                        </button>
+                                        {/* Removed large 'NEW' button per request; use plus icons in the list to start new chats. */}
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-2">
@@ -1176,9 +1162,7 @@ const AIChatBox = ({ isOpen, onClose }) => {
                                         ))}
                                     </div>
 
-                                    <div className="rounded-[1.5rem] border border-dashed border-gray-200 bg-white p-4 text-center text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
-                                        {t('ai_chat_idle_hint')}
-                                    </div>
+                                    {/* Guide text removed per request. */}
                                 </div>
                             )
                         )}

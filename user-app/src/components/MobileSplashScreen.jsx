@@ -66,6 +66,7 @@ const MobileSplashScreen = () => {
 
     return (
         <div
+            id="pricemate-mobile-splash"
             className={`fixed inset-0 z-[2600] flex items-center justify-center overflow-hidden transition-all duration-500 ${overlayTone} ${shouldFade ? 'opacity-0 scale-[1.03]' : 'opacity-100'}`}
             aria-hidden="true"
         >
@@ -92,6 +93,8 @@ const MobileSplashScreen = () => {
                         </p>
                     )}
                 </div>
+
+                {/* The launcher button is rendered by FloatingAIChatLauncher and will position itself over the splash when attached. */}
 
                 <div className="mt-8 flex items-center gap-3">
                     <div className={`h-2.5 w-2.5 rounded-full bg-brand-500 ${shouldFade ? 'animate-none' : 'animate-pulse'}`} />
