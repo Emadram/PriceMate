@@ -16,14 +16,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <!-- Fallback AI launcher for non-react webviews: navigates to app with ?openAI=1 -->
-    <style>
-      .pm-fallback-ai-btn{position:fixed;right:1rem;bottom:calc(1rem + env(safe-area-inset-bottom,0px));z-index:9999;width:56px;height:56px;border-radius:9999px;background:linear-gradient(135deg,var(--brand-600,#06b6d4),var(--brand-700,#0ea5a4));display:flex;align-items:center;justify-content:center;color:white;box-shadow:0 10px 30px rgba(11,115,133,0.18);}
-      .pm-fallback-ai-btn svg{width:26px;height:26px}
-    </style>
-    <a href="/?openAI=1" class="pm-fallback-ai-btn" aria-label="Open AI Assistant" title="Open AI Assistant">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
-    </a>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

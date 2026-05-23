@@ -38,6 +38,17 @@ const Navbar = () => {
 
     return (
         <>
+            <div className="md:hidden fixed top-0 left-0 right-0 z-50 pt-safe">
+                <div className="mx-2 rounded-b-[1.4rem] bg-white/96 dark:bg-gray-900/96 backdrop-blur-xl border border-gray-100/80 dark:border-gray-800/80 px-4 py-3 shadow-[0_8px_24px_rgba(0,0,0,0.06)]">
+                    <Link to="/" className="flex items-center justify-center gap-2 min-w-0">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-600 text-white font-black text-sm shadow-sm shadow-brand-500/25 shrink-0">
+                            P
+                        </div>
+                        <span className="text-sm font-black tracking-tight text-gray-900 dark:text-white truncate">PriceMate</span>
+                    </Link>
+                </div>
+            </div>
+
             <nav className="hidden md:block pt-safe bg-white/80 dark:bg-gray-800/80 backdrop-blur-md shadow-sm sticky top-0 z-50 transition-colors duration-200 border-b border-gray-100 dark:border-gray-700">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between h-16">
@@ -129,12 +140,6 @@ const Navbar = () => {
 
             {/* Mobile Bottom Navigation */}
             <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 mx-2 mb-2 rounded-t-[1.75rem] bg-white/96 dark:bg-gray-900/96 backdrop-blur-xl border border-gray-100/80 dark:border-gray-800/80 px-4 py-3 pb-safe-nav shadow-[0_-12px_30px_rgba(0,0,0,0.08)]">
-                <div className="mb-2 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-[0.28em] text-gray-500 dark:text-gray-400">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-brand-600 text-[10px] text-white shadow-sm shadow-brand-500/25">
-                        P
-                    </span>
-                    <span>PriceMate</span>
-                </div>
                 <div className="flex justify-between items-center max-w-md mx-auto">
                     <NavItem to="/" icon={FiHome} label={t('home')} currentPath={location.pathname} onTap={tapFeedback} />
                     <NavItem to="/search" icon={FiSearch} label={t('search')} currentPath={location.pathname} onTap={tapFeedback} />

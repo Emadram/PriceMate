@@ -198,14 +198,14 @@ const Favorites = () => {
 
                         {activeTab === 'supermarkets' &&
                             (supermarkets.length > 0 ? (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 px-0 sm:px-1">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 sm:gap-4 px-0 sm:px-1">
                                     {supermarkets.map((market) => (
                                         <Link
                                             key={market.$id}
                                             to={`/supermarket/${market.$id}`}
-                                            className="group bg-white dark:bg-[#121214] p-3.5 sm:p-5 rounded-2xl sm:rounded-[2.5rem] shadow-soft hover:shadow-soft-lg transition-all border border-gray-100/50 dark:border-white/5 active:scale-[0.98] flex items-center gap-3 sm:gap-4"
+                                            className="group bg-white dark:bg-[#121214] p-3 sm:p-5 rounded-[1.5rem] sm:rounded-[2.5rem] shadow-soft hover:shadow-soft-lg transition-all border border-gray-100/50 dark:border-white/5 active:scale-[0.98] flex items-center gap-2.5 sm:gap-4"
                                         >
-                                            <div className="w-14 h-14 sm:w-16 sm:h-20 md:w-20 md:h-20 bg-gray-50 dark:bg-[#1C1C1E] rounded-2xl sm:rounded-3xl flex items-center justify-center overflow-hidden p-2 sm:p-3 group-hover:scale-105 transition-transform shrink-0">
+                                            <div className="w-12 h-12 sm:w-16 sm:h-20 md:w-20 md:h-20 bg-gray-50 dark:bg-[#1C1C1E] rounded-2xl sm:rounded-3xl flex items-center justify-center overflow-hidden p-2 sm:p-3 group-hover:scale-105 transition-transform shrink-0">
                                                 {market.icon || market.logoUrl ? (
                                                     <img
                                                         src={market.icon || market.logoUrl}
@@ -213,19 +213,19 @@ const Favorites = () => {
                                                         alt={market.name}
                                                     />
                                                 ) : (
-                                                    <FiShoppingBag className="text-gray-400 text-2xl" />
+                                                    <FiShoppingBag className="text-gray-400 text-xl sm:text-2xl" />
                                                 )}
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <h3 className="font-bold text-gray-900 dark:text-white text-sm sm:text-base md:text-lg truncate mb-0.5 sm:mb-1">{market.name}</h3>
-                                                <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{market.address}</p>
-                                                <div className="mt-2 flex items-center gap-2">
-                                                    <span className="text-[10px] bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-500 px-2 py-0.5 rounded-full font-bold uppercase tracking-tighter">
+                                                <h3 className="font-bold text-gray-900 dark:text-white text-[13px] sm:text-base md:text-lg truncate mb-0.5 sm:mb-1">{market.name}</h3>
+                                                <p className="text-[11px] sm:text-xs text-gray-400 dark:text-gray-500 truncate">{market.address}</p>
+                                                <div className="mt-1.5 sm:mt-2 flex items-center gap-2">
+                                                    <span className="text-[9px] sm:text-[10px] bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-500 px-2 py-0.5 rounded-full font-bold uppercase tracking-tighter">
                                                         Open
                                                     </span>
                                                 </div>
                                             </div>
-                                            <FiChevronRight className="text-gray-300 group-hover:translate-x-1 transition-transform shrink-0" />
+                                            <FiChevronRight className="text-gray-300 group-hover:translate-x-1 transition-transform shrink-0 text-sm sm:text-base" />
                                         </Link>
                                     ))}
                                 </div>

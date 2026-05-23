@@ -22,6 +22,7 @@ import FeedbackPage from './pages/FeedbackPage';
 import PriceComparison from './pages/PriceComparison';
 import SupermarketProfile from './pages/SupermarketProfile';
 import FloatingAIChatLauncher from './components/FloatingAIChatLauncher';
+import MobileSplashScreen from './components/MobileSplashScreen';
 import PageTransition from './components/PageTransition';
 import Navbar from './components/Navbar';
 import NavigationListener from './components/NavigationListener';
@@ -36,11 +37,12 @@ const AppShell = ({ children }) => {
   const hideGlobalNav = AUTH_ROUTE_PREFIXES.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`)
   );
+  const mobileTopPadding = hideGlobalNav ? '' : 'pt-14 md:pt-0';
 
   return (
     <>
       {!hideGlobalNav && <Navbar />}
-      {children}
+      <div className={mobileTopPadding}>{children}</div>
       {!hideAiLauncher && <FloatingAIChatLauncher />}
     </>
   );
@@ -102,13 +104,26 @@ function App() {
   useEffect(() => {
     checkSession();
     fetchRates(); // Initialize exchange rates on mount
-    setTheme(theme); // Initialize theme on mount
+    if (typeof window !== 'undefined') {
+      const storedTheme = window.localStorage.getItem('pricemate-theme');
+      if (!storedTheme) {
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        setTheme(prefersDark ? 'dark' : 'light');
+      }
+    }
     
     // Run system health check in development
     if (import.meta.env.DEV) {
       runDiagnostics();
     }
-  }, [checkSession, setTheme, theme, fetchRates]);
+  }, [checkSession, setTheme, fetchRates]);
+
+  useEffect(() => {
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+    if (metaThemeColor) {
+      metaThemeColor.setAttribute('content', theme === 'dark' ? '#020617' : '#ffffff');
+    }
+  }, [theme]);
 
   // Sync favorites when user changes
   useEffect(() => {
@@ -135,6 +150,7 @@ function App() {
         }}
       />
       <AppShell>
+      <MobileSplashScreen />
       <PageTransition>
       <Routes>
         <Route path="/login" element={<Login />} />

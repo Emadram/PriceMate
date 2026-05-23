@@ -53,6 +53,14 @@
     animation: float 4s ease-in-out infinite;
   }
 
+  .animate-splash-ripple {
+    animation: splash-ripple 1.8s ease-out infinite;
+  }
+
+  .animate-splash-glow {
+    animation: splash-glow 2.2s ease-in-out infinite;
+  }
+
   @keyframes pulse-soft {
     0%, 100% { opacity: 0.3; transform: scale(0.95); }
     50% { opacity: 1; transform: scale(1.05); }
@@ -61,6 +69,32 @@
   @keyframes float {
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-10px); }
+  }
+
+  @keyframes splash-ripple {
+    0% {
+      transform: scale(0.92);
+      opacity: 0.28;
+    }
+    70% {
+      transform: scale(1.14);
+      opacity: 0.08;
+    }
+    100% {
+      transform: scale(1.2);
+      opacity: 0;
+    }
+  }
+
+  @keyframes splash-glow {
+    0%, 100% {
+      opacity: 0.5;
+      transform: scale(0.96);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.04);
+    }
   }
 }
 

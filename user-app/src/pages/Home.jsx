@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { FiSearch, FiCamera, FiChevronRight, FiPackage, FiZap, FiBell, FiInfo, FiAlertTriangle, FiHeart, FiMessageSquare, FiClock } from 'react-icons/fi';
+import { FiChevronRight, FiPackage, FiZap, FiBell, FiInfo, FiAlertTriangle, FiClock } from 'react-icons/fi';
 import useAnnouncementStore from '../stores/announcementStore';
 import useCategoriesStore from '../stores/categoriesStore';
 import useNavHistoryStore from '../stores/navHistoryStore';
@@ -13,7 +13,6 @@ import MarketsSection from '../components/MarketsSection';
 const Home = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
-    const [searchQuery, setSearchQuery] = useState('');
     
     // Stores
     const { categories, fetchCategories, getIconForCategory, loading: categoriesLoading } = useCategoriesStore();
@@ -34,15 +33,15 @@ const Home = () => {
     const recentRoute = navigationStack.length > 0 ? navigationStack[navigationStack.length - 1] : null;
 
     const getRecentRouteLabel = (route) => {
-        if (!route) return 'Start with a scan';
-        if (route.startsWith('/price-comparison/')) return 'Continue price comparison';
-        if (route.startsWith('/product/')) return 'Continue product details';
-        if (route.startsWith('/supermarket/')) return 'Continue store page';
-        if (route.startsWith('/search')) return 'Continue browsing';
-        if (route.startsWith('/favorites')) return 'Open favorites';
-        if (route.startsWith('/profile')) return 'Back to profile';
-        if (route.startsWith('/scan')) return 'Continue scanning';
-        return 'Continue where you left off';
+        if (!route) return 'Scan';
+        if (route.startsWith('/price-comparison/')) return 'Price comparison';
+        if (route.startsWith('/product/')) return 'Product details';
+        if (route.startsWith('/supermarket/')) return 'Store page';
+        if (route.startsWith('/search')) return 'Search';
+        if (route.startsWith('/favorites')) return 'Favorites';
+        if (route.startsWith('/profile')) return 'Profile';
+        if (route.startsWith('/scan')) return 'Scan';
+        return 'Recent page';
     };
 
     const getRecentRouteAction = (route) => {
@@ -55,24 +54,24 @@ const Home = () => {
         navigate(getRecentRouteAction(recentRoute));
     };
 
-    const openScan = () => {
-        tapFeedback();
-        navigate('/scan');
-    };
+    const getGreetingKey = () => {
+        try {
+            const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            const hour = Number(
+                new Intl.DateTimeFormat('en-US', {
+                    hour: 'numeric',
+                    hour12: false,
+                    timeZone,
+                }).format(new Date())
+            );
 
-    const openSearch = () => {
-        tapFeedback();
-        navigate('/search');
-    };
-
-    const openFavorites = () => {
-        tapFeedback();
-        navigate('/favorites');
-    };
-
-    const openAI = () => {
-        tapFeedback();
-        document.querySelector('[aria-label="Open AI Assistant"]')?.click();
+            if (hour >= 5 && hour < 12) return 'home_greeting_morning';
+            if (hour >= 12 && hour < 17) return 'home_greeting_afternoon';
+            if (hour >= 17 && hour < 22) return 'home_greeting_evening';
+            return 'home_greeting_night';
+        } catch {
+            return 'home_greeting_day';
+        }
     };
 
     const loadData = useCallback(async () => {
@@ -127,13 +126,7 @@ const Home = () => {
         loadData();
     }, [loadData]);
 
-    const handleSearch = (e) => {
-        e.preventDefault();
-        if (searchQuery.trim()) {
-            const url = `/search?q=${encodeURIComponent(searchQuery.trim())}`;
-            navigate(url);
-        }
-    };
+    const greetingKey = getGreetingKey();
 
     return (
         <div className="min-h-screen bg-[#F5F5F7] dark:bg-gray-950 pb-safe md:pb-12 text-gray-900 dark:text-gray-100 selection:bg-brand-500/30 transition-colors">
@@ -146,7 +139,7 @@ const Home = () => {
                                 {t('find_best_prices', 'Find the best prices')}
                             </h1>
                             <p className="text-gray-500 dark:text-gray-400 font-medium text-[13px] sm:text-sm md:text-lg mt-1">
-                                {t('ready_to_save', 'Ready to find the best deals today?')}
+                                {t(greetingKey, 'Good morning')} — {t('home_ready_to_save', 'Ready to find the best deals today?')}
                             </p>
                         </div>
                     </div>
@@ -171,43 +164,14 @@ const Home = () => {
                     </div>
                 </header>
 
-                {/* Search Bar - Stripe Inspired Softness */}
-                <section className="relative group animate-in slide-in-from-bottom-6 duration-700 delay-150">
-                    <div className="absolute -inset-2 bg-gradient-to-r from-brand-500/10 to-accent-500/10 rounded-[3rem] blur-2xl opacity-0 group-hover:opacity-100 transition duration-1000"></div>
-                    <div className="relative bg-white dark:bg-gray-900 rounded-[2.5rem] shadow-soft border border-gray-200/50 dark:border-gray-800/50 p-2 md:p-3 overflow-hidden">
-                        <form onSubmit={handleSearch} className="flex flex-col md:flex-row items-center gap-2">
-                            <div className="flex-1 relative w-full">
-                                <input
-                                    type="text"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder={t('search_placeholder')}
-                                    className="w-full pl-12 pr-11 py-4.5 sm:py-5 bg-transparent border-0 rounded-3xl text-gray-900 dark:text-white placeholder-gray-400 focus:ring-0 font-semibold text-base sm:text-lg"
-                                />
-                                <div className="absolute left-4.5 sm:left-5 top-1/2 -translate-y-1/2 text-gray-400">
-                                    <FiSearch size={20} className="stroke-[2.5]" />
-                                </div>
-                            </div>
-
-                            <div className="flex items-center gap-2 w-full md:w-auto p-2 md:p-0">
-                                <button
-                                    type="submit"
-                                    className="flex-1 md:flex-none bg-brand-600 hover:bg-brand-700 dark:bg-brand-700 dark:hover:bg-brand-600 text-white px-8 py-3.5 sm:py-4 rounded-2xl transition-all duration-300 shadow-lg shadow-brand-500/25 dark:shadow-brand-900/40 font-bold tracking-tight text-sm sm:text-base active:scale-95"
-                                >
-                                    {t('search')}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </section>
 
                 {/* Mobile Quick Access */}
                 <section className="md:hidden space-y-3 animate-in slide-in-from-bottom-6 duration-700 delay-200">
                     <div className="rounded-[1.75rem] bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-soft p-4 space-y-3">
                         <div className="flex items-center justify-between gap-3">
                             <div className="min-w-0">
-                                <p className="text-[10px] font-black uppercase tracking-[0.35em] text-gray-400">Quick Access</p>
-                                <h3 className="mt-1 text-base font-black tracking-tight text-gray-900 dark:text-white">Your last step</h3>
+                                <p className="text-[10px] font-black uppercase tracking-[0.35em] text-gray-400">Recent</p>
+                                <h3 className="mt-1 text-base font-black tracking-tight text-gray-900 dark:text-white">Page you were on</h3>
                             </div>
                             <div className="h-10 w-10 rounded-2xl bg-brand-50 dark:bg-brand-900/20 flex items-center justify-center text-brand-600 dark:text-brand-500">
                                 <FiClock size={18} />
@@ -221,7 +185,7 @@ const Home = () => {
                         >
                             <div className="flex items-center justify-between gap-3">
                                 <div className="min-w-0">
-                                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-600/70 dark:text-brand-400/80">Recent</p>
+                                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-600/70 dark:text-brand-400/80">Recently</p>
                                     <p className="mt-1 text-sm font-bold text-gray-900 dark:text-white truncate">
                                         {getRecentRouteLabel(recentRoute)}
                                     </p>
@@ -229,64 +193,6 @@ const Home = () => {
                                 <FiChevronRight className="shrink-0 text-gray-400" size={18} />
                             </div>
                         </button>
-
-                        <div className="grid grid-cols-2 gap-2.5">
-                            <button
-                                type="button"
-                                onClick={openScan}
-                                className="tap-target min-h-14 rounded-2xl bg-brand-600 text-white px-4 py-3 flex items-center gap-3 shadow-lg shadow-brand-500/20 active:scale-[0.96] transition-transform"
-                            >
-                                <span className="h-9 w-9 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
-                                    <FiCamera size={18} />
-                                </span>
-                                <span className="flex-1 text-left min-w-0">
-                                    <span className="block text-[10px] font-black uppercase tracking-[0.3em] text-white/70">Scan</span>
-                                    <span className="block text-sm font-black leading-none mt-1">Now</span>
-                                </span>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={openSearch}
-                                className="tap-target min-h-14 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-4 py-3 flex items-center gap-3 shadow-sm active:scale-[0.96] transition-transform"
-                            >
-                                <span className="h-9 w-9 rounded-xl bg-gray-50 dark:bg-gray-900 flex items-center justify-center shrink-0 text-brand-600 dark:text-brand-500">
-                                    <FiSearch size={18} />
-                                </span>
-                                <span className="flex-1 text-left min-w-0">
-                                    <span className="block text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">Search</span>
-                                    <span className="block text-sm font-black leading-none mt-1 text-gray-900 dark:text-white">Products</span>
-                                </span>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={openFavorites}
-                                className="tap-target min-h-14 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-4 py-3 flex items-center gap-3 shadow-sm active:scale-[0.96] transition-transform"
-                            >
-                                <span className="h-9 w-9 rounded-xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center shrink-0 text-red-500">
-                                    <FiHeart size={18} />
-                                </span>
-                                <span className="flex-1 text-left min-w-0">
-                                    <span className="block text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">Saved</span>
-                                    <span className="block text-sm font-black leading-none mt-1 text-gray-900 dark:text-white">Favorites</span>
-                                </span>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={openAI}
-                                className="tap-target min-h-14 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-4 py-3 flex items-center gap-3 shadow-sm active:scale-[0.96] transition-transform"
-                            >
-                                <span className="h-9 w-9 rounded-xl bg-brand-50 dark:bg-brand-900/20 flex items-center justify-center shrink-0 text-brand-600 dark:text-brand-500">
-                                    <FiMessageSquare size={18} />
-                                </span>
-                                <span className="flex-1 text-left min-w-0">
-                                    <span className="block text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">AI</span>
-                                    <span className="block text-sm font-black leading-none mt-1 text-gray-900 dark:text-white">Assistant</span>
-                                </span>
-                            </button>
-                        </div>
                     </div>
                 </section>
 

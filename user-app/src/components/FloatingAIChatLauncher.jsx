@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FiList } from 'react-icons/fi';
+import { FiCpu } from 'react-icons/fi';
 import AIChatBox from './AIChatBox';
 
 const FloatingAIChatLauncher = () => {
@@ -31,7 +31,7 @@ const FloatingAIChatLauncher = () => {
                 title="AI Assistant"
                 aria-label="Open AI Assistant"
             >
-                <FiList className="h-7 w-7 md:h-8 md:w-8" aria-hidden />
+                <FiCpu className="h-7 w-7 md:h-8 md:w-8" aria-hidden />
             </button>
             <AIChatBox isOpen={isOpen} onClose={() => setIsOpen(false)} />
         </>

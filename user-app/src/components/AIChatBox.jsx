@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { FiX, FiSend, FiList, FiLoader, FiExternalLink, FiPackage, FiShoppingBag, FiPlus, FiTrash2, FiChevronLeft } from 'react-icons/fi';
+import { FiX, FiSend, FiList, FiLoader, FiExternalLink, FiPackage, FiShoppingBag, FiPlus, FiTrash2, FiChevronLeft, FiCpu } from 'react-icons/fi';
 import OpenAI from "openai";
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -1064,8 +1064,8 @@ const AIChatBox = ({ isOpen, onClose }) => {
                             <FiList size={20} />
                         </button>
                     )}
-                        <div className="hidden sm:flex w-8 h-8 bg-white/20 rounded-2xl items-center justify-center backdrop-blur-sm shrink-0">
-                        <FiList className="text-xl" />
+                    <div className="hidden sm:flex w-8 h-8 bg-white/12 rounded-2xl items-center justify-center backdrop-blur-sm shrink-0">
+                        <FiCpu className="text-xl text-white/85" />
                     </div>
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 min-w-0">
@@ -1141,8 +1141,8 @@ const AIChatBox = ({ isOpen, onClose }) => {
                                 <div className="mx-auto w-full max-w-md space-y-4 pt-2">
                                     <div className="rounded-[1.75rem] bg-gradient-to-br from-brand-600 via-brand-600 to-brand-700 p-5 text-white shadow-xl shadow-brand-600/20">
                                         <div className="flex items-center gap-3">
-                                                <div className="h-11 w-11 rounded-2xl bg-white/15 flex items-center justify-center backdrop-blur-sm shrink-0">
-                                                <FiList size={22} />
+                                            <div className="h-11 w-11 rounded-2xl bg-white/10 flex items-center justify-center backdrop-blur-sm shrink-0">
+                                                <FiCpu size={22} className="text-white/85" />
                                             </div>
                                             <div className="min-w-0">
                                                 <h2 className="text-lg font-black tracking-tight">Start a new chat</h2>
