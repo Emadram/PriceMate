@@ -201,38 +201,7 @@ const Home = () => {
                     </div>
                 </section>
 
-                {/* Scanner CTA */}
-                <section className="animate-in slide-in-from-bottom-10 duration-700 delay-450">
-                    <button
-                        onClick={() => navigate('/scan')}
-                        className="tap-target w-full group relative bg-black dark:bg-brand-800 dark:hover:bg-brand-700 rounded-[1.75rem] sm:rounded-[2.5rem] p-6 sm:p-8 md:p-12 overflow-hidden shadow-2xl dark:shadow-brand-900/40 transition-all active:scale-[0.99]"
-                    >
-                        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-brand-400/30 dark:bg-brand-500/10 blur-3xl rounded-full transition-transform group-hover:translate-x-12"></div>
-                        <div className="relative flex flex-col items-center gap-4 sm:gap-6 md:flex-row md:items-center md:gap-8 text-left">
-                            <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 bg-white/10 backdrop-blur-xl border border-white/20 rounded-[1.5rem] sm:rounded-[2rem] flex items-center justify-center shadow-2xl group-hover:rotate-6 transition-transform">
-                                <FiCamera className="w-8 h-8 sm:w-10 sm:h-10 text-white" strokeWidth={2.5} />
-                            </div>
-                            <div className="flex-1 text-center md:text-left">
-                                <h3 className="text-xl sm:text-2xl md:text-4xl font-black text-white leading-tight tracking-tight">
-                                    {t('scan_barcode')}
-                                </h3>
-                                <p className="text-brand-100/60 dark:text-brand-100/50 text-sm md:text-lg font-medium mt-2">
-                                    {t('compare_live_prices', 'Instant price comparison at your fingertips')}
-                                </p>
-                            </div>
-                            <div className="hidden md:block">
-                                <div className="w-14 h-14 rounded-full border border-white/20 flex items-center justify-center text-white group-hover:bg-white group-hover:text-black transition-all">
-                                    <FiChevronRight size={32} />
-                                </div>
-                            </div>
-                            <div className="md:hidden mt-2">
-                                <span className="tap-target px-6 py-2.5 bg-white text-black text-sm font-bold rounded-full">
-                                    {t('start_scanning', 'Start Scanning')}
-                                </span>
-                            </div>
-                        </div>
-                    </button>
-                </section>
+                {/* Scanner CTA removed per user preference */}
 
                 {/* Featured Products */}
                 <section className="space-y-5 sm:space-y-6 md:space-y-8 animate-in slide-in-from-bottom-10 duration-700 delay-500">

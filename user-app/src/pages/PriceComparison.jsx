@@ -654,7 +654,7 @@ const PriceComparison = () => {
                                             supermarket?.googleMapsUrl.trim());
                                     const isSelectedContext = supermarketIdParam && supermarketId === supermarketIdParam;
                                     const isLowest = getLowestPrice()?.$id === priceEntry.$id;
-                                    const normalizedStatus = normalizeStockStatus(priceEntry.stockStatus);
+                                    // status text removed per UX decision; keep status normalization in branch details only
                                     const priceCurrency = getPriceCurrency(priceEntry);
                                     const convertedPrice = convert(priceEntry.price, priceCurrency);
                                     const ratingValue = typeof supermarket === 'object' ? (supermarket.rating ?? supermarket.avgRating ?? supermarket.averageRating ?? null) : null;
@@ -734,20 +734,7 @@ const PriceComparison = () => {
                                                                 {distanceDisplay}
                                                             </span>
                                                         )}
-                                                        <span className={`inline-flex items-center gap-1.5 text-xs font-bold ${
-                                                            normalizedStatus === 'out_of_stock' ? 'text-red-500' : 
-                                                            normalizedStatus === 'low_stock' ? 'text-amber-500' : 
-                                                            'text-green-600'
-                                                        }`}>
-                                                            <div className={`w-1.5 h-1.5 rounded-full ${
-                                                                normalizedStatus === 'out_of_stock' ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]' : 
-                                                                normalizedStatus === 'low_stock' ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.4)]' : 
-                                                                'bg-green-600 shadow-[0_0_8px_rgba(22,163,74,0.4)]'
-                                                            }`} />
-                                                            {normalizedStatus === 'out_of_stock' ? t('out_of_stock') : 
-                                                             normalizedStatus === 'low_stock' ? t('low_stock') : 
-                                                             t('in_stock')}
-                                                        </span>
+                                                        {/* Status text removed — showing stars only as requested */}
                                                     </div>
                                                 </div>
 
