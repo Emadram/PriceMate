@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { account } from '../lib/appwrite';
 import { ID } from 'appwrite';
 import toast from 'react-hot-toast';
+import useNavHistoryStore from './navHistoryStore';
 
 const useAuthStore = create((set) => ({
     user: null,
@@ -192,6 +193,8 @@ const useAuthStore = create((set) => ({
         try {
             await account.deleteSession('current');
             set({ user: null, loading: false, errorCode: null });
+            // Clear navigation history on logout to avoid leaking previous routes
+            try { useNavHistoryStore.getState().clear(); } catch { void 0; }
             toast.success('Logged out');
         } catch (error) {
             const message = error.message || 'Logout failed';

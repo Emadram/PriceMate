@@ -24,6 +24,7 @@ import SupermarketProfile from './pages/SupermarketProfile';
 import FloatingAIChatLauncher from './components/FloatingAIChatLauncher';
 import PageTransition from './components/PageTransition';
 import Navbar from './components/Navbar';
+import NavigationListener from './components/NavigationListener';
 
 const AUTH_ROUTE_PREFIXES = ['/login', '/register', '/verify-email', '/forgot-password', '/reset-password'];
 
@@ -120,6 +121,7 @@ function App() {
 
   return (
     <Router>
+      <NavigationListener />
       <Toaster 
         position="bottom-center"
         toastOptions={{

@@ -1,9 +1,26 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FiList } from 'react-icons/fi';
 import AIChatBox from './AIChatBox';
 
 const FloatingAIChatLauncher = () => {
     const [isOpen, setIsOpen] = useState(false);
+
+    useEffect(() => {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('openAI') === '1') {
+                // schedule async to avoid sync setState in effect
+                Promise.resolve().then(() => setIsOpen(true));
+                // remove the param to avoid reopening on navigation
+                params.delete('openAI');
+                const newQs = params.toString();
+                const newUrl = window.location.pathname + (newQs ? `?${newQs}` : '') + window.location.hash;
+                window.history.replaceState({}, '', newUrl);
+            }
+        } catch {
+            // ignore
+        }
+    }, []);
 
     return (
         <>
@@ -20,5 +37,6 @@ const FloatingAIChatLauncher = () => {
         </>
     );
 };
+
 
 export default FloatingAIChatLauncher;

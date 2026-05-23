@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { FiArrowLeft } from 'react-icons/fi';
+import useNavHistoryStore from '../stores/navHistoryStore';
 
 const BackButton = ({ to, label = 'Go Back', className = '', onClick }) => {
     const navigate = useNavigate();
@@ -11,6 +12,11 @@ const BackButton = ({ to, label = 'Go Back', className = '', onClick }) => {
         }
         if (to) {
             navigate(to);
+            return;
+        }
+        const last = useNavHistoryStore.getState().pop();
+        if (last) {
+            navigate(last);
             return;
         }
         navigate(-1);
