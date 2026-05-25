@@ -52,9 +52,10 @@ const useSupermarketsStore = create((set) => ({
                 name: data.name,
                 brand: data.brand || null,
                 branchName: data.branchName || null,
-                latitude: parseFloat(data.latitude),
-                longitude: parseFloat(data.longitude),
+                latitude: normalizeOptionalNumber(data.latitude, Number.parseFloat),
+                longitude: normalizeOptionalNumber(data.longitude, Number.parseFloat),
                 address: data.address || null,
+                embedHtml: data.embedHtml || null,
                 phoneNumber: data.phoneNumber || null,
                 email: data.email || null,
                 icon: data.icon || null,
@@ -83,9 +84,10 @@ const useSupermarketsStore = create((set) => ({
                 name: data.name,
                 brand: data.brand || null,
                 branchName: data.branchName || null,
-                latitude: parseFloat(data.latitude),
-                longitude: parseFloat(data.longitude),
+                latitude: normalizeOptionalNumber(data.latitude, Number.parseFloat),
+                longitude: normalizeOptionalNumber(data.longitude, Number.parseFloat),
                 address: data.address || null,
+                embedHtml: data.embedHtml || null,
                 phoneNumber: data.phoneNumber || null,
                 email: data.email || null,
                 icon: data.icon || null,
@@ -135,6 +137,8 @@ const useSupermarketsStore = create((set) => ({
 }));
 
 const guardCoordinates = (data) => {
+    const hasEmbed = String(data.embedHtml || '').trim().length > 0;
+    if (hasEmbed) return;
     const error = validateSupermarketCoordinates(data.latitude, data.longitude);
     if (error) throw new Error(error);
 };

@@ -11,6 +11,26 @@ import { client, DATABASE_ID, COLLECTIONS, functions } from '../lib/appwrite';
 
 const OFF_RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
 const OFF_PROXY_FUNCTION_ID = import.meta.env.VITE_APPWRITE_FUNCTION_OFF_PROXY || '';
+const NUTRITION_META_MARKER = '\n\n[PriceMate Nutrition]\n';
+
+const stripNutritionMeta = (value) => {
+    const text = String(value || '');
+    const markerIndex = text.indexOf(NUTRITION_META_MARKER);
+    return markerIndex >= 0 ? text.slice(0, markerIndex).trimEnd() : text.trimEnd();
+};
+
+const extractNutritionMeta = (value) => {
+    const text = String(value || '');
+    const markerIndex = text.indexOf(NUTRITION_META_MARKER);
+    if (markerIndex < 0) return null;
+    const jsonText = text.slice(markerIndex + NUTRITION_META_MARKER.length).trim();
+    if (!jsonText) return null;
+    try {
+        return JSON.parse(jsonText);
+    } catch {
+        return null;
+    }
+};
 
 const Products = () => {
     const { 
@@ -129,24 +149,122 @@ const Products = () => {
             '';
         if (!name) return null;
         const brand = (product.brands || '').split(',')[0]?.trim() || '';
-        const imageUrl = product.image_front_url || product.image_url || '';
+        // Prefer front image variants, then selected_images display variants, then generic image fields
+        const imageUrl = (
+            product.image_front_url ||
+            product.image_front_small_url ||
+            product.image_small_url ||
+            product.image_url ||
+            // some OFF payloads include nested selected_images with language keys
+            (product.selected_images && product.selected_images.front && (
+                product.selected_images.front.display?.en ||
+                product.selected_images.front.display?.fr ||
+                product.selected_images.front.display?.tr ||
+                Object.values(product.selected_images.front.display || {})[0]
+            )) ||
+            ''
+        );
         const description =
             product.generic_name ||
             product.generic_name_en ||
             product.generic_name_tr ||
             product.categories ||
             '';
+        // Extract some nutrition info if available
+        const nutriments = product.nutriments || {};
+        const parseNumber = (v) => {
+            if (v === undefined || v === null || String(v).trim() === '') return null;
+            const n = parseFloat(String(v).replace(',', '.'));
+            return Number.isFinite(n) ? n : null;
+        };
+
+        const sugarsPer100g = parseNumber(nutriments.sugars_100g ?? nutriments.sugars_value ?? nutriments.sugars);
+        const sodiumValue = parseNumber(nutriments.sodium_100g ?? nutriments.sodium_value ?? nutriments.sodium);
+        const sodiumUnit = String(nutriments.sodium_unit || '').toLowerCase();
+        let sodiumMgPer100g = null;
+        if (sodiumValue !== null) {
+            sodiumMgPer100g = sodiumUnit === 'mg' ? sodiumValue : sodiumValue * 1000;
+        }
+
+        // Fallback: some OFF records provide `salt_100g` instead of sodium. Convert salt (g) to sodium (mg).
+        const saltValue = parseNumber(nutriments.salt_100g ?? nutriments.salt_value ?? nutriments.salt);
+        const saltUnit = String(nutriments.salt_unit || '').toLowerCase();
+        let saltGPer100g = null;
+        if (saltValue !== null) {
+            // if unit is mg, convert to g
+            saltGPer100g = saltUnit === 'mg' ? saltValue / 1000 : saltValue;
+        }
+
+        if (sodiumMgPer100g === null && saltGPer100g !== null) {
+            // Approximate conversion: 1g salt (NaCl) ≈ 0.3934g sodium => sodium (mg) = salt_g * 1000 * 0.3934
+            // Many implementations approximate by dividing salt by 2.5 then *1000 (salt/2.5*1000) — keep compat with other helpers
+            sodiumMgPer100g = (saltGPer100g / 2.5) * 1000;
+        }
+
+        const ingredientsText = product.ingredients_text || product.ingredients_text_en || product.ingredients_text_tr || '';
+
         return {
             barcode,
             name,
             brand,
             imageUrl,
             description: String(description || '').trim(),
+            sugarsPer100g: sugarsPer100g ?? '',
+            sodiumMgPer100g: sodiumMgPer100g ?? '',
+            ingredientsText: ingredientsText || '',
+            nutritionSource: 'OpenFoodFacts'
         };
     };
 
     const handleOffLookup = useCallback(async () => {
-        const query = String(formData.name || '').trim();
+        const nameQuery = String(formData.name || '').trim();
+        const rawBarcode = String(formData.barcode || '').trim();
+        const barcodeOnly = rawBarcode.replace(/\s+/g, '');
+
+        if (offAbortRef.current) {
+            offAbortRef.current.abort();
+        }
+        const controller = new AbortController();
+        offAbortRef.current = controller;
+
+        // Prefer direct product lookup when a barcode is provided
+        if (barcodeOnly.length >= 6 && /^\d+$/.test(barcodeOnly)) {
+            setOffLookup({ loading: true, error: '', results: [] });
+            try {
+                let productData = null;
+                if (OFF_PROXY_FUNCTION_ID) {
+                    const proxyResult = await callOffProxy({ kind: 'product', barcode: barcodeOnly });
+                    if (proxyResult && proxyResult.ok && proxyResult.data && proxyResult.data.product) {
+                        productData = proxyResult.data.product;
+                    }
+                }
+
+                if (!productData) {
+                    const resp = await fetchWithBackoff(
+                        `https://world.openfoodfacts.org/api/v0/product/${encodeURIComponent(barcodeOnly)}.json`,
+                        { signal: controller.signal }
+                    );
+                    if (!resp || !resp.ok) {
+                        setOffLookup({ loading: false, error: 'No product found for barcode.', results: [] });
+                        return;
+                    }
+                    const json = await resp.json();
+                    productData = json?.product || null;
+                }
+
+                const result = normalizeOffResult(productData);
+                setOffLookup({ loading: false, error: result ? '' : 'No barcode matches found.', results: result ? [result] : [] });
+                return;
+            } catch (err) {
+                if (err.name === 'AbortError') return;
+                console.error('OFF barcode lookup failed:', err);
+                setOffLookup({ loading: false, error: 'Barcode lookup failed. Try again.', results: [] });
+                return;
+            }
+        }
+
+        // Fallback: search by name
+        const query = nameQuery;
         if (query.length < 3) {
             setOffLookup({ loading: false, error: 'Enter at least 3 characters.', results: [] });
             return;
@@ -156,8 +274,8 @@ const Products = () => {
             offAbortRef.current.abort();
         }
 
-        const controller = new AbortController();
-        offAbortRef.current = controller;
+        const searchController = new AbortController();
+        offAbortRef.current = searchController;
         setOffLookup({ loading: true, error: '', results: [] });
 
         try {
@@ -178,7 +296,7 @@ const Products = () => {
             } else {
                 const response = await fetchWithBackoff(
                     `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=5`,
-                    { signal: controller.signal }
+                        { signal: searchController.signal }
                 );
 
                 if (!response) {
@@ -219,6 +337,10 @@ const Products = () => {
             name: prev.name || candidate.name || prev.name,
             brand: prev.brand || candidate.brand || '',
             description: prev.description || candidate.description || '',
+            sugarsPer100g: candidate.sugarsPer100g ?? prev.sugarsPer100g ?? '',
+            sodiumMgPer100g: candidate.sodiumMgPer100g ?? prev.sodiumMgPer100g ?? '',
+            ingredientsText: candidate.ingredientsText ?? prev.ingredientsText ?? '',
+            nutritionSource: candidate.nutritionSource ?? prev.nutritionSource ?? '',
         }));
         resetOffLookup();
     };
@@ -318,20 +440,21 @@ const Products = () => {
         const catId = product.categoryId && typeof product.categoryId === 'object'
             ? product.categoryId.$id
             : product.categoryId;
+        const nutritionMeta = extractNutritionMeta(product.description);
 
         setFormData({
             name: product.name,
             brand: product.brand || '',
             barcode: product.barcode,
             imageUrl: product.imageUrl || '',
-            description: product.description || '',
+            description: stripNutritionMeta(product.description || ''),
             stockQuantity: product.stockQuantity || 0,
             categoryId: catId || '',
             supermarkets: product.supermarkets?.$id || '',
-            sugarsPer100g: product.sugarsPer100g ?? '',
-            sodiumMgPer100g: product.sodiumMgPer100g ?? '',
-            ingredientsText: product.ingredientsText || '',
-            nutritionSource: product.nutritionSource || '',
+            sugarsPer100g: nutritionMeta?.sugarsPer100g ?? product.nutrition?.sugarsPer100g ?? product.sugarsPer100g ?? '',
+            sodiumMgPer100g: nutritionMeta?.sodiumMgPer100g ?? product.nutrition?.sodiumMgPer100g ?? product.sodiumMgPer100g ?? '',
+            ingredientsText: nutritionMeta?.ingredientsText ?? product.nutrition?.ingredientsText ?? (product.ingredientsText || ''),
+            nutritionSource: nutritionMeta?.nutritionSource ?? product.nutrition?.nutritionSource ?? (product.nutritionSource || ''),
         });
         setShowModal(true);
     };
@@ -355,11 +478,12 @@ const Products = () => {
 
     const filteredBySearch = products.filter(product => {
         const searchLower = searchTerm.toLowerCase();
+        const description = stripNutritionMeta(product.description);
         return (
             product.name?.toLowerCase().includes(searchLower) ||
             product.brand?.toLowerCase().includes(searchLower) ||
             product.barcode?.toLowerCase().includes(searchLower) ||
-            product.description?.toLowerCase().includes(searchLower) ||
+            description.toLowerCase().includes(searchLower) ||
             getCategoryName(product).toLowerCase().includes(searchLower)
         );
     });
@@ -520,7 +644,7 @@ const Products = () => {
                                             </td>
                                             <td className="px-8 py-6">
                                                 <div className="text-base font-black text-gray-900 dark:text-white tracking-tight uppercase">{item.name}</div>
-                                                <div className="text-[10px] font-black text-blue-500 dark:text-blue-400 uppercase tracking-widest mt-0.5 max-w-[200px] truncate">{item.description || 'No Description provided'}</div>
+                                                <div className="text-[10px] font-black text-blue-500 dark:text-blue-400 uppercase tracking-widest mt-0.5 max-w-[200px] truncate">{stripNutritionMeta(item.description) || 'No Description provided'}</div>
                                             </td>
                                             <td className="px-8 py-6">
                                                 <div className="text-sm font-mono font-black text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 px-3 py-1.5 rounded-xl border border-gray-100 dark:border-gray-800 inline-block">
@@ -635,7 +759,7 @@ const Products = () => {
                                                     disabled={offLookup.loading}
                                                     className="text-[10px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-700 disabled:opacity-50"
                                                 >
-                                                    {offLookup.loading ? 'Searching...' : 'Find Barcode'}
+                                                    {offLookup.loading ? 'Searching...' : 'Autofill'}
                                                 </button>
                                             </div>
                                             <input

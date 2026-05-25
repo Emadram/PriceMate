@@ -1,6 +1,17 @@
 export const validateSupermarketCoordinates = (latitude, longitude) => {
-    const lat = Number(latitude);
-    const lon = Number(longitude);
+    const latText = String(latitude ?? '').trim();
+    const lonText = String(longitude ?? '').trim();
+
+    if (!latText && !lonText) {
+        return '';
+    }
+
+    if (!latText || !lonText) {
+        return 'Enter both latitude and longitude, or leave both empty.';
+    }
+
+    const lat = Number(latText);
+    const lon = Number(lonText);
 
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
         return 'Enter valid numeric latitude and longitude.';

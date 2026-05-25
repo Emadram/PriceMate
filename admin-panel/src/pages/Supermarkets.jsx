@@ -6,6 +6,28 @@ import useSupermarketsStore from '../stores/supermarketsStore';
 import Sidebar from '../components/Sidebar';
 import { validateSupermarketCoordinates } from '../utils/coordinateValidation';
 
+const extractGoogleMapsEmbedSrc = (value) => {
+    const text = String(value || '').trim();
+    if (!text) return '';
+
+    const iframeMatch = text.match(/<iframe[^>]*src=["']([^"']+)["'][^>]*>/i);
+    if (iframeMatch) {
+        const src = iframeMatch[1].trim();
+        return /google\.com\/maps\/embed/i.test(src) ? src : '';
+    }
+
+    return /google\.com\/maps\/embed/i.test(text) ? text : '';
+};
+
+const normalizeGoogleMapsEmbed = (value) => {
+    const src = extractGoogleMapsEmbedSrc(value);
+    if (!src) return '';
+
+    return `<iframe src="${src}" width="100%" height="100%" style="border:0;" loading="lazy" allowfullscreen referrerpolicy="no-referrer-when-downgrade"></iframe>`;
+};
+
+const isValidEmbedHtml = (value) => !!extractGoogleMapsEmbedSrc(value);
+
 const Supermarkets = () => {
     const { supermarkets, loading, fetchSupermarkets, deleteSupermarket, uploadSupermarketLogo, setSupermarketStatus } = useSupermarketsStore();
     const [showModal, setShowModal] = useState(false);
@@ -20,6 +42,7 @@ const Supermarkets = () => {
         latitude: '',
         longitude: '',
         address: '',
+        embedHtml: '',
         phoneNumber: '',
         email: '',
         icon: '',
@@ -65,7 +88,13 @@ const Supermarkets = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         const store = useSupermarketsStore.getState();
-        const nextCoordinateError = validateSupermarketCoordinates(formData.latitude, formData.longitude);
+        const trimmedEmbed = String(formData.embedHtml || '').trim();
+        const hasEmbed = trimmedEmbed.length > 0;
+        if (hasEmbed && !isValidEmbedHtml(trimmedEmbed)) {
+            setCoordinateError('Paste a Google Maps embed iframe or embed src URL.');
+            return;
+        }
+        const nextCoordinateError = hasEmbed ? '' : validateSupermarketCoordinates(formData.latitude, formData.longitude);
         if (nextCoordinateError) {
             setCoordinateError(nextCoordinateError);
             return;
@@ -77,10 +106,11 @@ const Supermarkets = () => {
         };
         const data = {
             ...formData,
-            latitude: Number(formData.latitude),
-            longitude: Number(formData.longitude),
+            latitude: parseOptionalNumber(formData.latitude, Number.parseFloat),
+            longitude: parseOptionalNumber(formData.longitude, Number.parseFloat),
             isParent: formData.isParent,
             parentId: formData.isParent ? null : formData.parentId,
+            embedHtml: hasEmbed ? normalizeGoogleMapsEmbed(trimmedEmbed) : null,
             rating: parseOptionalNumber(formData.rating, Number.parseFloat),
             reviewsCount: parseOptionalNumber(formData.reviewsCount, (value) => Number.parseInt(value, 10))
         };
@@ -101,7 +131,7 @@ const Supermarkets = () => {
     };
 
     const resetForm = () => {
-        setFormData({ name: '', brand: '', branchName: '', latitude: '', longitude: '', address: '', phoneNumber: '', email: '', icon: '', isParent: false, parentId: '', googleMapsUrl: '', rating: '', reviewsCount: '' });
+        setFormData({ name: '', brand: '', branchName: '', latitude: '', longitude: '', address: '', embedHtml: '', phoneNumber: '', email: '', icon: '', isParent: false, parentId: '', googleMapsUrl: '', rating: '', reviewsCount: '' });
         setCoordinateError('');
     };
 
@@ -114,6 +144,7 @@ const Supermarkets = () => {
             latitude: supermarket.latitude ?? '',
             longitude: supermarket.longitude ?? '',
             address: supermarket.address || '',
+            embedHtml: supermarket.embedHtml || '',
             phoneNumber: supermarket.phoneNumber || '',
             email: supermarket.email || '',
             icon: supermarket.icon || '',
@@ -208,7 +239,6 @@ const Supermarkets = () => {
                                         >
                                             Contact <SortIcon columnKey="address" currentKey={sortConfig.key} direction={sortConfig.direction} />
                                         </th>
-                                        <th className="px-8 py-5 text-left text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em]">Coordinates</th>
                                         <th className="px-8 py-5 text-right text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em]">Actions</th>
                                     </tr>
                                 </thead>
@@ -239,19 +269,6 @@ const Supermarkets = () => {
                                             <td className="px-8 py-6 whitespace-nowrap">
                                                 <div className="text-sm text-gray-800 dark:text-gray-200 flex items-center gap-2 font-bold mb-1.5"><FiMapPin className="text-blue-500 text-xs" /> {item.address || 'Location Hidden'}</div>
                                                 <div className="text-[10px] text-gray-400 dark:text-gray-500 flex items-center gap-2 font-black uppercase tracking-widest"><FiPhone className="text-gray-300" /> {item.phoneNumber || 'No Contact'}</div>
-                                            </td>
-                                            <td className="px-8 py-6 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 font-mono text-xs">
-                                                <span className={`px-3 py-1.5 rounded-xl border font-black ${
-                                                    validateSupermarketCoordinates(item.latitude, item.longitude)
-                                                        ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-800 text-amber-700 dark:text-amber-300'
-                                                        : 'bg-gray-50/80 dark:bg-gray-900/80 border-gray-100 dark:border-gray-800 text-gray-700 dark:text-gray-300'
-                                                }`}>
-                                                    {validateSupermarketCoordinates(item.latitude, item.longitude)
-                                                        ? 'Needs location fix'
-                                                        : Number.isFinite(Number(item.latitude)) && Number.isFinite(Number(item.longitude))
-                                                        ? `${Number(item.latitude).toFixed(4)}, ${Number(item.longitude).toFixed(4)}`
-                                                        : '—'}
-                                                </span>
                                             </td>
                                             <td className="px-8 py-6 whitespace-nowrap text-right text-sm font-medium">
                                                 <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -401,7 +418,7 @@ const Supermarkets = () => {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Latitude *</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Latitude</label>
                                     <input
                                         type="number"
                                         step="any"
@@ -411,11 +428,10 @@ const Supermarkets = () => {
                                             setCoordinateError('');
                                         }}
                                         className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                        required
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Longitude *</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Longitude</label>
                                     <input
                                         type="number"
                                         step="any"
@@ -425,7 +441,6 @@ const Supermarkets = () => {
                                             setCoordinateError('');
                                         }}
                                         className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                        required
                                     />
                                 </div>
                             </div>
@@ -443,6 +458,23 @@ const Supermarkets = () => {
                                     className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                                     rows="2"
                                 />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Google maps embed</label>
+                                <textarea
+                                    value={formData.embedHtml}
+                                    onChange={(e) => {
+                                        setFormData({ ...formData, embedHtml: e.target.value });
+                                        setCoordinateError('');
+                                    }}
+                                    className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                    rows="3"
+                                    placeholder={'Paste a Google Maps iframe or the embed src URL from Google Maps'}
+                                />
+                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                    Use the Google Maps embed link, not the normal share link.
+                                </p>
                             </div>
 
                             <div>
@@ -515,7 +547,7 @@ const Supermarkets = () => {
                                 </button>
                                 <button
                                     type="submit"
-                                    disabled={uploading || !!validateSupermarketCoordinates(formData.latitude, formData.longitude)}
+                                    disabled={uploading || (!!formData.embedHtml.trim() ? false : !!validateSupermarketCoordinates(formData.latitude, formData.longitude))}
                                     className="flex-1 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-50"
                                 >
                                     {editing ? 'Update' : 'Create'}

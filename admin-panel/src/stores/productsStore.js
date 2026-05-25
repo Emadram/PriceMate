@@ -4,37 +4,66 @@ import { ID, Query } from 'appwrite';
 
 const { endpoint: APPWRITE_ENDPOINT, projectId: APPWRITE_PROJECT_ID } = getAppwriteConfig();
 const PRODUCT_IMAGES_BUCKET = import.meta.env.VITE_APPWRITE_BUCKET_SUPERMARKET_LOGOS || 'product-images';
+const NUTRITION_META_MARKER = '\n\n[PriceMate Nutrition]\n';
 
-/** Optional product nutrition for in-app AI (Appwrite `products` attributes must exist). */
+const stripNutritionMeta = (value) => {
+    const text = String(value || '');
+    const markerIndex = text.indexOf(NUTRITION_META_MARKER);
+    return markerIndex >= 0 ? text.slice(0, markerIndex).trimEnd() : text.trimEnd();
+};
+
+const buildNutritionMeta = (data) => {
+    const parseNumber = (v) => {
+        if (v === undefined || v === null || String(v).trim() === '') return null;
+        const n = parseFloat(String(v).replace(',', '.'));
+        return Number.isFinite(n) ? n : null;
+    };
+
+    const sugars = parseNumber(data.sugarsPer100g);
+    const sodium = parseNumber(data.sodiumMgPer100g);
+    const ingredientsText = data.ingredientsText !== undefined && data.ingredientsText !== null ? String(data.ingredientsText).trim() : '';
+    const nutritionSource = data.nutritionSource !== undefined && data.nutritionSource !== null ? String(data.nutritionSource).trim() : '';
+
+    const hasNutrition = sugars !== null || sodium !== null || ingredientsText || nutritionSource;
+    if (!hasNutrition) return '';
+
+    return JSON.stringify({
+        sugarsPer100g: sugars,
+        sodiumMgPer100g: sodium,
+        ingredientsText,
+        nutritionSource,
+    });
+};
+
+const attachNutritionDescription = (payload, data) => {
+    const baseDescription = stripNutritionMeta(data.description || '');
+    const nutritionBlock = buildNutritionMeta(data);
+
+    if (nutritionBlock) {
+        payload.description = `${baseDescription}${NUTRITION_META_MARKER}${nutritionBlock}`;
+    } else if (baseDescription) {
+        payload.description = baseDescription;
+    } else if (payload.description !== undefined) {
+        payload.description = '';
+    }
+};
+
+/** Optional product nutrition handling.
+ * Appwrite collections may reject unknown top-level attributes (e.g. sugarsPer100g).
+ * To avoid invalid-document errors, we persist nutrition as a hidden JSON block in `description`.
+ */
 const attachOptionalNutrition = (payload, data, { allowNullClear = false } = {}) => {
-    const rawSugars = data.sugarsPer100g;
-    const rawSodium = data.sodiumMgPer100g;
+    attachNutritionDescription(payload, data);
 
-    const sugarsEmpty = rawSugars === undefined || rawSugars === null || String(rawSugars).trim() === '';
-    const sodiumEmpty = rawSodium === undefined || rawSodium === null || String(rawSodium).trim() === '';
+    // Defensive: ensure we never send legacy top-level nutrition keys or unsupported nested fields.
+    delete payload.nutrition;
+    delete payload.sugarsPer100g;
+    delete payload.sodiumMgPer100g;
+    delete payload.ingredientsText;
+    delete payload.nutritionSource;
 
-    if (!sugarsEmpty) {
-        const n = parseFloat(String(rawSugars).replace(',', '.'));
-        if (Number.isFinite(n)) payload.sugarsPer100g = n;
-    } else if (allowNullClear) {
-        payload.sugarsPer100g = null;
-    }
-
-    if (!sodiumEmpty) {
-        const n = parseFloat(String(rawSodium).replace(',', '.'));
-        if (Number.isFinite(n)) payload.sodiumMgPer100g = n;
-    } else if (allowNullClear) {
-        payload.sodiumMgPer100g = null;
-    }
-
-    if (data.ingredientsText !== undefined && data.ingredientsText !== null) {
-        const t = String(data.ingredientsText).trim();
-        if (t || allowNullClear) payload.ingredientsText = t || null;
-    }
-
-    if (data.nutritionSource !== undefined && data.nutritionSource !== null) {
-        const t = String(data.nutritionSource).trim();
-        if (t || allowNullClear) payload.nutritionSource = t || null;
+    if (allowNullClear && !payload.description) {
+        payload.description = '';
     }
 
     return payload;
