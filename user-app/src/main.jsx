@@ -6,6 +6,18 @@ import './lib/i18n';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { pingAppwriteBackend } from './lib/appwrite.js';
 
+// Silence console output when VITE_OFF_DEBUG is enabled.
+try {
+  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_OFF_DEBUG === 'true') {
+    ['log', 'info', 'warn', 'error', 'debug', 'trace'].forEach((m) => {
+      // eslint-disable-next-line no-console
+      console[m] = () => {};
+    });
+  }
+} catch (e) {
+  // ignore
+}
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
     try {

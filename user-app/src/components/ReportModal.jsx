@@ -66,16 +66,14 @@ const ReportModal = ({ isOpen, onClose, targetName, targetType = 'supermarket' }
         setIsSubmitting(true);
         setError(null);
 
-        const message = [selectedReason, details.trim()].filter(Boolean).join(' - ');
+        const context = targetName ? `${targetType === 'product' ? 'Product' : 'Store'}: ${targetName}` : '';
+        const message = [context, selectedReason, details.trim()].filter(Boolean).join(' - ');
 
         try {
             await db.feedback.create(
                 {
                     userId: user?.$id,
-                    targetName,
-                    reason: selectedReason,
                     message,
-                    details,
                     status: 'pending',
                     createdAt: new Date().toISOString()
                 }

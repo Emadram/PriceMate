@@ -40,6 +40,14 @@ const PriceHistoryChart = ({ productId, productName, currentPrices = [] }) => {
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('1m'); // 1d, 7d, 1m, 3m, 6m, 1y
+    const [isMobile, setIsMobile] = useState(false);
+
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 640);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
 
     const filterOptions = [
         { label: '1D', value: '1d' },
@@ -146,7 +154,7 @@ const PriceHistoryChart = ({ productId, productName, currentPrices = [] }) => {
         return history.filter(item => item.date >= cutoff);
     }, [history, filter]);
 
-    const showPointLabels = filteredData.length <= 12;
+    const showPointLabels = !isMobile && filteredData.length <= 12;
 
     const renderDot = (props) => {
         const { cx, cy, payload } = props;
@@ -222,7 +230,7 @@ const PriceHistoryChart = ({ productId, productName, currentPrices = [] }) => {
     );
 
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-100 dark:border-gray-700">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 sm:p-6 border border-gray-100 dark:border-gray-700">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                 <div>
                     <h3 className="text-lg font-black text-gray-800 dark:text-white flex items-center gap-2">
@@ -232,12 +240,12 @@ const PriceHistoryChart = ({ productId, productName, currentPrices = [] }) => {
                     <p className="text-xs text-gray-500 font-medium">Tracking {productName} across all stores</p>
                 </div>
 
-                <div className="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-lg self-start">
+                <div className="flex w-full sm:w-auto bg-gray-100 dark:bg-gray-700 p-1 rounded-lg self-start justify-between sm:justify-start overflow-x-auto scrollbar-none">
                     {filterOptions.map((opt) => (
                         <button
                             key={opt.value}
                             onClick={() => setFilter(opt.value)}
-                            className={`tap-target min-h-11 px-3 py-2 text-[10px] font-black rounded-md transition-all ${
+                            className={`tap-target min-h-11 px-2.5 sm:px-3 py-2 text-[10px] sm:text-xs font-black rounded-md transition-all ${
                                 filter === opt.value 
                                     ? 'bg-white dark:bg-gray-600 text-brand-600 dark:text-brand-500 shadow-sm' 
                                     : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
@@ -250,24 +258,24 @@ const PriceHistoryChart = ({ productId, productName, currentPrices = [] }) => {
             </div>
 
             {stats && (
-                <div className="grid grid-cols-3 gap-4 mb-6">
-                    <div className="bg-brand-50 dark:bg-brand-900/20 p-3 rounded-xl border border-brand-100 dark:border-brand-800">
-                        <p className="text-[10px] font-bold text-brand-600 dark:text-brand-500 uppercase">Lowest</p>
-                        <p className="text-sm font-black text-gray-800 dark:text-white">
+                <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-6">
+                    <div className="bg-brand-50 dark:bg-brand-900/20 p-2 sm:p-3 rounded-xl border border-brand-100 dark:border-brand-800 text-center sm:text-left min-w-0">
+                        <p className="text-[9px] sm:text-[10px] font-bold text-brand-600 dark:text-brand-500 uppercase truncate">Lowest</p>
+                        <p className="text-xs sm:text-sm font-black text-gray-800 dark:text-white truncate">
                             {stats.min.toFixed(2)} {getCurrencySymbol()}
                         </p>
                     </div>
-                    <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-xl border border-red-100 dark:border-red-800">
-                        <p className="text-[10px] font-bold text-red-600 dark:text-red-400 uppercase">Highest</p>
-                        <p className="text-sm font-black text-gray-800 dark:text-white">
+                    <div className="bg-red-50 dark:bg-red-900/20 p-2 sm:p-3 rounded-xl border border-red-100 dark:border-red-800 text-center sm:text-left min-w-0">
+                        <p className="text-[9px] sm:text-[10px] font-bold text-red-600 dark:text-red-400 uppercase truncate">Highest</p>
+                        <p className="text-xs sm:text-sm font-black text-gray-800 dark:text-white truncate">
                             {stats.max.toFixed(2)} {getCurrencySymbol()}
                         </p>
                     </div>
-                    <div className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-xl border border-gray-100 dark:border-gray-600">
-                        <p className="text-[10px] font-bold text-gray-500 uppercase">Trend</p>
-                        <p className={`text-sm font-black flex items-center gap-1 ${parseFloat(stats.change) <= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {parseFloat(stats.change) <= 0 ? <FiTrendingDown /> : <FiTrendingUp />}
-                            {stats.change}%
+                    <div className="bg-gray-50 dark:bg-gray-700/50 p-2 sm:p-3 rounded-xl border border-gray-100 dark:border-gray-600 text-center sm:text-left min-w-0">
+                        <p className="text-[9px] sm:text-[10px] font-bold text-gray-500 uppercase truncate">Trend</p>
+                        <p className={`text-xs sm:text-sm font-black flex items-center justify-center sm:justify-start gap-0.5 sm:gap-1 ${parseFloat(stats.change) <= 0 ? 'text-green-600' : 'text-red-600'} truncate`}>
+                            {parseFloat(stats.change) <= 0 ? <FiTrendingDown className="shrink-0" /> : <FiTrendingUp className="shrink-0" />}
+                            <span>{stats.change}%</span>
                         </p>
                     </div>
                 </div>
@@ -281,7 +289,7 @@ const PriceHistoryChart = ({ productId, productName, currentPrices = [] }) => {
                     </div>
                 ) : (
                     <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={filteredData}>
+                        <AreaChart data={filteredData} margin={{ top: 15, right: 5, left: 5, bottom: 5 }}>
                         <defs>
                             <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.25}/>

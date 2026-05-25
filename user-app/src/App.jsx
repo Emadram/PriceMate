@@ -100,10 +100,16 @@ function App() {
   const setTheme = useThemeStore((state) => state.setTheme);
   const theme = useThemeStore((state) => state.theme);
   const fetchRates = useCurrencyStore((state) => state.fetchRates);
+  const setCurrency = useCurrencyStore((state) => state.setCurrency);
+  const currency = useCurrencyStore((state) => state.currency);
 
   useEffect(() => {
     checkSession();
     fetchRates(); // Initialize exchange rates on mount
+    // Ensure default currency is TRY on first load
+    if (!currency) {
+      setCurrency('TRY');
+    }
     if (typeof window !== 'undefined') {
       const storedTheme = window.localStorage.getItem('pricemate-theme');
       if (!storedTheme) {

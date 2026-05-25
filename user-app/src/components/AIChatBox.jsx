@@ -1,3 +1,106 @@
+const PROMPT_STOPWORDS = new Set([
+    'is', 'this', 'that', 'the', 'a', 'an', 'of', 'in', 'on', 'for', 'with', 'to', 'and', 'or', 'but',
+    'what', 'which', 'who', 'whom', 'where', 'when', 'why', 'how', 'do', 'does', 'did', 'are', 'isnt',
+    'can', 'could', 'would', 'should', 'please', 'tell', 'me', 'about', 'show', 'find', 'compare',
+    'check', 'look', 'up', 'give', 'need', 'want', 'know', 'question', 'answer', 'again', 'same',
+]);
+
+const tokenizePromptIntent = (value) => {
+    const text = String(value || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9ğüşöçıİĞÜŞÖÇ\s]/g, ' ');
+
+    return text
+        .split(/\s+/)
+        .map((token) => token.trim())
+        .filter((token) => token.length >= 2 && !PROMPT_STOPWORDS.has(token))
+        .filter((token, index, array) => array.indexOf(token) === index)
+        .slice(0, 16);
+};
+
+const buildIntentSummary = (value) => {
+    const tokens = tokenizePromptIntent(value);
+    if (tokens.length === 0) return String(value || '').trim();
+    return tokens.join(' ');
+};
+// Simple in-memory intent cache with optional persistence to avoid repeating identical assistant calls
+const DEFAULT_INTENT_CACHE_TTL_MS = 1000 * 60 * 60; // 1 hour
+const INTENT_CACHE_STORAGE_KEY = 'pricemate_intent_cache_v1';
+const INTENT_CACHE_TTL_SETTING_KEY = 'pricemate_intent_cache_ttl_ms';
+
+const intentCache = new Map();
+
+const makeIntentKey = (intentSummary, barcode) => `${String(intentSummary || '').trim()}::BARCODE:${String(barcode || '').trim()}`;
+
+const readConfiguredTtl = () => {
+    try {
+        const raw = localStorage.getItem(INTENT_CACHE_TTL_SETTING_KEY);
+        if (!raw) return DEFAULT_INTENT_CACHE_TTL_MS;
+        const parsed = Number(raw);
+        if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_INTENT_CACHE_TTL_MS;
+        return parsed;
+    } catch (e) {
+        return DEFAULT_INTENT_CACHE_TTL_MS;
+    }
+};
+
+const persistCacheToStorage = () => {
+    try {
+        const obj = {};
+        for (const [k, v] of intentCache.entries()) {
+            obj[k] = v; // { value, expiresAt }
+        }
+        localStorage.setItem(INTENT_CACHE_STORAGE_KEY, JSON.stringify(obj));
+    } catch (e) {
+        // best-effort; don't block
+        console.debug('Failed to persist intent cache', e);
+    }
+};
+
+const hydrateCacheFromStorage = () => {
+    try {
+        const raw = localStorage.getItem(INTENT_CACHE_STORAGE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        const now = Date.now();
+        for (const k of Object.keys(parsed)) {
+            const rec = parsed[k];
+            if (!rec || !rec.expiresAt) continue;
+            if (now > rec.expiresAt) continue;
+            intentCache.set(k, rec);
+        }
+    } catch (e) {
+        console.debug('Failed to hydrate intent cache', e);
+    }
+};
+
+// Initialize cache from storage on module load
+if (typeof window !== 'undefined' && window.localStorage) {
+    hydrateCacheFromStorage();
+}
+
+const getCachedIntent = (key) => {
+    const rec = intentCache.get(key);
+    if (!rec) return null;
+    if (Date.now() > rec.expiresAt) {
+        intentCache.delete(key);
+        try { persistCacheToStorage(); } catch (e) {}
+        return null;
+    }
+    return rec.value;
+};
+
+const setCachedIntent = (key, value, ttl) => {
+    try {
+        const effectiveTtl = Number.isFinite(Number(ttl)) ? Number(ttl) : readConfiguredTtl();
+        const rec = { value, expiresAt: Date.now() + effectiveTtl };
+        intentCache.set(key, rec);
+        persistCacheToStorage();
+    } catch (e) {
+        console.debug('Intent cache set failed', e);
+    }
+};
+
 import { useState, useEffect, useRef } from 'react';
 import { FiX, FiSend, FiList, FiLoader, FiExternalLink, FiPackage, FiShoppingBag, FiPlus, FiTrash2, FiChevronLeft, FiCpu } from 'react-icons/fi';
 import OpenAI from "openai";
@@ -743,6 +846,18 @@ const AIChatBox = ({ isOpen, onClose }) => {
 
         const { conditions, allergenTargets, isMedical } = detectConditions(userMessage);
 
+        // Build intent summary and check cache to avoid duplicate API calls
+        const intentSummary = buildIntentSummary(userMessage);
+        const intentKey = makeIntentKey(intentSummary, effectiveBarcode);
+        const cachedReply = getCachedIntent(intentKey);
+        if (cachedReply) {
+            if (user?.$id) {
+                await addMessage(user.$id, 'assistant', cachedReply, user);
+            }
+            setIsLoading(false);
+            return;
+        }
+
         if (isMedical) {
             if (conditions.length === 0) {
                 if (user?.$id) {
@@ -853,7 +968,14 @@ const AIChatBox = ({ isOpen, onClose }) => {
             ];
 
             if (user?.$id) {
-                await addMessage(user.$id, 'assistant', responseLines.join('\n'), user);
+                const respText = responseLines.join('\n');
+                await addMessage(user.$id, 'assistant', respText, user);
+                try {
+                    setCachedIntent(intentKey, respText);
+                } catch (e) {
+                    // caching should never block the user flow
+                    console.debug('Intent cache set failed', e);
+                }
             }
 
             setIsLoading(false);
@@ -878,9 +1000,16 @@ const AIChatBox = ({ isOpen, onClose }) => {
             });
 
             const promptContext = buildRankedProductContextLines(fullProductList, userMessage);
+            const intentSummary = buildIntentSummary(userMessage);
 
             const prompt = `
                 You are the official PriceMate assistant. Your primary goal is to help users find products and compare prices.
+
+                RESPONSE RULES (STRICT):
+                - Answer the latest user intent directly.
+                - Do not repeat the user's exact sentence or echo the same question back.
+                - If the same intent already appears earlier in the chat history, do not ask the user to repeat it.
+                - Use the token summary below to understand the request, not to paraphrase it.
                 
                 WEBSITE PRODUCT DATA (sample; catalog has many more items):
                 ${promptContext}
@@ -921,11 +1050,12 @@ const AIChatBox = ({ isOpen, onClose }) => {
                 12. If ingredient suitability data is provided, summarize it briefly and do not refuse to answer.
                 13. If you are unsure, ask the user for the barcode or exact product name instead of giving a generic refusal.
                 14. For ingredient safety answers, treat Open Food Facts as the source of truth and mention it in the source line.
+                15. Never restate the full user question; keep the answer short and direct.
             `;
 
             const openRouterMessage = effectiveBarcode && !barcodeFromMessage
-                ? `${userMessage}\nKnown barcode: [BARCODE:${effectiveBarcode}]`
-                : userMessage;
+                ? `Intent: ${intentSummary || userMessage}\nKnown barcode: [BARCODE:${effectiveBarcode}]`
+                : `Intent: ${intentSummary || userMessage}`;
 
             const threadForApi = useChatStore
                 .getState()
@@ -949,6 +1079,11 @@ const AIChatBox = ({ isOpen, onClose }) => {
 
             if (user?.$id) {
                 await addMessage(user.$id, 'assistant', text, user);
+                try {
+                    setCachedIntent(intentKey, text);
+                } catch (e) {
+                    console.debug('Intent cache set failed', e);
+                }
             }
         } catch (error) {
             console.error("AI Error details:", error);

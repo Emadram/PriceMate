@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildDirectionsUrl, calculateDistance, getRelationshipId, hasValidLatLon, normalizeProduct } from './productUtils';
+import { buildDirectionsUrl, calculateDistance, extractGoogleMapsCoordinates, getRelationshipId, hasValidLatLon, normalizeProduct, resolveCoordinates } from './productUtils';
 
 describe('productUtils', () => {
     describe('hasValidLatLon', () => {
@@ -44,6 +44,41 @@ describe('productUtils', () => {
 
         it('uses googleMapsUrl if provided', () => {
             expect(buildDirectionsUrl(41.0082, 28.9784, 'https://maps.google.com/test')).toBe('https://maps.google.com/test');
+        });
+
+        it('derives directions from Google Maps coordinate URLs', () => {
+            expect(buildDirectionsUrl(null, null, 'https://www.google.com/maps/place/Store/@41.0082,28.9784,17z')).toBe(
+                'https://www.google.com/maps/dir/?api=1&destination=41.0082%2C28.9784'
+            );
+        });
+    });
+
+    describe('extractGoogleMapsCoordinates', () => {
+        it('parses coordinates from Google Maps embed URLs', () => {
+            expect(extractGoogleMapsCoordinates('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d1234!2d28.9784!3d41.0082!2m3!1f0!2f0!3f0')).toEqual({
+                latitude: 41.0082,
+                longitude: 28.9784
+            });
+        });
+
+        it('parses coordinates from place URLs with an @ marker', () => {
+            expect(extractGoogleMapsCoordinates('https://www.google.com/maps/place/Store/@41.0082,28.9784,17z')).toEqual({
+                latitude: 41.0082,
+                longitude: 28.9784
+            });
+        });
+    });
+
+    describe('resolveCoordinates', () => {
+        it('falls back to coordinates embedded in Google Maps data', () => {
+            expect(resolveCoordinates({
+                latitude: '',
+                longitude: '',
+                embedHtml: '<iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d1234!2d28.9784!3d41.0082!2m3!1f0!2f0!3f0"></iframe>'
+            })).toEqual({
+                latitude: 41.0082,
+                longitude: 28.9784
+            });
         });
     });
 

@@ -17,6 +17,7 @@ import {
     formatLastUpdate,
     getRelationshipAttribute,
     hasValidLatLon,
+    resolveCoordinates,
 } from '../utils/productUtils';
 import ReportModal from '../components/ReportModal';
 import StoreMap from '../components/StoreMap';
@@ -29,10 +30,38 @@ import useUserLocation from '../hooks/useUserLocation';
 import useCurrencyStore from '../stores/currencyStore';
 import StarRating from '../components/StarRating';
 
+const extractEmbedSrc = (embedHtml) => {
+    const text = String(embedHtml || '').trim();
+    if (!text) return '';
+    const match = text.match(/<iframe[^>]*src=["']([^"']+)["'][^>]*>/i);
+    if (match) {
+        const src = match[1];
+        if (!/google\.com\/maps\/embed/i.test(src)) return '';
+        return src;
+    }
+    return /google\.com\/maps\/embed/i.test(text) ? text : '';
+};
+
+const buildRoutePreviewUrl = (origin, destination) => {
+    if (!origin || !hasValidLatLon(origin.latitude, origin.longitude)) return '';
+
+    const resolvedDestination = resolveCoordinates(destination);
+
+    const originText = `${origin.latitude},${origin.longitude}`;
+    const destinationCoords = resolvedDestination
+        ? `${resolvedDestination.latitude},${resolvedDestination.longitude}`
+        : '';
+    const destinationText = destinationCoords || String(destination?.address || destination?.name || destination || '').trim();
+
+    if (!destinationText) return '';
+
+    return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(originText)}&destination=${encodeURIComponent(destinationText)}&travelmode=driving`;
+};
+
 const SupermarketProfile = () => {
     const { id } = useParams();
     const navigate = useNavigate();
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const { location, error: locationError, loading: locationLoading, retry: retryLocation } = useUserLocation();
     const [showRoute, setShowRoute] = useState(false);
     const { convert, getCurrencySymbol } = useCurrencyStore();
@@ -158,11 +187,42 @@ const SupermarketProfile = () => {
     }
 
     const userGeoOk = location && hasValidLatLon(location.latitude, location.longitude);
-    const storeGeoOk = hasValidLatLon(supermarket.latitude, supermarket.longitude);
-    const hasDirections = storeGeoOk || (supermarket.googleMapsUrl && supermarket.googleMapsUrl.trim());
-    const distance = userGeoOk && storeGeoOk
-        ? calculateDistance(location.latitude, location.longitude, supermarket.latitude, supermarket.longitude)
-        : null;
+    const resolvedStoreCoordinates = resolveCoordinates(supermarket);
+    const storeGeoOk = !!resolvedStoreCoordinates;
+    const hasDirections = storeGeoOk || (supermarket.googleMapsUrl && supermarket.googleMapsUrl.trim()) || (supermarket.embedHtml && supermarket.embedHtml.trim());
+    const embedSrc = extractEmbedSrc(supermarket.embedHtml);
+    const hasEmbed = !!embedSrc;
+    const routePreviewUrl = userGeoOk
+        ? buildRoutePreviewUrl(location, {
+              latitude: resolvedStoreCoordinates?.latitude ?? supermarket.latitude,
+              longitude: resolvedStoreCoordinates?.longitude ?? supermarket.longitude,
+              address: supermarket.address,
+              name: supermarket.name,
+              googleMapsUrl: supermarket.googleMapsUrl,
+              embedHtml: supermarket.embedHtml,
+          })
+        : '';
+
+    const formatDistance = (value) => {
+        if (!Number.isFinite(value)) return null;
+        const formatter = new Intl.NumberFormat(i18n?.language || undefined, {
+            minimumFractionDigits: 1,
+            maximumFractionDigits: 1
+        });
+        return formatter.format(value);
+    };
+
+    const resolveDistanceKm = (market) => {
+        const marketCoordinates = resolveCoordinates(market);
+        if (userGeoOk && marketCoordinates) {
+            const computed = Number(calculateDistance(location.latitude, location.longitude, marketCoordinates.latitude, marketCoordinates.longitude));
+            return Number.isFinite(computed) ? computed : null;
+        }
+        return null;
+    };
+
+    const distanceValue = resolveDistanceKm(supermarket);
+    const distanceLabel = distanceValue !== null ? formatDistance(distanceValue) : null;
 
     const ratingValue = supermarket.rating ?? supermarket.avgRating ?? supermarket.averageRating ?? null;
     const reviewsCount = supermarket.reviewsCount ?? supermarket.reviewCount ?? null;
@@ -243,9 +303,9 @@ const SupermarketProfile = () => {
                                         Verified Partner
                                     </span>
                                 )}
-                                {distance && (
+                                {distanceLabel && (
                                     <span className="bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400 text-[11px] font-medium px-2.5 py-1 rounded-full">
-                                        {distance} away
+                                        {distanceLabel} km away
                                     </span>
                                 )}
                             </div>
@@ -287,8 +347,8 @@ const SupermarketProfile = () => {
                                                                 <p className="text-[13px] sm:text-[14px] font-semibold text-gray-900 dark:text-white line-clamp-1">
                                                                     {supermarket.branchName ? `${supermarket.name} — ${supermarket.branchName}` : supermarket.address || 'This branch'}
                                                                 </p>
-                                                                {distance && (
-                                                                    <p className="text-[11px] sm:text-[12px] text-gray-500">{distance} away</p>
+                                                                {distanceLabel && (
+                                                                    <p className="text-[11px] sm:text-[12px] text-gray-500">{distanceLabel} km away</p>
                                                                 )}
                                                             </div>
                                                         </div>
@@ -307,8 +367,8 @@ const SupermarketProfile = () => {
                                                                     <p className="text-[13px] sm:text-[14px] font-semibold text-gray-900 dark:text-white line-clamp-1">
                                                                         {branch.branchName ? `${branch.name || supermarket.name} — ${branch.branchName}` : branch.address || 'Branch'}
                                                                     </p>
-                                                                    {userGeoOk && hasValidLatLon(branch.latitude, branch.longitude) && (
-                                                                        <p className="text-[11px] sm:text-[12px] text-gray-500">{calculateDistance(location.latitude, location.longitude, branch.latitude, branch.longitude)} km away</p>
+                                                                    {resolveDistanceKm(branch) !== null && (
+                                                                        <p className="text-[11px] sm:text-[12px] text-gray-500">{formatDistance(resolveDistanceKm(branch))} km away</p>
                                                                     )}
                                                                 </div>
                                                                 <ChevronRight size={14} className="ml-auto mt-1 text-gray-300 group-hover:text-black dark:group-hover:text-white" />
@@ -377,24 +437,7 @@ const SupermarketProfile = () => {
                         <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
                             <div className="flex gap-2">
                                     <div className="flex items-center gap-2">
-                                        <a
-                                            href={buildDirectionsUrl(supermarket.latitude, supermarket.longitude, supermarket.googleMapsUrl)}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className={`tap-target inline-flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-semibold active:scale-95 transition-all w-full md:w-auto ${
-                                                hasDirections
-                                                    ? 'bg-black dark:bg-white text-white dark:text-black hover:opacity-90'
-                                                    : 'bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-500 pointer-events-none'
-                                            }`}
-                                            aria-disabled={!hasDirections}
-                                            title={hasDirections ? t('get_directions') : 'Directions unavailable for this store'}
-                                            onClick={(e) => {
-                                                if (!hasDirections) e.preventDefault();
-                                            }}
-                                        >
-                                            <ExternalLink size={16} />
-                                            {t('get_directions')}
-                                        </a>
+
 
                                         {locationLoading && !location && (
                                             <button
@@ -407,16 +450,6 @@ const SupermarketProfile = () => {
                                                     <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" className="opacity-75" />
                                                 </svg>
                                                 {t('loading')}
-                                            </button>
-                                        )}
-
-                                        {location && hasValidLatLon(location.latitude, location.longitude) && (
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowRoute((s) => !s)}
-                                                className={`tap-target inline-flex items-center gap-2 px-4 py-3 rounded-2xl text-sm font-semibold active:scale-95 transition-all border border-gray-100 dark:border-white/5 shadow-soft hover:shadow-soft-lg ${showRoute ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white' : 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white'}`}
-                                            >
-                                                {showRoute ? 'Hide Preview' : t('preview_route')}
                                             </button>
                                         )}
                                     </div>
@@ -451,23 +484,50 @@ const SupermarketProfile = () => {
                 <div className="mt-8 sm:mt-12 space-y-8 sm:space-y-12">
                     {/* Map Section */}
                     <section className="space-y-4 sm:space-y-6">
-                        <div className="flex items-center px-2">
+                        <div className="flex items-center justify-between px-2">
                             <h2 className="text-xl sm:text-2xl font-bold dark:text-white tracking-tight">Location</h2>
+                            {location && hasValidLatLon(location.latitude, location.longitude) && (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowRoute((s) => !s)}
+                                    className={`tap-target inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold active:scale-95 transition-all border border-gray-100 dark:border-white/5 shadow-soft hover:shadow-soft-lg ${
+                                        showRoute 
+                                            ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white' 
+                                            : 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white'
+                                    }`}
+                                >
+                                    {showRoute ? 'Hide Preview' : t('preview_route')}
+                                </button>
+                            )}
                         </div>
                         <div className="rounded-2xl sm:rounded-[2.5rem] overflow-hidden shadow-soft border border-gray-100 dark:border-white/5 h-52 sm:h-64 relative group">
-                            {storeGeoOk ? (
+                            {hasEmbed && !showRoute ? (
+                                <div className="relative rounded-2xl overflow-hidden shadow-inner border border-gray-100 dark:border-gray-700" style={{ height: '100%' }}>
+                                    <div className="bg-gray-50 dark:bg-gray-900 map-dark-invert" style={{ width: '100%', height: '100%' }}>
+                                        <iframe
+                                            src={embedSrc}
+                                            title="Map location"
+                                            style={{ width: '100%', height: '100%', border: 0 }}
+                                            loading="lazy"
+                                            allowFullScreen
+                                            sandbox="allow-scripts allow-same-origin allow-popups"
+                                            referrerPolicy="no-referrer-when-downgrade"
+                                        />
+                                    </div>
+                                </div>
+                            ) : storeGeoOk ? (
                                 <StoreMap 
                                     supermarkets={[supermarket]} 
-                                    center={[supermarket.latitude, supermarket.longitude]} 
+                                    center={[resolvedStoreCoordinates.latitude, resolvedStoreCoordinates.longitude]} 
                                     zoom={15}
                                     height="100%"
                                     directionsFrom={showRoute ? location : null}
-                                    directionsTo={showRoute ? { latitude: supermarket.latitude, longitude: supermarket.longitude } : null}
+                                    directionsTo={showRoute ? { latitude: resolvedStoreCoordinates.latitude, longitude: resolvedStoreCoordinates.longitude } : null}
                                 />
                             ) : (
                                 <div className="h-full flex flex-col items-center justify-center bg-gray-50 dark:bg-[#1C1C1E] px-6 text-center">
                                     <MapPin className="w-10 h-10 text-gray-300 dark:text-gray-600 mb-3" />
-                                    <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">{t('supermarket_location_not_on_map')}</p>
+                                    <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">Location not available</p>
                                     {supermarket.address && (
                                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">{supermarket.address}</p>
                                     )}

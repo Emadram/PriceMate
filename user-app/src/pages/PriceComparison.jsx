@@ -7,7 +7,7 @@ import {
     FiCalendar, FiTag, FiPlusCircle, FiAlertTriangle, FiInfo 
 } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
-import { buildDirectionsUrl, calculateDistance, hasValidLatLon, fetchSimilarProductsByCategory, fetchPricesForProducts, getRelationshipId, normalizeProduct } from '../utils/productUtils';
+import { buildDirectionsUrl, calculateDistance, hasValidLatLon, fetchSimilarProductsByCategory, fetchPricesForProducts, getRelationshipId, normalizeProduct, resolveCoordinates } from '../utils/productUtils';
 import PriceHistoryChart from '../components/PriceHistoryChart';
 import AddPriceModal from '../components/AddPriceModal';
 import ReportModal from '../components/ReportModal';
@@ -103,7 +103,7 @@ const StockBranch = ({ name, status, price, distance, t, currencyLabel, supermar
 };
 
 const PriceComparison = () => {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const { convert, getCurrencySymbol } = useCurrencyStore();
     const { location: userLocation, error: locationError, loading: locationLoading, retry: retryLocation } = useUserLocation();
     const { barcode } = useParams();
@@ -180,17 +180,18 @@ const PriceComparison = () => {
                 hasValidLatLon(userLocation.latitude, userLocation.longitude) &&
                 supermarket &&
                 typeof supermarket === 'object' &&
-                hasValidLatLon(supermarket.latitude, supermarket.longitude)
+                resolveCoordinates(supermarket)
             ) {
+                const supermarketCoordinates = resolveCoordinates(supermarket);
                 distance = calculateDistance(
                     userLocation.latitude,
                     userLocation.longitude,
-                    supermarket.latitude,
-                    supermarket.longitude
+                    supermarketCoordinates.latitude,
+                    supermarketCoordinates.longitude
                 );
             }
 
-            return { ...price, distance: distance ? parseFloat(distance) : null };
+            return { ...price, distance: distance !== null ? parseFloat(distance) : null };
         });
 
         // Grouping logic for multi-branch support
@@ -350,6 +351,15 @@ const PriceComparison = () => {
         }
         return sorted;
     }, [prices, sortBy, supermarketIdParam]);
+
+    const formatDistance = (value) => {
+        const parsed = Number(value);
+        if (!Number.isFinite(parsed)) return null;
+        return new Intl.NumberFormat(i18n?.language || undefined, {
+            minimumFractionDigits: 1,
+            maximumFractionDigits: 1
+        }).format(parsed);
+    };
 
     const [showMapForPriceId, setShowMapForPriceId] = useState(null);
 
@@ -535,15 +545,13 @@ const PriceComparison = () => {
                                 </div>
 
                         {user && (
-                        <>
-                        <ReportModal 
-                            isOpen={isReportModalOpen} 
-                            onClose={() => setIsReportModalOpen(false)} 
-                            targetName={product.name}
-                            targetType="product"
-                            targetId={product.$id}
-                        />
-                        </>
+                            <ReportModal
+                                isOpen={isReportModalOpen} 
+                                onClose={() => setIsReportModalOpen(false)} 
+                                targetName={product.name}
+                                targetType="product"
+                                targetId={product.$id}
+                            />
                         )}
                         
                         {product.description && (
@@ -758,25 +766,10 @@ const PriceComparison = () => {
                                                     )}
 
                                                     <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                                                        {hasDirections ? (
-                                                            <a
-                                                                href={buildDirectionsUrl(supermarket.latitude, supermarket.longitude, supermarket.googleMapsUrl)}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className="tap-target inline-flex items-center gap-1.5 text-xs font-semibold text-brand-600 dark:text-brand-500 hover:text-brand-700"
-                                                                title={t('get_directions')}
-                                                                onClick={(e) => e.stopPropagation()}
-                                                            >
-                                                                <FiNavigation size={12} />
-                                                                {distanceDisplay}
-                                                            </a>
-                                                        ) : (
-                                                            <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-400">
-                                                                <FiNavigation size={12} />
-                                                                {distanceDisplay}
-                                                            </span>
-                                                        )}
-                                                        {/* Status text removed — showing stars only as requested */}
+                                                        <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400">
+                                                            <FiNavigation size={12} />
+                                                            {distanceDisplay}
+                                                        </span>
                                                     </div>
                                                 </div>
 
@@ -847,7 +840,7 @@ const PriceComparison = () => {
                                                                     t={t}
                                                                     price={`${bConverted}`}
                                                                     currencyLabel={getCurrencySymbol()}
-                                                                    distance={branchPrice.distance !== null ? `${branchPrice.distance}` : null}
+                                                                    distance={branchPrice.distance !== null ? formatDistance(branchPrice.distance) : null}
                                                                     supermarketId={branchSupermarketId}
                                                                 />
                                                             );

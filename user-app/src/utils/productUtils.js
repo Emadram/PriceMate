@@ -17,6 +17,26 @@ const OFF_API_BASE = 'https://world.openfoodfacts.org';
 const OFF_DEBUG = import.meta.env.VITE_OFF_DEBUG === 'true';
 const OFF_PROXY_FUNCTION_ID = import.meta.env.VITE_APPWRITE_FUNCTION_OFF_PROXY || '';
 const OFF_RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
+const NUTRITION_META_MARKER = '\n\n[PriceMate Nutrition]\n';
+
+const stripNutritionMeta = (value) => {
+    const text = String(value || '');
+    const markerIndex = text.indexOf(NUTRITION_META_MARKER);
+    return markerIndex >= 0 ? text.slice(0, markerIndex).trimEnd() : text.trimEnd();
+};
+
+const extractNutritionMeta = (value) => {
+    const text = String(value || '');
+    const markerIndex = text.indexOf(NUTRITION_META_MARKER);
+    if (markerIndex < 0) return null;
+    const jsonText = text.slice(markerIndex + NUTRITION_META_MARKER.length).trim();
+    if (!jsonText) return null;
+    try {
+        return JSON.parse(jsonText);
+    } catch {
+        return null;
+    }
+};
 
 const logOffDebug = (...args) => {
     if (OFF_DEBUG) console.info('[OFF]', ...args);
@@ -110,10 +130,81 @@ const fetchWithBackoff = async (url, options = {}, config = {}) => {
     return null;
 };
 
-export const buildDirectionsUrl = (latitude, longitude, googleMapsUrl = null) => {
+export const buildDirectionsUrl = (latitude, longitude, googleMapsUrl = null, embedHtml = null) => {
+    const destinationCoords = extractGoogleMapsCoordinates(googleMapsUrl);
+    if (destinationCoords) {
+        return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${destinationCoords.latitude},${destinationCoords.longitude}`)}`;
+    }
+    const embedCoords = extractGoogleMapsCoordinates(embedHtml);
+    if (embedCoords) {
+        return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${embedCoords.latitude},${embedCoords.longitude}`)}`;
+    }
     if (googleMapsUrl && googleMapsUrl.trim()) return googleMapsUrl.trim();
-    if (!hasValidLatLon(latitude, longitude)) return '';
-    return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${latitude},${longitude}`)}`;
+    if (hasValidLatLon(latitude, longitude)) {
+        return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${latitude},${longitude}`)}`;
+    }
+    return '';
+};
+
+const toFiniteCoordinate = (value) => {
+    const numeric = typeof value === 'number' ? value : parseFloat(String(value ?? ''));
+    return Number.isFinite(numeric) ? numeric : null;
+};
+
+const coordinatePairFromMatch = (match, order = 'latlon') => {
+    if (!match || match.length < 3) return null;
+    const first = toFiniteCoordinate(match[1]);
+    const second = toFiniteCoordinate(match[2]);
+    const latitude = order === 'lonlat' ? second : first;
+    const longitude = order === 'lonlat' ? first : second;
+    if (latitude === null || longitude === null) return null;
+    return hasValidLatLon(latitude, longitude) ? { latitude, longitude } : null;
+};
+
+export const extractGoogleMapsCoordinates = (value) => {
+    const text = String(value || '').trim();
+    if (!text) return null;
+
+    const patterns = [
+        { regex: /!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/i, order: 'latlon' },
+        { regex: /!2d(-?\d+(?:\.\d+)?)!3d(-?\d+(?:\.\d+)?)/i, order: 'lonlat' },
+        { regex: /@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)(?:,[^/?#]*)?/i, order: 'latlon' },
+        { regex: /[?&](?:q|query|ll|saddr|daddr|destination|origin|center)=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/i, order: 'latlon' },
+    ];
+
+    for (const { regex, order } of patterns) {
+        const match = text.match(regex);
+        const coordinates = coordinatePairFromMatch(match, order);
+        if (coordinates) return coordinates;
+    }
+
+    try {
+        const decoded = decodeURIComponent(text);
+        if (decoded !== text) {
+            return extractGoogleMapsCoordinates(decoded);
+        }
+    } catch {
+        // ignore malformed escape sequences
+    }
+
+    return null;
+};
+
+export const resolveCoordinates = (entity) => {
+    if (!entity) return null;
+
+    if (hasValidLatLon(entity.latitude, entity.longitude)) {
+        return {
+            latitude: Number(entity.latitude),
+            longitude: Number(entity.longitude)
+        };
+    }
+
+    return (
+        extractGoogleMapsCoordinates(entity.googleMapsUrl) ||
+        extractGoogleMapsCoordinates(entity.embedHtml) ||
+        extractGoogleMapsCoordinates(entity)
+    );
 };
 
 const getOffCacheTimestamp = (doc) => doc?.sourceUpdatedAt || doc?.$updatedAt || doc?.$createdAt || '';
@@ -536,9 +627,12 @@ export const ingredientPayloadFromAppwriteProduct = (doc) => {
         return Number.isFinite(num) ? num : null;
     };
 
-    const sugarsPer100g = parseNumber(doc.sugarsPer100g);
-    const sodiumMgPer100g = parseNumber(doc.sodiumMgPer100g);
-    const ingredientsText = String(doc.ingredientsText || '').trim();
+    const hiddenNutrition = extractNutritionMeta(doc.description);
+
+    // Prefer nested `nutrition` object (new format), then the hidden description block, then legacy top-level fields
+    const sugarsPer100g = parseNumber(doc?.nutrition?.sugarsPer100g ?? hiddenNutrition?.sugarsPer100g ?? doc.sugarsPer100g);
+    const sodiumMgPer100g = parseNumber(doc?.nutrition?.sodiumMgPer100g ?? hiddenNutrition?.sodiumMgPer100g ?? doc.sodiumMgPer100g);
+    const ingredientsText = String(doc?.nutrition?.ingredientsText ?? hiddenNutrition?.ingredientsText ?? (doc.ingredientsText || '')).trim();
 
     const hasData =
         sugarsPer100g !== null || sodiumMgPer100g !== null || ingredientsText.length > 0;
@@ -562,7 +656,7 @@ export const ingredientPayloadFromAppwriteProduct = (doc) => {
         },
         source: 'PriceMate',
         sourceUrl: '',
-        nutritionSourceLabel: String(doc.nutritionSource || '').trim(),
+        nutritionSourceLabel: String(doc?.nutrition?.nutritionSource ?? hiddenNutrition?.nutritionSource ?? (doc.nutritionSource || '')).trim(),
     };
 };
 
@@ -923,6 +1017,7 @@ export const normalizeProduct = (product, prices = []) => {
         id: productId,
         name,
         image,
+        description: stripNutritionMeta(product.description || ''),
         brand,
         category: categoryName,
         cheapestPrice: cheapest ? cheapest.price : null,
