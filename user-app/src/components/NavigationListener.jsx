@@ -16,7 +16,7 @@ const NavigationListener = () => {
     if (prev && prev !== location.pathname) {
       try {
         sessionStorage.setItem(`${SCROLL_KEY_PREFIX}${prev}`, String(window.scrollY || window.pageYOffset || 0));
-      } catch (e) {
+      } catch {
         // ignore storage errors
       }
       // push previous location so BackButton can use it
@@ -35,7 +35,7 @@ const NavigationListener = () => {
       } else {
         window.setTimeout(() => window.scrollTo(0, 0), 30);
       }
-    } catch (e) {
+    } catch {
       window.setTimeout(() => window.scrollTo(0, 0), 30);
     }
 
@@ -43,7 +43,9 @@ const NavigationListener = () => {
     const handleBeforeUnload = () => {
       try {
         sessionStorage.setItem(`${SCROLL_KEY_PREFIX}${location.pathname}`, String(window.scrollY || window.pageYOffset || 0));
-      } catch (e) {}
+      } catch {
+        // ignore storage errors
+      }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
 

@@ -10,11 +10,10 @@ import { pingAppwriteBackend } from './lib/appwrite.js';
 try {
   if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_OFF_DEBUG === 'true') {
     ['log', 'info', 'warn', 'error', 'debug', 'trace'].forEach((m) => {
-      // eslint-disable-next-line no-console
       console[m] = () => {};
     });
   }
-} catch (e) {
+} catch {
   // ignore
 }
 

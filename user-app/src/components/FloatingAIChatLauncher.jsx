@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { FiCpu } from 'react-icons/fi';
-import AIChatBox from './AIChatBox';
+
+const AIChatBox = lazy(() => import('./AIChatBox'));
 
 const FloatingAIChatLauncher = () => {
     const [isOpen, setIsOpen] = useState(false);
@@ -26,7 +27,7 @@ const FloatingAIChatLauncher = () => {
                     const style = window.getComputedStyle(splash);
                     visible = rects.length > 0 && style.visibility !== 'hidden' && parseFloat(style.opacity || '1') > 0;
                 }
-            } catch (e) {
+            } catch {
                 visible = exists;
             }
 
@@ -93,7 +94,9 @@ const FloatingAIChatLauncher = () => {
                     </button>
                 )}
             </div>
-            <AIChatBox isOpen={isOpen} onClose={() => setIsOpen(false)} />
+            <Suspense fallback={null}>
+                {isOpen ? <AIChatBox isOpen={isOpen} onClose={() => setIsOpen(false)} /> : null}
+            </Suspense>
         </>
     );
 };

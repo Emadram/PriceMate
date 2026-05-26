@@ -1,24 +1,69 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, User, ArrowRight, Loader2, CheckCircle2 } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, Loader2, CheckCircle2, Shield } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import useAuthStore from '../stores/authStore';
 import BackButton from '../components/BackButton';
 
+const ALLERGY_OPTIONS = [
+    { id: 'milk', labelKey: 'allergy_option_milk' },
+    { id: 'lactose', labelKey: 'allergy_option_lactose' },
+    { id: 'gluten', labelKey: 'allergy_option_gluten' },
+    { id: 'peanut', labelKey: 'allergy_option_peanut' },
+    { id: 'tree nuts', labelKey: 'allergy_option_tree_nuts' },
+    { id: 'soy', labelKey: 'allergy_option_soy' },
+    { id: 'egg', labelKey: 'allergy_option_egg' },
+    { id: 'fish', labelKey: 'allergy_option_fish' },
+    { id: 'shellfish', labelKey: 'allergy_option_shellfish' },
+    { id: 'sesame', labelKey: 'allergy_option_sesame' }
+];
+
 const Register = () => {
+    const { t } = useTranslation();
     const [formData, setFormData] = useState({
         name: '',
         email: '',
         password: ''
     });
+    const [selectedAllergies, setSelectedAllergies] = useState([]);
+    const [noKnownAllergies, setNoKnownAllergies] = useState(false);
+    const [allergyError, setAllergyError] = useState('');
     const signup = useAuthStore((state) => state.signup);
     const error = useAuthStore((state) => state.error);
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
 
+    const hasAnsweredAllergyQuestion = noKnownAllergies || selectedAllergies.length > 0;
+
+    const toggleAllergy = (id) => {
+        setAllergyError('');
+        setNoKnownAllergies(false);
+        setSelectedAllergies((prev) =>
+            prev.includes(id)
+                ? prev.filter((item) => item !== id)
+                : [...prev, id]
+        );
+    };
+
+    const toggleNoKnownAllergies = () => {
+        setAllergyError('');
+        setNoKnownAllergies((prev) => {
+            const next = !prev;
+            if (next) setSelectedAllergies([]);
+            return next;
+        });
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (!hasAnsweredAllergyQuestion) {
+            setAllergyError(t('allergy_profile_required_error'));
+            return;
+        }
+
         setLoading(true);
-        const success = await signup(formData.email, formData.password, formData.name);
+        const signupAllergies = noKnownAllergies ? [] : selectedAllergies;
+        const success = await signup(formData.email, formData.password, formData.name, signupAllergies);
         if (success) {
             // Redirect to login page instead of Home, since they are logged out
             // until they verify their email.
@@ -119,6 +164,51 @@ const Register = () => {
                                     className="block w-full pl-12 pr-6 py-4 bg-gray-50/50 dark:bg-black/20 border-gray-100 dark:border-white/5 focus:bg-white dark:focus:bg-black border focus:border-brand-500 dark:focus:border-brand-500 rounded-2xl text-[15px] font-bold transition-all outline-none text-gray-900 dark:text-white placeholder:text-gray-300 dark:placeholder:text-gray-700 shadow-inner"
                                 />
                             </div>
+                        </div>
+
+                        <div className="space-y-3 rounded-2xl border border-gray-100 dark:border-white/10 bg-gray-50/60 dark:bg-black/30 p-4">
+                            <div className="flex items-center gap-2">
+                                <Shield className="h-4 w-4 text-brand-500" />
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+                                    {t('allergy_profile_required_title')}
+                                </p>
+                            </div>
+                            <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                                {t('allergy_profile_register_description')}
+                            </p>
+                            <div className="grid grid-cols-2 gap-2">
+                                {ALLERGY_OPTIONS.map((item) => {
+                                    const active = selectedAllergies.includes(item.id);
+                                    return (
+                                        <button
+                                            key={item.id}
+                                            type="button"
+                                            onClick={() => toggleAllergy(item.id)}
+                                            className={`min-h-10 rounded-xl border px-2 text-[10px] font-black uppercase tracking-widest transition-all ${
+                                                active
+                                                    ? 'bg-black dark:bg-white text-white dark:text-black border-black dark:border-white'
+                                                    : 'bg-white/70 dark:bg-gray-900/60 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'
+                                            }`}
+                                        >
+                                            {t(item.labelKey)}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            <button
+                                type="button"
+                                onClick={toggleNoKnownAllergies}
+                                className={`w-full min-h-10 rounded-xl border px-3 text-[10px] font-black uppercase tracking-widest transition-all ${
+                                    noKnownAllergies
+                                        ? 'bg-black dark:bg-white text-white dark:text-black border-black dark:border-white'
+                                        : 'bg-white/70 dark:bg-gray-900/60 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'
+                                }`}
+                            >
+                                {t('allergy_profile_none')}
+                            </button>
+                            {allergyError && (
+                                <p className="text-[11px] font-bold text-red-600 dark:text-red-400">{allergyError}</p>
+                            )}
                         </div>
 
                         <div className="py-2">

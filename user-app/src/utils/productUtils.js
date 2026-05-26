@@ -614,6 +614,96 @@ export const fetchIngredientsByBarcode = async (barcode) => {
     });
 };
 
+const parseNutritionNumber = (value) => {
+    if (value === null || value === undefined || value === '') return null;
+    const num = typeof value === 'number' ? value : parseFloat(String(value).replace(',', '.'));
+    return Number.isFinite(num) ? num : null;
+};
+
+const hasIngredientPayloadContent = (payload) => {
+    if (!payload) return false;
+    const ingredientsText = String(payload.ingredientsText || '').trim();
+    const nutriments = payload.nutriments || {};
+    const sugar = parseNutritionNumber(nutriments.sugarsPer100g);
+    const sodium = parseNutritionNumber(nutriments.sodiumMgPer100g);
+    const caffeine = parseNutritionNumber(nutriments.caffeineMgPerL);
+    return ingredientsText.length > 0 || sugar !== null || sodium !== null || caffeine !== null;
+};
+
+/**
+ * Persist ingredient/nutrition info into catalog product document.
+ * We store nutrition in the hidden JSON block under `description` to avoid schema mismatch.
+ * Best-effort only: failures should never break chat responses.
+ */
+export const persistIngredientPayloadToCatalogProduct = async (productDoc, payload) => {
+    if (!productDoc?.$id || !hasIngredientPayloadContent(payload)) return false;
+
+    try {
+        const hiddenNutrition = extractNutritionMeta(productDoc.description);
+        const currentNutrition = {
+            sugarsPer100g: parseNutritionNumber(
+                productDoc?.nutrition?.sugarsPer100g ?? hiddenNutrition?.sugarsPer100g ?? productDoc.sugarsPer100g
+            ),
+            sodiumMgPer100g: parseNutritionNumber(
+                productDoc?.nutrition?.sodiumMgPer100g ?? hiddenNutrition?.sodiumMgPer100g ?? productDoc.sodiumMgPer100g
+            ),
+            caffeineMgPerL: parseNutritionNumber(
+                productDoc?.nutrition?.caffeineMgPerL ?? hiddenNutrition?.caffeineMgPerL ?? productDoc.caffeineMgPerL
+            ),
+            ingredientsText: String(
+                productDoc?.nutrition?.ingredientsText ??
+                hiddenNutrition?.ingredientsText ??
+                productDoc.ingredientsText ??
+                ''
+            ).trim(),
+            nutritionSource: String(
+                productDoc?.nutrition?.nutritionSource ??
+                hiddenNutrition?.nutritionSource ??
+                productDoc.nutritionSource ??
+                ''
+            ).trim(),
+        };
+
+        const incomingNutrition = {
+            sugarsPer100g: parseNutritionNumber(payload?.nutriments?.sugarsPer100g),
+            sodiumMgPer100g: parseNutritionNumber(payload?.nutriments?.sodiumMgPer100g),
+            caffeineMgPerL: parseNutritionNumber(payload?.nutriments?.caffeineMgPerL),
+            ingredientsText: String(payload?.ingredientsText || '').trim(),
+            nutritionSource: String(payload?.source || '').trim(),
+        };
+
+        const mergedNutrition = {
+            sugarsPer100g: incomingNutrition.sugarsPer100g ?? currentNutrition.sugarsPer100g ?? null,
+            sodiumMgPer100g: incomingNutrition.sodiumMgPer100g ?? currentNutrition.sodiumMgPer100g ?? null,
+            caffeineMgPerL: incomingNutrition.caffeineMgPerL ?? currentNutrition.caffeineMgPerL ?? null,
+            ingredientsText: incomingNutrition.ingredientsText || currentNutrition.ingredientsText || '',
+            nutritionSource: incomingNutrition.nutritionSource || currentNutrition.nutritionSource || '',
+        };
+
+        const hasMergedData =
+            mergedNutrition.sugarsPer100g !== null ||
+            mergedNutrition.sodiumMgPer100g !== null ||
+            mergedNutrition.caffeineMgPerL !== null ||
+            mergedNutrition.ingredientsText.length > 0 ||
+            mergedNutrition.nutritionSource.length > 0;
+
+        if (!hasMergedData) return false;
+
+        const baseDescription = stripNutritionMeta(productDoc.description || '');
+        const nextDescription = `${baseDescription}${NUTRITION_META_MARKER}${JSON.stringify(mergedNutrition)}`;
+
+        if (String(productDoc.description || '') === nextDescription) {
+            return false;
+        }
+
+        await db.products.update(productDoc.$id, { description: nextDescription });
+        return true;
+    } catch (error) {
+        console.warn('Catalog nutrition save failed:', error?.message || error);
+        return false;
+    }
+};
+
 /**
  * Build ingredient-check payload from optional Appwrite product fields (sugarsPer100g, ingredientsText, nutritionSource).
  * Returns null if no nutrition fields are set on the document.
@@ -621,21 +711,16 @@ export const fetchIngredientsByBarcode = async (barcode) => {
 export const ingredientPayloadFromAppwriteProduct = (doc) => {
     if (!doc) return null;
 
-    const parseNumber = (value) => {
-        if (value === null || value === undefined || value === '') return null;
-        const num = typeof value === 'number' ? value : parseFloat(String(value).replace(',', '.'));
-        return Number.isFinite(num) ? num : null;
-    };
-
     const hiddenNutrition = extractNutritionMeta(doc.description);
 
     // Prefer nested `nutrition` object (new format), then the hidden description block, then legacy top-level fields
-    const sugarsPer100g = parseNumber(doc?.nutrition?.sugarsPer100g ?? hiddenNutrition?.sugarsPer100g ?? doc.sugarsPer100g);
-    const sodiumMgPer100g = parseNumber(doc?.nutrition?.sodiumMgPer100g ?? hiddenNutrition?.sodiumMgPer100g ?? doc.sodiumMgPer100g);
+    const sugarsPer100g = parseNutritionNumber(doc?.nutrition?.sugarsPer100g ?? hiddenNutrition?.sugarsPer100g ?? doc.sugarsPer100g);
+    const sodiumMgPer100g = parseNutritionNumber(doc?.nutrition?.sodiumMgPer100g ?? hiddenNutrition?.sodiumMgPer100g ?? doc.sodiumMgPer100g);
+    const caffeineMgPerL = parseNutritionNumber(doc?.nutrition?.caffeineMgPerL ?? hiddenNutrition?.caffeineMgPerL ?? doc.caffeineMgPerL);
     const ingredientsText = String(doc?.nutrition?.ingredientsText ?? hiddenNutrition?.ingredientsText ?? (doc.ingredientsText || '')).trim();
 
     const hasData =
-        sugarsPer100g !== null || sodiumMgPer100g !== null || ingredientsText.length > 0;
+        sugarsPer100g !== null || sodiumMgPer100g !== null || caffeineMgPerL !== null || ingredientsText.length > 0;
     if (!hasData) return null;
 
     return {
@@ -650,8 +735,8 @@ export const ingredientPayloadFromAppwriteProduct = (doc) => {
         nutriments: {
             sugarsPer100g,
             sodiumMgPer100g,
-            caffeineMgPerL: null,
-            caffeineMgPer100g: null,
+            caffeineMgPerL,
+            caffeineMgPer100g: caffeineMgPerL !== null ? caffeineMgPerL / 10 : null,
             saltGPer100g: null,
         },
         source: 'PriceMate',

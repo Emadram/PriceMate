@@ -10,9 +10,10 @@ import CategoryIconLabel from '../components/CategoryIconLabel';
 
 const ProductCard = ({ product, prices = [] }) => {
     const { t } = useTranslation();
-    const { convert } = useCurrencyStore();
+    const { convert, currency } = useCurrencyStore();
     const user = useAuthStore((state) => state.user);
     const [isReportOpen, setIsReportOpen] = useState(false);
+    const displayCurrency = String(currency || 'TRY').trim().toUpperCase() === 'TL' ? 'TRY' : String(currency || 'TRY').trim().toUpperCase();
     
     // Get the lowest price for this product
     const lowestPrice = prices.length > 0
@@ -123,10 +124,10 @@ const ProductCard = ({ product, prices = [] }) => {
                             <div className="flex flex-col min-w-0">
                                 <span className="text-[9px] sm:text-[10px] uppercase font-bold tracking-widest text-gray-400 mb-0.5">{t('starting_from')}</span>
                                 <div className="flex items-baseline gap-1">
-                                        <span className="text-[1.05rem] sm:text-xl font-bold text-gray-900 dark:text-white leading-none">
+                                    <span className="text-[1.05rem] sm:text-xl font-bold text-gray-900 dark:text-white leading-none">
                                         {convert(lowestPrice.price, 'TRY')}
                                     </span>
-                                    <span className="text-xs sm:text-sm font-medium text-gray-400">TRY</span>
+                                    <span className="text-xs sm:text-sm font-medium text-gray-400">{displayCurrency}</span>
                                 </div>
                             </div>
                         ) : (

@@ -10,7 +10,6 @@ import { useTranslation } from 'react-i18next';
 import { 
     fetchSupermarketById, 
     fetchPricesBySupermarket, 
-    buildDirectionsUrl,
     calculateDistance, 
     resolveRelatedSupermarkets,
     isStoreOpen,
@@ -40,22 +39,6 @@ const extractEmbedSrc = (embedHtml) => {
         return src;
     }
     return /google\.com\/maps\/embed/i.test(text) ? text : '';
-};
-
-const buildRoutePreviewUrl = (origin, destination) => {
-    if (!origin || !hasValidLatLon(origin.latitude, origin.longitude)) return '';
-
-    const resolvedDestination = resolveCoordinates(destination);
-
-    const originText = `${origin.latitude},${origin.longitude}`;
-    const destinationCoords = resolvedDestination
-        ? `${resolvedDestination.latitude},${resolvedDestination.longitude}`
-        : '';
-    const destinationText = destinationCoords || String(destination?.address || destination?.name || destination || '').trim();
-
-    if (!destinationText) return '';
-
-    return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(originText)}&destination=${encodeURIComponent(destinationText)}&travelmode=driving`;
 };
 
 const SupermarketProfile = () => {
@@ -189,19 +172,8 @@ const SupermarketProfile = () => {
     const userGeoOk = location && hasValidLatLon(location.latitude, location.longitude);
     const resolvedStoreCoordinates = resolveCoordinates(supermarket);
     const storeGeoOk = !!resolvedStoreCoordinates;
-    const hasDirections = storeGeoOk || (supermarket.googleMapsUrl && supermarket.googleMapsUrl.trim()) || (supermarket.embedHtml && supermarket.embedHtml.trim());
     const embedSrc = extractEmbedSrc(supermarket.embedHtml);
     const hasEmbed = !!embedSrc;
-    const routePreviewUrl = userGeoOk
-        ? buildRoutePreviewUrl(location, {
-              latitude: resolvedStoreCoordinates?.latitude ?? supermarket.latitude,
-              longitude: resolvedStoreCoordinates?.longitude ?? supermarket.longitude,
-              address: supermarket.address,
-              name: supermarket.name,
-              googleMapsUrl: supermarket.googleMapsUrl,
-              embedHtml: supermarket.embedHtml,
-          })
-        : '';
 
     const formatDistance = (value) => {
         if (!Number.isFinite(value)) return null;

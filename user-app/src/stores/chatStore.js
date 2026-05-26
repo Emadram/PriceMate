@@ -280,41 +280,8 @@ const useChatStore = create((set, get) => ({
             newMessage.conversationId = activeConversationId;
         }
 
-        // #region agent log
-        fetch('http://127.0.0.1:7770/ingest/1f1abd7c-5362-4143-89b7-435321e4a663', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '2e1aa6' },
-            body: JSON.stringify({
-                sessionId: '2e1aa6',
-                location: 'chatStore.js:addMessage:preCreate',
-                message: 'chatHistory.create payload',
-                data: {
-                    hypothesisId: 'H1',
-                    runId: 'verify',
-                    hasConversationId: Object.prototype.hasOwnProperty.call(newMessage, 'conversationId'),
-                    activeIsLegacy: activeConversationId === LEGACY_CONVERSATION_ID,
-                },
-                timestamp: Date.now(),
-            }),
-        }).catch(() => {});
-        // #endregion
-
         try {
             const doc = await db.chatHistory.create(newMessage);
-
-            // #region agent log
-            fetch('http://127.0.0.1:7770/ingest/1f1abd7c-5362-4143-89b7-435321e4a663', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '2e1aa6' },
-                body: JSON.stringify({
-                    sessionId: '2e1aa6',
-                    location: 'chatStore.js:addMessage:success',
-                    message: 'chatHistory.create ok',
-                    data: { hypothesisId: 'H1', runId: 'verify', docId: doc.$id },
-                    timestamp: Date.now(),
-                }),
-            }).catch(() => {});
-            // #endregion
 
             if (messageMatchesActive(doc, userId, get().activeConversationId)) {
                 set((state) => ({
@@ -330,25 +297,6 @@ const useChatStore = create((set, get) => ({
             const isMissingConversationIdAttr =
                 /Unknown attribute[:\s]+"?conversationId"?/i.test(msg) ||
                 (msg.includes('Unknown attribute') && msg.includes('conversationId'));
-
-            // #region agent log
-            fetch('http://127.0.0.1:7770/ingest/1f1abd7c-5362-4143-89b7-435321e4a663', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '2e1aa6' },
-                body: JSON.stringify({
-                    sessionId: '2e1aa6',
-                    location: 'chatStore.js:addMessage:catch',
-                    message: 'chatHistory.create failed',
-                    data: {
-                        hypothesisId: 'H1',
-                        runId: 'verify',
-                        isMissingConversationIdAttr,
-                        msgSnippet: msg.slice(0, 160),
-                    },
-                    timestamp: Date.now(),
-                }),
-            }).catch(() => {});
-            // #endregion
 
             set({
                 error: isMissingConversationIdAttr ? CHAT_ERROR_MISSING_CONVERSATION_ID : msg,

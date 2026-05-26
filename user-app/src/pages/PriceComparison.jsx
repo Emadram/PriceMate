@@ -7,7 +7,7 @@ import {
     FiCalendar, FiTag, FiPlusCircle, FiAlertTriangle, FiInfo 
 } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
-import { buildDirectionsUrl, calculateDistance, hasValidLatLon, fetchSimilarProductsByCategory, fetchPricesForProducts, getRelationshipId, normalizeProduct, resolveCoordinates } from '../utils/productUtils';
+import { calculateDistance, hasValidLatLon, fetchSimilarProductsByCategory, fetchPricesForProducts, getRelationshipId, normalizeProduct, resolveCoordinates } from '../utils/productUtils';
 import PriceHistoryChart from '../components/PriceHistoryChart';
 import AddPriceModal from '../components/AddPriceModal';
 import ReportModal from '../components/ReportModal';
@@ -697,11 +697,6 @@ const PriceComparison = () => {
                                     const hasCoordinates =
                                         typeof supermarket === 'object' &&
                                         hasValidLatLon(supermarket?.latitude, supermarket?.longitude);
-                                    const hasDirections =
-                                        hasCoordinates ||
-                                        (typeof supermarket === 'object' &&
-                                            supermarket?.googleMapsUrl &&
-                                            supermarket?.googleMapsUrl.trim());
                                     const isSelectedContext = supermarketIdParam && supermarketId === supermarketIdParam;
                                     const isLowest = getLowestPrice()?.$id === priceEntry.$id;
                                     // status text removed per UX decision; keep status normalization in branch details only

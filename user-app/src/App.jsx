@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import useAuthStore from './stores/authStore';
@@ -6,21 +6,20 @@ import useThemeStore from './stores/themeStore';
 import useFavoritesStore from './stores/favoritesStore';
 import useCurrencyStore from './stores/currencyStore';
 import { runDiagnostics } from './utils/diagnostics';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Home from './pages/Home';
-import VerifyEmail from './pages/VerifyEmail';
-import ForgotPassword from './pages/ForgotPassword';
-import ResetPassword from './pages/ResetPassword';
-
-import ScanPage from './pages/ScanPage';
-import SearchResults from './pages/SearchResults';
-import ProductDetails from './pages/ProductDetails';
-import Profile from './pages/Profile';
-import Favorites from './pages/Favorites';
-import FeedbackPage from './pages/FeedbackPage';
-import PriceComparison from './pages/PriceComparison';
-import SupermarketProfile from './pages/SupermarketProfile';
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const Home = lazy(() => import('./pages/Home'));
+const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const ScanPage = lazy(() => import('./pages/ScanPage'));
+const SearchResults = lazy(() => import('./pages/SearchResults'));
+const ProductDetails = lazy(() => import('./pages/ProductDetails'));
+const Profile = lazy(() => import('./pages/Profile'));
+const Favorites = lazy(() => import('./pages/Favorites'));
+const FeedbackPage = lazy(() => import('./pages/FeedbackPage'));
+const PriceComparison = lazy(() => import('./pages/PriceComparison'));
+const SupermarketProfile = lazy(() => import('./pages/SupermarketProfile'));
 import FloatingAIChatLauncher from './components/FloatingAIChatLauncher';
 import MobileSplashScreen from './components/MobileSplashScreen';
 import PageTransition from './components/PageTransition';
@@ -122,7 +121,7 @@ function App() {
     if (import.meta.env.DEV) {
       runDiagnostics();
     }
-  }, [checkSession, setTheme, fetchRates]);
+  }, [checkSession, setTheme, fetchRates, currency, setCurrency]);
 
   useEffect(() => {
     const metaThemeColor = document.querySelector('meta[name="theme-color"]');
@@ -157,6 +156,13 @@ function App() {
       />
       <AppShell>
       <MobileSplashScreen />
+      <Suspense
+        fallback={
+          <div className="min-h-[40vh] flex items-center justify-center">
+            <div className="w-10 h-10 border-4 border-brand-600/20 border-t-brand-600 rounded-full animate-spin"></div>
+          </div>
+        }
+      >
       <PageTransition>
       <Routes>
         <Route path="/login" element={<Login />} />
@@ -193,6 +199,7 @@ function App() {
         />
       </Routes>
       </PageTransition>
+      </Suspense>
       </AppShell>
     </Router>
   );

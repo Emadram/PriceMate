@@ -1,12 +1,19 @@
 import { useEffect, useState } from 'react';
 
 const MOBILE_SPLASH_KEY = 'pricemate-mobile-splash-seen';
+const isDarkModeActive = () => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return false;
+    return (
+        document.documentElement.classList.contains('dark') ||
+        window.matchMedia('(prefers-color-scheme: dark)').matches
+    );
+};
 
 const MobileSplashScreen = () => {
     const [phase, setPhase] = useState('hidden');
-    const [isDark, setIsDark] = useState(false);
     const [isPageLoaded, setIsPageLoaded] = useState(false);
     const SCROLL_KEY_PREFIX = 'pricemate-scroll:';
+    const isDark = isDarkModeActive();
 
     useEffect(() => {
         if (typeof window === 'undefined') return undefined;
@@ -21,12 +28,10 @@ const MobileSplashScreen = () => {
         try {
             const path = window.location.pathname || '/';
             sessionStorage.setItem(`${SCROLL_KEY_PREFIX}${path}`, String(window.scrollY || window.pageYOffset || 0));
-        } catch (e) {}
-        setIsDark(
-            document.documentElement.classList.contains('dark') ||
-                window.matchMedia('(prefers-color-scheme: dark)').matches
-        );
-        setPhase('visible');
+        } catch {
+            // ignore storage errors
+        }
+        const showTimeout = window.setTimeout(() => setPhase('visible'), 0);
 
         const beginExit = () => {
             setIsPageLoaded(true);
@@ -41,6 +46,7 @@ const MobileSplashScreen = () => {
         }
 
         return () => {
+            window.clearTimeout(showTimeout);
             window.removeEventListener('load', beginExit);
         };
     }, []);
@@ -56,7 +62,9 @@ const MobileSplashScreen = () => {
         // Ensure we start at the top while the splash is visible
         try {
             window.scrollTo(0, 0);
-        } catch (e) {}
+        } catch {
+            // ignore scroll errors
+        }
 
         return () => {
             document.body.style.overflow = previousBodyOverflow;
@@ -69,7 +77,9 @@ const MobileSplashScreen = () => {
                     const pos = parseInt(stored, 10) || 0;
                     window.setTimeout(() => window.scrollTo(0, pos), 30);
                 }
-            } catch (e) {}
+            } catch {
+                // ignore restore errors
+            }
         };
     }, [phase]);
 

@@ -23,14 +23,219 @@ const buildIntentSummary = (value) => {
     if (tokens.length === 0) return String(value || '').trim();
     return tokens.join(' ');
 };
+
+const NO_ALLERGY_PREFERENCE_VALUES = new Set([
+    'none',
+    'no allergy',
+    'no allergies',
+    'no known allergy',
+    'no known allergies',
+    'no_known_allergies',
+    'bilinen alerjim yok',
+]);
+const ALLERGY_KEYWORDS = ['allergy', 'allergic', 'alerji', 'alerjik', 'intolerant', 'intolerance', 'cannot eat', "can't eat", 'cant eat', 'avoid'];
+const ALLERGEN_GROUPS = [
+    { label: 'peanut', terms: ['peanut', 'peanuts', 'yer fıstığı', 'yer fistik', 'fıstık', 'fistik'] },
+    { label: 'tree nuts', terms: ['almond', 'walnut', 'hazelnut', 'cashew', 'pistachio', 'pecan', 'badem', 'ceviz', 'fındık', 'findik', 'kaju', 'antep fıstığı'] },
+    { label: 'milk', terms: ['milk', 'dairy', 'whey', 'casein', 'butter', 'cheese', 'cream', 'yogurt', 'süt', 'sut', 'peynir', 'yoğurt', 'yogurt', 'tereyağ', 'tereyag', 'krema', 'kazein'] },
+    { label: 'lactose', terms: ['lactose', 'laktoz', 'milk', 'dairy', 'whey', 'casein', 'süt', 'sut'] },
+    { label: 'egg', terms: ['egg', 'eggs', 'yumurta'] },
+    { label: 'soy', terms: ['soy', 'soya'] },
+    { label: 'gluten', terms: ['gluten', 'wheat', 'buğday', 'bugday', 'barley', 'arpa', 'rye', 'çavdar', 'cavdar', 'malt'] },
+    { label: 'fish', terms: ['fish', 'balık', 'balik'] },
+    { label: 'shellfish', terms: ['shrimp', 'prawn', 'crab', 'lobster', 'shellfish', 'karides', 'yengeç', 'yengec', 'ıstakoz', 'istakoz'] },
+    { label: 'sesame', terms: ['sesame', 'susam'] },
+    { label: 'mustard', terms: ['mustard', 'hardal'] },
+    { label: 'celery', terms: ['celery', 'kereviz'] },
+    { label: 'lupin', terms: ['lupin', 'acı bakla', 'aci bakla'] },
+    { label: 'sulfites', terms: ['sulfite', 'sulphite', 'sülfit', 'sulfit'] }
+];
+const ALLERGEN_GROUP_BY_LABEL = new Map(
+    ALLERGEN_GROUPS.map((group) => [group.label, group])
+);
+
+const normalizeAllergyLabel = (value) => String(value || '').trim().toLowerCase().replace(/_/g, ' ');
+
+const resolveAllergyPreferenceLabel = (value) => {
+    const normalized = normalizeAllergyLabel(value);
+    if (!normalized || NO_ALLERGY_PREFERENCE_VALUES.has(normalized)) return '';
+    if (ALLERGEN_GROUP_BY_LABEL.has(normalized)) return normalized;
+    if (normalized === 'nuts' || normalized === 'nut') return 'tree nuts';
+    if (normalized === 'dairy') return 'milk';
+    return normalized;
+};
+
+const getAllergenTermsForLabels = (labels = []) => {
+    const terms = labels.flatMap((label) => {
+        const resolved = resolveAllergyPreferenceLabel(label);
+        const group = ALLERGEN_GROUP_BY_LABEL.get(resolved);
+        return group?.terms || [resolved];
+    });
+    return Array.from(new Set(terms.filter(Boolean)));
+};
 // Simple in-memory intent cache with optional persistence to avoid repeating identical assistant calls
 const DEFAULT_INTENT_CACHE_TTL_MS = 1000 * 60 * 60; // 1 hour
-const INTENT_CACHE_STORAGE_KEY = 'pricemate_intent_cache_v1';
+const INTENT_CACHE_FORMAT_VERSION = 'v5';
+const INTENT_CACHE_STORAGE_KEY = `pricemate_intent_cache_${INTENT_CACHE_FORMAT_VERSION}`;
 const INTENT_CACHE_TTL_SETTING_KEY = 'pricemate_intent_cache_ttl_ms';
 
 const intentCache = new Map();
 
-const makeIntentKey = (intentSummary, barcode) => `${String(intentSummary || '').trim()}::BARCODE:${String(barcode || '').trim()}`;
+const makeIntentKey = (intentSummary, barcode, userKey = 'guest', allergyKey = 'none') =>
+    `${INTENT_CACHE_FORMAT_VERSION}::USER:${String(userKey || 'guest').trim()}::ALLERGY:${String(allergyKey || 'none').trim()}::${String(intentSummary || '').trim()}::BARCODE:${String(barcode || '').trim()}`;
+
+const sanitizeAssistantReply = (value) => {
+    const text = String(value || '').replace(/\r\n/g, '\n').trim();
+    if (!text) return '';
+
+    const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
+    const kept = [];
+    let sourceAdded = false;
+
+    for (const line of lines) {
+        if (/^note\s*:/i.test(line)) {
+            continue;
+        }
+
+        if (/^source\s*:/i.test(line)) {
+            if (!sourceAdded) {
+                kept.push('Source: PriceMate');
+                sourceAdded = true;
+            }
+            continue;
+        }
+
+        kept.push(line);
+    }
+
+    // Keep source explicit and single-line for ingredient-style responses.
+    const looksLikeIngredientCheck = /ingredients?\s*:|allergens?\s*:|suitability\s*:|checks?(?:\s*for)?\s*:/i.test(text);
+    if (looksLikeIngredientCheck && !sourceAdded) {
+        kept.push('Source: PriceMate');
+    }
+
+    return kept.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+};
+
+const truncateText = (value, max = 140) => {
+    const text = String(value || '').replace(/\s+/g, ' ').trim();
+    if (text.length <= max) return text;
+    return `${text.slice(0, max).trim()}...`;
+};
+
+const emphasizeImportantIngredients = (value) => {
+    const text = String(value || '');
+    if (!text) return '';
+
+    const importantTerms = [
+        'sugar', 'glucose', 'fructose', 'syrup', 'corn syrup', 'honey', 'dextrose', 'sucrose',
+        'salt', 'sodium', 'msg', 'monosodium',
+        'caffeine', 'alcohol',
+        'gluten', 'wheat', 'barley', 'rye', 'malt',
+        'milk', 'dairy', 'lactose', 'whey', 'casein', 'butter', 'cheese', 'cream', 'yogurt',
+        'peanut', 'nuts', 'soy', 'egg', 'fish', 'shellfish', 'sesame',
+        'şeker', 'seker', 'glikoz', 'fruktoz', 'şurup', 'surup', 'bal',
+        'tuz', 'sodyum', 'kafein',
+        'buğday', 'bugday', 'arpa', 'çavdar', 'cavdar',
+        'süt', 'sut', 'laktoz', 'peynir', 'yoğurt', 'yogurt'
+    ];
+
+    const escaped = importantTerms
+        .map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        .sort((a, b) => b.length - a.length);
+
+    if (escaped.length === 0) return text;
+
+    const rx = new RegExp(`\\b(${escaped.join('|')})\\b`, 'giu');
+    return text.replace(rx, '**$1**');
+};
+
+const renderInlineBoldText = (value, keyPrefix = 'txt') => {
+    const parts = String(value || '').split(/(\*\*[^*]+\*\*)/g);
+    return parts.map((part, index) => {
+        if (/^\*\*[^*]+\*\*$/.test(part)) {
+            return (
+                <strong key={`${keyPrefix}-b-${index}`} className="font-black text-gray-900 dark:text-white">
+                    {part.slice(2, -2)}
+                </strong>
+            );
+        }
+        return <span key={`${keyPrefix}-t-${index}`}>{part}</span>;
+    });
+};
+
+const parseIngredientCardData = (value) => {
+    const text = String(value || '').replace(/\r\n/g, '\n').trim();
+    if (!text) return null;
+
+    const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
+    const data = {
+        product: '',
+        suitability: '',
+        checks: '',
+        reasons: [],
+        ingredients: '',
+        allergens: '',
+        source: '',
+        tip: '',
+    };
+
+    let collectingReasons = false;
+
+    for (const line of lines) {
+        if (/^product\s*:/i.test(line)) {
+            data.product = line.replace(/^product\s*:/i, '').trim();
+            collectingReasons = false;
+            continue;
+        }
+        if (/^suitability\s*:/i.test(line)) {
+            data.suitability = line.replace(/^suitability\s*:/i, '').trim();
+            collectingReasons = false;
+            continue;
+        }
+        if (/^checks?(?:\s*for)?\s*:/i.test(line)) {
+            data.checks = line.replace(/^checks?(?:\s*for)?\s*:/i, '').trim();
+            collectingReasons = false;
+            continue;
+        }
+        if (/^reasons?\s*:/i.test(line)) {
+            collectingReasons = true;
+            const inlineReason = line.replace(/^reasons?\s*:/i, '').trim();
+            if (inlineReason) data.reasons.push(inlineReason);
+            continue;
+        }
+        if (/^ingredients?\s*:/i.test(line)) {
+            data.ingredients = line.replace(/^ingredients?\s*:/i, '').trim();
+            collectingReasons = false;
+            continue;
+        }
+        if (/^allergens?\s*:/i.test(line)) {
+            data.allergens = line.replace(/^allergens?\s*:/i, '').trim();
+            collectingReasons = false;
+            continue;
+        }
+        if (/^source\s*:/i.test(line)) {
+            data.source = line.replace(/^source\s*:/i, '').trim();
+            collectingReasons = false;
+            continue;
+        }
+        if (/^tip\s*:/i.test(line)) {
+            data.tip = line.replace(/^tip\s*:/i, '').trim();
+            collectingReasons = false;
+            continue;
+        }
+
+        if (collectingReasons) {
+            const cleaned = line.replace(/^\d+\.\s*/, '').replace(/^[-•]\s*/, '').trim();
+            if (cleaned) data.reasons.push(cleaned);
+        }
+    }
+
+    const looksStructured = !!data.suitability && (!!data.ingredients || data.reasons.length > 0);
+    if (!looksStructured) return null;
+    if (!data.source) data.source = 'PriceMate';
+    return data;
+};
 
 const readConfiguredTtl = () => {
     try {
@@ -39,7 +244,7 @@ const readConfiguredTtl = () => {
         const parsed = Number(raw);
         if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_INTENT_CACHE_TTL_MS;
         return parsed;
-    } catch (e) {
+    } catch {
         return DEFAULT_INTENT_CACHE_TTL_MS;
     }
 };
@@ -84,7 +289,7 @@ const getCachedIntent = (key) => {
     if (!rec) return null;
     if (Date.now() > rec.expiresAt) {
         intentCache.delete(key);
-        try { persistCacheToStorage(); } catch (e) {}
+        persistCacheToStorage();
         return null;
     }
     return rec.value;
@@ -113,17 +318,323 @@ import {
     searchIngredientsByName,
     resolveCatalogProductForIngredients,
     ingredientPayloadFromAppwriteProduct,
+    persistIngredientPayloadToCatalogProduct,
     fetchOffCacheSnapshot,
     normalizeOffCacheDoc,
     resolveOffCacheProductForIngredients,
     ingredientPayloadFromOffCache,
 } from '../utils/productUtils';
+import {
+    buildAiProfileCacheKey,
+    buildAiCheckFingerprint,
+    parseAiCheckResponse,
+    readStoredAiProfile,
+    readStoredAllergyProfile,
+    serializeAiCheckResponse,
+} from '../utils/aiCheckUtils';
+import { functions as appwriteFunctions } from '../lib/appwrite';
 import useCurrencyStore from '../stores/currencyStore';
 import useAuthStore from '../stores/authStore';
 import useChatStore, { CHAT_ERROR_MISSING_CONVERSATION_ID } from '../stores/chatStore';
 
+const AI_CHECK_FUNCTION_ID = import.meta.env.VITE_APPWRITE_FUNCTION_AI_CHECK || '';
+const AI_CHECK_MODE = import.meta.env.VITE_AI_CHECK_MODE || 'legacy';
+
+const runAiCheckFunction = async (payload) => {
+    if (AI_CHECK_MODE !== 'hybrid' || !AI_CHECK_FUNCTION_ID) return null;
+    try {
+        const execution = await appwriteFunctions.createExecution(
+            AI_CHECK_FUNCTION_ID,
+            JSON.stringify(payload),
+            false
+        );
+        if (!execution?.response) return null;
+        const parsed = JSON.parse(execution.response);
+        return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch (error) {
+        console.debug('AI check function unavailable, falling back locally:', error?.message || error);
+        return null;
+    }
+};
+
+const profileHasPersonalization = (profile = {}) =>
+    [
+        profile.dietaryPreferences,
+        profile.nutritionPriorities,
+        profile.avoidIngredients,
+        profile.preferredStores,
+        profile.preferredBrands,
+        profile.dislikedBrands,
+    ].some((items) => Array.isArray(items) && items.length > 0) ||
+    profile.budgetPreference !== 'balanced' ||
+    profile.responseStyle !== 'balanced';
+
+const formatAiProfileForPrompt = (profile = {}) => {
+    if (!profileHasPersonalization(profile)) {
+        return 'No optional AI shopping profile preferences saved.';
+    }
+
+    return [
+        `Dietary preferences: ${profile.dietaryPreferences?.join(', ') || 'none'}`,
+        `Nutrition priorities: ${profile.nutritionPriorities?.join(', ') || 'none'}`,
+        `Avoid ingredients: ${profile.avoidIngredients?.join(', ') || 'none'}`,
+        `Budget preference: ${profile.budgetPreference || 'balanced'}`,
+        `Preferred stores: ${profile.preferredStores?.join(', ') || 'none'}`,
+        `Preferred brands: ${profile.preferredBrands?.join(', ') || 'none'}`,
+        `Disliked brands: ${profile.dislikedBrands?.join(', ') || 'none'}`,
+        `Response style: ${profile.responseStyle || 'balanced'}`,
+    ].join('\n');
+};
+
 const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [] }) => {
+    const extractBarcodeFromText = (value) => {
+        const match = String(value || '').match(/\[BARCODE:([\w\d-]+)\]/i);
+        return match ? match[1] : '';
+    };
+
+    const renderBarcodeProductCard = (barcode, key = 'barcode-card') => {
+        const product = allProducts.find((p) => String(p.barcode || '') === String(barcode || ''));
+        if (!barcode) return null;
+
+        if (!product) {
+            return (
+                <Link
+                    key={key}
+                    to={`/price-comparison/${barcode}`}
+                    className="mt-2 inline-flex items-center gap-1 rounded-full bg-brand-50 dark:bg-brand-900/30 px-3 py-1.5 text-xs font-bold text-brand-700 dark:text-brand-300 border border-brand-100 dark:border-brand-800/30"
+                >
+                    View Product <FiExternalLink size={12} />
+                </Link>
+            );
+        }
+
+        const sortedPrices = [...(product.prices || [])].sort((a, b) => a.price - b.price);
+        const best = sortedPrices.length > 0 ? sortedPrices[0] : null;
+
+        return (
+            <Link
+                key={key}
+                to={`/price-comparison/${barcode}`}
+                className="mt-2 block rounded-xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/10 overflow-hidden hover:shadow-md transition-all"
+            >
+                <div className="flex items-center gap-3 p-2.5">
+                    <div className="w-12 h-12 bg-white dark:bg-gray-800 rounded-lg flex items-center justify-center overflow-hidden border border-gray-100 dark:border-gray-900/50 shrink-0">
+                        {product.imageUrl ? (
+                            <img src={product.imageUrl} alt={product.name} className="w-full h-full object-contain" />
+                        ) : (
+                            <FiPackage className="text-gray-400 text-lg" />
+                        )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-gray-800 dark:text-white truncate">{product.name || product.productName}</p>
+                        {best ? (
+                            <p className="text-xs text-green-700 dark:text-green-300 font-black">
+                                Best: {convert(best.price, 'TRY')} {getCurrencySymbol()}
+                            </p>
+                        ) : (
+                            <p className="text-xs text-gray-500">No price info</p>
+                        )}
+                    </div>
+                </div>
+            </Link>
+        );
+    };
+
+    const renderIngredientCard = (data) => {
+        const productBarcode = extractBarcodeFromText(data.product);
+        const suitabilityLower = (data.suitability || '').toLowerCase();
+        const tone =
+            suitabilityLower.includes('not suitable') || suitabilityLower.includes('avoid')
+                ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                : suitabilityLower.includes('caution')
+                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                    : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300';
+
+        return (
+            <div className="my-1.5 rounded-2xl border border-brand-100 dark:border-brand-800/30 bg-gradient-to-br from-white to-brand-50/40 dark:from-gray-800 dark:to-brand-900/10 p-3 sm:p-4 shadow-soft">
+                <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-[0.18em] text-brand-600 dark:text-brand-300">Ingredient Check</span>
+                    <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${tone}`}>
+                        {data.suitability || 'Unknown'}
+                    </span>
+                </div>
+                {productBarcode ? renderBarcodeProductCard(productBarcode, `ingredient-${productBarcode}`) : null}
+                {data.checks && (
+                    <p className="mt-1 text-[11px] font-semibold text-gray-500 dark:text-gray-300">
+                        Checks: {renderInlineBoldText(data.checks, 'ic-checks')}
+                    </p>
+                )}
+                {data.reasons.length > 0 && (
+                    <div className="mt-3">
+                        <p className="text-[11px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">Reasons</p>
+                        <ol className="mt-1 space-y-1 text-[13px] text-gray-700 dark:text-gray-200">
+                            {data.reasons.map((reason, index) => (
+                                <li key={`reason-${index}`} className="leading-5">
+                                    <span className="font-black mr-1.5">{index + 1}.</span>
+                                    {renderInlineBoldText(reason, `ic-reason-${index}`)}
+                                </li>
+                            ))}
+                        </ol>
+                    </div>
+                )}
+                <details className="mt-3 rounded-2xl border border-gray-100 bg-white/70 dark:border-gray-700/70 dark:bg-gray-900/30 px-3 py-2 group">
+                    <summary className="cursor-pointer list-none text-[11px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                        Ingredients & allergens
+                    </summary>
+                    <div className="mt-2 space-y-2">
+                        <p className="text-[12px] leading-5 text-gray-700 dark:text-gray-200">
+                            <span className="font-black text-gray-500 dark:text-gray-400">Ingredients: </span>
+                            {renderInlineBoldText(data.ingredients || 'No ingredients listed', 'ic-ingredients')}
+                        </p>
+                        <p className="text-[12px] leading-5 text-gray-700 dark:text-gray-200">
+                            <span className="font-black text-gray-500 dark:text-gray-400">Allergens: </span>
+                            {renderInlineBoldText(data.allergens || 'No allergens listed', 'ic-allergens')}
+                        </p>
+                    </div>
+                </details>
+                <p className="mt-3 text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                    Source: PriceMate
+                </p>
+                {data.tip && (
+                    <p className="mt-2 rounded-2xl bg-brand-50 px-3 py-2 text-[11px] font-bold text-brand-700 dark:bg-brand-900/20 dark:text-brand-300">
+                        {data.tip}
+                    </p>
+                )}
+            </div>
+        );
+    };
+
+    const statusLabel = (status) => {
+        if (status === 'avoid') return 'Not suitable';
+        if (status === 'caution') return 'Use caution';
+        if (status === 'safe') return 'Likely suitable';
+        if (status === 'ok') return 'Available';
+        return 'Unknown';
+    };
+
+    const checkLabel = (value) => {
+        const labels = {
+            high_sugar: 'sugar',
+            high_sodium: 'sodium',
+            high_caffeine: 'caffeine',
+            allergy: 'allergy',
+            gluten: 'gluten',
+            lactose: 'lactose',
+            pregnancy: 'pregnancy',
+            ingredients: 'ingredients',
+        };
+        return labels[value] || String(value || '').replace(/_/g, ' ');
+    };
+
+    const renderStructuredIngredientCard = (result) => {
+        const product = result.product || {};
+        const check = result.ingredientCheck || {};
+        const checks = Array.isArray(check.checks) ? check.checks : [];
+        const checkNames = check.allergenTargets?.length
+            ? checks.filter((item) => item !== 'allergy')
+            : checks;
+        return renderIngredientCard({
+            product: product.barcode
+                ? `${product.name || 'Unknown Product'} [BARCODE:${product.barcode}]`
+                : (product.name || 'Unknown Product'),
+            suitability: statusLabel(check.status || result.status),
+            checks: [
+                ...checkNames.map(checkLabel),
+                ...(check.allergenTargets?.length ? [`allergy (${check.allergenTargets.join(', ')})`] : []),
+            ].join(', '),
+            reasons: check.reasons || result.reasons || [],
+            ingredients: emphasizeImportantIngredients(truncateText(check.ingredients || 'No ingredients listed', 180)),
+            allergens: emphasizeImportantIngredients(
+                Array.isArray(check.allergens) && check.allergens.length > 0
+                    ? truncateText(check.allergens.join(', '), 120)
+                    : 'No allergens listed'
+            ),
+            source: 'PriceMate',
+        });
+    };
+
+    const renderStructuredPriceCard = (result) => {
+        const product = result.product || {};
+        const check = result.priceCheck || {};
+        const rows = Array.isArray(check.items) ? check.items : [];
+        const headline = check.type === 'highest' ? check.highest : check.best;
+        const tone = result.errorCode
+            ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+            : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300';
+
+        return (
+            <div className="my-1.5 rounded-2xl border border-brand-100 dark:border-brand-800/30 bg-gradient-to-br from-white to-brand-50/40 dark:from-gray-800 dark:to-brand-900/10 p-3 sm:p-4 shadow-soft">
+                <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-[0.18em] text-brand-600 dark:text-brand-300">Price Check</span>
+                    <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${tone}`}>
+                        {result.stale ? 'Cached' : statusLabel(result.status)}
+                    </span>
+                </div>
+                {product.barcode ? renderBarcodeProductCard(product.barcode, `price-${product.barcode}`) : null}
+                <div className="mt-3">
+                    <p className="text-sm font-black text-gray-900 dark:text-white">
+                        {product.name || 'Product'}
+                    </p>
+                    {headline ? (
+                        <p className="mt-1 text-[13px] font-semibold text-gray-700 dark:text-gray-200">
+                            {check.type === 'highest' ? 'Highest' : 'Best'}: <strong>{convert(headline.price, headline.currency || 'TRY')} {getCurrencySymbol()}</strong>
+                            <span className="text-gray-400"> at {headline.supermarketName || 'Store'}</span>
+                        </p>
+                    ) : (
+                        <p className="mt-1 text-[13px] font-semibold text-amber-700 dark:text-amber-300">
+                            {result.reasons?.[0] || 'Price temporarily unavailable.'}
+                        </p>
+                    )}
+                </div>
+                {rows.length > 0 && (
+                    <div className="mt-3 space-y-1.5">
+                        {rows.slice(0, 4).map((item, index) => (
+                            <div
+                                key={`${item.supermarketId || item.supermarketName || 'store'}-${index}`}
+                                className="flex items-center justify-between gap-3 rounded-xl bg-white/70 dark:bg-gray-900/40 border border-gray-100 dark:border-gray-700/60 px-3 py-2"
+                            >
+                                <span className="min-w-0 truncate text-[12px] font-bold text-gray-700 dark:text-gray-200">
+                                    {item.supermarketName || 'Store'}
+                                    {item.isPreferredStore ? (
+                                        <span className="ml-1 rounded-full bg-brand-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
+                                            preferred
+                                        </span>
+                                    ) : null}
+                                </span>
+                                <span className="shrink-0 text-[13px] font-black text-gray-900 dark:text-white">
+                                    {convert(item.price, item.currency || 'TRY')} {getCurrencySymbol()}
+                                </span>
+                            </div>
+                        ))}
+                        {product.barcode && rows.length > 4 && (
+                            <Link
+                                to={`/price-comparison/${product.barcode}`}
+                                className="mt-2 inline-flex min-h-10 items-center rounded-full bg-brand-50 px-3 text-[11px] font-black uppercase tracking-widest text-brand-700 dark:bg-brand-900/30 dark:text-brand-300"
+                            >
+                                View all prices
+                            </Link>
+                        )}
+                    </div>
+                )}
+                <p className="mt-3 text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                    Source: PriceMate
+                </p>
+            </div>
+        );
+    };
+
+    const renderStructuredAiCheck = (result) => {
+        if (result.mode === 'price_check') return renderStructuredPriceCard(result);
+        if (result.mode === 'ingredient_safety') return renderStructuredIngredientCard(result);
+        return null;
+    };
+
     const renderContent = (content) => {
+        const structuredAiCheck = msg.role === 'assistant' ? parseAiCheckResponse(content) : null;
+        if (structuredAiCheck) {
+            return renderStructuredAiCheck(structuredAiCheck);
+        }
+
         // First step: CLEANING
         // 1. Remove redundancy: remove lines that the cards will handle
         let text = content;
@@ -137,6 +648,11 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [] }) => {
         // Remove empty lines created by removals
         text = text.replace(/\n\s*\n/g, '\n').trim();
 
+        const ingredientCardData = msg.role === 'assistant' ? parseIngredientCardData(text) : null;
+        if (ingredientCardData) {
+            return renderIngredientCard(ingredientCardData);
+        }
+
         // 2. PARSING TAGS
         const barcodeRegex = /\[(?:BARCODE|ID):([\w\d-]+)\]/g;
         const parts = text.split(barcodeRegex);
@@ -146,7 +662,7 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [] }) => {
 
         return parts.map((part, i) => {
             if (i % 2 === 0) {
-                return part;
+                return <span key={`msg-part-${i}`}>{renderInlineBoldText(part, `plain-${i}`)}</span>;
             } else {
                 const barcode = part;
                 const product = allProducts.find(p => p.barcode === barcode);
@@ -240,6 +756,13 @@ const SUGAR_THRESHOLD_G_PER_100G = 22.5;
 const SODIUM_THRESHOLD_MG_PER_100G = 600;
 const CAFFEINE_THRESHOLD_MG_PER_L = 150;
 
+const DIETARY_RESTRICTION_TERMS = {
+    vegan: ['milk', 'dairy', 'lactose', 'whey', 'casein', 'butter', 'cheese', 'cream', 'yogurt', 'egg', 'honey', 'gelatin', 'süt', 'sut', 'yumurta', 'bal', 'jelatin'],
+    vegetarian: ['beef', 'chicken', 'pork', 'fish', 'shellfish', 'meat', 'gelatin', 'beef gelatin', 'tavuk', 'sığır', 'sigir', 'domuz', 'balık', 'balik', 'jelatin'],
+    halal: ['pork', 'bacon', 'ham', 'lard', 'alcohol', 'wine', 'beer', 'gelatin', 'domuz', 'alkol', 'şarap', 'sarap', 'bira', 'jelatin'],
+    kosher: ['pork', 'bacon', 'ham', 'lard', 'shellfish', 'shrimp', 'crab', 'lobster', 'domuz', 'karides', 'yengeç', 'yengec'],
+};
+
 /** Prefer products that match the user message; fall back to a short sample (prompt cap + relevance). */
 const buildRankedProductContextLines = (products, userHint) => {
     const norm = (s) =>
@@ -279,8 +802,8 @@ const buildRankedProductContextLines = (products, userHint) => {
 };
 
 const AIChatBox = ({ isOpen, onClose }) => {
-    const { t } = useTranslation();
-    const { convert, getCurrencySymbol } = useCurrencyStore();
+    const { t, i18n } = useTranslation();
+    const { convert, getCurrencySymbol, currency } = useCurrencyStore();
     const user = useAuthStore(state => state.user);
     const {
         messages: history,
@@ -303,17 +826,28 @@ const AIChatBox = ({ isOpen, onClose }) => {
     const [mobileListOpen, setMobileListOpen] = useState(false);
     const [fullProductList, setFullProductList] = useState([]);
     const messagesEndRef = useRef(null);
+    const inputRef = useRef(null);
+    const formRef = useRef(null);
 
     const mobileQuickPrompts = [
-        t('ai_chat_prompt_cheapest', 'Find the cheapest option'),
-        t('ai_chat_prompt_compare', 'Compare these products'),
-        t('ai_chat_prompt_ingredients', 'Check ingredients for me'),
-        t('ai_chat_prompt_premium', 'Show premium choices'),
+        { label: 'Cheapest nearby', prompt: t('ai_chat_prompt_cheapest_nearby', 'Find the cheapest nearby option') },
+        { label: 'Check ingredients', prompt: t('ai_chat_prompt_ingredients', 'Check ingredients for me') },
+        { label: 'Is this suitable?', prompt: t('ai_chat_prompt_suitable', 'Is this suitable for me?') },
+        { label: 'Compare prices', prompt: t('ai_chat_prompt_compare', 'Compare prices for this product') },
+        { label: 'Scan barcode', prompt: t('ai_chat_prompt_scan_barcode', 'I scanned a product. Check this barcode: ') },
     ];
+
+    const mobileEmptyActions = mobileQuickPrompts.slice(0, 4);
 
     const beginNewConversation = () => {
         startNewConversation();
         setMobileListOpen(false);
+    };
+
+    const applyQuickPrompt = (prompt) => {
+        if (!activeConversationId) beginNewConversation();
+        setInput(prompt);
+        requestAnimationFrame(() => inputRef.current?.focus());
     };
 
     const maxChatIndex = conversationSummaries.reduce(
@@ -367,6 +901,13 @@ const AIChatBox = ({ isOpen, onClose }) => {
     useEffect(() => {
         if (!isOpen) setMobileListOpen(false);
     }, [isOpen]);
+
+    useEffect(() => {
+        const el = inputRef.current;
+        if (!el) return;
+        el.style.height = 'auto';
+        el.style.height = `${Math.min(el.scrollHeight, 132)}px`;
+    }, [input]);
 
     // Auto-scroll to bottom
     const scrollToBottom = () => {
@@ -489,17 +1030,27 @@ const AIChatBox = ({ isOpen, onClose }) => {
         return match ? match[1].trim() : '';
     };
 
-    const detectConditions = (message) => {
+    const getUserAllergyPreferences = () => {
+        const prefs = user?.prefs && typeof user.prefs === 'object' ? user.prefs : {};
+        return readStoredAllergyProfile(prefs).allergies;
+    };
+
+    const getUserAiProfile = () => {
+        const prefs = user?.prefs && typeof user.prefs === 'object' ? user.prefs : {};
+        return readStoredAiProfile(prefs).profile;
+    };
+
+    const detectConditions = (message, preferredAllergies = []) => {
         const lowered = message.toLowerCase();
         const conditions = new Set();
 
         const hasAny = (keywords) => keywords.some((word) => lowered.includes(word));
 
-        if (hasAny(['gluten', 'celiac', 'coeliac', 'çölyak', 'glutensiz'])) {
+        if (hasAny(['gluten', 'gluten free', 'gluten-free', 'celiac', 'coeliac', 'çölyak', 'glutensiz'])) {
             conditions.add('gluten');
         }
 
-        if (hasAny(['lactose', 'laktoz', 'dairy', 'süt', 'sut', 'yoğurt', 'yogurt', 'peynir'])) {
+        if (hasAny(['lactose', 'laktoz', 'lactose free', 'lactose-free', 'dairy free', 'dairy-free'])) {
             conditions.add('lactose');
         }
 
@@ -569,34 +1120,33 @@ const AIChatBox = ({ isOpen, onClose }) => {
             conditions.add('high_caffeine');
         }
 
-        const allergyKeywords = ['allergy', 'allergic', 'alerji', 'alerjik'];
-        const allergenGroups = [
-            { label: 'peanut', terms: ['peanut', 'peanuts', 'yer fıstığı', 'yer fistik', 'fıstık', 'fistik'] },
-            { label: 'tree nuts', terms: ['almond', 'walnut', 'hazelnut', 'cashew', 'pistachio', 'pecan', 'badem', 'ceviz', 'fındık', 'findik', 'kaju', 'antep fıstığı'] },
-            { label: 'milk', terms: ['milk', 'dairy', 'lactose', 'whey', 'casein', 'butter', 'cheese', 'cream', 'yogurt', 'süt', 'sut', 'laktoz', 'peynir', 'yoğurt', 'yogurt', 'tereyağ', 'tereyag', 'krema', 'kazein'] },
-            { label: 'egg', terms: ['egg', 'eggs', 'yumurta'] },
-            { label: 'soy', terms: ['soy', 'soya'] },
-            { label: 'wheat', terms: ['wheat', 'buğday', 'bugday', 'gluten', 'barley', 'arpa', 'rye', 'çavdar', 'cavdar', 'malt'] },
-            { label: 'fish', terms: ['fish', 'balık', 'balik'] },
-            { label: 'shellfish', terms: ['shrimp', 'prawn', 'crab', 'lobster', 'shellfish', 'karides', 'yengeç', 'yengec', 'ıstakoz', 'istakoz'] },
-            { label: 'sesame', terms: ['sesame', 'susam'] },
-            { label: 'mustard', terms: ['mustard', 'hardal'] },
-            { label: 'celery', terms: ['celery', 'kereviz'] },
-            { label: 'lupin', terms: ['lupin', 'acı bakla', 'aci bakla'] },
-            { label: 'sulfites', terms: ['sulfite', 'sulphite', 'sülfit', 'sulfit'] }
+        const preferenceAllergenTargets = Array.from(
+            new Set(
+                (Array.isArray(preferredAllergies) ? preferredAllergies : [])
+                    .map((item) => resolveAllergyPreferenceLabel(item))
+                    .filter(Boolean)
+            )
+        );
+
+        const explicitAllergyIntent = hasAny(ALLERGY_KEYWORDS);
+        const allergySafetyKeywords = [
+            'ingredient', 'ingredients', 'allergen', 'allergens', 'içerik', 'icerik', 'içindekiler',
+            'suitable', 'uygun', 'safe', 'güvenli', 'guvenli', 'contains', 'has', 'good for me', 'better for me'
         ];
+        const allergySafetyIntent = explicitAllergyIntent || hasAny(allergySafetyKeywords);
+        // Personal safety verdicts must come from the saved profile. Mentioning
+        // "milk" in a question should not turn into a personal milk allergy.
+        const allergenTargets = allergySafetyIntent
+            ? Array.from(new Set(preferenceAllergenTargets))
+            : [];
 
-        const allergenTargets = allergenGroups
-            .filter((group) => group.terms.some((term) => lowered.includes(term)))
-            .map((group) => group.label);
-
-        if (hasAny(allergyKeywords) || allergenTargets.length > 0) {
+        if (allergySafetyIntent && preferenceAllergenTargets.length > 0) {
             conditions.add('allergy');
         }
 
         const medicalKeywords = [
             'ingredient', 'ingredients', 'allergen', 'allergens', 'içerik', 'icerik', 'içindekiler', 'suitable', 'uygun', 'safe', 'güvenli',
-            'sugar', 'sugary', 'şeker', 'seker', 'sodium', 'sodyum', 'salt', 'tuz', 'caffeine', 'kafein'
+            'good for me', 'better for me', 'sugar', 'sugary', 'şeker', 'seker', 'sodium', 'sodyum', 'salt', 'tuz', 'caffeine', 'kafein'
         ];
         const isMedical = hasAny(medicalKeywords) || conditions.size > 0;
 
@@ -619,7 +1169,7 @@ const AIChatBox = ({ isOpen, onClose }) => {
             'is', 'this', 'that', 'product', 'for', 'with', 'can', 'i', 'eat', 'drink', 'safe', 'suitable',
             'ingredients', 'ingredient', 'contains', 'has', 'please', 'need', 'check', 'about', 'my', 'me', 'the',
             'a', 'an', 'of', 'in', 'on', 'too', 'very', 'really', 'much', 'many', 'lot',
-            'sugar', 'sugary', 'salt', 'sodium', 'caffeine', 'high', 'low', 'level', 'content', 'amount',
+            'good', 'better', 'sugar', 'sugary', 'salt', 'sodium', 'caffeine', 'high', 'low', 'level', 'content', 'amount',
             'bu', 'şu', 'su', 'ürün', 'urun', 'icerik', 'içerik', 'içindekiler', 'uygun', 'güvenli', 'var', 'mi',
             'nedir', 'içinde', 'kadar',
         ]);
@@ -635,7 +1185,7 @@ const AIChatBox = ({ isOpen, onClose }) => {
         return cleaned.length >= 3 ? cleaned : '';
     };
 
-    const evaluateSuitability = (payload, conditions, allergenTargets) => {
+    const evaluateSuitability = (payload, conditions, allergenTargets, aiProfile = {}) => {
         if (!payload) {
             return {
                 status: 'unknown',
@@ -681,17 +1231,29 @@ const AIChatBox = ({ isOpen, onClose }) => {
             return `${limited.join(', ')}${matches.length > 6 ? '...' : ''}`;
         };
 
-        const formatThresholdReason = (nutrientLabel, valueText, thresholdText, isHigh) =>
-            isHigh
-                ? t('ai_reason_above_threshold', { nutrient: nutrientLabel, value: valueText, threshold: thresholdText })
-                : t('ai_reason_below_threshold', { nutrient: nutrientLabel, value: valueText, threshold: thresholdText });
+        const formatNutrientLevel = (nutrientLabel, valueText, isHigh) =>
+            `${nutrientLabel}: ${isHigh ? 'high' : 'within limit'} (${valueText})`;
 
-        const formatMissingNutrition = (nutrientLabel) =>
-            t('ai_reason_nutrition_missing', { nutrient: nutrientLabel });
+        const profileAvoids = Array.isArray(aiProfile.avoidIngredients) ? aiProfile.avoidIngredients : [];
+        const avoidMatches = collectMatches(profileAvoids);
+        if (avoidMatches.length > 0) {
+            reasons.push(`Preference: avoid ingredient found (${formatMatches(avoidMatches)})`);
+            bumpStatus('caution');
+        }
+
+        for (const dietary of aiProfile.dietaryPreferences || []) {
+            const terms = DIETARY_RESTRICTION_TERMS[dietary] || [];
+            const matches = collectMatches(terms);
+            if (matches.length > 0) {
+                reasons.push(`Preference (${dietary}): may not match (${formatMatches(matches)})`);
+                bumpStatus('caution');
+            }
+        }
 
         if (conditions.includes('allergy')) {
             if (allergenTargets.length > 0) {
-                const matches = collectMatches(allergenTargets);
+                const allergyTerms = getAllergenTermsForLabels(allergenTargets);
+                const matches = collectMatches(allergyTerms);
                 if (matches.length > 0) {
                     reasons.push(`${t('condition_allergy')}: ${t('ai_reason_found', { items: formatMatches(matches) })}`);
                     bumpStatus('avoid');
@@ -738,20 +1300,19 @@ const AIChatBox = ({ isOpen, onClose }) => {
             const labelKey = conditions.includes('diabetes') ? 'condition_diabetes' : 'condition_high_sugar';
             if (sugarPer100g !== null && sugarPer100g !== undefined) {
                 const valueText = `${Number(sugarPer100g).toFixed(1)}g/100g`;
-                const thresholdText = `${SUGAR_THRESHOLD_G_PER_100G}g/100g`;
                 const isHigh = sugarPer100g >= SUGAR_THRESHOLD_G_PER_100G;
-                reasons.push(`${t(labelKey)}: ${formatThresholdReason(t('nutrient_sugar'), valueText, thresholdText, isHigh)}`);
+                reasons.push(`${t(labelKey)}: ${formatNutrientLevel(t('nutrient_sugar'), valueText, isHigh)}`);
                 if (isHigh) bumpStatus('caution');
             } else if (hasIngredientBlob) {
                 const matches = collectMatches(sugarTerms);
                 if (matches.length > 0) {
-                    reasons.push(`${t(labelKey)}: ${t('ai_reason_found', { items: formatMatches(matches) })}`);
+                    reasons.push(`${t(labelKey)}: ${t('nutrient_sugar')} found in ingredients (${formatMatches(matches)})`);
                     bumpStatus('caution');
                 } else {
-                    reasons.push(`${t(labelKey)}: ${t('ai_reason_none_found', { items: t('nutrient_sugar') })}`);
+                    reasons.push(`${t(labelKey)}: ${t('nutrient_sugar')} not listed`);
                 }
             } else {
-                reasons.push(`${t(labelKey)}: ${formatMissingNutrition(t('nutrient_sugar'))}`);
+                reasons.push(`${t(labelKey)}: ${t('nutrient_sugar')} unknown`);
             }
         }
 
@@ -759,20 +1320,19 @@ const AIChatBox = ({ isOpen, onClose }) => {
             const labelKey = conditions.includes('hypertension') ? 'condition_hypertension' : 'condition_high_sodium';
             if (sodiumMgPer100g !== null && sodiumMgPer100g !== undefined) {
                 const valueText = `${Math.round(sodiumMgPer100g)}mg/100g`;
-                const thresholdText = `${SODIUM_THRESHOLD_MG_PER_100G}mg/100g`;
                 const isHigh = sodiumMgPer100g >= SODIUM_THRESHOLD_MG_PER_100G;
-                reasons.push(`${t(labelKey)}: ${formatThresholdReason(t('nutrient_sodium'), valueText, thresholdText, isHigh)}`);
+                reasons.push(`${t(labelKey)}: ${formatNutrientLevel(t('nutrient_sodium'), valueText, isHigh)}`);
                 if (isHigh) bumpStatus('caution');
             } else if (hasIngredientBlob) {
                 const matches = collectMatches(sodiumTerms);
                 if (matches.length > 0) {
-                    reasons.push(`${t(labelKey)}: ${t('ai_reason_found', { items: formatMatches(matches) })}`);
+                    reasons.push(`${t(labelKey)}: ${t('nutrient_sodium')} found in ingredients (${formatMatches(matches)})`);
                     bumpStatus('caution');
                 } else {
-                    reasons.push(`${t(labelKey)}: ${t('ai_reason_none_found', { items: t('nutrient_sodium') })}`);
+                    reasons.push(`${t(labelKey)}: ${t('nutrient_sodium')} not listed`);
                 }
             } else {
-                reasons.push(`${t(labelKey)}: ${formatMissingNutrition(t('nutrient_sodium'))}`);
+                reasons.push(`${t(labelKey)}: ${t('nutrient_sodium')} unknown`);
             }
         }
 
@@ -780,20 +1340,19 @@ const AIChatBox = ({ isOpen, onClose }) => {
             const labelKey = 'condition_high_caffeine';
             if (caffeineMgPerL !== null && caffeineMgPerL !== undefined) {
                 const valueText = `${Math.round(caffeineMgPerL)}mg/L`;
-                const thresholdText = `${CAFFEINE_THRESHOLD_MG_PER_L}mg/L`;
                 const isHigh = caffeineMgPerL >= CAFFEINE_THRESHOLD_MG_PER_L;
-                reasons.push(`${t(labelKey)}: ${formatThresholdReason(t('nutrient_caffeine'), valueText, thresholdText, isHigh)}`);
+                reasons.push(`${t(labelKey)}: ${formatNutrientLevel(t('nutrient_caffeine'), valueText, isHigh)}`);
                 if (isHigh) bumpStatus('caution');
             } else if (hasIngredientBlob) {
                 const matches = collectMatches(caffeineTerms);
                 if (matches.length > 0) {
-                    reasons.push(`${t(labelKey)}: ${t('ai_reason_found', { items: formatMatches(matches) })}`);
+                    reasons.push(`${t(labelKey)}: ${t('nutrient_caffeine')} found in ingredients (${formatMatches(matches)})`);
                     bumpStatus('caution');
                 } else {
-                    reasons.push(`${t(labelKey)}: ${t('ai_reason_none_found', { items: t('nutrient_caffeine') })}`);
+                    reasons.push(`${t(labelKey)}: ${t('nutrient_caffeine')} not listed`);
                 }
             } else {
-                reasons.push(`${t(labelKey)}: ${formatMissingNutrition(t('nutrient_caffeine'))}`);
+                reasons.push(`${t(labelKey)}: ${t('nutrient_caffeine')} unknown`);
             }
         }
 
@@ -844,30 +1403,104 @@ const AIChatBox = ({ isOpen, onClose }) => {
 
         setIsLoading(true);
 
-        const { conditions, allergenTargets, isMedical } = detectConditions(userMessage);
+        const userAllergyPreferences = getUserAllergyPreferences();
+        const userAiProfile = getUserAiProfile();
+        const { conditions, allergenTargets, isMedical } = detectConditions(userMessage, userAllergyPreferences);
+        const explicitNutrientOrMedicalConditions = new Set([
+            'gluten',
+            'lactose',
+            'diabetes',
+            'hypertension',
+            'high_sugar',
+            'high_sodium',
+            'high_caffeine',
+            'pregnancy'
+        ]);
+        const hasExplicitNutrientOrMedicalCondition = conditions.some((condition) =>
+            explicitNutrientOrMedicalConditions.has(condition)
+        );
+        const shouldRunDefaultIngredientCheck = isMedical && !hasExplicitNutrientOrMedicalCondition;
+        const profileNutritionConditions = (userAiProfile.nutritionPriorities || []).flatMap((priority) => {
+            if (priority === 'low sugar') return ['high_sugar'];
+            if (priority === 'low sodium') return ['high_sodium'];
+            if (priority === 'low caffeine') return ['high_caffeine'];
+            return [];
+        });
+        const effectiveConditions = shouldRunDefaultIngredientCheck
+            ? Array.from(new Set([...conditions, ...profileNutritionConditions, 'high_sugar', 'high_sodium', 'high_caffeine']))
+            : Array.from(new Set([...conditions, ...profileNutritionConditions]));
 
         // Build intent summary and check cache to avoid duplicate API calls
         const intentSummary = buildIntentSummary(userMessage);
-        const intentKey = makeIntentKey(intentSummary, effectiveBarcode);
+        const allergyKey = userAllergyPreferences.length > 0
+            ? [...userAllergyPreferences].sort().join('|')
+            : 'none';
+        const profileKey = buildAiProfileCacheKey(userAiProfile);
+        const intentKey = makeIntentKey(intentSummary, effectiveBarcode, user?.$id || 'guest', `${allergyKey}::PROFILE:${profileKey}`);
+
+        const aiCheckResult = await runAiCheckFunction({
+            query: userMessage,
+            userId: user.$id,
+            locale: i18n.resolvedLanguage || i18n.language || 'en',
+            currency,
+            allergyPrefs: userAllergyPreferences,
+            userProfile: userAiProfile,
+            barcodeHint: effectiveBarcode,
+            nameHint: catalogDisplayName || mergedProductProfile?.name || mergedProductProfile?.productName || '',
+        });
+
+        if (aiCheckResult && aiCheckResult.mode && aiCheckResult.mode !== 'generic') {
+            const structuredReply = serializeAiCheckResponse(aiCheckResult);
+            if (user?.$id) {
+                await addMessage(user.$id, 'assistant', structuredReply, user);
+                setCachedIntent(
+                    `${intentKey}::DATA:${buildAiCheckFingerprint(aiCheckResult)}`,
+                    structuredReply,
+                    1000 * 60
+                );
+            }
+            setIsLoading(false);
+            return;
+        }
+
         const cachedReply = getCachedIntent(intentKey);
         if (cachedReply) {
+            const sanitizedCachedReply = sanitizeAssistantReply(cachedReply);
             if (user?.$id) {
-                await addMessage(user.$id, 'assistant', cachedReply, user);
+                await addMessage(user.$id, 'assistant', sanitizedCachedReply, user);
             }
             setIsLoading(false);
             return;
         }
 
         if (isMedical) {
-            if (conditions.length === 0) {
-                if (user?.$id) {
-                    await addMessage(user.$id, 'assistant', t('ai_need_condition'), user);
-                }
-                setIsLoading(false);
-                return;
-            }
-
             const queryName = buildIngredientQuery(userMessage, mergedProductProfile);
+            const hasIngredientContent = (payload) =>
+                String(payload?.ingredientsText || '').trim().length > 0;
+            const hasAllergenContent = (payload) =>
+                Array.isArray(payload?.allergens) && payload.allergens.length > 0;
+            const pickDefined = (primary, fallback) =>
+                primary !== null && primary !== undefined && primary !== '' ? primary : fallback;
+            const mergeIngredientPayload = (base, extra) => {
+                if (!base) return extra;
+                if (!extra) return base;
+                return {
+                    ...base,
+                    ingredientsText: hasIngredientContent(base) ? base.ingredientsText : (extra.ingredientsText || ''),
+                    ingredientsList:
+                        Array.isArray(base.ingredientsList) && base.ingredientsList.length > 0
+                            ? base.ingredientsList
+                            : (extra.ingredientsList || []),
+                    allergens: hasAllergenContent(base) ? base.allergens : (extra.allergens || []),
+                    nutriments: {
+                        sugarsPer100g: pickDefined(base?.nutriments?.sugarsPer100g, extra?.nutriments?.sugarsPer100g ?? null),
+                        sodiumMgPer100g: pickDefined(base?.nutriments?.sodiumMgPer100g, extra?.nutriments?.sodiumMgPer100g ?? null),
+                        caffeineMgPerL: pickDefined(base?.nutriments?.caffeineMgPerL, extra?.nutriments?.caffeineMgPerL ?? null),
+                        caffeineMgPer100g: pickDefined(base?.nutriments?.caffeineMgPer100g, extra?.nutriments?.caffeineMgPer100g ?? null),
+                        saltGPer100g: pickDefined(base?.nutriments?.saltGPer100g, extra?.nutriments?.saltGPer100g ?? null),
+                    },
+                };
+            };
 
             if (!effectiveBarcode && !queryName && !catalog.product) {
                 if (user?.$id) {
@@ -884,6 +1517,23 @@ const AIChatBox = ({ isOpen, onClose }) => {
 
             if (!ingredientPayload && effectiveBarcode) {
                 ingredientPayload = await fetchIngredientsByBarcode(effectiveBarcode);
+            }
+
+            // If we have nutrition-only data (e.g., from Appwrite) but no ingredient text,
+            // enrich it from OFF so ingredients/allergens still show in the card.
+            if (ingredientPayload && !hasIngredientContent(ingredientPayload)) {
+                if (effectiveBarcode) {
+                    const offByBarcode = await fetchIngredientsByBarcode(effectiveBarcode);
+                    ingredientPayload = mergeIngredientPayload(ingredientPayload, offByBarcode);
+                }
+
+                if (!hasIngredientContent(ingredientPayload)) {
+                    const fallbackSearch = catalogDisplayName || queryName || ingredientPayload?.name || '';
+                    if (fallbackSearch) {
+                        const offByName = await searchIngredientsByName(fallbackSearch);
+                        ingredientPayload = mergeIngredientPayload(ingredientPayload, offByName);
+                    }
+                }
             }
 
             if (!ingredientPayload) {
@@ -917,7 +1567,23 @@ const AIChatBox = ({ isOpen, onClose }) => {
                 return;
             }
 
-            const conditionLabels = conditions.map((condition) => t(`condition_${condition}`));
+            // Persist resolved ingredient data to catalog product so future checks can be served locally.
+            if (catalog.product?.$id) {
+                try {
+                    await persistIngredientPayloadToCatalogProduct(catalog.product, ingredientPayload);
+                } catch {
+                    // best-effort only; ingredient check must still return
+                }
+            }
+
+            const conditionLabels = effectiveConditions.map((condition) => t(`condition_${condition}`));
+            const allergyChecksText = userAllergyPreferences.length > 0
+                ? `allergy (${userAllergyPreferences.join(', ')})`
+                : '';
+            const baseChecksText = shouldRunDefaultIngredientCheck
+                ? t('ai_default_ingredient_checks', 'sugar, sodium, caffeine')
+                : conditionLabels.join(', ');
+            const checksForText = [baseChecksText, allergyChecksText].filter(Boolean).join(', ');
             const resolvedProductName =
                 catalogDisplayName ||
                 mergedProductProfile?.name ||
@@ -928,24 +1594,14 @@ const AIChatBox = ({ isOpen, onClose }) => {
                 : (resolvedProductName || ingredientPayload.name);
 
             const ingredientPreview = ingredientPayload.ingredientsText
-                ? (ingredientPayload.ingredientsText.length > 220
-                    ? `${ingredientPayload.ingredientsText.slice(0, 220)}...`
-                    : ingredientPayload.ingredientsText)
+                ? truncateText(ingredientPayload.ingredientsText, 140)
                 : t('ai_no_ingredients');
 
             const allergenPreview = ingredientPayload.allergens?.length
-                ? ingredientPayload.allergens.slice(0, 6).join(', ')
+                ? truncateText(ingredientPayload.allergens.slice(0, 4).join(', '), 90)
                 : t('ai_no_allergens');
 
-            const { status, reasons } = evaluateSuitability(ingredientPayload, conditions, allergenTargets);
-            const sourceText =
-                ingredientPayload.source === 'PriceMate'
-                    ? ingredientPayload.nutritionSourceLabel
-                        ? `${t('ai_source_pricemate')}: ${ingredientPayload.nutritionSourceLabel}`
-                        : t('ai_source_pricemate')
-                    : ingredientPayload.barcode
-                      ? `Open Food Facts - ${ingredientPayload.sourceUrl}`
-                      : `Open Food Facts search result - ${ingredientPayload.sourceUrl}`;
+            const { status, reasons } = evaluateSuitability(ingredientPayload, effectiveConditions, allergenTargets, userAiProfile);
 
             const statusKey = status === 'avoid'
                 ? 'ai_status_avoid'
@@ -955,20 +1611,28 @@ const AIChatBox = ({ isOpen, onClose }) => {
                         ? 'ai_status_unknown'
                         : 'ai_status_safe';
 
+            const formattedReasons = (reasons.length > 0 ? reasons : [t('ai_reason_no_ingredients')])
+                .slice(0, 2)
+                .map((reason, index) => `${index + 1}. ${emphasizeImportantIngredients(truncateText(reason, 120))}`)
+                .join('\n');
+
             const responseLines = [
-                t('ai_suitability_title'),
-                `${t('ai_product')}: ${productLabel}`,
-                `${t('ai_checks_for', { conditions: conditionLabels.join(', ') })}`,
-                `${t('ai_suitability')}: ${t(statusKey)}`,
-                `${t('ai_reasons')}: ${reasons.join(' | ')}`,
-                `${t('ai_ingredients')}: ${ingredientPreview}`,
-                `${t('ai_allergens')}: ${allergenPreview}`,
-                `${t('ai_source')}: ${sourceText}`,
-                `${t('ai_note')}: ${t('ai_note_text')}`
+                `Product: ${productLabel}`,
+                `Suitability: ${t(statusKey)}`,
+                `Checks: ${checksForText}`,
+                'Reasons:',
+                formattedReasons,
+                `Ingredients: ${emphasizeImportantIngredients(ingredientPreview)}`,
+                `Allergens: ${emphasizeImportantIngredients(allergenPreview)}`,
+                'Source: PriceMate'
             ];
 
+            if (!profileHasPersonalization(userAiProfile)) {
+                responseLines.push('Tip: Add shopping preferences to personalize future answers.');
+            }
+
             if (user?.$id) {
-                const respText = responseLines.join('\n');
+                const respText = sanitizeAssistantReply(responseLines.join('\n'));
                 await addMessage(user.$id, 'assistant', respText, user);
                 try {
                     setCachedIntent(intentKey, respText);
@@ -1001,6 +1665,12 @@ const AIChatBox = ({ isOpen, onClose }) => {
 
             const promptContext = buildRankedProductContextLines(fullProductList, userMessage);
             const intentSummary = buildIntentSummary(userMessage);
+            const aiProfileContext = formatAiProfileForPrompt(userAiProfile);
+            const maxGenericReplyWords = userAiProfile.responseStyle === 'detailed'
+                ? 110
+                : userAiProfile.responseStyle === 'concise'
+                    ? 45
+                    : 60;
 
             const prompt = `
                 You are the official PriceMate assistant. Your primary goal is to help users find products and compare prices.
@@ -1010,12 +1680,20 @@ const AIChatBox = ({ isOpen, onClose }) => {
                 - Do not repeat the user's exact sentence or echo the same question back.
                 - If the same intent already appears earlier in the chat history, do not ask the user to repeat it.
                 - Use the token summary below to understand the request, not to paraphrase it.
+                - Keep normal replies concise: maximum 4 short lines or about ${maxGenericReplyWords} words.
+                - No filler, no long intros, no repeated disclaimers.
+
+                USER AI SHOPPING PROFILE:
+                ${aiProfileContext}
+                - Use these preferences to rank suggestions and tailor tone.
+                - Dietary preferences are preferences, not allergy safety verdicts.
+                - If no optional profile preferences are saved, add at most one short line: "Add shopping preferences to personalize future answers."
                 
                 WEBSITE PRODUCT DATA (sample; catalog has many more items):
                 ${promptContext}
 
                 PRODUCT LIMITS (STRICT):
-                - Mention at most five [BARCODE:...] products per reply; prefer one to three when possible.
+                - Mention at most three [BARCODE:...] products per reply.
                 - Never dump long lists. If the request is broad (category, "cheapest X", "show me Y") and many items could match,
                   choose only the best few matches from WEBSITE PRODUCT DATA above, then add one short friendly sentence inviting the user
                   to narrow down (brand, exact name, pack size, or barcode) so you can refine—warm tone, not lecturing.
@@ -1029,11 +1707,13 @@ const AIChatBox = ({ isOpen, onClose }) => {
                 - If the data is insufficient for a nutrient, say unknown and suggest scanning or checking the label.
 
                 RESPONSE FORMAT FOR INGREDIENT IMPACT QUESTIONS:
+                Product: <name + [BARCODE:...]>
                 Suitability: <Likely suitable | Use caution | Not suitable | Unknown>
-                Reasons: <short reasons based on ingredients/allergens/nutrition>
+                Checks For: <short list>
+                Reasons: <at most 2 short points>
                 Ingredients: <brief ingredient summary>
                 Allergens: <brief allergen summary>
-                Source: <product barcode or source used>
+                Source: PriceMate
 
                 INSTRUCTIONS:
                 1. Answer questions about products, prices, shopping, and ingredient suitability within the PriceMate app.
@@ -1041,7 +1721,7 @@ const AIChatBox = ({ isOpen, onClose }) => {
                 3. Recommend specific products using the data provided—respect the PRODUCT LIMITS above.
                 4. If the user asks for "cheapest" or "best deal", highlight at most a few; do not list everything.
                 5. If the user asks for "most expensive" or "premium", highlight at most a few; do not list everything.
-                6. For category-style questions, suggest at most five relevant items from the sample, then briefly ask the user to be more specific if the catalog is huge.
+                6. For category-style questions, suggest at most three relevant items from the sample, then briefly ask the user to be more specific if the catalog is huge.
                 7. For every product you mention, you must include its barcode ID in square brackets like this: [BARCODE:123456].
                 8. Do not use [ID:123456], only use the word BARCODE in the brackets.
                 9. Minimize text. Do not describe features or give long intros. Just a short sentence and the barcode(s).
@@ -1076,11 +1756,12 @@ const AIChatBox = ({ isOpen, onClose }) => {
             });
 
             const text = completion.choices[0]?.message?.content || "No response received.";
+            const sanitizedText = sanitizeAssistantReply(text);
 
             if (user?.$id) {
-                await addMessage(user.$id, 'assistant', text, user);
+                await addMessage(user.$id, 'assistant', sanitizedText, user);
                 try {
-                    setCachedIntent(intentKey, text);
+                    setCachedIntent(intentKey, sanitizedText);
                 } catch (e) {
                     console.debug('Intent cache set failed', e);
                 }
@@ -1110,7 +1791,7 @@ const AIChatBox = ({ isOpen, onClose }) => {
         if (!user?.$id) return null;
         return (
             <div className="flex flex-col h-full min-h-0 bg-gray-100 dark:bg-gray-900/80">
-                <div className="flex-1 overflow-y-auto p-1 space-y-1">
+                <div className="flex-1 overflow-y-auto p-2 space-y-2">
                     {summariesLoading && conversationRows.length === 0 ? (
                         <div className="flex justify-center p-4">
                             <FiLoader className="animate-spin text-brand-600" />
@@ -1121,7 +1802,7 @@ const AIChatBox = ({ isOpen, onClose }) => {
                             return (
                                 <div
                                     key={row.id}
-                                    className={`group relative rounded-lg border ${
+                                    className={`group relative rounded-2xl border ${
                                         selected
                                             ? 'border-brand-500 bg-white dark:bg-gray-800 shadow-sm'
                                             : 'border-transparent bg-transparent hover:bg-white/60 dark:hover:bg-gray-800/60'
@@ -1135,9 +1816,9 @@ const AIChatBox = ({ isOpen, onClose }) => {
                                             }
                                             afterPick?.();
                                         }}
-                                        className="w-full text-left p-2 pr-7"
+                                        className="w-full min-h-14 text-left p-3 pr-9"
                                     >
-                                        <span className="block text-[10px] font-bold text-gray-900 dark:text-white line-clamp-2 leading-tight">
+                                        <span className="block text-[12px] font-black text-gray-900 dark:text-white line-clamp-2 leading-tight">
                                             {labelForRow(row)}
                                         </span>
                                     </button>
@@ -1151,7 +1832,7 @@ const AIChatBox = ({ isOpen, onClose }) => {
                                                     afterPick?.();
                                                 }
                                             }}
-                                            className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 opacity-70 group-hover:opacity-100"
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-xl text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 opacity-80 group-hover:opacity-100"
                                             aria-label={t('ai_chat_delete_thread')}
                                         >
                                             <FiTrash2 size={12} />
@@ -1173,8 +1854,8 @@ const AIChatBox = ({ isOpen, onClose }) => {
                 onClick={onClose}
                 aria-hidden="true"
             />
-            <div className="fixed inset-x-0 bottom-0 z-[2000] flex h-[min(92dvh,760px)] flex-col overflow-hidden rounded-t-[2rem] border border-gray-200 bg-white shadow-2xl animate-in slide-in-from-bottom-4 duration-300 dark:border-gray-700 dark:bg-gray-800 sm:inset-auto sm:bottom-4 sm:right-4 sm:h-[min(640px,90vh)] sm:w-[400px] sm:rounded-2xl md:w-[448px] sm:border sm:shadow-2xl sm:slide-in-from-bottom-5 sm:slide-in-from-right">
-            <div className="border-b border-black/5 bg-gradient-to-r from-brand-600 via-brand-600 to-brand-700 px-4 py-3 text-white shadow-md shrink-0 sm:px-5 sm:py-4">
+            <div className="fixed inset-0 z-[2000] flex h-[100dvh] flex-col overflow-hidden border border-gray-200 bg-white shadow-2xl animate-in slide-in-from-bottom-4 duration-300 dark:border-gray-700 dark:bg-gray-800 sm:inset-auto sm:bottom-4 sm:right-4 sm:h-[min(640px,90vh)] sm:w-[400px] sm:rounded-2xl md:w-[448px] sm:border sm:shadow-2xl sm:slide-in-from-bottom-5 sm:slide-in-from-right">
+            <div className="border-b border-black/5 bg-gradient-to-r from-brand-600 via-brand-600 to-brand-700 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] text-white shadow-md shrink-0 sm:px-5 sm:py-4">
                 <div className="flex items-center gap-3 min-w-0">
                     {user && (
                         <button
@@ -1203,6 +1884,16 @@ const AIChatBox = ({ isOpen, onClose }) => {
                         </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
+                        {user && (
+                            <button
+                                type="button"
+                                onClick={beginNewConversation}
+                                className="p-2.5 hover:bg-white/15 rounded-2xl transition-all active:scale-95 shrink-0"
+                                aria-label={t('ai_chat_new')}
+                            >
+                                <FiPlus size={20} />
+                            </button>
+                        )}
                         <button
                             onClick={onClose}
                             className="p-2.5 hover:bg-white/15 rounded-2xl transition-all active:scale-95 shrink-0"
@@ -1272,9 +1963,9 @@ const AIChatBox = ({ isOpen, onClose }) => {
                                                 <FiCpu size={22} className="text-white/85" />
                                             </div>
                                             <div className="min-w-0">
-                                                <h2 className="text-lg font-black tracking-tight">Start a new chat</h2>
+                                                <h2 className="text-lg font-black tracking-tight">What do you want to check?</h2>
                                                 <p className="text-white/80 text-xs sm:text-sm mt-0.5 leading-relaxed">
-                                                    Ask for cheaper picks, compare products, or check ingredients instantly.
+                                                    Pick a shortcut or type your own shopping question.
                                                 </p>
                                             </div>
                                         </div>
@@ -1282,17 +1973,14 @@ const AIChatBox = ({ isOpen, onClose }) => {
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-2">
-                                        {mobileQuickPrompts.map((prompt) => (
+                                        {mobileEmptyActions.map((item) => (
                                             <button
-                                                key={prompt}
+                                                key={item.label}
                                                 type="button"
-                                                onClick={() => {
-                                                    beginNewConversation();
-                                                    setInput(prompt);
-                                                }}
-                                                className="min-h-14 rounded-2xl border border-gray-200 bg-white px-3 py-2 text-left text-[11px] font-bold text-gray-700 shadow-sm transition active:scale-[0.98] dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                                                onClick={() => applyQuickPrompt(item.prompt)}
+                                                className="min-h-20 rounded-3xl border border-gray-200 bg-white px-4 py-3 text-left text-[12px] font-black text-gray-800 shadow-sm transition active:scale-[0.98] dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
                                             >
-                                                {prompt}
+                                                {item.label}
                                             </button>
                                         ))}
                                     </div>
@@ -1353,14 +2041,36 @@ const AIChatBox = ({ isOpen, onClose }) => {
                     )}
 
                     <form
+                        ref={formRef}
                         onSubmit={handleSend}
-                        className="p-4 sm:p-5 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 shrink-0"
+                        className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] sm:p-5 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 shrink-0"
                     >
+                        {user && activeConversationId && !input.trim() && !isLoading && (
+                            <div className="mb-3 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none]">
+                                {mobileQuickPrompts.map((item) => (
+                                    <button
+                                        key={item.label}
+                                        type="button"
+                                        onClick={() => applyQuickPrompt(item.prompt)}
+                                        className="shrink-0 rounded-full border border-brand-100 bg-brand-50 px-3 py-2 text-[11px] font-black text-brand-700 dark:border-brand-800/50 dark:bg-brand-900/20 dark:text-brand-300"
+                                    >
+                                        {item.label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                         <div className="relative flex items-end gap-2">
-                            <input
-                                type="text"
+                            <textarea
+                                ref={inputRef}
+                                rows={1}
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        formRef.current?.requestSubmit();
+                                    }
+                                }}
                                 placeholder={
                                     !user
                                         ? t('ai_chat_login_placeholder')
@@ -1369,7 +2079,7 @@ const AIChatBox = ({ isOpen, onClose }) => {
                                           : t('ai_chat_input_placeholder')
                                 }
                                 disabled={isLoading || !user || !activeConversationId}
-                                className="flex-1 min-h-12 bg-gray-50 dark:bg-gray-900 border-none rounded-[1.25rem] py-3.5 px-4 text-[15px] focus:ring-2 focus:ring-brand-500 transition-all dark:text-white disabled:opacity-50"
+                                className="flex-1 max-h-32 min-h-12 resize-none bg-gray-50 dark:bg-gray-900 border-none rounded-[1.25rem] py-3.5 px-4 text-[15px] leading-5 focus:ring-2 focus:ring-brand-500 transition-all dark:text-white disabled:opacity-50"
                             />
                             <button
                                 type="submit"

@@ -4,14 +4,56 @@ import { useTranslation } from 'react-i18next';
 import useAuthStore from '../stores/authStore';
 import useCurrencyStore from '../stores/currencyStore';
 import useThemeStore from '../stores/themeStore';
-import { FiHeart, FiMessageSquare, FiShield, FiChevronRight, FiLogOut, FiUser, FiMoon, FiSun, FiGlobe } from 'react-icons/fi';
+import useSupermarketsStore from '../stores/supermarketsStore';
+import { FiHeart, FiMessageSquare, FiShield, FiChevronRight, FiLogOut, FiUser, FiMoon, FiSun, FiGlobe, FiShoppingBag, FiPlus, FiX } from 'react-icons/fi';
 import BackButton from '../components/BackButton';
+import { AI_PROFILE_DEFAULTS, normalizeAiProfile, readStoredAiProfile, readStoredAllergyProfile } from '../utils/aiCheckUtils';
+
+const ALLERGY_OPTIONS = [
+    { id: 'milk', labelKey: 'allergy_option_milk' },
+    { id: 'lactose', labelKey: 'allergy_option_lactose' },
+    { id: 'gluten', labelKey: 'allergy_option_gluten' },
+    { id: 'peanut', labelKey: 'allergy_option_peanut' },
+    { id: 'tree nuts', labelKey: 'allergy_option_tree_nuts' },
+    { id: 'soy', labelKey: 'allergy_option_soy' },
+    { id: 'egg', labelKey: 'allergy_option_egg' },
+    { id: 'fish', labelKey: 'allergy_option_fish' },
+    { id: 'shellfish', labelKey: 'allergy_option_shellfish' },
+    { id: 'sesame', labelKey: 'allergy_option_sesame' },
+];
+
+const DIETARY_OPTIONS = [
+    { id: 'vegetarian', label: 'Vegetarian' },
+    { id: 'vegan', label: 'Vegan' },
+    { id: 'halal', label: 'Halal' },
+    { id: 'kosher', label: 'Kosher' },
+];
+
+const NUTRITION_OPTIONS = [
+    { id: 'low sugar', label: 'Low sugar' },
+    { id: 'low sodium', label: 'Low sodium' },
+    { id: 'low caffeine', label: 'Low caffeine' },
+    { id: 'high protein', label: 'High protein' },
+];
+
+const BUDGET_OPTIONS = [
+    { id: 'lowest_price', label: 'Lowest price' },
+    { id: 'balanced', label: 'Balanced' },
+    { id: 'quality_first', label: 'Quality first' },
+];
+
+const RESPONSE_STYLE_OPTIONS = [
+    { id: 'concise', label: 'Concise' },
+    { id: 'balanced', label: 'Balanced' },
+    { id: 'detailed', label: 'Detailed' },
+];
 
 const Profile = () => {
     const { t, i18n } = useTranslation();
-    const { user, logout, updateProfileName, updatePasswordWhileLoggedIn } = useAuthStore();
+    const { user, logout, updateProfileName, updatePasswordWhileLoggedIn, updateAllergyPreferences, updateAiProfilePreferences } = useAuthStore();
     const { currency, setCurrency } = useCurrencyStore();
     const { theme, toggleTheme } = useThemeStore();
+    const { supermarkets, fetchSupermarkets } = useSupermarketsStore();
 
     const [displayName, setDisplayName] = useState('');
     const [nameSaving, setNameSaving] = useState(false);
@@ -20,10 +62,36 @@ const Profile = () => {
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [passwordSaving, setPasswordSaving] = useState(false);
+    const [allergyPrefs, setAllergyPrefs] = useState([]);
+    const [noKnownAllergies, setNoKnownAllergies] = useState(false);
+    const [allergySaving, setAllergySaving] = useState(false);
+    const [aiProfile, setAiProfile] = useState(AI_PROFILE_DEFAULTS);
+    const [aiProfileSaving, setAiProfileSaving] = useState(false);
+    const [avoidDraft, setAvoidDraft] = useState('');
+    const [preferredBrandDraft, setPreferredBrandDraft] = useState('');
+    const [dislikedBrandDraft, setDislikedBrandDraft] = useState('');
 
     useEffect(() => {
         if (user?.name != null) setDisplayName(user.name);
     }, [user?.$id, user?.name]);
+
+    useEffect(() => {
+        const prefs = user?.prefs && typeof user.prefs === 'object' ? user.prefs : {};
+        const profile = readStoredAllergyProfile(prefs);
+        setAllergyPrefs(profile.allergies);
+        setNoKnownAllergies(profile.isSet && !profile.hasKnownAllergies);
+    }, [user?.$id, user?.prefs]);
+
+    useEffect(() => {
+        const prefs = user?.prefs && typeof user.prefs === 'object' ? user.prefs : {};
+        setAiProfile(readStoredAiProfile(prefs).profile);
+    }, [user?.$id, user?.prefs]);
+
+    useEffect(() => {
+        if (user?.$id && supermarkets.length === 0) {
+            fetchSupermarkets();
+        }
+    }, [user?.$id, supermarkets.length, fetchSupermarkets]);
 
     if (!user) return <Navigate to="/login" />;
 
@@ -67,6 +135,140 @@ const Profile = () => {
             setPasswordSaving(false);
         }
     };
+
+    const toggleAllergy = (id) => {
+        setNoKnownAllergies(false);
+        setAllergyPrefs((prev) =>
+            prev.includes(id)
+                ? prev.filter((item) => item !== id)
+                : [...prev, id]
+        );
+    };
+
+    const toggleNoKnownAllergies = () => {
+        setNoKnownAllergies((prev) => {
+            const next = !prev;
+            if (next) setAllergyPrefs([]);
+            return next;
+        });
+    };
+
+    const handleSaveAllergies = async (e) => {
+        e.preventDefault();
+        setAllergySaving(true);
+        try {
+            await updateAllergyPreferences(allergyPrefs);
+        } finally {
+            setAllergySaving(false);
+        }
+    };
+
+    const toggleAiProfileListValue = (field, value) => {
+        setAiProfile((prev) => {
+            const current = Array.isArray(prev[field]) ? prev[field] : [];
+            const next = current.includes(value)
+                ? current.filter((item) => item !== value)
+                : [...current, value];
+            return normalizeAiProfile({ ...prev, [field]: next });
+        });
+    };
+
+    const setAiProfileChoice = (field, value) => {
+        setAiProfile((prev) => normalizeAiProfile({ ...prev, [field]: value }));
+    };
+
+    const addAiProfileChip = (field, value, clearDraft) => {
+        const trimmed = String(value || '').trim();
+        if (!trimmed) return;
+        setAiProfile((prev) => {
+            const current = Array.isArray(prev[field]) ? prev[field] : [];
+            return normalizeAiProfile({ ...prev, [field]: [...current, trimmed] });
+        });
+        clearDraft('');
+    };
+
+    const removeAiProfileChip = (field, value) => {
+        setAiProfile((prev) => {
+            const current = Array.isArray(prev[field]) ? prev[field] : [];
+            return normalizeAiProfile({ ...prev, [field]: current.filter((item) => item !== value) });
+        });
+    };
+
+    const handleSaveAiProfile = async (e) => {
+        e.preventDefault();
+        setAiProfileSaving(true);
+        try {
+            await updateAiProfilePreferences(aiProfile);
+        } finally {
+            setAiProfileSaving(false);
+        }
+    };
+
+    const renderToggleGrid = (items, selectedValues, onToggle) => (
+        <div className="grid grid-cols-2 gap-2">
+            {items.map((item) => {
+                const active = selectedValues.includes(item.id);
+                return (
+                    <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => onToggle(item.id)}
+                        className={`tap-target min-h-11 rounded-2xl border px-2 text-[10px] font-black uppercase tracking-widest transition-all ${
+                            active
+                                ? 'bg-black dark:bg-white text-white dark:text-black border-black dark:border-white'
+                                : 'bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'
+                        }`}
+                    >
+                        {item.label}
+                    </button>
+                );
+            })}
+        </div>
+    );
+
+    const renderChipInput = (label, value, setValue, field, placeholder) => (
+        <div className="space-y-2">
+            <span className="text-[10px] uppercase font-black tracking-widest text-gray-400">{label}</span>
+            <div className="flex gap-2">
+                <input
+                    type="text"
+                    value={value}
+                    onChange={(e) => setValue(e.target.value)}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            addAiProfileChip(field, value, setValue);
+                        }
+                    }}
+                    placeholder={placeholder}
+                    className="min-h-11 flex-1 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 text-sm font-semibold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-brand-500/30 placeholder:text-gray-400"
+                />
+                <button
+                    type="button"
+                    onClick={() => addAiProfileChip(field, value, setValue)}
+                    className="tap-target min-h-11 min-w-11 rounded-2xl bg-black text-white dark:bg-white dark:text-black flex items-center justify-center"
+                    aria-label={`Add ${label}`}
+                >
+                    <FiPlus size={16} />
+                </button>
+            </div>
+            {aiProfile[field]?.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                    {aiProfile[field].map((item) => (
+                        <button
+                            key={`${field}-${item}`}
+                            type="button"
+                            onClick={() => removeAiProfileChip(field, item)}
+                            className="inline-flex items-center gap-1 rounded-full bg-brand-50 dark:bg-brand-900/20 border border-brand-100 dark:border-brand-800/40 px-3 py-1.5 text-[11px] font-black text-brand-700 dark:text-brand-300"
+                        >
+                            {item}
+                            <FiX size={12} />
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
 
     return (
         <div className="min-h-screen bg-[#F5F5F7] dark:bg-black text-gray-900 dark:text-gray-100 pb-safe">
@@ -174,6 +376,160 @@ const Profile = () => {
                                     <span>{theme === 'dark' ? t('light_mode', 'Light') : t('dark_mode', 'Dark')}</span>
                                 </button>
                             </div>
+
+                            <form onSubmit={handleSaveAllergies} className="pt-1 space-y-3">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <FiShield size={12} className="text-brand-600" />
+                                    <span className="text-[10px] uppercase font-black tracking-widest text-gray-400">{t('allergy_profile_title')}</span>
+                                </div>
+                                <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                                    {t('allergy_profile_description')}
+                                </p>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {ALLERGY_OPTIONS.map((item) => {
+                                        const active = allergyPrefs.includes(item.id);
+                                        return (
+                                            <button
+                                                key={item.id}
+                                                type="button"
+                                                onClick={() => toggleAllergy(item.id)}
+                                                className={`tap-target min-h-11 rounded-2xl border text-[10px] font-black uppercase tracking-widest transition-all ${
+                                                    active
+                                                        ? 'bg-black dark:bg-white text-white dark:text-black border-black dark:border-white'
+                                                        : 'bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'
+                                                }`}
+                                            >
+                                                {t(item.labelKey)}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={toggleNoKnownAllergies}
+                                    className={`tap-target w-full min-h-11 rounded-2xl border text-[10px] font-black uppercase tracking-widest transition-all ${
+                                        noKnownAllergies
+                                            ? 'bg-black dark:bg-white text-white dark:text-black border-black dark:border-white'
+                                            : 'bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'
+                                    }`}
+                                >
+                                    {t('allergy_profile_none')}
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={allergySaving}
+                                    className="tap-target w-full min-h-11 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 py-3 text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white transition-opacity disabled:opacity-40 disabled:pointer-events-none hover:bg-gray-100 dark:hover:bg-gray-700/70"
+                                >
+                                    {allergySaving ? t('saving', 'Saving…') : t('allergy_profile_save')}
+                                </button>
+                            </form>
+
+                            <form onSubmit={handleSaveAiProfile} className="pt-4 space-y-4 border-t border-gray-100 dark:border-gray-800">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <FiShoppingBag size={12} className="text-brand-600" />
+                                    <span className="text-[10px] uppercase font-black tracking-widest text-gray-400">
+                                        {t('ai_shopping_profile_title', 'AI Shopping Profile')}
+                                    </span>
+                                </div>
+                                <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                                    {t('ai_shopping_profile_description', 'Optional preferences that help PriceMate tailor ingredient, price, and product suggestions.')}
+                                </p>
+
+                                <div className="space-y-2">
+                                    <span className="text-[10px] uppercase font-black tracking-widest text-gray-400">Dietary preferences</span>
+                                    {renderToggleGrid(DIETARY_OPTIONS, aiProfile.dietaryPreferences, (id) => toggleAiProfileListValue('dietaryPreferences', id))}
+                                </div>
+
+                                <div className="space-y-2">
+                                    <span className="text-[10px] uppercase font-black tracking-widest text-gray-400">Nutrition priorities</span>
+                                    {renderToggleGrid(NUTRITION_OPTIONS, aiProfile.nutritionPriorities, (id) => toggleAiProfileListValue('nutritionPriorities', id))}
+                                </div>
+
+                                <div className="space-y-2">
+                                    <span className="text-[10px] uppercase font-black tracking-widest text-gray-400">Budget preference</span>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {BUDGET_OPTIONS.map((item) => {
+                                            const active = aiProfile.budgetPreference === item.id;
+                                            return (
+                                                <button
+                                                    key={item.id}
+                                                    type="button"
+                                                    onClick={() => setAiProfileChoice('budgetPreference', item.id)}
+                                                    className={`tap-target min-h-11 rounded-2xl border px-2 text-[9px] font-black uppercase tracking-widest transition-all ${
+                                                        active
+                                                            ? 'bg-black dark:bg-white text-white dark:text-black border-black dark:border-white'
+                                                            : 'bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'
+                                                    }`}
+                                                >
+                                                    {item.label}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <span className="text-[10px] uppercase font-black tracking-widest text-gray-400">Preferred stores</span>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {supermarkets.slice(0, 8).map((store) => {
+                                            const value = store.$id || store.name;
+                                            const active = aiProfile.preferredStores.includes(value);
+                                            return (
+                                                <button
+                                                    key={value}
+                                                    type="button"
+                                                    onClick={() => toggleAiProfileListValue('preferredStores', value)}
+                                                    className={`tap-target min-h-11 rounded-2xl border px-2 text-[10px] font-black uppercase tracking-widest transition-all ${
+                                                        active
+                                                            ? 'bg-black dark:bg-white text-white dark:text-black border-black dark:border-white'
+                                                            : 'bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'
+                                                    }`}
+                                                >
+                                                    {store.name || 'Store'}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                    {supermarkets.length === 0 && (
+                                        <p className="text-[11px] text-gray-400">Stores will appear here after supermarket data loads.</p>
+                                    )}
+                                </div>
+
+                                {renderChipInput('Avoid ingredients', avoidDraft, setAvoidDraft, 'avoidIngredients', 'palm oil, aspartame...')}
+                                {renderChipInput('Preferred brands', preferredBrandDraft, setPreferredBrandDraft, 'preferredBrands', 'Coca-Cola, Ülker...')}
+                                {renderChipInput('Disliked brands', dislikedBrandDraft, setDislikedBrandDraft, 'dislikedBrands', 'Brand to avoid...')}
+
+                                <div className="space-y-2">
+                                    <span className="text-[10px] uppercase font-black tracking-widest text-gray-400">Response style</span>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {RESPONSE_STYLE_OPTIONS.map((item) => {
+                                            const active = aiProfile.responseStyle === item.id;
+                                            return (
+                                                <button
+                                                    key={item.id}
+                                                    type="button"
+                                                    onClick={() => setAiProfileChoice('responseStyle', item.id)}
+                                                    className={`tap-target min-h-11 rounded-2xl border px-2 text-[9px] font-black uppercase tracking-widest transition-all ${
+                                                        active
+                                                            ? 'bg-black dark:bg-white text-white dark:text-black border-black dark:border-white'
+                                                            : 'bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'
+                                                    }`}
+                                                >
+                                                    {item.label}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    disabled={aiProfileSaving}
+                                    className="tap-target w-full min-h-11 rounded-2xl bg-brand-600 py-3 text-xs font-black uppercase tracking-widest text-white transition-opacity disabled:opacity-40 disabled:pointer-events-none hover:bg-brand-700"
+                                >
+                                    {aiProfileSaving ? t('saving', 'Saving…') : t('ai_shopping_profile_save', 'Save AI shopping profile')}
+                                </button>
+                            </form>
                         </div>
 
                         <div className="h-px bg-gray-100/50 dark:bg-gray-800/50" />
