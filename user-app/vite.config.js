@@ -8,7 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.png', 'apple-touch-icon.png', 'pwa-icon.svg'],
+      includeAssets: ['favicon.svg', 'pwa-icon.svg'],
       manifest: {
         name: 'PriceMate',
         short_name: 'PriceMate',
@@ -20,9 +20,9 @@ export default defineConfig({
         start_url: '/',
         icons: [
           {
-            src: '/favicon.png',
-            sizes: '48x48',
-            type: 'image/png',
+            src: '/favicon.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
             purpose: 'any',
           },
           {
@@ -31,20 +31,24 @@ export default defineConfig({
             type: 'image/svg+xml',
             purpose: 'any maskable',
           },
-          {
-            src: '/android-chrome-192.png',
-            sizes: '192x192',
-            type: 'image/png',
-            purpose: 'any',
-          },
-          {
-            src: '/android-chrome-512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any',
-          },
         ],
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-appwrite': ['appwrite'],
+          'vendor-icons': ['react-icons', 'lucide-react'],
+          'vendor-i18n': ['i18next', 'react-i18next', 'i18next-browser-languagedetector'],
+          'vendor-charts': ['recharts'],
+          'vendor-map': ['ol'],
+          'vendor-scanner': ['@ericblade/quagga2', '@zxing/browser', '@zxing/library'],
+          'vendor-ai': ['openai', '@google/generative-ai'],
+        },
+      },
+    },
+  },
 })
