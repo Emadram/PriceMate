@@ -3,7 +3,7 @@ docs/
 
 *.docx
 *.md
-
+.kiro
 # Exceptions
 !README.md
 
