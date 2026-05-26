@@ -90,10 +90,10 @@ const Register = () => {
                 </div>
                 
                 <h2 className="text-center text-4xl font-black tracking-tight text-gray-900 dark:text-white">
-                    Join PriceMate
+                    {t('register_title')}
                 </h2>
                 <p className="mt-3 text-center text-gray-400 dark:text-gray-500 text-[10px] font-black uppercase tracking-[0.2em]">
-                    START SAVING ON EVERY SHOPPING TRIP
+                    {t('register_subtitle')}
                 </p>
             </div>
 
@@ -108,7 +108,7 @@ const Register = () => {
 
                         <div className="space-y-2">
                             <label htmlFor="name" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500 ml-1">
-                                Full Name
+                                {t('full_name')}
                             </label>
                             <div className="relative group">
                                 <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
@@ -128,7 +128,7 @@ const Register = () => {
 
                         <div className="space-y-2">
                             <label htmlFor="email" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500 ml-1">
-                                Email Address
+                                {t('email_address')}
                             </label>
                             <div className="relative group">
                                 <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
@@ -148,7 +148,7 @@ const Register = () => {
 
                         <div className="space-y-2">
                             <label htmlFor="password" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500 ml-1">
-                                Password
+                                {t('password')}
                             </label>
                             <div className="relative group">
                                 <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
@@ -160,7 +160,7 @@ const Register = () => {
                                     required
                                     value={formData.password}
                                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                    placeholder="Minimum 8 characters"
+                                    placeholder={t('password_min_placeholder')}
                                     className="block w-full pl-12 pr-6 py-4 bg-gray-50/50 dark:bg-black/20 border-gray-100 dark:border-white/5 focus:bg-white dark:focus:bg-black border focus:border-brand-500 dark:focus:border-brand-500 rounded-2xl text-[15px] font-bold transition-all outline-none text-gray-900 dark:text-white placeholder:text-gray-300 dark:placeholder:text-gray-700 shadow-inner"
                                 />
                             </div>
@@ -215,13 +215,13 @@ const Register = () => {
                            <div className="flex items-start gap-3 px-1">
                                 <CheckCircle2 className="w-4 h-4 text-green-500 mt-1 shrink-0" />
                                 <p className="text-[11px] text-gray-400 font-medium leading-relaxed uppercase tracking-wider">
-                                    I agree to the <span className="text-brand-600 font-black cursor-pointer">Terms</span> and <span className="text-brand-600 font-black cursor-pointer">Privacy Policy</span>.
+                                    {t('terms_agree_prefix')} <span className="text-brand-600 font-black cursor-pointer">{t('terms')}</span> {t('terms_and', 'and')} <span className="text-brand-600 font-black cursor-pointer">{t('privacy_policy')}</span>.
                                 </p>
                            </div>
                         </div>
 
                         <p className="text-[11px] text-gray-500 dark:text-gray-400 font-medium text-center">
-                            We will email a verification link to activate your account.
+                            {t('verification_email_notice')}
                         </p>
 
                         <button
@@ -233,7 +233,7 @@ const Register = () => {
                                 <Loader2 className="h-5 w-5 animate-spin" />
                             ) : (
                                 <>
-                                    <span>Create Account</span>
+                                    <span>{t('create_account')}</span>
                                     <ArrowRight className="h-4 w-4" />
                                 </>
                             )}
@@ -242,9 +242,9 @@ const Register = () => {
                 </div>
 
                 <p className="mt-10 text-center text-[14px] text-gray-500 font-medium">
-                    Already have an account?{' '}
+                    {t('already_have_account')}{' '}
                     <Link to="/login" className="tap-target inline-flex items-center justify-center px-2 py-1 rounded-lg font-black text-brand-600 dark:text-brand-500 hover:text-black dark:hover:text-white transition-colors uppercase tracking-widest text-[11px] ml-1">
-                        Sign in
+                        {t('sign_in')}
                     </Link>
                 </p>
             </div>

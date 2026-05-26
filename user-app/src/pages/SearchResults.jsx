@@ -134,14 +134,14 @@ const SearchResults = () => {
                 <div className="max-w-5xl mx-auto px-3 sm:px-4 py-3 md:py-6">
                     <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-6">
                         <div className="flex items-center justify-between md:justify-start gap-3 md:gap-4 flex-shrink-0">
-                            <BackButton to="/" label="Back to Home" />
+                            <BackButton to="/" label={t('go_back_home')} />
                             <h1 className="text-base sm:text-xl md:text-2xl font-black text-gray-900 dark:text-white tracking-tighter">
                                 {t('results')}
                             </h1>
                             <div className="md:hidden">
                                 {products.length > 0 && (
                                     <span className="bg-brand-600/10 text-brand-600 dark:text-brand-500 text-[9px] font-black px-2 py-1 rounded-full uppercase tracking-widest">
-                                        {products.length} Items
+                                        {t('items_count', { count: products.length, defaultValue: '{{count}} Items' })}
                                     </span>
                                 )}
                             </div>
@@ -166,10 +166,10 @@ const SearchResults = () => {
                                     onChange={(e) => setSelectedCategory(e.target.value)}
                                     className="flex-1 md:flex-none min-h-11 px-3 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 transition text-[9px] font-black uppercase tracking-widest min-w-[120px] appearance-none text-center shadow-inner"
                                 >
-                                    <option value="">ALL CATEGORIES</option>
+                                    <option value="">{t('all_categories', 'ALL CATEGORIES')}</option>
                                     {categories.map((cat) => (
                                         <option key={cat.$id} value={cat.$id}>
-                                            {cat.categoryName || cat.name || 'Category'}
+                                            {cat.categoryName || cat.name || t('category', 'Category')}
                                         </option>
                                     ))}
                                 </select>
@@ -188,10 +188,10 @@ const SearchResults = () => {
             <main className="max-w-5xl mx-auto px-4 py-6 md:py-8">
                 <div className="mb-4 md:mb-8 flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
                     <div className="space-y-1">
-                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.28em]">Browsing</p>
+                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.28em]">{t('browsing', 'Browsing')}</p>
                         <h2 className="text-sm sm:text-lg md:text-xl font-bold text-gray-900 dark:text-white leading-tight">
-                            {query ? `Results for "${query}"` : 'All Available Products'}
-                            {categoryIdFromUrl && <span className="ml-2 text-[9px] bg-brand-600 text-white px-2 py-0.5 rounded-full uppercase tracking-widest font-black align-middle">Filtered</span>}
+                            {query ? t('results_for_query', { query, defaultValue: 'Results for "{{query}}"' }) : t('all_available_products', 'All Available Products')}
+                            {categoryIdFromUrl && <span className="ml-2 text-[9px] bg-brand-600 text-white px-2 py-0.5 rounded-full uppercase tracking-widest font-black align-middle">{t('filtered', 'Filtered')}</span>}
                         </h2>
                     </div>
                     
@@ -207,32 +207,32 @@ const SearchResults = () => {
                                     onChange={(e) => setSortBy(e.target.value)}
                                     className="min-h-11 pl-9 pr-8 py-2 bg-white dark:bg-gray-800 border-0 rounded-xl text-xs font-bold text-gray-600 dark:text-gray-300 shadow-soft appearance-none focus:ring-2 focus:ring-brand-500 cursor-pointer min-w-[140px]"
                                 >
-                                    <option value="relevance">Sort: Relevance</option>
-                                    <option value="price-asc">Price: Low to High</option>
-                                    <option value="price-desc">Price: High to Low</option>
-                                    <option value="name">Name: A to Z</option>
+                                    <option value="relevance">{t('sort_relevance', 'Sort: Relevance')}</option>
+                                    <option value="price-asc">{t('sort_price_low_high', 'Price: Low to High')}</option>
+                                    <option value="price-desc">{t('sort_price_high_low', 'Price: High to Low')}</option>
+                                    <option value="name">{t('sort_name_az', 'Name: A to Z')}</option>
                                 </select>
                                 <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-gray-400">
                                     <FiArrowLeft className="rotate-[270deg]" size={10} />
                                 </div>
                             </div>
                             <div className="hidden md:block text-right">
-                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Found</p>
-                                <p className="text-sm font-bold text-brand-600 dark:text-brand-500">{products.length} items</p>
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('found', 'Found')}</p>
+                                <p className="text-sm font-bold text-brand-600 dark:text-brand-500">{t('items_count_lower', { count: products.length, defaultValue: '{{count}} items' })}</p>
                             </div>
                         </div>
 
                         <div className="md:hidden rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-800 p-2 shadow-sm">
                             <div className="flex items-center justify-between gap-2 px-1 pb-2">
-                                <span className="text-[9px] font-black uppercase tracking-[0.28em] text-gray-400">Sort</span>
-                                <span className="text-[9px] font-black uppercase tracking-[0.28em] text-brand-600/70 dark:text-brand-500/70">{products.length} items</span>
+                                <span className="text-[9px] font-black uppercase tracking-[0.28em] text-gray-400">{t('sort', 'Sort')}</span>
+                                <span className="text-[9px] font-black uppercase tracking-[0.28em] text-brand-600/70 dark:text-brand-500/70">{t('items_count_lower', { count: products.length, defaultValue: '{{count}} items' })}</span>
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                                 {[
-                                    ['relevance', 'Relevance'],
-                                    ['price-asc', 'Low to High'],
-                                    ['price-desc', 'High to Low'],
-                                    ['name', 'A to Z'],
+                                    ['relevance', t('relevance', 'Relevance')],
+                                    ['price-asc', t('low_to_high', 'Low to High')],
+                                    ['price-desc', t('high_to_low', 'High to Low')],
+                                    ['name', t('a_to_z', 'A to Z')],
                                 ].map(([value, label]) => {
                                     const active = sortBy === value;
                                     return (

@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, ArrowRight, Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import useAuthStore from '../stores/authStore';
 import BackButton from '../components/BackButton';
 
 const ForgotPassword = () => {
+    const { t } = useTranslation();
     const requestPasswordReset = useAuthStore((state) => state.requestPasswordReset);
     const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
@@ -33,7 +35,7 @@ const ForgotPassword = () => {
             setResendCount(nextCount);
             setResendCooldown(nextCount * 30);
         } else {
-            setError(useAuthStore.getState().error || 'Failed to send reset email.');
+            setError(useAuthStore.getState().error || t('reset_email_failed', 'Failed to send reset email.'));
         }
         setLoading(false);
         return success;
@@ -61,10 +63,10 @@ const ForgotPassword = () => {
                 </div>
 
                 <h2 className="text-center text-4xl font-black tracking-tight text-gray-900 dark:text-white">
-                    Reset password
+                    {t('reset_password_title', 'Reset password')}
                 </h2>
                 <p className="mt-3 text-center text-gray-400 dark:text-gray-500 text-[10px] font-black uppercase tracking-[0.2em]">
-                    WE WILL EMAIL YOU A RESET LINK
+                    {t('reset_password_subtitle', 'We will email you a reset link')}
                 </p>
             </div>
 
@@ -73,7 +75,7 @@ const ForgotPassword = () => {
                     {sent ? (
                         <div className="space-y-4 text-center">
                             <p className="text-sm text-gray-600 dark:text-gray-300 font-medium">
-                                Check your inbox for the password reset link.
+                                {t('reset_link_sent', 'Check your inbox for the password reset link.')}
                             </p>
                             <button
                                 type="button"
@@ -82,16 +84,16 @@ const ForgotPassword = () => {
                                 className="tap-target w-full min-h-11 py-4 bg-brand-600 text-white rounded-[1.5rem] text-[12px] font-black uppercase tracking-widest hover:bg-black dark:hover:bg-white dark:hover:text-black disabled:opacity-60"
                             >
                                 {loading
-                                    ? 'Sending...'
+                                    ? t('resend_sending')
                                     : resendCooldown > 0
-                                        ? `Resend in ${resendCooldown}s`
-                                        : 'Resend Reset Link'}
+                                        ? t('resend_in', { seconds: resendCooldown })
+                                        : t('resend_reset_link', 'Resend Reset Link')}
                             </button>
                             <Link
                                 to="/login"
                                 className="tap-target inline-flex items-center justify-center gap-2 w-full min-h-11 py-4 bg-black dark:bg-white text-white dark:text-black rounded-[1.5rem] text-[12px] font-black uppercase tracking-widest"
                             >
-                                Go to Login
+                                {t('go_to_login', 'Go to Login')}
                                 <ArrowRight className="h-4 w-4" />
                             </Link>
                         </div>
@@ -105,7 +107,7 @@ const ForgotPassword = () => {
 
                             <div className="space-y-2">
                                 <label htmlFor="email" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500 ml-1">
-                                    Email Address
+                                    {t('email_address')}
                                 </label>
                                 <div className="relative group">
                                     <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
@@ -132,7 +134,7 @@ const ForgotPassword = () => {
                                     <Loader2 className="h-5 w-5 animate-spin" />
                                 ) : (
                                     <>
-                                        <span>Send reset link</span>
+                                        <span>{t('send_reset_link', 'Send reset link')}</span>
                                         <ArrowRight className="h-4 w-4" />
                                     </>
                                 )}

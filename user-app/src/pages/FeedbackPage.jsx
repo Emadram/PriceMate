@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { FiMessageSquare, FiSend, FiCheckCircle } from 'react-icons/fi';
+import { useTranslation } from 'react-i18next';
 import { db } from '../lib/appwrite';
 import useAuthStore from '../stores/authStore';
 import BackButton from '../components/BackButton';
 
 const FeedbackPage = () => {
+    const { t } = useTranslation();
     const user = useAuthStore((state) => state.user);
     const [formData, setFormData] = useState({
         type: 'general',
@@ -36,7 +38,7 @@ const FeedbackPage = () => {
             setFormData({ type: 'general', message: '' });
         } catch (error) {
             console.error('Error submitting feedback:', error);
-            alert('Failed to submit feedback. Please try again.');
+            alert(t('feedback_submit_failed'));
         }
 
         setSubmitting(false);
@@ -47,10 +49,10 @@ const FeedbackPage = () => {
             <div className="min-h-screen bg-[#F5F5F7] dark:bg-black text-gray-900 dark:text-gray-100 flex flex-col">
                 <header className="pt-safe bg-white/80 dark:bg-black/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 dark:border-white/5 p-4">
                     <div className="max-w-4xl mx-auto flex items-center justify-between">
-                        <BackButton to="/profile" label="Back to profile" />
+                        <BackButton to="/profile" label={t('back_to_profile')} />
                         <h1 className="text-xl font-black text-gray-900 dark:text-white flex items-center gap-2">
                             <FiMessageSquare className="text-accent-500" />
-                            Send Feedback
+                            {t('send_feedback')}
                         </h1>
                         <div className="w-10" />
                     </div>
@@ -60,12 +62,12 @@ const FeedbackPage = () => {
                         <div className="flex justify-center mb-4">
                             <FiCheckCircle className="text-green-600 text-6xl" />
                         </div>
-                        <h2 className="text-2xl font-bold text-green-600 mb-2">Thank You!</h2>
+                        <h2 className="text-2xl font-bold text-green-600 mb-2">{t('feedback_thank_you')}</h2>
                         <p className="text-gray-600 dark:text-gray-400 mb-6">
-                            Your feedback has been submitted.
+                            {t('feedback_submitted')}
                         </p>
                         <div className="flex justify-center">
-                            <BackButton to="/profile" label="Back to profile" className="!w-auto !h-auto !rounded-xl px-5 py-2.5 gap-2 !inline-flex" />
+                            <BackButton to="/profile" label={t('back_to_profile')} className="!w-auto !h-auto !rounded-xl px-5 py-2.5 gap-2 !inline-flex" />
                         </div>
                     </div>
                 </div>
@@ -77,10 +79,10 @@ const FeedbackPage = () => {
         <div className="min-h-screen bg-[#F5F5F7] dark:bg-black text-gray-900 dark:text-gray-100 pb-safe transition-colors">
             <header className="pt-safe bg-white/80 dark:bg-black/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 dark:border-white/5 p-4">
                 <div className="max-w-4xl mx-auto flex items-center justify-between">
-                    <BackButton to="/profile" label="Back to profile" />
+                    <BackButton to="/profile" label={t('back_to_profile')} />
                     <h1 className="text-xl font-black text-gray-900 dark:text-white flex items-center gap-2">
                         <FiMessageSquare className="text-accent-500" />
-                        Send Feedback
+                        {t('send_feedback')}
                     </h1>
                     <div className="w-10" />
                 </div>
@@ -91,7 +93,7 @@ const FeedbackPage = () => {
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Feedback Type
+                                {t('feedback_type')}
                             </label>
                             <select
                                 value={formData.type}
@@ -99,23 +101,23 @@ const FeedbackPage = () => {
                                 className="w-full min-h-11 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                                 required
                             >
-                                <option value="general">General</option>
-                                <option value="bug">Bug Report</option>
-                                <option value="feature">Feature Request</option>
-                                <option value="complaint">Complaint</option>
+                                <option value="general">{t('feedback_type_general')}</option>
+                                <option value="bug">{t('feedback_type_bug')}</option>
+                                <option value="feature">{t('feedback_type_feature')}</option>
+                                <option value="complaint">{t('feedback_type_complaint')}</option>
                             </select>
                         </div>
 
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Message
+                                {t('message')}
                             </label>
                             <textarea
                                 value={formData.message}
                                 onChange={(e) => setFormData({ ...formData, message: e.target.value })}
                                 className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                                 rows="6"
-                                placeholder="Tell us what you think..."
+                                placeholder={t('feedback_placeholder')}
                                 required
                             />
                         </div>
@@ -125,7 +127,7 @@ const FeedbackPage = () => {
                             disabled={submitting}
                             className="tap-target w-full min-h-11 bg-brand-600 text-white py-3 rounded-lg hover:bg-brand-700 transition font-medium disabled:bg-gray-400 flex items-center justify-center gap-2"
                         >
-                            <FiSend /> {submitting ? 'Submitting...' : 'Submit Feedback'}
+                            <FiSend /> {submitting ? t('feedback_submitting') : t('feedback_submit')}
                         </button>
                     </form>
                 </div>

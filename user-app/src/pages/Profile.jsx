@@ -23,29 +23,29 @@ const ALLERGY_OPTIONS = [
 ];
 
 const DIETARY_OPTIONS = [
-    { id: 'vegetarian', label: 'Vegetarian' },
-    { id: 'vegan', label: 'Vegan' },
-    { id: 'halal', label: 'Halal' },
-    { id: 'kosher', label: 'Kosher' },
+    { id: 'vegetarian', labelKey: 'diet_vegetarian' },
+    { id: 'vegan', labelKey: 'diet_vegan' },
+    { id: 'halal', labelKey: 'diet_halal' },
+    { id: 'kosher', labelKey: 'diet_kosher' },
 ];
 
 const NUTRITION_OPTIONS = [
-    { id: 'low sugar', label: 'Low sugar' },
-    { id: 'low sodium', label: 'Low sodium' },
-    { id: 'low caffeine', label: 'Low caffeine' },
-    { id: 'high protein', label: 'High protein' },
+    { id: 'low sugar', labelKey: 'nutrition_low_sugar' },
+    { id: 'low sodium', labelKey: 'nutrition_low_sodium' },
+    { id: 'low caffeine', labelKey: 'nutrition_low_caffeine' },
+    { id: 'high protein', labelKey: 'nutrition_high_protein' },
 ];
 
 const BUDGET_OPTIONS = [
-    { id: 'lowest_price', label: 'Lowest price' },
-    { id: 'balanced', label: 'Balanced' },
-    { id: 'quality_first', label: 'Quality first' },
+    { id: 'lowest_price', labelKey: 'budget_lowest_price' },
+    { id: 'balanced', labelKey: 'budget_balanced' },
+    { id: 'quality_first', labelKey: 'budget_quality_first' },
 ];
 
 const RESPONSE_STYLE_OPTIONS = [
-    { id: 'concise', label: 'Concise' },
-    { id: 'balanced', label: 'Balanced' },
-    { id: 'detailed', label: 'Detailed' },
+    { id: 'concise', labelKey: 'response_concise' },
+    { id: 'balanced', labelKey: 'response_balanced' },
+    { id: 'detailed', labelKey: 'response_detailed' },
 ];
 
 const Profile = () => {
@@ -219,7 +219,7 @@ const Profile = () => {
                                 : 'bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'
                         }`}
                     >
-                        {item.label}
+                        {t(item.labelKey)}
                     </button>
                 );
             })}
@@ -436,17 +436,17 @@ const Profile = () => {
                                 </p>
 
                                 <div className="space-y-2">
-                                    <span className="text-[10px] uppercase font-black tracking-widest text-gray-400">Dietary preferences</span>
+                                    <span className="text-[10px] uppercase font-black tracking-widest text-gray-400">{t('dietary_preferences', 'Dietary preferences')}</span>
                                     {renderToggleGrid(DIETARY_OPTIONS, aiProfile.dietaryPreferences, (id) => toggleAiProfileListValue('dietaryPreferences', id))}
                                 </div>
 
                                 <div className="space-y-2">
-                                    <span className="text-[10px] uppercase font-black tracking-widest text-gray-400">Nutrition priorities</span>
+                                    <span className="text-[10px] uppercase font-black tracking-widest text-gray-400">{t('nutrition_priorities', 'Nutrition priorities')}</span>
                                     {renderToggleGrid(NUTRITION_OPTIONS, aiProfile.nutritionPriorities, (id) => toggleAiProfileListValue('nutritionPriorities', id))}
                                 </div>
 
                                 <div className="space-y-2">
-                                    <span className="text-[10px] uppercase font-black tracking-widest text-gray-400">Budget preference</span>
+                                    <span className="text-[10px] uppercase font-black tracking-widest text-gray-400">{t('budget_preference', 'Budget preference')}</span>
                                     <div className="grid grid-cols-3 gap-2">
                                         {BUDGET_OPTIONS.map((item) => {
                                             const active = aiProfile.budgetPreference === item.id;
@@ -461,7 +461,7 @@ const Profile = () => {
                                                             : 'bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'
                                                     }`}
                                                 >
-                                                    {item.label}
+                                                    {t(item.labelKey)}
                                                 </button>
                                             );
                                         })}
@@ -469,7 +469,7 @@ const Profile = () => {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <span className="text-[10px] uppercase font-black tracking-widest text-gray-400">Preferred stores</span>
+                                    <span className="text-[10px] uppercase font-black tracking-widest text-gray-400">{t('preferred_stores', 'Preferred stores')}</span>
                                     <div className="grid grid-cols-2 gap-2">
                                         {supermarkets.slice(0, 8).map((store) => {
                                             const value = store.$id || store.name;
@@ -485,22 +485,22 @@ const Profile = () => {
                                                             : 'bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'
                                                     }`}
                                                 >
-                                                    {store.name || 'Store'}
+                                                    {store.name || t('store', 'Store')}
                                                 </button>
                                             );
                                         })}
                                     </div>
                                     {supermarkets.length === 0 && (
-                                        <p className="text-[11px] text-gray-400">Stores will appear here after supermarket data loads.</p>
+                                        <p className="text-[11px] text-gray-400">{t('stores_load_later', 'Stores will appear here after supermarket data loads.')}</p>
                                     )}
                                 </div>
 
-                                {renderChipInput('Avoid ingredients', avoidDraft, setAvoidDraft, 'avoidIngredients', 'palm oil, aspartame...')}
-                                {renderChipInput('Preferred brands', preferredBrandDraft, setPreferredBrandDraft, 'preferredBrands', 'Coca-Cola, Ülker...')}
-                                {renderChipInput('Disliked brands', dislikedBrandDraft, setDislikedBrandDraft, 'dislikedBrands', 'Brand to avoid...')}
+                                {renderChipInput(t('avoid_ingredients', 'Avoid ingredients'), avoidDraft, setAvoidDraft, 'avoidIngredients', t('avoid_ingredients_placeholder', 'palm oil, aspartame...'))}
+                                {renderChipInput(t('preferred_brands', 'Preferred brands'), preferredBrandDraft, setPreferredBrandDraft, 'preferredBrands', t('preferred_brands_placeholder', 'Coca-Cola, Ülker...'))}
+                                {renderChipInput(t('disliked_brands', 'Disliked brands'), dislikedBrandDraft, setDislikedBrandDraft, 'dislikedBrands', t('disliked_brands_placeholder', 'Brand to avoid...'))}
 
                                 <div className="space-y-2">
-                                    <span className="text-[10px] uppercase font-black tracking-widest text-gray-400">Response style</span>
+                                    <span className="text-[10px] uppercase font-black tracking-widest text-gray-400">{t('response_style', 'Response style')}</span>
                                     <div className="grid grid-cols-3 gap-2">
                                         {RESPONSE_STYLE_OPTIONS.map((item) => {
                                             const active = aiProfile.responseStyle === item.id;
@@ -515,7 +515,7 @@ const Profile = () => {
                                                             : 'bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'
                                                     }`}
                                                 >
-                                                    {item.label}
+                                                    {t(item.labelKey)}
                                                 </button>
                                             );
                                         })}
@@ -535,7 +535,7 @@ const Profile = () => {
                         <div className="h-px bg-gray-100/50 dark:bg-gray-800/50" />
 
                         <div>
-                            <span className="text-[10px] uppercase font-black tracking-widest text-gray-400 mb-1 block">Email Address</span>
+                            <span className="text-[10px] uppercase font-black tracking-widest text-gray-400 mb-1 block">{t('email_address')}</span>
                             <span className="font-bold text-sm tracking-tight">{user.email}</span>
                         </div>
                         <div className="h-px bg-gray-100/50 dark:bg-gray-800/50" />

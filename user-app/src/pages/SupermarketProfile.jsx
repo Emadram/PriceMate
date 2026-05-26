@@ -47,6 +47,7 @@ const SupermarketProfile = () => {
     const { t, i18n } = useTranslation();
     const { location, error: locationError, loading: locationLoading, retry: retryLocation } = useUserLocation();
     const [showRoute, setShowRoute] = useState(false);
+    const [routeOrigin, setRouteOrigin] = useState(null);
     const { convert, getCurrencySymbol } = useCurrencyStore();
     const [supermarket, setSupermarket] = useState(null);
     const [branches, setBranches] = useState([]);
@@ -61,7 +62,7 @@ const SupermarketProfile = () => {
 
     const handleFavoriteClick = () => {
         if (!user) {
-            alert('Please login to favorite supermarkets');
+            alert(t('login_to_favorite_supermarkets', 'Please login to favorite supermarkets'));
             return;
         }
         toggleSupermarketFavorite(supermarket.$id);
@@ -69,7 +70,7 @@ const SupermarketProfile = () => {
 
     const handleReportClick = () => {
         if (!user) {
-            alert('Please login to report issues');
+            alert(t('login_to_report_issues', 'Please login to report issues'));
             return;
         }
         setIsReportModalOpen(true);
@@ -79,7 +80,7 @@ const SupermarketProfile = () => {
         const shareUrl = window.location.href;
         const shareText = supermarket?.name
             ? `${supermarket.name} on PriceMate`
-            : 'Check this supermarket on PriceMate';
+            : t('share_supermarket_text', 'Check this supermarket on PriceMate');
 
         try {
             if (navigator.share) {
@@ -93,15 +94,15 @@ const SupermarketProfile = () => {
 
             if (navigator.clipboard?.writeText) {
                 await navigator.clipboard.writeText(shareUrl);
-                alert('Link copied to clipboard');
+                alert(t('link_copied', 'Link copied to clipboard'));
                 return;
             }
 
-            window.prompt('Copy this link', shareUrl);
+            window.prompt(t('copy_this_link', 'Copy this link'), shareUrl);
         } catch (error) {
             if (error?.name !== 'AbortError') {
                 console.error('Share failed:', error);
-                alert('Could not share this page right now.');
+                alert(t('share_failed', 'Could not share this page right now.'));
             }
         }
     };
@@ -143,6 +144,14 @@ const SupermarketProfile = () => {
         return () => clearTimeout(t);
     }, [id]);
 
+    useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            setShowRoute(false);
+            setRouteOrigin(null);
+        }, 0);
+        return () => clearTimeout(timeoutId);
+    }, [id]);
+
     if (loading) {
         return (
             <div className="min-h-screen bg-white dark:bg-[#0A0A0B] flex items-center justify-center">
@@ -157,13 +166,13 @@ const SupermarketProfile = () => {
                 <div className="w-20 h-20 bg-gray-50 dark:bg-white/5 rounded-[2rem] flex items-center justify-center mb-6">
                     <ShoppingBag className="text-gray-400 w-10 h-10" />
                 </div>
-                <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">Supermarket Not Found</h2>
-                <p className="text-gray-500 mb-8 max-w-xs">We couldn't find the store you're looking for. It might have been removed or the link is broken.</p>
+                <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">{t('supermarket_not_found', 'Supermarket Not Found')}</h2>
+                <p className="text-gray-500 mb-8 max-w-xs">{t('supermarket_not_found_description', "We couldn't find the store you're looking for. It might have been removed or the link is broken.")}</p>
                 <button
                     onClick={() => navigate('/')}
                     className="bg-black dark:bg-white text-white dark:text-black px-8 py-3.5 rounded-2xl font-semibold transition-transform active:scale-95 shadow-soft"
                 >
-                    Back to Home
+                    {t('go_back_home')}
                 </button>
             </div>
         );
@@ -211,7 +220,7 @@ const SupermarketProfile = () => {
         <div className="min-h-screen bg-[#FDFDFD] dark:bg-[#0A0A0B] pb-safe">
             <div className="max-w-4xl mx-auto px-4 py-4">
                 <div className="flex items-center">
-                    <BackButton label="Go Back" onClick={() => navigate(-1)} />
+                    <BackButton label={t('go_back', 'Go Back')} onClick={() => navigate(-1)} />
                 </div>
             </div>
 
@@ -219,7 +228,7 @@ const SupermarketProfile = () => {
                 <div className="max-w-4xl mx-auto px-4 mb-4">
                     <div className="rounded-3xl border border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/10 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                         <div className="min-w-0">
-                            <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">Map location is limited</p>
+                            <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">{t('route_location_limited')}</p>
                             <p className="text-xs text-amber-800/90 dark:text-amber-100/80">{locationError}</p>
                         </div>
                         <button
@@ -228,7 +237,7 @@ const SupermarketProfile = () => {
                             disabled={locationLoading}
                             className="shrink-0 inline-flex items-center justify-center rounded-2xl bg-amber-600 px-4 py-2 text-xs font-bold uppercase tracking-widest text-white transition-opacity disabled:opacity-60"
                         >
-                            Try Again
+                            {t('try_again')}
                         </button>
                     </div>
                 </div>
@@ -242,8 +251,8 @@ const SupermarketProfile = () => {
                             type="button"
                             onClick={handleShareClick}
                             className="tap-target h-11 w-11 bg-gray-50 dark:bg-white/5 hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black rounded-full flex items-center justify-center text-gray-500 dark:text-gray-300 transition-all active:scale-90"
-                            aria-label="Share supermarket"
-                            title="Share supermarket"
+                            aria-label={t('share_supermarket', 'Share supermarket')}
+                            title={t('share_supermarket', 'Share supermarket')}
                         >
                             <Share2 size={18} />
                         </button>
@@ -252,8 +261,8 @@ const SupermarketProfile = () => {
                             onClick={handleFavoriteClick}
                             ariaLabel={
                                 isSupermarketFavorite(supermarket.$id)
-                                    ? 'Remove supermarket from favorites'
-                                    : 'Add supermarket to favorites'
+                                    ? t('remove_supermarket_favorite', 'Remove supermarket from favorites')
+                                    : t('add_supermarket_favorite', 'Add supermarket to favorites')
                             }
                         />
                     </div>
@@ -272,12 +281,12 @@ const SupermarketProfile = () => {
                             <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
                                 {supermarket.isVerified && (
                                     <span className="bg-brand-50 dark:bg-brand-500/10 text-brand-600 dark:text-brand-500 text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full border border-brand-100 dark:border-brand-500/20">
-                                        Verified Partner
+                                        {t('verified_partner', 'Verified Partner')}
                                     </span>
                                 )}
                                 {distanceLabel && (
                                     <span className="bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400 text-[11px] font-medium px-2.5 py-1 rounded-full">
-                                        {distanceLabel} km away
+                                        {t('distance_away', { distance: distanceLabel, defaultValue: '{{distance}} km away' })}
                                     </span>
                                 )}
                             </div>
@@ -294,7 +303,7 @@ const SupermarketProfile = () => {
                                             <button 
                                                 onClick={() => setIsBranchDropdownOpen(!isBranchDropdownOpen)}
                                                 className="tap-target h-11 w-11 mt-1 p-2 bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-gray-400 rounded-full hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-all active:scale-95"
-                                                title="Switch Branch"
+                                                title={t('switch_branch', 'Switch Branch')}
                                             >
                                                 <ChevronDown size={18} className={`transition-transform duration-300 ${isBranchDropdownOpen ? 'rotate-180' : ''}`} />
                                             </button>
@@ -307,7 +316,7 @@ const SupermarketProfile = () => {
                                                     ></div>
                                                     <div className="absolute left-0 mt-3 w-72 bg-white dark:bg-[#1C1C1E] rounded-[1.5rem] shadow-2xl border border-gray-100 dark:border-white/5 py-3 z-50 animate-in fade-in slide-in-from-top-2">
                                                         <div className="px-4 py-2 mb-2">
-                                                            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Branches</p>
+                                                            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">{t('branches', 'Branches')}</p>
                                                         </div>
                                                         <div
                                                             className="w-full px-4 py-3 flex items-start gap-3 bg-gray-50/80 dark:bg-white/5 text-left border-b border-gray-100 dark:border-white/5"
@@ -315,12 +324,12 @@ const SupermarketProfile = () => {
                                                         >
                                                             <MapPin size={16} className="mt-0.5 text-brand-600 dark:text-brand-500" />
                                                             <div className="flex-1 min-w-0">
-                                                                <p className="text-[10px] font-bold text-brand-600 dark:text-brand-500 uppercase tracking-wider mb-0.5">Current</p>
+                                                                <p className="text-[10px] font-bold text-brand-600 dark:text-brand-500 uppercase tracking-wider mb-0.5">{t('current', 'Current')}</p>
                                                                 <p className="text-[13px] sm:text-[14px] font-semibold text-gray-900 dark:text-white line-clamp-1">
-                                                                    {supermarket.branchName ? `${supermarket.name} — ${supermarket.branchName}` : supermarket.address || 'This branch'}
+                                                                    {supermarket.branchName ? `${supermarket.name} — ${supermarket.branchName}` : supermarket.address || t('this_branch', 'This branch')}
                                                                 </p>
                                                                 {distanceLabel && (
-                                                                    <p className="text-[11px] sm:text-[12px] text-gray-500">{distanceLabel} km away</p>
+                                                                    <p className="text-[11px] sm:text-[12px] text-gray-500">{t('distance_away', { distance: distanceLabel, defaultValue: '{{distance}} km away' })}</p>
                                                                 )}
                                                             </div>
                                                         </div>
@@ -337,10 +346,10 @@ const SupermarketProfile = () => {
                                                                 <MapPin size={16} className="mt-0.5 text-gray-400 group-hover:text-black dark:group-hover:text-white" />
                                                                 <div>
                                                                     <p className="text-[13px] sm:text-[14px] font-semibold text-gray-900 dark:text-white line-clamp-1">
-                                                                        {branch.branchName ? `${branch.name || supermarket.name} — ${branch.branchName}` : branch.address || 'Branch'}
+                                                                        {branch.branchName ? `${branch.name || supermarket.name} — ${branch.branchName}` : branch.address || t('branch', 'Branch')}
                                                                     </p>
                                                                     {resolveDistanceKm(branch) !== null && (
-                                                                        <p className="text-[11px] sm:text-[12px] text-gray-500">{formatDistance(resolveDistanceKm(branch))} km away</p>
+                                                                        <p className="text-[11px] sm:text-[12px] text-gray-500">{t('distance_away', { distance: formatDistance(resolveDistanceKm(branch)), defaultValue: '{{distance}} km away' })}</p>
                                                                     )}
                                                                 </div>
                                                                 <ChevronRight size={14} className="ml-auto mt-1 text-gray-300 group-hover:text-black dark:group-hover:text-white" />
@@ -363,11 +372,11 @@ const SupermarketProfile = () => {
                     {/* Quick Stats / Action Bar */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3 md:gap-4 mt-5 sm:mt-10 pt-5 sm:pt-8 border-t border-gray-50 dark:border-white/5">
                         <div className="bg-gray-50 dark:bg-[#1C1C1E] p-3 sm:p-4 rounded-xl sm:rounded-2xl">
-                            <p className="text-[9px] sm:text-[11px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest mb-1">Products</p>
+                            <p className="text-[9px] sm:text-[11px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest mb-1">{t('products', 'Products')}</p>
                             <p className="text-base sm:text-xl font-bold dark:text-white">{products.length}</p>
                         </div>
                         <div className="bg-gray-50 dark:bg-[#1C1C1E] p-3 sm:p-4 rounded-xl sm:rounded-2xl">
-                            <p className="text-[9px] sm:text-[11px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest mb-1">Rating</p>
+                            <p className="text-[9px] sm:text-[11px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest mb-1">{t('rating', 'Rating')}</p>
                             {ratingValue !== null && ratingValue !== undefined ? (
                                 <div className="flex items-center gap-2">
                                     <StarRating value={ratingValue} size={14} />
@@ -377,29 +386,29 @@ const SupermarketProfile = () => {
                                     )}
                                 </div>
                             ) : (
-                                <p className="text-xs sm:text-sm font-semibold text-gray-400 pt-1">No ratings yet</p>
+                                <p className="text-xs sm:text-sm font-semibold text-gray-400 pt-1">{t('no_ratings_yet', 'No ratings yet')}</p>
                             )}
                         </div>
                         <div className="bg-gray-50 dark:bg-[#1C1C1E] p-3 sm:p-4 rounded-xl sm:rounded-2xl">
-                            <p className="text-[9px] sm:text-[11px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest mb-1">Status</p>
+                            <p className="text-[9px] sm:text-[11px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest mb-1">{t('status', 'Status')}</p>
                             <div className="flex items-center gap-1.5 pt-1">
                                 {isOpen ? (
                                     <>
                                         <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                                        <p className="text-xs sm:text-sm font-semibold text-green-600 dark:text-green-500">Open Now</p>
+                                        <p className="text-xs sm:text-sm font-semibold text-green-600 dark:text-green-500">{t('open_now', 'Open Now')}</p>
                                     </>
                                 ) : (
                                     <>
                                         <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                                        <p className="text-xs sm:text-sm font-semibold text-red-600 dark:text-red-500">Closed</p>
+                                        <p className="text-xs sm:text-sm font-semibold text-red-600 dark:text-red-500">{t('closed', 'Closed')}</p>
                                     </>
                                 )}
                             </div>
                         </div>
                         <div className="bg-gray-50 dark:bg-[#1C1C1E] p-3 sm:p-4 rounded-xl sm:rounded-2xl">
-                            <p className="text-[9px] sm:text-[11px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest mb-1">Last Update</p>
+                            <p className="text-[9px] sm:text-[11px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest mb-1">{t('last_updated')}</p>
                             <p className="text-[11px] sm:text-sm font-semibold dark:text-white pt-1 leading-snug">
-                                {lastUpdateValue ? formatLastUpdate(lastUpdateValue) : 'No updates yet'}
+                                {lastUpdateValue ? formatLastUpdate(lastUpdateValue) : t('no_updates_yet', 'No updates yet')}
                             </p>
                         </div>
                     </div>
@@ -429,7 +438,7 @@ const SupermarketProfile = () => {
                                 <button
                                     onClick={handleReportClick}
                                     className="tap-target h-11 w-11 p-3 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 rounded-2xl hover:bg-red-100 dark:hover:bg-red-500/20 active:scale-95 transition-all border border-red-100 dark:border-red-500/20"
-                                    title="Report an issue"
+                                    title={t('report_issue', 'Report an issue')}
                                 >
                                     <AlertTriangle size={20} />
                                 </button>
@@ -457,18 +466,31 @@ const SupermarketProfile = () => {
                     {/* Map Section */}
                     <section className="space-y-4 sm:space-y-6">
                         <div className="flex items-center justify-between px-2">
-                            <h2 className="text-xl sm:text-2xl font-bold dark:text-white tracking-tight">Location</h2>
+                            <h2 className="text-xl sm:text-2xl font-bold dark:text-white tracking-tight">{t('location', 'Location')}</h2>
                             {location && hasValidLatLon(location.latitude, location.longitude) && (
                                 <button
                                     type="button"
-                                    onClick={() => setShowRoute((s) => !s)}
+                                    onClick={() => {
+                                        setShowRoute((current) => {
+                                            if (current) {
+                                                setRouteOrigin(null);
+                                                return false;
+                                            }
+
+                                            setRouteOrigin({
+                                                latitude: location.latitude,
+                                                longitude: location.longitude,
+                                            });
+                                            return true;
+                                        });
+                                    }}
                                     className={`tap-target inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold active:scale-95 transition-all border border-gray-100 dark:border-white/5 shadow-soft hover:shadow-soft-lg ${
                                         showRoute 
                                             ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white' 
                                             : 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white'
                                     }`}
                                 >
-                                    {showRoute ? 'Hide Preview' : t('preview_route')}
+                                    {showRoute ? t('hide_preview', 'Hide Preview') : t('preview_route')}
                                 </button>
                             )}
                         </div>
@@ -478,7 +500,7 @@ const SupermarketProfile = () => {
                                     <div className="bg-gray-50 dark:bg-gray-900 map-dark-invert" style={{ width: '100%', height: '100%' }}>
                                         <iframe
                                             src={embedSrc}
-                                            title="Map location"
+                                            title={t('map_location', 'Map location')}
                                             style={{ width: '100%', height: '100%', border: 0 }}
                                             loading="lazy"
                                             allowFullScreen
@@ -493,13 +515,13 @@ const SupermarketProfile = () => {
                                     center={[resolvedStoreCoordinates.latitude, resolvedStoreCoordinates.longitude]} 
                                     zoom={15}
                                     height="100%"
-                                    directionsFrom={showRoute ? location : null}
+                                    directionsFrom={showRoute ? routeOrigin : null}
                                     directionsTo={showRoute ? { latitude: resolvedStoreCoordinates.latitude, longitude: resolvedStoreCoordinates.longitude } : null}
                                 />
                             ) : (
                                 <div className="h-full flex flex-col items-center justify-center bg-gray-50 dark:bg-[#1C1C1E] px-6 text-center">
                                     <MapPin className="w-10 h-10 text-gray-300 dark:text-gray-600 mb-3" />
-                                    <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">Location not available</p>
+                                    <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">{t('location_not_available', 'Location not available')}</p>
                                     {supermarket.address && (
                                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">{supermarket.address}</p>
                                     )}
@@ -512,10 +534,10 @@ const SupermarketProfile = () => {
                     {/* Available Products Section */}
                     <section className="space-y-4 sm:space-y-6">
                         <div className="flex items-center justify-between px-2 gap-2">
-                            <h2 className="text-xl sm:text-2xl font-bold dark:text-white tracking-tight">Available Items</h2>
+                            <h2 className="text-xl sm:text-2xl font-bold dark:text-white tracking-tight">{t('available_items', 'Available Items')}</h2>
                             <div className="flex items-center gap-2 sm:gap-4 shrink-0">
                                 <TrendingDown size={16} className="sm:w-[18px] sm:h-[18px] text-green-500" />
-                                <span className="text-xs sm:text-sm font-medium text-gray-500">Live prices</span>
+                                <span className="text-xs sm:text-sm font-medium text-gray-500">{t('live_prices', 'Live prices')}</span>
                             </div>
                         </div>
 
@@ -537,12 +559,12 @@ const SupermarketProfile = () => {
                                         price.productId ||
                                         '';
                                     const productReportId = price.products?.$id || price.productId || null;
-                                    const productReportName = price.products?.name || 'Product';
+                                    const productReportName = price.products?.name || t('product', 'Product');
                                     const categoryFallback =
                                         price.products?.category ||
                                         getRelationshipAttribute(price.products?.categoryId, 'categoryName') ||
                                         getRelationshipAttribute(price.products?.categoryId, 'name') ||
-                                        'Other';
+                                        t('other', 'Other');
                                     const productBrand =
                                         price.products?.brand || price.products?.brands || '';
 
@@ -569,7 +591,7 @@ const SupermarketProfile = () => {
                                                     <div className="flex items-start justify-between gap-3">
                                                         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
                                                             <h3 className="truncate text-sm font-semibold leading-tight text-gray-900 transition-colors group-hover:text-brand-600 dark:text-white sm:text-base md:text-lg">
-                                                                {price.products?.name || 'Unknown Product'}
+                                                                {price.products?.name || t('unknown_product', 'Unknown Product')}
                                                             </h3>
                                                             {price.stockStatus && (
                                                                 <span className={`shrink-0 text-[9px] font-bold uppercase tracking-tighter px-1.5 py-0.5 rounded-full ${stockBadgeClass}`}>
@@ -587,8 +609,8 @@ const SupermarketProfile = () => {
                                                                 setIsProductReportOpen(true);
                                                             }}
                                                             className="tap-target flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 shadow-sm transition-all hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-400 dark:hover:bg-red-500/25"
-                                                            title="Report an issue"
-                                                            aria-label="Report an issue"
+                                                            title={t('report_issue', 'Report an issue')}
+                                                            aria-label={t('report_issue', 'Report an issue')}
                                                         >
                                                             <AlertTriangle size={16} className="sm:w-[18px] sm:h-[18px]" />
                                                         </button>
@@ -620,7 +642,7 @@ const SupermarketProfile = () => {
                                                                 <span className="text-sm font-medium text-gray-400 line-through decoration-red-500/30">
                                                                     {getCurrencySymbol()} {convert(price.originalPrice)}
                                                                 </span>
-                                                                <span className="text-[10px] font-bold rounded-full bg-green-500 px-1.5 py-0.5 text-white ring-2 ring-white dark:ring-gray-800">SALE</span>
+                                                                <span className="text-[10px] font-bold rounded-full bg-green-500 px-1.5 py-0.5 text-white ring-2 ring-white dark:ring-gray-800">{t('sale', 'SALE')}</span>
                                                             </>
                                                         )}
                                                     </div>
@@ -636,8 +658,8 @@ const SupermarketProfile = () => {
                                 <div className="w-16 h-16 bg-gray-50 dark:bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
                                     <Info className="text-gray-300" />
                                 </div>
-                                <h3 className="text-xl font-semibold dark:text-white mb-2">No prices found</h3>
-                                <p className="text-gray-500 dark:text-gray-400 mb-8 max-w-sm mx-auto">Help the community by contributing the first price for this location!</p>
+                                <h3 className="text-xl font-semibold dark:text-white mb-2">{t('no_prices_found', 'No prices found')}</h3>
+                                <p className="text-gray-500 dark:text-gray-400 mb-8 max-w-sm mx-auto">{t('no_prices_found_description', 'Help the community by contributing the first price for this location!')}</p>
                                 <button className="tap-target bg-black dark:bg-white text-white dark:text-black px-6 py-3 rounded-2xl font-semibold active:scale-95 transition-all">
                                     Contribute Data
                                 </button>

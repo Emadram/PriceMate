@@ -5,12 +5,14 @@ import AddPriceModal from '../components/AddPriceModal';
 import BackButton from '../components/BackButton';
 import { FiPackage, FiCamera, FiPlusCircle } from 'react-icons/fi';
 import { getAppwriteConfig } from '../lib/appwrite';
+import { useTranslation } from 'react-i18next';
 
 const { endpoint: APPWRITE_ENDPOINT, projectId: APPWRITE_PROJECT_ID } = getAppwriteConfig();
 const PRODUCT_IMAGES_BUCKET = import.meta.env.VITE_APPWRITE_BUCKET_PRODUCT_IMAGES || 'product-images';
 const PRODUCT_PLACEHOLDER_ID = import.meta.env.VITE_APPWRITE_PRODUCT_PLACEHOLDER_ID || '';
 
 const ProductDetails = () => {
+    const { t } = useTranslation();
     const { barcode } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
@@ -57,17 +59,17 @@ const ProductDetails = () => {
             <div className="min-h-screen bg-gray-50 pb-safe pt-safe">
                 <div className="bg-white px-4 sm:px-6 pt-6 sm:pt-10 pb-6 sm:pb-8 rounded-b-[2.25rem] sm:rounded-b-[3rem] shadow-sm mb-5 sm:mb-6">
                     <div className="max-w-4xl mx-auto flex items-center">
-                        <BackButton label="Go Back" className="-ml-2" />
+                        <BackButton label={t('go_back', 'Go Back')} className="-ml-2" />
                     </div>
                     <div className="flex flex-col items-center text-center">
                         <div className="w-20 h-20 sm:w-24 sm:h-24 bg-gray-100 rounded-3xl mb-5 sm:mb-6 flex items-center justify-center">
                             <FiPackage className="text-gray-300 text-3xl sm:text-4xl" />
                         </div>
                         <h1 className="text-xl sm:text-2xl font-black text-gray-900 mb-2">
-                            {error ? 'Could not load product' : 'Product not found'}
+                            {error ? t('failed_to_load_product') : t('product_not_found')}
                         </h1>
                         <p className="text-sm sm:text-base text-gray-500 font-medium mb-6">
-                            {error || 'Try searching again or scan the barcode.'}
+                            {error || t('try_search_or_scan', 'Try searching again or scan the barcode.')}
                         </p>
                         <button
                             onClick={() => {
@@ -76,7 +78,7 @@ const ProductDetails = () => {
                             }}
                             className="inline-flex items-center gap-2 px-6 py-3 bg-brand-600 text-white rounded-2xl font-bold shadow-lg shadow-brand-500/20 hover:bg-brand-700"
                         >
-                            <FiCamera size={16} /> Scan a product
+                            <FiCamera size={16} /> {t('scan_product', 'Scan a product')}
                         </button>
                     </div>
                 </div>
@@ -94,7 +96,7 @@ const ProductDetails = () => {
             {/* Header Info */}
             <div className="bg-white px-4 sm:px-6 pt-6 sm:pt-10 pb-6 sm:pb-8 rounded-b-[2.25rem] sm:rounded-b-[3rem] shadow-sm mb-5 sm:mb-6">
                 <div className="max-w-4xl mx-auto flex items-center">
-                    <BackButton label="Go Back" className="-ml-2" />
+                    <BackButton label={t('go_back', 'Go Back')} className="-ml-2" />
                 </div>
                 <div className="flex flex-col items-center text-center">
                     <div className="w-36 h-36 sm:w-48 sm:h-48 bg-gray-50 rounded-3xl p-5 sm:p-6 mb-5 sm:mb-6 flex items-center justify-center border border-gray-100">
@@ -113,7 +115,7 @@ const ProductDetails = () => {
                     <h1 className="text-2xl sm:text-3xl font-black text-gray-900 mb-2 leading-tight px-2">{product.name}</h1>
                     <div className="flex flex-wrap items-center justify-center gap-2 mb-4 px-2">
                         <span className="px-3 py-1 bg-brand-50 text-brand-600 rounded-full text-xs font-bold uppercase tracking-wider">
-                            {product.brand || 'No Brand'}
+                            {product.brand || t('no_brand', 'No Brand')}
                         </span>
                         <span className="px-3 py-1 bg-gray-50 text-gray-400 rounded-full text-xs font-medium uppercase tracking-wider">
                             {barcode}
@@ -130,7 +132,7 @@ const ProductDetails = () => {
                     }}
                     className="px-4 sm:px-6 py-4 bg-gray-100 text-gray-700 rounded-2xl font-bold hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
                 >
-                    Back
+                    {t('back', 'Back')}
                 </button>
                 <button
                     onClick={() => {
@@ -139,7 +141,7 @@ const ProductDetails = () => {
                     }}
                     className="flex-1 py-4 bg-brand-600 text-white rounded-2xl font-bold shadow-lg shadow-brand-500/20 hover:bg-brand-700 active:scale-95 transition-all flex items-center justify-center gap-2"
                 >
-                    <FiPlusCircle size={18} /> Add Current Price
+                    <FiPlusCircle size={18} /> {t('add_current_price', 'Add Current Price')}
                 </button>
             </div>
 

@@ -98,7 +98,7 @@ const Navbar = () => {
                             <button
                                 onClick={toggleTheme}
                                 className="p-2.5 text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl transition-all shadow-sm hover:scale-105"
-                                aria-label="Toggle Dark Mode"
+                                aria-label={t('toggle_dark_mode', 'Toggle Dark Mode')}
                             >
                                 {theme === 'dark' ? <FiSun size={20} /> : <FiMoon size={20} />}
                             </button>
@@ -113,7 +113,7 @@ const Navbar = () => {
                                             {user.name?.charAt(0).toUpperCase()}
                                         </div>
                                         <div className="flex flex-col">
-                                            <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">Account</span>
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">{t('account', 'Account')}</span>
                                             <span className="text-xs font-black text-gray-900 dark:text-white leading-none max-w-[80px] truncate tracking-tight">{user.name}</span>
                                         </div>
                                     </Link>

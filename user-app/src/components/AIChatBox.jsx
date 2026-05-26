@@ -307,7 +307,7 @@ const setCachedIntent = (key, value, ttl) => {
 };
 
 import { useState, useEffect, useRef } from 'react';
-import { FiX, FiSend, FiList, FiLoader, FiExternalLink, FiPackage, FiShoppingBag, FiPlus, FiTrash2, FiChevronLeft, FiCpu } from 'react-icons/fi';
+import { FiX, FiSend, FiList, FiLoader, FiExternalLink, FiPackage, FiShoppingBag, FiPlus, FiTrash2, FiChevronLeft, FiCpu, FiMapPin, FiCheckCircle, FiSearch, FiCamera, FiClipboard } from 'react-icons/fi';
 import OpenAI from "openai";
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -386,7 +386,7 @@ const formatAiProfileForPrompt = (profile = {}) => {
     ].join('\n');
 };
 
-const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [] }) => {
+const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [], t }) => {
     const extractBarcodeFromText = (value) => {
         const match = String(value || '').match(/\[BARCODE:([\w\d-]+)\]/i);
         return match ? match[1] : '';
@@ -429,10 +429,10 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [] }) => {
                         <p className="text-sm font-bold text-gray-800 dark:text-white truncate">{product.name || product.productName}</p>
                         {best ? (
                             <p className="text-xs text-green-700 dark:text-green-300 font-black">
-                                Best: {convert(best.price, 'TRY')} {getCurrencySymbol()}
+                                {t('best', 'Best')}: {convert(best.price, 'TRY')} {getCurrencySymbol()}
                             </p>
                         ) : (
-                            <p className="text-xs text-gray-500">No price info</p>
+                            <p className="text-xs text-gray-500">{t('no_price_info', 'No price info')}</p>
                         )}
                     </div>
                 </div>
@@ -453,20 +453,20 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [] }) => {
         return (
             <div className="my-1.5 rounded-2xl border border-brand-100 dark:border-brand-800/30 bg-gradient-to-br from-white to-brand-50/40 dark:from-gray-800 dark:to-brand-900/10 p-3 sm:p-4 shadow-soft">
                 <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-black uppercase tracking-[0.18em] text-brand-600 dark:text-brand-300">Ingredient Check</span>
+                    <span className="text-[10px] font-black uppercase tracking-[0.18em] text-brand-600 dark:text-brand-300">{t('ai_ingredient_check', 'Ingredient Check')}</span>
                     <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${tone}`}>
-                        {data.suitability || 'Unknown'}
+                        {data.suitability || t('ai_status_unknown', 'Unknown')}
                     </span>
                 </div>
                 {productBarcode ? renderBarcodeProductCard(productBarcode, `ingredient-${productBarcode}`) : null}
                 {data.checks && (
                     <p className="mt-1 text-[11px] font-semibold text-gray-500 dark:text-gray-300">
-                        Checks: {renderInlineBoldText(data.checks, 'ic-checks')}
+                        {t('ai_checks', 'Checks')}: {renderInlineBoldText(data.checks, 'ic-checks')}
                     </p>
                 )}
                 {data.reasons.length > 0 && (
                     <div className="mt-3">
-                        <p className="text-[11px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">Reasons</p>
+                        <p className="text-[11px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">{t('ai_reasons', 'Reasons')}</p>
                         <ol className="mt-1 space-y-1 text-[13px] text-gray-700 dark:text-gray-200">
                             {data.reasons.map((reason, index) => (
                                 <li key={`reason-${index}`} className="leading-5">
@@ -479,21 +479,21 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [] }) => {
                 )}
                 <details className="mt-3 rounded-2xl border border-gray-100 bg-white/70 dark:border-gray-700/70 dark:bg-gray-900/30 px-3 py-2 group">
                     <summary className="cursor-pointer list-none text-[11px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">
-                        Ingredients & allergens
+                        {t('ai_ingredients_allergens', 'Ingredients & allergens')}
                     </summary>
                     <div className="mt-2 space-y-2">
                         <p className="text-[12px] leading-5 text-gray-700 dark:text-gray-200">
-                            <span className="font-black text-gray-500 dark:text-gray-400">Ingredients: </span>
-                            {renderInlineBoldText(data.ingredients || 'No ingredients listed', 'ic-ingredients')}
+                            <span className="font-black text-gray-500 dark:text-gray-400">{t('ai_ingredients', 'Ingredients')}: </span>
+                            {renderInlineBoldText(data.ingredients || t('ai_no_ingredients', 'No ingredients listed'), 'ic-ingredients')}
                         </p>
                         <p className="text-[12px] leading-5 text-gray-700 dark:text-gray-200">
-                            <span className="font-black text-gray-500 dark:text-gray-400">Allergens: </span>
-                            {renderInlineBoldText(data.allergens || 'No allergens listed', 'ic-allergens')}
+                            <span className="font-black text-gray-500 dark:text-gray-400">{t('ai_allergens', 'Allergens')}: </span>
+                            {renderInlineBoldText(data.allergens || t('ai_no_allergens', 'No allergens listed'), 'ic-allergens')}
                         </p>
                     </div>
                 </details>
                 <p className="mt-3 text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">
-                    Source: PriceMate
+                    {t('ai_source_pricemate', 'Source: PriceMate')}
                 </p>
                 {data.tip && (
                     <p className="mt-2 rounded-2xl bg-brand-50 px-3 py-2 text-[11px] font-bold text-brand-700 dark:bg-brand-900/20 dark:text-brand-300">
@@ -505,23 +505,23 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [] }) => {
     };
 
     const statusLabel = (status) => {
-        if (status === 'avoid') return 'Not suitable';
-        if (status === 'caution') return 'Use caution';
-        if (status === 'safe') return 'Likely suitable';
-        if (status === 'ok') return 'Available';
-        return 'Unknown';
+        if (status === 'avoid') return t('ai_status_avoid', 'Not suitable');
+        if (status === 'caution') return t('ai_status_caution', 'Use caution');
+        if (status === 'safe') return t('ai_status_safe', 'Likely suitable');
+        if (status === 'ok') return t('available', 'Available');
+        return t('ai_status_unknown', 'Unknown');
     };
 
     const checkLabel = (value) => {
         const labels = {
-            high_sugar: 'sugar',
-            high_sodium: 'sodium',
-            high_caffeine: 'caffeine',
-            allergy: 'allergy',
-            gluten: 'gluten',
-            lactose: 'lactose',
-            pregnancy: 'pregnancy',
-            ingredients: 'ingredients',
+            high_sugar: t('check_sugar', 'sugar'),
+            high_sodium: t('check_sodium', 'sodium'),
+            high_caffeine: t('check_caffeine', 'caffeine'),
+            allergy: t('condition_allergy', 'allergy'),
+            gluten: t('condition_gluten', 'gluten'),
+            lactose: t('condition_lactose', 'lactose'),
+            pregnancy: t('condition_pregnancy', 'pregnancy'),
+            ingredients: t('ai_ingredients', 'ingredients'),
         };
         return labels[value] || String(value || '').replace(/_/g, ' ');
     };
@@ -535,19 +535,19 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [] }) => {
             : checks;
         return renderIngredientCard({
             product: product.barcode
-                ? `${product.name || 'Unknown Product'} [BARCODE:${product.barcode}]`
-                : (product.name || 'Unknown Product'),
+                ? `${product.name || t('unknown_product', 'Unknown Product')} [BARCODE:${product.barcode}]`
+                : (product.name || t('unknown_product', 'Unknown Product')),
             suitability: statusLabel(check.status || result.status),
             checks: [
                 ...checkNames.map(checkLabel),
                 ...(check.allergenTargets?.length ? [`allergy (${check.allergenTargets.join(', ')})`] : []),
             ].join(', '),
             reasons: check.reasons || result.reasons || [],
-            ingredients: emphasizeImportantIngredients(truncateText(check.ingredients || 'No ingredients listed', 180)),
+            ingredients: emphasizeImportantIngredients(truncateText(check.ingredients || t('ai_no_ingredients', 'No ingredients listed'), 180)),
             allergens: emphasizeImportantIngredients(
                 Array.isArray(check.allergens) && check.allergens.length > 0
                     ? truncateText(check.allergens.join(', '), 120)
-                    : 'No allergens listed'
+                    : t('ai_no_allergens', 'No allergens listed')
             ),
             source: 'PriceMate',
         });
@@ -565,24 +565,24 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [] }) => {
         return (
             <div className="my-1.5 rounded-2xl border border-brand-100 dark:border-brand-800/30 bg-gradient-to-br from-white to-brand-50/40 dark:from-gray-800 dark:to-brand-900/10 p-3 sm:p-4 shadow-soft">
                 <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-black uppercase tracking-[0.18em] text-brand-600 dark:text-brand-300">Price Check</span>
+                    <span className="text-[10px] font-black uppercase tracking-[0.18em] text-brand-600 dark:text-brand-300">{t('ai_price_check', 'Price Check')}</span>
                     <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${tone}`}>
-                        {result.stale ? 'Cached' : statusLabel(result.status)}
+                        {result.stale ? t('cached', 'Cached') : statusLabel(result.status)}
                     </span>
                 </div>
                 {product.barcode ? renderBarcodeProductCard(product.barcode, `price-${product.barcode}`) : null}
                 <div className="mt-3">
                     <p className="text-sm font-black text-gray-900 dark:text-white">
-                        {product.name || 'Product'}
+                        {product.name || t('product', 'Product')}
                     </p>
                     {headline ? (
                         <p className="mt-1 text-[13px] font-semibold text-gray-700 dark:text-gray-200">
-                            {check.type === 'highest' ? 'Highest' : 'Best'}: <strong>{convert(headline.price, headline.currency || 'TRY')} {getCurrencySymbol()}</strong>
-                            <span className="text-gray-400"> at {headline.supermarketName || 'Store'}</span>
+                            {check.type === 'highest' ? t('highest', 'Highest') : t('best', 'Best')}: <strong>{convert(headline.price, headline.currency || 'TRY')} {getCurrencySymbol()}</strong>
+                            <span className="text-gray-400"> {t('at_store', 'at')} {headline.supermarketName || t('store', 'Store')}</span>
                         </p>
                     ) : (
                         <p className="mt-1 text-[13px] font-semibold text-amber-700 dark:text-amber-300">
-                            {result.reasons?.[0] || 'Price temporarily unavailable.'}
+                            {result.reasons?.[0] || t('price_temporarily_unavailable', 'Price temporarily unavailable.')}
                         </p>
                     )}
                 </div>
@@ -594,10 +594,10 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [] }) => {
                                 className="flex items-center justify-between gap-3 rounded-xl bg-white/70 dark:bg-gray-900/40 border border-gray-100 dark:border-gray-700/60 px-3 py-2"
                             >
                                 <span className="min-w-0 truncate text-[12px] font-bold text-gray-700 dark:text-gray-200">
-                                    {item.supermarketName || 'Store'}
+                                    {item.supermarketName || t('store', 'Store')}
                                     {item.isPreferredStore ? (
                                         <span className="ml-1 rounded-full bg-brand-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
-                                            preferred
+                                            {t('preferred', 'preferred')}
                                         </span>
                                     ) : null}
                                 </span>
@@ -611,13 +611,13 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [] }) => {
                                 to={`/price-comparison/${product.barcode}`}
                                 className="mt-2 inline-flex min-h-10 items-center rounded-full bg-brand-50 px-3 text-[11px] font-black uppercase tracking-widest text-brand-700 dark:bg-brand-900/30 dark:text-brand-300"
                             >
-                                View all prices
+                                {t('view_all_prices', 'View all prices')}
                             </Link>
                         )}
                     </div>
                 )}
                 <p className="mt-3 text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">
-                    Source: PriceMate
+                    {t('ai_source_pricemate', 'Source: PriceMate')}
                 </p>
             </div>
         );
@@ -673,7 +673,7 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [] }) => {
                     const highestPrice = sortedPrices.length > 0 ? sortedPrices[sortedPrices.length - 1] : null;
                     
                     const priceToShow = isMostExpensiveRequest ? highestPrice : lowestPrice;
-                    const badgeText = isMostExpensiveRequest ? "Most Expensive" : (isCheapestRequest ? "Cheapest" : null);
+                    const badgeText = isMostExpensiveRequest ? t('most_expensive', 'Most Expensive') : (isCheapestRequest ? t('cheapest', 'Cheapest') : null);
                     const badgeColor = isMostExpensiveRequest ? "bg-red-600" : "bg-green-600";
 
                     return (
@@ -702,7 +702,7 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [] }) => {
                                     {priceToShow ? (
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-baseline gap-1">
-                                                <span className="text-xs text-gray-500 dark:text-gray-400">{isMostExpensiveRequest ? 'High:' : 'Best:'}</span>
+                                                <span className="text-xs text-gray-500 dark:text-gray-400">{isMostExpensiveRequest ? t('high', 'High') : t('best', 'Best')}:</span>
                                                 <span className={`text-base font-black ${isMostExpensiveRequest ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
                                                     {convert(priceToShow.price, 'TRY')} {getCurrencySymbol()}
                                                 </span>
@@ -710,12 +710,12 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [] }) => {
                                             <div className="flex items-center gap-1 text-[10px] font-bold text-gray-500 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-700">
                                                 <FiShoppingBag className="shrink-0" size={10} />
                                                 <span className="truncate max-w-[70px]">
-                                                    {Array.isArray(priceToShow.supermarkets) ? priceToShow.supermarkets[0]?.name : (priceToShow.supermarketName || "Store")}
+                                                    {Array.isArray(priceToShow.supermarkets) ? priceToShow.supermarkets[0]?.name : (priceToShow.supermarketName || t('store', 'Store'))}
                                                 </span>
                                             </div>
                                         </div>
                                     ) : (
-                                        <span className="text-[10px] text-gray-500 italic">No price info</span>
+                                        <span className="text-[10px] text-gray-500 italic">{t('no_price_info', 'No price info')}</span>
                                     )}
                                 </div>
                             </div>
@@ -730,7 +730,7 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [] }) => {
                         to={`/price-comparison/${barcode}`}
                         className="inline-flex items-center gap-0.5 bg-white/20 hover:bg-white/30 px-1.5 py-0.5 rounded text-xs font-bold underline transition-colors"
                     >
-                        View Product <FiExternalLink size={10} />
+                        {t('view_product', 'View Product')} <FiExternalLink size={10} />
                     </Link>
                 );
             }
@@ -830,11 +830,41 @@ const AIChatBox = ({ isOpen, onClose }) => {
     const formRef = useRef(null);
 
     const mobileQuickPrompts = [
-        { label: 'Cheapest nearby', prompt: t('ai_chat_prompt_cheapest_nearby', 'Find the cheapest nearby option') },
-        { label: 'Check ingredients', prompt: t('ai_chat_prompt_ingredients', 'Check ingredients for me') },
-        { label: 'Is this suitable?', prompt: t('ai_chat_prompt_suitable', 'Is this suitable for me?') },
-        { label: 'Compare prices', prompt: t('ai_chat_prompt_compare', 'Compare prices for this product') },
-        { label: 'Scan barcode', prompt: t('ai_chat_prompt_scan_barcode', 'I scanned a product. Check this barcode: ') },
+        {
+            key: 'cheapest',
+            Icon: FiMapPin,
+            label: t('ai_chat_quick_cheapest', 'Cheapest nearby'),
+            description: t('ai_chat_quick_cheapest_desc', 'Find the lowest available price.'),
+            prompt: t('ai_chat_prompt_cheapest_nearby', 'Find the cheapest nearby option'),
+        },
+        {
+            key: 'ingredients',
+            Icon: FiClipboard,
+            label: t('ai_chat_quick_ingredients', 'Check ingredients'),
+            description: t('ai_chat_quick_ingredients_desc', 'Review ingredients and key nutrition.'),
+            prompt: t('ai_chat_prompt_ingredients', 'Check ingredients for me'),
+        },
+        {
+            key: 'suitable',
+            Icon: FiCheckCircle,
+            label: t('ai_chat_quick_suitable', 'Suitable for me?'),
+            description: t('ai_chat_quick_suitable_desc', 'Use your saved allergies and preferences.'),
+            prompt: t('ai_chat_prompt_suitable', 'Is this suitable for me?'),
+        },
+        {
+            key: 'compare',
+            Icon: FiSearch,
+            label: t('ai_chat_quick_compare', 'Compare prices'),
+            description: t('ai_chat_quick_compare_desc', 'See stores ranked by price.'),
+            prompt: t('ai_chat_prompt_compare', 'Compare prices for this product'),
+        },
+        {
+            key: 'scan',
+            Icon: FiCamera,
+            label: t('ai_chat_quick_scan', 'Scan barcode'),
+            description: t('ai_chat_quick_scan_desc', 'Paste or scan a barcode to check.'),
+            prompt: t('ai_chat_prompt_scan_barcode', 'I scanned a product. Check this barcode: '),
+        },
     ];
 
     const mobileEmptyActions = mobileQuickPrompts.slice(0, 4);
@@ -1791,7 +1821,7 @@ const AIChatBox = ({ isOpen, onClose }) => {
         if (!user?.$id) return null;
         return (
             <div className="flex flex-col h-full min-h-0 bg-gray-100 dark:bg-gray-900/80">
-                <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                <div className="flex-1 overflow-y-auto p-3 sm:p-2 space-y-2.5 sm:space-y-2">
                     {summariesLoading && conversationRows.length === 0 ? (
                         <div className="flex justify-center p-4">
                             <FiLoader className="animate-spin text-brand-600" />
@@ -1816,9 +1846,9 @@ const AIChatBox = ({ isOpen, onClose }) => {
                                             }
                                             afterPick?.();
                                         }}
-                                        className="w-full min-h-14 text-left p-3 pr-9"
+                                        className="w-full min-h-16 sm:min-h-14 text-left p-4 pr-11 sm:p-3 sm:pr-9"
                                     >
-                                        <span className="block text-[12px] font-black text-gray-900 dark:text-white line-clamp-2 leading-tight">
+                                        <span className="block text-[13px] sm:text-[12px] font-black text-gray-900 dark:text-white line-clamp-2 leading-tight">
                                             {labelForRow(row)}
                                         </span>
                                     </button>
@@ -1832,7 +1862,7 @@ const AIChatBox = ({ isOpen, onClose }) => {
                                                     afterPick?.();
                                                 }
                                             }}
-                                            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-xl text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 opacity-80 group-hover:opacity-100"
+                                            className="absolute right-2 top-1/2 min-h-10 min-w-10 -translate-y-1/2 rounded-xl text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 opacity-80 group-hover:opacity-100 flex items-center justify-center"
                                             aria-label={t('ai_chat_delete_thread')}
                                         >
                                             <FiTrash2 size={12} />
@@ -1854,8 +1884,8 @@ const AIChatBox = ({ isOpen, onClose }) => {
                 onClick={onClose}
                 aria-hidden="true"
             />
-            <div className="fixed inset-0 z-[2000] flex h-[100dvh] flex-col overflow-hidden border border-gray-200 bg-white shadow-2xl animate-in slide-in-from-bottom-4 duration-300 dark:border-gray-700 dark:bg-gray-800 sm:inset-auto sm:bottom-4 sm:right-4 sm:h-[min(640px,90vh)] sm:w-[400px] sm:rounded-2xl md:w-[448px] sm:border sm:shadow-2xl sm:slide-in-from-bottom-5 sm:slide-in-from-right">
-            <div className="border-b border-black/5 bg-gradient-to-r from-brand-600 via-brand-600 to-brand-700 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] text-white shadow-md shrink-0 sm:px-5 sm:py-4">
+            <div className="fixed inset-0 z-[2000] flex h-[100dvh] w-screen touch-pan-y flex-col overflow-hidden border-0 bg-white shadow-2xl animate-in slide-in-from-bottom-4 duration-300 dark:border-gray-700 dark:bg-gray-800 sm:inset-auto sm:bottom-4 sm:right-4 sm:h-[min(640px,90vh)] sm:w-[400px] sm:rounded-2xl sm:border sm:border-gray-200 sm:shadow-2xl sm:slide-in-from-bottom-5 sm:slide-in-from-right md:w-[448px]">
+            <div className="border-b border-black/5 bg-gradient-to-r from-brand-700 via-brand-600 to-accent-600 px-3.5 pb-3 pt-[calc(0.65rem+env(safe-area-inset-top,0px))] text-white shadow-md shrink-0 sm:px-5 sm:py-4">
                 <div className="flex items-center gap-3 min-w-0">
                     {user && (
                         <button
@@ -1873,14 +1903,14 @@ const AIChatBox = ({ isOpen, onClose }) => {
                     <div className="flex-1 min-w-0 flex flex-col justify-center">
                         <div className="flex items-center gap-2 min-w-0 leading-none">
                             <span className="font-black block text-sm sm:text-[15px] truncate">
-                                PriceMate AI
+                                {t('ai_chat_title', 'PriceMate AI')}
                             </span>
                             <span className="hidden sm:inline-flex text-[9px] uppercase tracking-[0.22em] font-black bg-white/15 px-2 py-0.5 rounded-full">
-                                Powered by Gemini
+                                {t('ai_chat_powered_by', 'Powered by Gemini')}
                             </span>
                         </div>
                         <p className="mt-1 text-[11px] text-white/80 leading-relaxed hidden sm:block">
-                            Ask for cheaper picks, compare products, or check ingredients instantly.
+                            {t('ai_chat_subtitle', 'Ask for cheaper picks, compare products, or check ingredients instantly.')}
                         </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
@@ -1942,11 +1972,11 @@ const AIChatBox = ({ isOpen, onClose }) => {
                         </div>
                     )}
 
-                    <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 bg-gray-50 dark:bg-gray-900 min-h-0">
+                    <div className="flex-1 overflow-y-auto overscroll-contain scroll-pb-32 p-4 sm:p-5 space-y-4 bg-gray-50 dark:bg-gray-900 min-h-0">
                         {!user && (
                             <div className="p-4 rounded-[1.5rem] bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/30 text-center">
                                 <p className="text-xs sm:text-sm text-amber-700 dark:text-amber-300 leading-relaxed">
-                                    Log in to save your chat history and get personalized recommendations.
+                                    {t('ai_chat_login_hint', 'Log in to save your chat history and get personalized recommendations.')}
                                 </p>
                             </div>
                         )}
@@ -1963,9 +1993,9 @@ const AIChatBox = ({ isOpen, onClose }) => {
                                                 <FiCpu size={22} className="text-white/85" />
                                             </div>
                                             <div className="min-w-0">
-                                                <h2 className="text-lg font-black tracking-tight">What do you want to check?</h2>
+                                                <h2 className="text-lg font-black tracking-tight">{t('ai_chat_empty_title', 'What do you want to check?')}</h2>
                                                 <p className="text-white/80 text-xs sm:text-sm mt-0.5 leading-relaxed">
-                                                    Pick a shortcut or type your own shopping question.
+                                                    {t('ai_chat_empty_description', 'Pick a shortcut or type your own shopping question.')}
                                                 </p>
                                             </div>
                                         </div>
@@ -1973,16 +2003,23 @@ const AIChatBox = ({ isOpen, onClose }) => {
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-2">
-                                        {mobileEmptyActions.map((item) => (
+                                        {mobileEmptyActions.map((item) => {
+                                            const Icon = item.Icon;
+                                            return (
                                             <button
-                                                key={item.label}
+                                                key={item.key}
                                                 type="button"
                                                 onClick={() => applyQuickPrompt(item.prompt)}
-                                                className="min-h-20 rounded-3xl border border-gray-200 bg-white px-4 py-3 text-left text-[12px] font-black text-gray-800 shadow-sm transition active:scale-[0.98] dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                                                className="min-h-24 rounded-3xl border border-gray-200 bg-white px-4 py-3.5 text-left text-gray-800 shadow-sm transition active:scale-[0.98] dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
                                             >
-                                                {item.label}
+                                                <span className="mb-2 flex h-9 w-9 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 dark:bg-brand-900/30 dark:text-brand-300">
+                                                    <Icon size={17} />
+                                                </span>
+                                                <span className="block text-[12px] font-black leading-tight">{item.label}</span>
+                                                <span className="mt-1 block text-[10px] font-semibold leading-4 text-gray-500 dark:text-gray-400">{item.description}</span>
                                             </button>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
 
                                     {/* Guide text removed per request. */}
@@ -2008,6 +2045,7 @@ const AIChatBox = ({ isOpen, onClose }) => {
                                         convert={convert}
                                         getCurrencySymbol={getCurrencySymbol}
                                         allProducts={fullProductList}
+                                        t={t}
                                     />
                                 ))}
                                 {isLoading && (
@@ -2049,11 +2087,12 @@ const AIChatBox = ({ isOpen, onClose }) => {
                             <div className="mb-3 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none]">
                                 {mobileQuickPrompts.map((item) => (
                                     <button
-                                        key={item.label}
+                                        key={item.key}
                                         type="button"
                                         onClick={() => applyQuickPrompt(item.prompt)}
-                                        className="shrink-0 rounded-full border border-brand-100 bg-brand-50 px-3 py-2 text-[11px] font-black text-brand-700 dark:border-brand-800/50 dark:bg-brand-900/20 dark:text-brand-300"
+                                        className="shrink-0 min-h-11 rounded-full border border-brand-100 bg-brand-50 px-4 py-2.5 text-[11px] font-black text-brand-700 dark:border-brand-800/50 dark:bg-brand-900/20 dark:text-brand-300 flex items-center gap-2"
                                     >
+                                        <item.Icon size={14} />
                                         {item.label}
                                     </button>
                                 ))}

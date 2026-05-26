@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Lock, ArrowRight, Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import useAuthStore from '../stores/authStore';
 import BackButton from '../components/BackButton';
 
 const ResetPassword = () => {
+    const { t } = useTranslation();
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const confirmPasswordReset = useAuthStore((state) => state.confirmPasswordReset);
@@ -28,7 +30,7 @@ const ResetPassword = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!isValidLink) {
-            setError('This reset link is invalid or expired.');
+            setError(t('reset_link_invalid', 'This reset link is invalid or expired.'));
             return;
         }
 
@@ -38,7 +40,7 @@ const ResetPassword = () => {
         if (ok) {
             setSuccess(true);
         } else {
-            setError(useAuthStore.getState().error || 'Failed to reset password.');
+            setError(useAuthStore.getState().error || t('reset_password_failed', 'Failed to reset password.'));
         }
         setLoading(false);
     };
@@ -60,10 +62,10 @@ const ResetPassword = () => {
                 </div>
 
                 <h2 className="text-center text-4xl font-black tracking-tight text-gray-900 dark:text-white">
-                    New password
+                    {t('new_password_title', 'New password')}
                 </h2>
                 <p className="mt-3 text-center text-gray-400 dark:text-gray-500 text-[10px] font-black uppercase tracking-[0.2em]">
-                    SET A NEW PASSWORD FOR YOUR ACCOUNT
+                    {t('new_password_subtitle', 'Set a new password for your account')}
                 </p>
             </div>
 
@@ -72,26 +74,26 @@ const ResetPassword = () => {
                     {!isValidLink ? (
                         <div className="space-y-4 text-center">
                             <p className="text-sm text-gray-600 dark:text-gray-300 font-medium">
-                                This reset link is invalid or expired.
+                                {t('reset_link_invalid', 'This reset link is invalid or expired.')}
                             </p>
                             <Link
                                 to="/forgot-password"
                                 className="tap-target inline-flex items-center justify-center gap-2 w-full min-h-11 py-4 bg-black dark:bg-white text-white dark:text-black rounded-[1.5rem] text-[12px] font-black uppercase tracking-widest"
                             >
-                                Request a new link
+                                {t('request_new_link', 'Request a new link')}
                                 <ArrowRight className="h-4 w-4" />
                             </Link>
                         </div>
                     ) : success ? (
                         <div className="space-y-4 text-center">
                             <p className="text-sm text-gray-600 dark:text-gray-300 font-medium">
-                                Password updated. Redirecting to login...
+                                {t('password_updated_redirecting', 'Password updated. Redirecting to login...')}
                             </p>
                             <Link
                                 to="/login"
                                 className="tap-target inline-flex items-center justify-center gap-2 w-full min-h-11 py-4 bg-black dark:bg-white text-white dark:text-black rounded-[1.5rem] text-[12px] font-black uppercase tracking-widest"
                             >
-                                Go to Login
+                                {t('go_to_login', 'Go to Login')}
                                 <ArrowRight className="h-4 w-4" />
                             </Link>
                         </div>
@@ -105,7 +107,7 @@ const ResetPassword = () => {
 
                             <div className="space-y-2">
                                 <label htmlFor="password" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500 ml-1">
-                                    New Password
+                                    {t('new_password', 'New Password')}
                                 </label>
                                 <div className="relative group">
                                     <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
@@ -117,7 +119,7 @@ const ResetPassword = () => {
                                         required
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
-                                        placeholder="Minimum 8 characters"
+                                        placeholder={t('password_min_placeholder')}
                                         className="block w-full pl-12 pr-6 py-4 bg-gray-50/50 dark:bg-black/20 border-gray-100 dark:border-white/5 focus:bg-white dark:focus:bg-black border focus:border-brand-500 dark:focus:border-brand-500 rounded-2xl text-[15px] font-bold transition-all outline-none text-gray-900 dark:text-white placeholder:text-gray-300 dark:placeholder:text-gray-700 shadow-inner"
                                     />
                                 </div>
@@ -125,7 +127,7 @@ const ResetPassword = () => {
 
                             <div className="space-y-2">
                                 <label htmlFor="confirmPassword" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500 ml-1">
-                                    Confirm Password
+                                    {t('confirm_password', 'Confirm Password')}
                                 </label>
                                 <div className="relative group">
                                     <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
@@ -137,7 +139,7 @@ const ResetPassword = () => {
                                         required
                                         value={confirmPassword}
                                         onChange={(e) => setConfirmPassword(e.target.value)}
-                                        placeholder="Re-enter password"
+                                        placeholder={t('reenter_password', 'Re-enter password')}
                                         className="block w-full pl-12 pr-6 py-4 bg-gray-50/50 dark:bg-black/20 border-gray-100 dark:border-white/5 focus:bg-white dark:focus:bg-black border focus:border-brand-500 dark:focus:border-brand-500 rounded-2xl text-[15px] font-bold transition-all outline-none text-gray-900 dark:text-white placeholder:text-gray-300 dark:placeholder:text-gray-700 shadow-inner"
                                     />
                                 </div>
@@ -152,7 +154,7 @@ const ResetPassword = () => {
                                     <Loader2 className="h-5 w-5 animate-spin" />
                                 ) : (
                                     <>
-                                        <span>Update password</span>
+                                        <span>{t('update_password', 'Update password')}</span>
                                         <ArrowRight className="h-4 w-4" />
                                     </>
                                 )}

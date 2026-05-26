@@ -20,3 +20,22 @@ export const resolveCenter = ({ lat, lon, centerProp, supermarkets = [] }) => {
   const averageLon = validMarkers.reduce((sum, marker) => sum + Number(marker.longitude), 0) / validMarkers.length;
   return { latitude: averageLat, longitude: averageLon };
 };
+
+export const buildRouteKey = (from, to, precision = 5) => {
+  if (
+    !from ||
+    !to ||
+    !hasValidLatLon(from.latitude, from.longitude) ||
+    !hasValidLatLon(to.latitude, to.longitude)
+  ) {
+    return '';
+  }
+
+  const format = (value) => Number(value).toFixed(precision);
+  return [
+    format(from.latitude),
+    format(from.longitude),
+    format(to.latitude),
+    format(to.longitude),
+  ].join(':');
+};

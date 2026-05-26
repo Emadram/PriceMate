@@ -1,4 +1,5 @@
 import React from 'react';
+import i18n from '../lib/i18n';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -27,16 +28,16 @@ class ErrorBoundary extends React.Component {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
             </div>
-            <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">Something went wrong</h1>
+            <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">{i18n.t('error_boundary_title', 'Something went wrong')}</h1>
             <p className="text-zinc-600 dark:text-zinc-400">
-              The application encountered an unexpected error. We've been notified and are looking into it.
+              {i18n.t('error_boundary_description', "The application encountered an unexpected error. We've been notified and are looking into it.")}
             </p>
             <div className="pt-4">
               <button
                 onClick={() => window.location.reload()}
                 className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/20"
               >
-                Reload Application
+                {i18n.t('reload_application', 'Reload Application')}
               </button>
             </div>
             {import.meta.env.DEV && (

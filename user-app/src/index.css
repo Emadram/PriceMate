@@ -34,6 +34,18 @@
     min-height: 100vh;
   }
 
+  html.pricemate-splash-active,
+  body.pricemate-splash-active {
+    overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: none;
+  }
+
+  body.pricemate-splash-active #pricemate-ai-launcher {
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+
   .dark body {
     background-color: #020617;
     color: #e6eef8;
@@ -121,4 +133,3 @@
 .dark .map-dark-invert .map-tiles {
   filter: invert(0.92) hue-rotate(180deg) brightness(0.92) contrast(1.12);
 }
-

@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import useAuthStore from '../stores/authStore';
 import BackButton from '../components/BackButton';
 
 const Login = () => {
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const login = useAuthStore((state) => state.login);
     const resendVerification = useAuthStore((state) => state.resendVerification);
@@ -38,7 +40,7 @@ const Login = () => {
             navigate('/');
         } else {
             const { error: storeError, errorCode: storeErrorCode } = useAuthStore.getState();
-            setError(storeError || 'Invalid credentials. Please try again.');
+            setError(storeError || t('invalid_credentials'));
             setErrorCode(storeErrorCode || null);
             setLoading(false);
         }
@@ -47,7 +49,7 @@ const Login = () => {
     const handleResendVerification = async () => {
         if (resendCooldown > 0 || resendLoading) return;
         if (!formData.email || !formData.password) {
-            setError('Enter your email and password to resend the verification email.');
+            setError(t('resend_verification_need_credentials'));
             setErrorCode('email_not_verified');
             return;
         }
@@ -80,10 +82,10 @@ const Login = () => {
                 </div>
                 
                 <h2 className="text-center text-4xl font-black tracking-tight text-gray-900 dark:text-white">
-                    Sign in
+                    {t('login_title')}
                 </h2>
                 <p className="mt-3 text-center text-gray-400 dark:text-gray-500 text-[10px] font-black uppercase tracking-[0.2em]">
-                    SIGN IN TO YOUR PRICEMATE ACCOUNT
+                    {t('login_subtitle')}
                 </p>
             </div>
 
@@ -101,10 +103,10 @@ const Login = () => {
                                         className="w-full py-3 bg-white text-red-600 border border-red-200 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-red-50 disabled:opacity-60"
                                     >
                                         {resendLoading
-                                            ? 'Sending...'
+                                            ? t('resend_sending')
                                             : resendCooldown > 0
-                                                ? `Resend in ${resendCooldown}s`
-                                                : 'Resend Verification Email'}
+                                                ? t('resend_in', { seconds: resendCooldown })
+                                                : t('resend_verification_email')}
                                     </button>
                                 )}
                             </div>
@@ -112,7 +114,7 @@ const Login = () => {
 
                         <div className="space-y-2">
                             <label htmlFor="email" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500 ml-1">
-                                Email Address
+                                {t('email_address')}
                             </label>
                             <div className="relative group">
                                 <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
@@ -133,10 +135,10 @@ const Login = () => {
                         <div className="space-y-2">
                             <div className="flex justify-between items-center ml-1">
                                 <label htmlFor="password" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">
-                                    Password
+                                    {t('password')}
                                 </label>
                                 <Link to="/forgot-password" className="tap-target inline-flex items-center justify-center px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300">
-                                    Forgot?
+                                    {t('forgot')}
                                 </Link>
                             </div>
                             <div className="relative group">
@@ -164,7 +166,7 @@ const Login = () => {
                                 <Loader2 className="h-5 w-5 animate-spin" />
                             ) : (
                                 <>
-                                    <span>Sign in</span>
+                                    <span>{t('sign_in')}</span>
                                     <ArrowRight className="h-4 w-4" />
                                 </>
                             )}
@@ -173,9 +175,9 @@ const Login = () => {
                 </div>
 
                 <p className="mt-10 text-center text-[14px] text-gray-500 font-medium">
-                    Don't have an account?{' '}
+                    {t('dont_have_account')}{' '}
                     <Link to="/register" className="tap-target inline-flex items-center justify-center px-2 py-1 rounded-lg font-black text-brand-600 dark:text-brand-400 hover:text-black dark:hover:text-brand-300 transition-colors uppercase tracking-widest text-[11px] ml-1">
-                        Create one
+                        {t('create_one')}
                     </Link>
                 </p>
             </div>

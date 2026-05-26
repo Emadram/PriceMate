@@ -1,6 +1,17 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const MOBILE_SPLASH_KEY = 'pricemate-mobile-splash-seen';
+const SCROLL_KEY_PREFIX = 'pricemate-scroll:';
+
+const shouldShowInitialSplash = () => {
+    if (typeof window === 'undefined') return false;
+    return (
+        window.matchMedia('(max-width: 767px)').matches &&
+        sessionStorage.getItem(MOBILE_SPLASH_KEY) !== '1'
+    );
+};
+
 const isDarkModeActive = () => {
     if (typeof window === 'undefined' || typeof document === 'undefined') return false;
     return (
@@ -10,9 +21,11 @@ const isDarkModeActive = () => {
 };
 
 const MobileSplashScreen = () => {
-    const [phase, setPhase] = useState('hidden');
-    const [isPageLoaded, setIsPageLoaded] = useState(false);
-    const SCROLL_KEY_PREFIX = 'pricemate-scroll:';
+    const { t } = useTranslation();
+    const [phase, setPhase] = useState(() => (shouldShowInitialSplash() ? 'visible' : 'hidden'));
+    const [isPageLoaded, setIsPageLoaded] = useState(
+        () => typeof document !== 'undefined' && document.readyState === 'complete'
+    );
     const isDark = isDarkModeActive();
 
     useEffect(() => {
@@ -31,12 +44,12 @@ const MobileSplashScreen = () => {
         } catch {
             // ignore storage errors
         }
-        const showTimeout = window.setTimeout(() => setPhase('visible'), 0);
 
+        const timers = [];
         const beginExit = () => {
             setIsPageLoaded(true);
-            window.setTimeout(() => setPhase('exiting'), 700);
-            window.setTimeout(() => setPhase('hidden'), 1200);
+            timers.push(window.setTimeout(() => setPhase('exiting'), 700));
+            timers.push(window.setTimeout(() => setPhase('hidden'), 1200));
         };
 
         if (document.readyState === 'complete') {
@@ -46,7 +59,7 @@ const MobileSplashScreen = () => {
         }
 
         return () => {
-            window.clearTimeout(showTimeout);
+            timers.forEach((timer) => window.clearTimeout(timer));
             window.removeEventListener('load', beginExit);
         };
     }, []);
@@ -57,6 +70,8 @@ const MobileSplashScreen = () => {
         const previousBodyOverflow = document.body.style.overflow;
         const previousHtmlOverflow = document.documentElement.style.overflow;
 
+        document.body.classList.add('pricemate-splash-active');
+        document.documentElement.classList.add('pricemate-splash-active');
         document.body.style.overflow = 'hidden';
         document.documentElement.style.overflow = 'hidden';
         // Ensure we start at the top while the splash is visible
@@ -67,6 +82,8 @@ const MobileSplashScreen = () => {
         }
 
         return () => {
+            document.body.classList.remove('pricemate-splash-active');
+            document.documentElement.classList.remove('pricemate-splash-active');
             document.body.style.overflow = previousBodyOverflow;
             document.documentElement.style.overflow = previousHtmlOverflow;
             // restore stored scroll for this path (if any)
@@ -87,8 +104,7 @@ const MobileSplashScreen = () => {
         return null;
     }
 
-    // Use transparent overlay in light mode to avoid a solid white band at the top
-    const overlayTone = isDark ? 'bg-slate-950 text-white' : 'bg-transparent text-slate-950';
+    const overlayTone = isDark ? 'bg-slate-950 text-white' : 'bg-[#faf5ff] text-slate-950';
     const surfaceTone = 'from-brand-500 via-brand-600 to-brand-700';
     const mutedTone = isDark ? 'text-white/65' : 'text-slate-500';
     const promptTone = isDark ? 'text-brand-300' : 'text-brand-600';
@@ -97,10 +113,10 @@ const MobileSplashScreen = () => {
     return (
         <div
             id="pricemate-mobile-splash"
-            className={`fixed inset-0 z-[2600] flex items-center justify-center overflow-hidden transition-all duration-500 ${overlayTone} ${shouldFade ? 'opacity-0 scale-[1.03]' : 'opacity-100'}`}
+            className={`fixed inset-0 z-[2147483647] flex items-center justify-center overflow-hidden transition-all duration-500 ${overlayTone} ${shouldFade ? 'opacity-0 scale-[1.03]' : 'opacity-100'}`}
             aria-hidden="true"
         >
-            <div className={`absolute inset-0 ${isDark ? 'bg-[radial-gradient(circle_at_top,rgba(79,70,229,0.22),transparent_36%),linear-gradient(180deg,rgba(2,6,23,0.98),rgba(15,23,42,0.98))]' : 'bg-[radial-gradient(circle_at_top,rgba(99,102,241,0.16),transparent_36%),linear-gradient(180deg,rgba(255,255,255,0),rgba(255,255,255,0))]'}`} />
+            <div className={`absolute inset-0 ${isDark ? 'bg-[radial-gradient(circle_at_top,rgba(124,58,237,0.24),transparent_38%),linear-gradient(180deg,rgba(2,6,23,1),rgba(15,23,42,1))]' : 'bg-[radial-gradient(circle_at_top,rgba(124,58,237,0.2),transparent_38%),linear-gradient(180deg,#faf5ff,#ffffff)]'}`} />
             <div className="relative flex w-full max-w-sm flex-col items-center px-8 text-center touch-none">
                 <div className="relative mb-8 flex h-32 w-32 items-center justify-center">
                     <div className={`absolute inset-0 rounded-[2rem] bg-gradient-to-br ${surfaceTone} shadow-[0_24px_80px_rgba(79,70,229,0.35)]`} />
@@ -119,7 +135,7 @@ const MobileSplashScreen = () => {
                     </h1>
                     {isPageLoaded && (
                         <p className={`mx-auto max-w-[18rem] text-sm font-medium leading-relaxed ${mutedTone}`}>
-                            Smart price tracking, ready when you are.
+                            {t('mobile_splash_ready', 'Smart price tracking, ready when you are.')}
                         </p>
                     )}
                 </div>

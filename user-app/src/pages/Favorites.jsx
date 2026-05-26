@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { FiStar, FiShoppingBag, FiPackage, FiChevronRight, FiHeart, FiClock } from 'react-icons/fi';
+import { useTranslation } from 'react-i18next';
 import { db, Query } from '../lib/appwrite';
 import { fetchAllPrices, normalizeProduct } from '../utils/productUtils';
 import ProductCard from '../components/ProductCard';
@@ -9,6 +10,7 @@ import BackButton from '../components/BackButton';
 import { ProductCardSkeleton } from '../components/SkeletonLoaders';
 
 const Favorites = () => {
+    const { t } = useTranslation();
     const location = useLocation();
     const [products, setProducts] = useState([]);
     const [supermarkets, setSupermarkets] = useState([]);
@@ -81,7 +83,7 @@ const Favorites = () => {
                     <BackButton to={backTarget} />
                     <h1 className="text-base sm:text-xl font-black text-gray-900 dark:text-white flex items-center gap-2 min-w-0">
                         <FiStar className="text-yellow-500 shrink-0" />
-                        <span className="truncate">Favorites</span>
+                        <span className="truncate">{t('favorites')}</span>
                     </h1>
                     <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-yellow-50 dark:bg-yellow-900/20 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-yellow-700 dark:text-yellow-400">
                         <FiClock size={10} /> {totalCount}
@@ -103,15 +105,15 @@ const Favorites = () => {
                                 <FiStar size={42} className="text-yellow-500" />
                             </div>
                         </div>
-                        <h3 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white mb-2">No Favorites Yet</h3>
+                        <h3 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white mb-2">{t('no_favorites_yet', 'No Favorites Yet')}</h3>
                         <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400 max-w-xs mx-auto mb-8 font-medium">
-                            Save products and stores to quickly compare prices later.
+                            {t('favorites_empty_description', 'Save products and stores to quickly compare prices later.')}
                         </p>
                         <Link
                             to="/"
                             className="tap-target inline-flex items-center justify-center px-8 py-4 bg-black dark:bg-white text-white dark:text-black rounded-2xl font-black uppercase tracking-widest text-[10px] hover:scale-105 transition-transform active:scale-95 shadow-lg shadow-black/10 dark:shadow-white/5"
                         >
-                            Start Exploring
+                            {t('start_exploring', 'Start Exploring')}
                         </Link>
                     </div>
                 ) : (
@@ -128,7 +130,7 @@ const Favorites = () => {
                                 }`}
                             >
                                 <FiPackage className={activeTab === 'products' ? 'text-red-500' : ''} size={16} />
-                                Products
+                                {t('products', 'Products')}
                                 <span
                                     className={`min-w-[1.25rem] rounded-full px-1.5 py-0.5 text-[10px] ${
                                         activeTab === 'products'
@@ -149,7 +151,7 @@ const Favorites = () => {
                                 }`}
                             >
                                 <FiShoppingBag className={activeTab === 'supermarkets' ? 'text-brand-600 dark:text-brand-500' : ''} size={16} />
-                                Supermarkets
+                                {t('supermarkets', 'Supermarkets')}
                                 <span
                                     className={`min-w-[1.25rem] rounded-full px-1.5 py-0.5 text-[10px] ${
                                         activeTab === 'supermarkets'
@@ -165,9 +167,9 @@ const Favorites = () => {
 
                         <div className="md:hidden flex items-center justify-between gap-3 rounded-2xl bg-white dark:bg-[#121214] border border-gray-100 dark:border-white/5 px-4 py-3 shadow-sm">
                             <div className="min-w-0">
-                                <p className="text-[9px] font-black uppercase tracking-[0.28em] text-gray-400">Saved</p>
+                                <p className="text-[9px] font-black uppercase tracking-[0.28em] text-gray-400">{t('saved', 'Saved')}</p>
                                 <p className="mt-1 text-sm font-bold text-gray-900 dark:text-white truncate">
-                                    {activeTab === 'products' ? 'Products' : 'Supermarkets'}
+                                    {activeTab === 'products' ? t('products', 'Products') : t('supermarkets', 'Supermarkets')}
                                 </p>
                             </div>
                             <div className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-gray-50 dark:bg-gray-900 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">
@@ -185,13 +187,13 @@ const Favorites = () => {
                             ) : (
                                 <div className="text-center py-14 bg-white dark:bg-[#121214] rounded-[2rem] sm:rounded-[2.5rem] border border-gray-100 dark:border-white/10 px-5">
                                     <FiPackage className="mx-auto text-gray-300 dark:text-gray-600 mb-4" size={40} />
-                                    <p className="font-bold text-gray-900 dark:text-white mb-1">No saved products</p>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Heart a product on its price comparison page.</p>
+                                    <p className="font-bold text-gray-900 dark:text-white mb-1">{t('no_saved_products', 'No saved products')}</p>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">{t('no_saved_products_description', 'Heart a product on its price comparison page.')}</p>
                                     <Link
                                         to="/"
                                         className="tap-target inline-flex items-center justify-center px-3 py-2 rounded-full text-sm font-black text-brand-600 dark:text-brand-500 uppercase tracking-widest"
                                     >
-                                        Browse products
+                                        {t('browse_products', 'Browse products')}
                                     </Link>
                                 </div>
                             ))}
@@ -221,7 +223,7 @@ const Favorites = () => {
                                                 <p className="text-[11px] sm:text-xs text-gray-400 dark:text-gray-500 truncate">{market.address}</p>
                                                 <div className="mt-1.5 sm:mt-2 flex items-center gap-2">
                                                     <span className="text-[9px] sm:text-[10px] bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-500 px-2 py-0.5 rounded-full font-bold uppercase tracking-tighter">
-                                                        Open
+                                                        {t('open', 'Open')}
                                                     </span>
                                                 </div>
                                             </div>
@@ -232,15 +234,15 @@ const Favorites = () => {
                             ) : (
                                 <div className="text-center py-16 bg-white dark:bg-[#121214] rounded-[2.5rem] border border-gray-100 dark:border-white/10">
                                     <FiShoppingBag className="mx-auto text-gray-300 dark:text-gray-600 mb-4" size={40} />
-                                    <p className="font-bold text-gray-900 dark:text-white mb-1">No saved stores</p>
+                                    <p className="font-bold text-gray-900 dark:text-white mb-1">{t('no_saved_stores', 'No saved stores')}</p>
                                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-                                        Save a supermarket from its profile page.
+                                        {t('no_saved_stores_description', 'Save a supermarket from its profile page.')}
                                     </p>
                                     <Link
                                         to="/"
                                         className="text-sm font-black text-brand-600 dark:text-brand-500 uppercase tracking-widest"
                                     >
-                                        Find stores
+                                        {t('find_stores', 'Find stores')}
                                     </Link>
                                 </div>
                             ))}

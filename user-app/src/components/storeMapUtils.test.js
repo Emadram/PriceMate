@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveCenter } from './storeMapUtils';
+import { buildRouteKey, resolveCenter } from './storeMapUtils';
 
 describe('storeMapUtils.resolveCenter', () => {
   it('prefers centerProp when valid', () => {
@@ -26,5 +26,24 @@ describe('storeMapUtils.resolveCenter', () => {
   it('returns null when no valid coordinates', () => {
     const out = resolveCenter({ lat: null, lon: null, supermarkets: [] });
     expect(out).toBeNull();
+  });
+});
+
+describe('storeMapUtils.buildRouteKey', () => {
+  it('returns a stable rounded key for equivalent route coordinates', () => {
+    const a = buildRouteKey(
+      { latitude: 35.1234567, longitude: 33.7654321 },
+      { latitude: 35.2234567, longitude: 33.8654321 }
+    );
+    const b = buildRouteKey(
+      { latitude: 35.12345671, longitude: 33.76543209 },
+      { latitude: 35.22345673, longitude: 33.86543208 }
+    );
+    expect(a).toBe(b);
+  });
+
+  it('returns an empty key when route coordinates are missing', () => {
+    expect(buildRouteKey(null, { latitude: 35, longitude: 33 })).toBe('');
+    expect(buildRouteKey({ latitude: 35, longitude: 33 }, null)).toBe('');
   });
 });
