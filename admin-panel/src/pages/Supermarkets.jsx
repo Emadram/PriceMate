@@ -547,7 +547,11 @@ const Supermarkets = () => {
                                 </button>
                                 <button
                                     type="submit"
-                                    disabled={uploading || (!!formData.embedHtml.trim() ? false : !!validateSupermarketCoordinates(formData.latitude, formData.longitude))}
+                                    disabled={
+                                        uploading ||
+                                        (!formData.embedHtml.trim() &&
+                                            Boolean(validateSupermarketCoordinates(formData.latitude, formData.longitude)))
+                                    }
                                     className="flex-1 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-50"
                                 >
                                     {editing ? 'Update' : 'Create'}

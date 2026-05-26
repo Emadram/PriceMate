@@ -325,7 +325,7 @@ const Products = () => {
             console.error('OFF barcode lookup failed:', error);
             setOffLookup({ loading: false, error: 'Barcode lookup failed. Try again.', results: [] });
         }
-    }, [callOffProxy, fetchWithBackoff, formData.name]);
+    }, [callOffProxy, fetchWithBackoff, formData.name, formData.barcode]);
 
     const applyOffCandidate = (candidate) => {
         setFormData((prev) => ({

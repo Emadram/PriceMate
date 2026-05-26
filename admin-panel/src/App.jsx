@@ -1,19 +1,19 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import useAdminAuthStore from './stores/adminAuthStore';
-import AdminLogin from './pages/AdminLogin';
-import Dashboard from './pages/Dashboard';
-import Categories from './pages/Categories';
-import Products from './pages/Products';
-import Supermarkets from './pages/Supermarkets';
-import Prices from './pages/Prices';
-import PriceHistory from './pages/PriceHistory';
-import Feedback from './pages/Feedback';
-import Announcements from './pages/Announcements';
-import ChatHistory from './pages/ChatHistory';
-import UserChatSessions from './pages/UserChatSessions';
-import UserChatDetail from './pages/UserChatDetail';
+const AdminLogin = lazy(() => import('./pages/AdminLogin'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Categories = lazy(() => import('./pages/Categories'));
+const Products = lazy(() => import('./pages/Products'));
+const Supermarkets = lazy(() => import('./pages/Supermarkets'));
+const Prices = lazy(() => import('./pages/Prices'));
+const PriceHistory = lazy(() => import('./pages/PriceHistory'));
+const Feedback = lazy(() => import('./pages/Feedback'));
+const Announcements = lazy(() => import('./pages/Announcements'));
+const ChatHistory = lazy(() => import('./pages/ChatHistory'));
+const UserChatSessions = lazy(() => import('./pages/UserChatSessions'));
+const UserChatDetail = lazy(() => import('./pages/UserChatDetail'));
 
 const ProtectedRoute = ({ children }) => {
   const admin = useAdminAuthStore((state) => state.admin);
@@ -57,6 +57,13 @@ function App() {
           },
         }}
       />
+      <Suspense
+        fallback={
+          <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
+          </div>
+        }
+      >
       <Routes>
         <Route path="/login" element={<AdminLogin />} />
         <Route
@@ -148,6 +155,7 @@ function App() {
           }
         />
       </Routes>
+      </Suspense>
     </Router>
   );
 }
