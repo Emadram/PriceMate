@@ -141,7 +141,7 @@ const Navbar = () => {
 
             {/* Mobile Bottom Navigation */}
             <div className="md:hidden fixed bottom-0 left-0 right-0 z-9998 mx-2 mb-2 px-4 py-3 pb-safe-nav bg-transparent dark:bg-gray-900/95 rounded-t-[1.75rem] backdrop-blur-md">
-                <div className="flex justify-between items-center max-w-md mx-auto">
+                <div className="flex justify-evenly items-center max-w-md mx-auto">
                     <NavItem to="/" icon={FiHome} label={t('home')} currentPath={location.pathname} onTap={tapFeedback} />
                     <NavItem to="/search" icon={FiSearch} label={t('search')} currentPath={location.pathname} onTap={tapFeedback} />
                     <Link

@@ -194,8 +194,9 @@ describe('AIChatBox — Task 1: Bug Condition Exploration (Property 1)', () => {
                 <AIChatBox isOpen={true} onClose={() => {}} />
             );
 
-            // The outer container is the second div (first is the backdrop)
-            const outerContainer = container.querySelector('div.fixed.z-\\[2000\\]');
+            // The outer container is the second fixed div (first is the backdrop)
+            const fixedDivs = container.querySelectorAll('div.fixed');
+            const outerContainer = fixedDivs[1];
 
             expect(outerContainer).not.toBeNull();
 
@@ -221,7 +222,8 @@ describe('AIChatBox — Task 1: Bug Condition Exploration (Property 1)', () => {
                 <AIChatBox isOpen={true} onClose={() => {}} />
             );
 
-            const outerContainer = container.querySelector('div.fixed.z-\\[2000\\]');
+            const fixedDivs = container.querySelectorAll('div.fixed');
+            const outerContainer = fixedDivs[1];
 
             expect(outerContainer).not.toBeNull();
 
@@ -253,7 +255,8 @@ describe('AIChatBox — Task 1: Bug Condition Exploration (Property 1)', () => {
                 <AIChatBox isOpen={true} onClose={() => {}} />
             );
 
-            const outerContainer = container.querySelector('div.fixed.z-\\[2000\\]');
+            const fixedDivs = container.querySelectorAll('div.fixed');
+            const outerContainer = fixedDivs[1];
 
             expect(outerContainer).not.toBeNull();
 
@@ -316,7 +319,8 @@ describe('AIChatBox — Task 2: Preservation Tests (Property 2)', () => {
                 <AIChatBox isOpen={true} onClose={() => {}} />
             );
 
-            const outerContainer = container.querySelector('div.fixed.z-\\[2000\\]');
+            const fixedDivs = container.querySelectorAll('div.fixed');
+            const outerContainer = fixedDivs[1];
             expect(outerContainer).not.toBeNull();
 
             // Desktop geometry classes must be present in the class string
@@ -350,7 +354,8 @@ describe('AIChatBox — Task 2: Preservation Tests (Property 2)', () => {
                 <AIChatBox isOpen={true} onClose={() => {}} />
             );
 
-            const outerContainer = container.querySelector('div.fixed.z-\\[2000\\]');
+            const fixedDivs = container.querySelectorAll('div.fixed');
+            const outerContainer = fixedDivs[1];
             expect(outerContainer).not.toBeNull();
 
             // Post-fix: sm:max-h-none MUST be present to reset the mobile height cap on desktop

@@ -1880,11 +1880,11 @@ const AIChatBox = ({ isOpen, onClose }) => {
     return (
         <>
             <div
-                className="fixed inset-0 z-[1990] bg-black/40 backdrop-blur-[2px] sm:hidden"
+                className="fixed inset-0 z-[9998] bg-black/40 backdrop-blur-[2px] sm:hidden"
                 onClick={onClose}
                 aria-hidden="true"
             />
-            <div className="fixed bottom-0 left-0 right-0 z-[2000] flex h-[85dvh] max-h-[85dvh] w-screen touch-pan-y flex-col overflow-hidden rounded-t-2xl border-0 bg-white shadow-2xl animate-in slide-in-from-bottom-4 duration-300 dark:border-gray-700 dark:bg-gray-800 sm:inset-auto sm:bottom-4 sm:right-4 sm:h-[min(640px,90vh)] sm:max-h-none sm:w-[400px] sm:rounded-2xl sm:border sm:border-gray-200 sm:shadow-2xl sm:slide-in-from-bottom-5 sm:slide-in-from-right md:w-[448px]">
+            <div className="fixed bottom-0 left-0 right-0 z-[9999] flex h-[85dvh] max-h-[85dvh] w-screen touch-pan-y flex-col overflow-hidden rounded-t-2xl border-0 bg-white shadow-2xl animate-in slide-in-from-bottom-4 duration-300 dark:border-gray-700 dark:bg-gray-800 sm:inset-auto sm:bottom-4 sm:right-4 sm:z-[2000] sm:h-[min(640px,90vh)] sm:max-h-none sm:w-[400px] sm:rounded-2xl sm:border sm:border-gray-200 sm:shadow-2xl sm:slide-in-from-bottom-5 sm:slide-in-from-right md:w-[448px]">
             <div className="sm:hidden flex justify-center pt-2.5 pb-1 shrink-0" aria-hidden="true">
                 <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
             </div>
