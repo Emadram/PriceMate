@@ -71,11 +71,12 @@ const FloatingAIChatLauncher = () => {
         ? 'fixed left-1/2 -translate-x-1/2 bottom-[40%] z-[2710]'
         : 'fixed z-[2710] right-[max(1rem,env(safe-area-inset-right,0px))] max-md:bottom-[calc(7.25rem+env(safe-area-inset-bottom,0px))] md:bottom-[max(1rem,env(safe-area-inset-bottom,0px))]';
 
+    // Only lock scroll on desktop; mobile drawer must keep the underlying page scrollable
     useEffect(() => {
         if (typeof document === 'undefined') return undefined;
-        if (isOpen) document.body.classList.add('ai-open');
+        const isDesktop = window.matchMedia('(min-width: 640px)').matches;
+        if (isOpen && isDesktop) document.body.classList.add('ai-open');
         else document.body.classList.remove('ai-open');
-
         return () => document.body.classList.remove('ai-open');
     }, [isOpen]);
 
