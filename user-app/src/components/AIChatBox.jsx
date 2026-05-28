@@ -1542,9 +1542,10 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 };
             };
 
-            if (!effectiveBarcode && !queryName && !catalog.product) {
+            // Catalog-only policy: only answer ingredient/safety questions for products available in PriceMate.
+            if (!catalog.product) {
                 if (user?.$id) {
-                    await addMessage(user.$id, 'assistant', t('ai_need_product'), user);
+                    await addMessage(user.$id, 'assistant', t('ai_catalog_only_refusal'), user);
                 }
                 setIsLoading(false);
                 return;
@@ -1577,31 +1578,16 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
             }
 
             if (!ingredientPayload) {
-                const primarySearch = catalogDisplayName || queryName;
-                if (primarySearch) {
-                    ingredientPayload = await searchIngredientsByName(primarySearch);
-                }
-            }
-
-            if (!ingredientPayload && queryName && queryName !== (catalogDisplayName || '')) {
-                ingredientPayload = await searchIngredientsByName(queryName);
-            }
-
-            if (!ingredientPayload) {
                 if (user?.$id) {
-                    if (catalog.product) {
-                        await addMessage(
-                            user.$id,
-                            'assistant',
-                            t('ai_off_miss_catalog_hit', {
-                                name: catalogDisplayName || catalog.product.name || '',
-                                barcode: catalog.catalogBarcode || t('ai_barcode_unknown'),
-                            }),
-                            user
-                        );
-                    } else {
-                        await addMessage(user.$id, 'assistant', t('ai_barcode_not_found'), user);
-                    }
+                    await addMessage(
+                        user.$id,
+                        'assistant',
+                        t('ai_off_miss_catalog_hit', {
+                            name: catalogDisplayName || catalog.product.name || '',
+                            barcode: catalog.catalogBarcode || t('ai_barcode_unknown'),
+                        }),
+                        user
+                    );
                 }
                 setIsLoading(false);
                 return;
@@ -1686,6 +1672,44 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
             return;
         }
 
+        // Catalog-only policy: for product-related questions, refuse if the product is not in PriceMate.
+        // We use the full-catalog resolver (Appwrite) rather than the in-chat 50-item sample.
+        const loweredMessage = String(userMessage || '').toLowerCase();
+        const isProductSpecific =
+            /\b\d{8,14}\b/.test(loweredMessage) ||
+            loweredMessage.includes('ingredient') ||
+            loweredMessage.includes('ingredients') ||
+            loweredMessage.includes('allergen') ||
+            loweredMessage.includes('allergens') ||
+            loweredMessage.includes('suitable') ||
+            loweredMessage.includes('safe') ||
+            loweredMessage.includes('compare') ||
+            loweredMessage.includes('cheapest') ||
+            loweredMessage.includes('price') ||
+            loweredMessage.includes('barcode') ||
+            loweredMessage.includes('içerik') ||
+            loweredMessage.includes('icerik') ||
+            loweredMessage.includes('içindekiler') ||
+            loweredMessage.includes('uygun') ||
+            loweredMessage.includes('en ucuz') ||
+            loweredMessage.includes('fiyat') ||
+            loweredMessage.includes('barkod');
+
+        if (isProductSpecific) {
+            try {
+                const catalogOnly = await resolveCatalogProductForIngredients(userMessage);
+                if (!catalogOnly?.product) {
+                    if (user?.$id) {
+                        await addMessage(user.$id, 'assistant', t('ai_catalog_only_refusal'), user);
+                    }
+                    setIsLoading(false);
+                    return;
+                }
+            } catch {
+                // If catalog lookup fails, fall back to normal behavior rather than blocking all chat.
+            }
+        }
+
         try {
             const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
 
@@ -1743,7 +1767,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 - When the user names a product (e.g. Coca-Cola), look it up in WEBSITE PRODUCT DATA first and use its [BARCODE:...] line.
                 - For questions like "is the sugar high?", "how much salt?", or "is it high in caffeine?", answer using that product's barcode:
                   tie the answer to the catalog match when possible instead of asking which health condition they mean.
-                - If the product is not in WEBSITE PRODUCT DATA, ask for a barcode or a clearer product name—not a generic "what condition?" prompt.
+                - If the product is not available in the PriceMate catalog, refuse and ask the user to ask about an available product (or share its barcode).
                 - If the data is insufficient for a nutrient, say unknown and suggest scanning or checking the label.
 
                 RESPONSE FORMAT FOR INGREDIENT IMPACT QUESTIONS:
@@ -1903,7 +1927,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 className={
                     isPage
                         ? 'w-full flex flex-col'
-                        : 'fixed bottom-0 left-0 right-0 z-[9999] flex h-[85dvh] max-h-[85dvh] w-screen touch-pan-y flex-col overflow-hidden rounded-t-2xl border-0 bg-white shadow-2xl animate-in slide-in-from-bottom-4 duration-300 dark:border-gray-700 dark:bg-gray-800 sm:inset-auto sm:bottom-4 sm:right-4 sm:z-[2000] sm:h-[min(640px,90vh)] sm:max-h-none sm:w-[400px] sm:rounded-2xl sm:border sm:border-gray-200 sm:shadow-2xl sm:slide-in-from-bottom-5 sm:slide-in-from-right md:w-[448px]'
+                        : 'fixed bottom-0 left-0 right-0 z-[9999] flex h-[85dvh] max-h-[85dvh] w-full touch-pan-y flex-col overflow-hidden rounded-t-2xl border-0 bg-white shadow-2xl animate-in slide-in-from-bottom-4 duration-300 dark:border-gray-700 dark:bg-gray-800 sm:inset-auto sm:bottom-4 sm:right-4 sm:z-[2000] sm:h-[min(640px,90vh)] sm:max-h-none sm:w-[400px] sm:rounded-2xl sm:border sm:border-gray-200 sm:shadow-2xl sm:slide-in-from-bottom-5 sm:slide-in-from-right md:w-[448px]'
                 }
             >
             {isPage ? (

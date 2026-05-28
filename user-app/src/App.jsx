@@ -28,6 +28,7 @@ import MobileSplashScreen from './components/MobileSplashScreen';
 import PageTransition from './components/PageTransition';
 import Navbar from './components/Navbar';
 import NavigationListener from './components/NavigationListener';
+import { startOverflowDetector } from './utils/overflowDetector';
 
 const AUTH_ROUTE_PREFIXES = ['/login', '/register', '/verify-email', '/forgot-password', '/reset-password'];
 
@@ -125,6 +126,14 @@ function App() {
       runDiagnostics();
     }
   }, [checkSession, setTheme, fetchRates, currency, setCurrency]);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return undefined;
+    // Enable by running in console: localStorage.setItem('pricemate_overflow_debug', '1')
+    const enabled = typeof window !== 'undefined' && window.localStorage?.getItem('pricemate_overflow_debug') === '1';
+    const stop = startOverflowDetector({ enabled });
+    return () => stop?.();
+  }, []);
 
   useEffect(() => {
     const metaThemeColor = document.querySelector('meta[name="theme-color"]');
