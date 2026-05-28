@@ -603,7 +603,7 @@ export const resources = {
       "ai_price_check": "Fiyat Kontrolü",
       "ai_checks": "Kontroller",
       "ai_ingredients_allergens": "İçindekiler ve alerjenler",
-      "ai_chat_title": "PriceMate YZ",
+      "ai_chat_title": "PriceMate AI",
       "ai_chat_powered_by": "Gemini destekli",
       "ai_chat_subtitle": "Daha ucuz seçenekleri bulun, ürünleri karşılaştırın veya içerikleri anında kontrol edin.",
       "ai_chat_login_hint": "Sohbet geçmişinizi kaydetmek ve kişiselleştirilmiş öneriler almak için giriş yapın.",
