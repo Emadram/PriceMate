@@ -173,6 +173,7 @@ const parseIngredientCardData = (value) => {
         product: '',
         suitability: '',
         checks: '',
+        triggers: '',
         reasons: [],
         ingredients: '',
         allergens: '',
@@ -195,6 +196,11 @@ const parseIngredientCardData = (value) => {
         }
         if (/^checks?(?:\s*for)?\s*:/i.test(line)) {
             data.checks = line.replace(/^checks?(?:\s*for)?\s*:/i, '').trim();
+            collectingReasons = false;
+            continue;
+        }
+        if (/^triggers?\s*:/i.test(line)) {
+            data.triggers = line.replace(/^triggers?\s*:/i, '').trim();
             collectingReasons = false;
             continue;
         }
@@ -460,6 +466,12 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [], t }) =
                     ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
                     : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300';
 
+        const shouldShowTriggers =
+            !!data.triggers &&
+            (suitabilityLower.includes('not suitable') ||
+                suitabilityLower.includes('avoid') ||
+                suitabilityLower.includes('caution'));
+
         return (
             <div className="my-1.5 rounded-2xl border border-brand-100 dark:border-brand-800/30 bg-gradient-to-br from-white to-brand-50/40 dark:from-gray-800 dark:to-brand-900/10 p-3 sm:p-4 shadow-soft">
                 <div className="flex items-center justify-between gap-2">
@@ -472,6 +484,11 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [], t }) =
                 {data.checks && (
                     <p className="mt-1 text-[11px] font-semibold text-gray-500 dark:text-gray-300">
                         {t('ai_checks', 'Checks')}: {renderInlineBoldText(data.checks, 'ic-checks')}
+                    </p>
+                )}
+                {shouldShowTriggers && (
+                    <p className="mt-1.5 text-[11px] font-semibold text-gray-500 dark:text-gray-300">
+                        {t('ai_triggers', 'Detected')}: {renderInlineBoldText(data.triggers, 'ic-triggers')}
                     </p>
                 )}
                 {data.reasons.length > 0 && (
@@ -774,17 +791,38 @@ const DIETARY_RESTRICTION_TERMS = {
 };
 
 /** Prefer products that match the user message; fall back to a short sample (prompt cap + relevance). */
-const buildRankedProductContextLines = (products, userHint) => {
+const buildRankedProductContextLines = (products, userHint, aiProfile = {}) => {
     const norm = (s) =>
         String(s || '')
             .toLowerCase()
             .replace(/[^a-z0-9ğüşöçı]/gi, ' ');
     const words = new Set(norm(userHint).split(/\s+/).filter((w) => w.length > 2));
+    const avoidWords = new Set(
+        (Array.isArray(aiProfile.avoidIngredients) ? aiProfile.avoidIngredients : [])
+            .flatMap((term) => norm(term).split(/\s+/))
+            .filter((w) => w.length > 2)
+            .slice(0, 24)
+    );
+    const dietaryBoostWords = new Set(
+        (Array.isArray(aiProfile.dietaryPreferences) ? aiProfile.dietaryPreferences : [])
+            .flatMap((pref) => {
+                const key = String(pref || '').toLowerCase();
+                if (key === 'vegan') return ['vegan'];
+                if (key === 'vegetarian') return ['vegetarian', 'veggie'];
+                return [];
+            })
+    );
     const scored = products.map((p) => {
-        const blob = norm(`${p.name || ''} ${p.productName || ''}`);
+        const blob = norm(`${p.name || ''} ${p.productName || ''} ${p.categoryId?.categoryName || ''}`);
         let score = 0;
         for (const w of words) {
             if (blob.includes(w)) score++;
+        }
+        for (const w of dietaryBoostWords) {
+            if (blob.includes(w)) score += 2;
+        }
+        for (const w of avoidWords) {
+            if (blob.includes(w)) score -= 1;
         }
         return { p, score };
     });
@@ -1240,7 +1278,8 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         if (!payload) {
             return {
                 status: 'unknown',
-                reasons: [t('ai_reason_no_ingredients')]
+                reasons: [t('ai_reason_no_ingredients')],
+                triggers: { allergy: [], avoidIngredients: [], dietary: {} },
             };
         }
 
@@ -1257,13 +1296,15 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         if (!hasIngredientBlob && !hasNutriments) {
             return {
                 status: 'unknown',
-                reasons: [t('ai_reason_no_ingredients')]
+                reasons: [t('ai_reason_no_ingredients')],
+                triggers: { allergy: [], avoidIngredients: [], dietary: {} },
             };
         }
 
         const severityRank = { safe: 0, caution: 1, avoid: 2 };
         let status = 'safe';
         const reasons = [];
+        const triggers = { allergy: [], avoidIngredients: [], dietary: {} };
 
         const bumpStatus = (next) => {
             if (severityRank[next] > severityRank[status]) {
@@ -1289,6 +1330,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         const avoidMatches = collectMatches(profileAvoids);
         if (avoidMatches.length > 0) {
             reasons.push(`Preference: avoid ingredient found (${formatMatches(avoidMatches)})`);
+            triggers.avoidIngredients = avoidMatches;
             bumpStatus('caution');
         }
 
@@ -1297,6 +1339,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
             const matches = collectMatches(terms);
             if (matches.length > 0) {
                 reasons.push(`Preference (${dietary}): may not match (${formatMatches(matches)})`);
+                triggers.dietary[dietary] = matches;
                 bumpStatus('caution');
             }
         }
@@ -1307,12 +1350,14 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 const matches = collectMatches(allergyTerms);
                 if (matches.length > 0) {
                     reasons.push(`${t('condition_allergy')}: ${t('ai_reason_found', { items: formatMatches(matches) })}`);
+                    triggers.allergy = matches;
                     bumpStatus('avoid');
                 } else {
                     reasons.push(`${t('condition_allergy')}: ${t('ai_reason_none_found', { items: allergenTargets.join(', ') })}`);
                 }
             } else if (payload.allergens?.length > 0) {
                 reasons.push(`${t('condition_allergy')}: ${t('ai_reason_found', { items: formatMatches(payload.allergens) })}`);
+                triggers.allergy = payload.allergens.slice(0, 10);
                 bumpStatus('caution');
             }
         }
@@ -1418,7 +1463,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
             }
         }
 
-        return { status, reasons };
+        return { status, reasons, triggers };
     };
 
     const handleSend = async (e) => {
@@ -1634,11 +1679,29 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 ? truncateText(ingredientPayload.ingredientsText, 140)
                 : t('ai_no_ingredients');
 
+            const { status, reasons, triggers } = evaluateSuitability(
+                ingredientPayload,
+                effectiveConditions,
+                allergenTargets,
+                userAiProfile
+            );
+
             const allergenPreview = ingredientPayload.allergens?.length
                 ? truncateText(ingredientPayload.allergens.slice(0, 4).join(', '), 90)
-                : t('ai_no_allergens');
+                : (triggers?.allergy?.length
+                    ? truncateText(triggers.allergy.slice(0, 6).join(', '), 90)
+                    : t('ai_no_allergens'));
 
-            const { status, reasons } = evaluateSuitability(ingredientPayload, effectiveConditions, allergenTargets, userAiProfile);
+            const triggerTerms = Array.from(
+                new Set([
+                    ...(Array.isArray(triggers?.allergy) ? triggers.allergy : []),
+                    ...(Array.isArray(triggers?.avoidIngredients) ? triggers.avoidIngredients : []),
+                    ...Object.values(triggers?.dietary || {}).flatMap((items) => items || []),
+                ].filter(Boolean))
+            );
+            const triggersText = triggerTerms.length > 0
+                ? emphasizeImportantIngredients(truncateText(triggerTerms.slice(0, 6).join(', '), 120))
+                : '';
 
             const statusKey = status === 'avoid'
                 ? 'ai_status_avoid'
@@ -1657,6 +1720,9 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 `Product: ${productLabel}`,
                 `Suitability: ${t(statusKey)}`,
                 `Checks: ${checksForText}`,
+                ...(triggersText && (status === 'avoid' || status === 'caution')
+                    ? [`Triggers: ${triggersText}`]
+                    : []),
                 'Reasons:',
                 formattedReasons,
                 `Ingredients: ${emphasizeImportantIngredients(ingredientPreview)}`,
@@ -1738,7 +1804,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 }
             });
 
-            const promptContext = buildRankedProductContextLines(fullProductList, userMessage);
+            const promptContext = buildRankedProductContextLines(fullProductList, userMessage, userAiProfile);
             const intentSummary = buildIntentSummary(userMessage);
             const aiProfileContext = formatAiProfileForPrompt(userAiProfile);
             const maxGenericReplyWords = userAiProfile.responseStyle === 'detailed'
@@ -1937,7 +2003,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
             <div
                 className={
                     isPage
-                        ? 'w-full flex flex-col'
+                        ? 'w-full flex flex-col h-full min-h-0 overflow-hidden'
                         : 'fixed bottom-0 left-0 right-0 z-[9999] flex h-[85dvh] max-h-[85dvh] w-full touch-pan-y flex-col overflow-hidden rounded-t-2xl border-0 bg-white shadow-2xl animate-in slide-in-from-bottom-4 duration-300 dark:border-gray-700 dark:bg-gray-800 sm:inset-auto sm:bottom-4 sm:right-4 sm:z-[2000] sm:h-[min(640px,90vh)] sm:max-h-none sm:w-[400px] sm:rounded-2xl sm:border sm:border-gray-200 sm:shadow-2xl sm:slide-in-from-bottom-5 sm:slide-in-from-right md:w-[448px]'
                 }
             >
