@@ -56,8 +56,14 @@ const ResetPassword = () => {
 
             <div className="sm:mx-auto sm:w-full sm:max-w-md relative">
                 <div className="flex justify-center mb-8">
-                    <div className="w-16 h-16 bg-brand-600 rounded-[2rem] flex items-center justify-center shadow-xl shadow-brand-500/20 active:scale-95 transition-transform cursor-pointer">
-                        <span className="text-white font-black text-3xl tracking-tighter">P</span>
+                    <div className="w-16 h-16 bg-white/90 dark:bg-gray-900/60 rounded-[2rem] flex items-center justify-center shadow-xl shadow-brand-500/20 active:scale-95 transition-transform cursor-pointer border border-gray-100/70 dark:border-gray-800/60 overflow-hidden">
+                        <img
+                            src="/LogoPriceMate.png"
+                            alt="PriceMate"
+                            className="h-full w-full object-contain p-2"
+                            loading="eager"
+                            decoding="async"
+                        />
                     </div>
                 </div>
 

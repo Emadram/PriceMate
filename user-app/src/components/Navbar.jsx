@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { FiUser, FiLogOut, FiMoon, FiSun, FiGlobe, FiHome, FiCamera, FiCpu } from 'react-icons/fi';
+import { FiUser, FiLogOut, FiMoon, FiSun, FiGlobe, FiHome, FiCamera, FiCpu, FiSearch } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
 import useAuthStore from '../stores/authStore';
 import useCurrencyStore from '../stores/currencyStore';
@@ -156,7 +156,7 @@ const Navbar = () => {
               <div className="mx-2 mb-2 px-4 py-3 pb-safe-nav bg-transparent dark:bg-gray-900/95 rounded-t-[1.75rem] backdrop-blur-md">
                 <div className="flex items-center justify-between max-w-md mx-auto">
                     <NavItem to="/" icon={FiHome} label={t('home')} currentPath={location.pathname} onTap={tapFeedback} />
-                    <div className="w-11" aria-hidden />
+                    <NavItem to="/search" icon={FiSearch} label={t('search', 'Search')} currentPath={location.pathname} onTap={tapFeedback} />
                     <Link
                         to="/scan"
                         onClick={tapFeedback}
