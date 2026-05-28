@@ -459,7 +459,7 @@ export const resources = {
       "popular_categories": "Popüler kategoriler",
       "browse_by_type": "Türe göre göz at",
       "primary_store": "Ana mağaza",
-      "ai_chat_tab": "YZ",
+      "ai_chat_tab": "AI",
       "ai_shopping_profile_title": "YZ alışveriş profili",
       "ai_shopping_profile_description": "PriceMate’in içerik, fiyat ve ürün önerilerini kişiselleştirmesine yardımcı olan isteğe bağlı tercihler.",
       "ai_shopping_profile_save": "Alışveriş profilini kaydet",
