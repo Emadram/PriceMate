@@ -40,15 +40,15 @@ const Home = () => {
     const recentRoute = navigationStack.length > 0 ? navigationStack[navigationStack.length - 1] : null;
 
     const getRecentRouteLabel = (route) => {
-        if (!route) return 'Scan';
-        if (route.startsWith('/price-comparison/')) return 'Price comparison';
-        if (route.startsWith('/product/')) return 'Product details';
-        if (route.startsWith('/supermarket/')) return 'Store page';
-        if (route.startsWith('/search')) return 'Search';
-        if (route.startsWith('/favorites')) return 'Favorites';
-        if (route.startsWith('/profile')) return 'Profile';
-        if (route.startsWith('/scan')) return 'Scan';
-        return 'Recent page';
+        if (!route) return t('scan', 'Scan');
+        if (route.startsWith('/price-comparison/')) return t('price_comparison', 'Price comparison');
+        if (route.startsWith('/product/')) return t('product_details', 'Product details');
+        if (route.startsWith('/supermarket/')) return t('store_page', 'Store page');
+        if (route.startsWith('/search')) return t('search', 'Search');
+        if (route.startsWith('/favorites')) return t('favorites', 'Favorites');
+        if (route.startsWith('/profile')) return t('profile', 'Profile');
+        if (route.startsWith('/scan')) return t('scan', 'Scan');
+        return t('recent_page', 'Recent page');
     };
 
     const getRecentRouteAction = (route) => {
@@ -399,7 +399,7 @@ const Home = () => {
                                 onClick={loadData}
                                 className="px-8 py-3 bg-brand-600 text-white rounded-2xl font-black uppercase tracking-widest text-sm hover:bg-brand-700 transition-colors"
                             >
-                                Try Again
+                                {t('try_again', 'Try Again')}
                             </button>
                         </div>
                     ) : featuredProducts.length === 0 ? (

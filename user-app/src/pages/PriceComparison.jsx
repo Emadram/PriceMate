@@ -453,7 +453,7 @@ const PriceComparison = () => {
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-safe md:pb-12">
             <main className="max-w-4xl mx-auto px-3 sm:px-4 pt-2 pb-6 md:py-8 space-y-3 md:space-y-8">
                 <div className="flex items-center">
-                    <BackButton label="Go Back" onClick={handleBack} />
+                    <BackButton label={t('go_back', 'Go Back')} onClick={handleBack} />
                 </div>
                 {locationError && (
                     <div className="rounded-3xl border border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/10 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
@@ -467,7 +467,7 @@ const PriceComparison = () => {
                             disabled={locationLoading}
                             className="shrink-0 inline-flex items-center justify-center rounded-2xl bg-amber-600 px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-white transition-opacity disabled:opacity-60"
                         >
-                            Try Again
+                            {t('try_again', 'Try Again')}
                         </button>
                     </div>
                 )}

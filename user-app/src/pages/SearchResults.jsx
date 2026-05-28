@@ -330,7 +330,7 @@ const SearchResults = () => {
                                 onClick={() => navigate('/search')}
                                 className="tap-target bg-brand-600 text-white px-8 py-3 rounded-full font-black uppercase tracking-widest text-[10px] hover:bg-black transition-colors"
                             >
-                                Clear filters
+                                {t('clear_filters', 'Clear filters')}
                             </button>
                             <button
                                 onClick={() => navigate('/')}
