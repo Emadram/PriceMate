@@ -543,13 +543,13 @@ const Products = () => {
                             Updated {lastUpdated ? new Date(lastUpdated).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
                         </span>
                         <div className="relative group max-w-md w-full ml-4 hidden md:block">
-                            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand-600 dark:group-focus-within:text-brand-300 transition-colors" />
                             <input
                                 type="text"
                                 placeholder="Search by name, barcode or category..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="bg-gray-100 dark:bg-gray-900 border-gray-200 dark:border-gray-700 rounded-2xl py-2.5 pl-11 pr-4 w-full text-sm focus:ring-2 focus:ring-blue-500/20 focus:bg-white dark:focus:bg-gray-900 transition-all outline-none text-gray-800 dark:text-gray-100"
+                                className="bg-gray-100 dark:bg-gray-900 border-gray-200 dark:border-gray-700 rounded-2xl py-2.5 pl-11 pr-4 w-full text-sm focus:ring-2 focus:ring-brand-500/20 focus:bg-white dark:focus:bg-gray-900 transition-all outline-none text-gray-800 dark:text-gray-100"
                             />
                         </div>
                     </div>
@@ -561,7 +561,7 @@ const Products = () => {
                             setShowModal(true);
                             setFormData({ name: '', brand: '', barcode: '', imageUrl: '', description: '', stockQuantity: 0, categoryId: '', supermarkets: '', sugarsPer100g: '', sodiumMgPer100g: '', ingredientsText: '', nutritionSource: '' });
                         }}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl flex items-center gap-2 transition-all shadow-lg shadow-blue-500/20 active:scale-95 text-sm font-black uppercase tracking-widest"
+                        className="bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 rounded-2xl flex items-center gap-2 transition-all shadow-lg shadow-brand-600/20 active:scale-95 text-sm font-black uppercase tracking-widest"
                     >
                         <FiPlus size={20} className="stroke-[3]" /> Add Product
                     </button>
@@ -571,12 +571,12 @@ const Products = () => {
                     <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] shadow-sm mb-8 border border-gray-100 dark:border-gray-700 flex flex-col md:flex-row gap-6 items-center justify-between">
                         <div className="flex items-center gap-6 w-full md:w-auto">
                             <div className="flex items-center gap-3 text-sm font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.15em] whitespace-nowrap">
-                                <FiFilter className="text-blue-500" />
+                                <FiFilter className="text-brand-600 dark:text-brand-300" />
                                 <span>Filter By Category:</span>
                                 <select
                                     value={filterCategory}
                                     onChange={(e) => setFilterCategory(e.target.value)}
-                                    className="bg-gray-50 dark:bg-gray-900 border-none px-4 py-2 rounded-xl focus:ring-0 cursor-pointer text-blue-600 font-black text-xs tracking-widest uppercase transition-all hover:bg-blue-50 dark:hover:bg-blue-900/40"
+                                    className="bg-gray-50 dark:bg-gray-900 border-none px-4 py-2 rounded-xl focus:ring-0 cursor-pointer text-brand-700 dark:text-brand-300 font-black text-xs tracking-widest uppercase transition-all hover:bg-brand-50 dark:hover:bg-brand-900/30"
                                 >
                                     <option value="">All Categories</option>
                                     {categories.map(c => (
@@ -587,7 +587,7 @@ const Products = () => {
                         </div>
                         <div className="flex items-center gap-4">
                             <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Showing:</span>
-                            <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest border border-blue-200 dark:border-blue-800/50">
+                            <span className="bg-brand-100 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest border border-brand-200 dark:border-brand-800/50">
                                 {filteredProducts.length} {filteredProducts.length === 1 ? 'Product' : 'Products'}
                             </span>
                         </div>
@@ -595,7 +595,7 @@ const Products = () => {
 
                     {loading ? (
                         <div className="flex h-64 items-center justify-center">
-                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-600"></div>
                         </div>
                     ) : (
                         <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
@@ -604,25 +604,25 @@ const Products = () => {
                                     <tr>
                                         <th className="px-8 py-5 text-left text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] w-20">Media</th>
                                         <th
-                                            className="px-8 py-5 text-left text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] cursor-pointer hover:text-blue-600 transition-colors"
+                                            className="px-8 py-5 text-left text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] cursor-pointer hover:text-brand-700 dark:hover:text-brand-300 transition-colors"
                                             onClick={() => requestSort('name')}
                                         >
                                             Product Details <SortIcon columnKey="name" currentKey={sortConfig.key} direction={sortConfig.direction} />
                                         </th>
                                         <th
-                                            className="px-8 py-5 text-left text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] cursor-pointer hover:text-blue-600 transition-colors"
+                                            className="px-8 py-5 text-left text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] cursor-pointer hover:text-brand-700 dark:hover:text-brand-300 transition-colors"
                                             onClick={() => requestSort('barcode')}
                                         >
                                             Identification <SortIcon columnKey="barcode" currentKey={sortConfig.key} direction={sortConfig.direction} />
                                         </th>
                                         <th
-                                            className="px-8 py-5 text-left text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] cursor-pointer hover:text-blue-600 transition-colors"
+                                            className="px-8 py-5 text-left text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] cursor-pointer hover:text-brand-700 dark:hover:text-brand-300 transition-colors"
                                             onClick={() => requestSort('category')}
                                         >
                                             Category <SortIcon columnKey="category" currentKey={sortConfig.key} direction={sortConfig.direction} />
                                         </th>
                                         <th
-                                            className="px-8 py-5 text-left text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] cursor-pointer hover:text-blue-600 transition-colors"
+                                            className="px-8 py-5 text-left text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] cursor-pointer hover:text-brand-700 dark:hover:text-brand-300 transition-colors"
                                             onClick={() => requestSort('stockQuantity')}
                                         >
                                             Stock <SortIcon columnKey="stockQuantity" currentKey={sortConfig.key} direction={sortConfig.direction} />
@@ -632,7 +632,7 @@ const Products = () => {
                                 </thead>
                                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-50 dark:divide-gray-700/50">
                                     {sortedProducts.map((item) => (
-                                        <tr key={item.$id} className="hover:bg-blue-50/20 dark:hover:bg-blue-900/10 transition-colors group">
+                                        <tr key={item.$id} className="hover:bg-brand-50/40 dark:hover:bg-brand-900/10 transition-colors group">
                                             <td className="px-8 py-6">
                                                 <div className="h-16 w-16 bg-gray-50 dark:bg-gray-900 rounded-[1.5rem] overflow-hidden border border-gray-100 dark:border-gray-700 flex-shrink-0 group-hover:scale-105 transition-transform duration-300">
                                                     {item.imageUrl ? (
@@ -644,7 +644,7 @@ const Products = () => {
                                             </td>
                                             <td className="px-8 py-6">
                                                 <div className="text-base font-black text-gray-900 dark:text-white tracking-tight uppercase">{item.name}</div>
-                                                <div className="text-[10px] font-black text-blue-500 dark:text-blue-400 uppercase tracking-widest mt-0.5 max-w-[200px] truncate">{stripNutritionMeta(item.description) || 'No Description provided'}</div>
+                                                <div className="text-[10px] font-black text-brand-600 dark:text-brand-300 uppercase tracking-widest mt-0.5 max-w-[200px] truncate">{stripNutritionMeta(item.description) || 'No Description provided'}</div>
                                             </td>
                                             <td className="px-8 py-6">
                                                 <div className="text-sm font-mono font-black text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 px-3 py-1.5 rounded-xl border border-gray-100 dark:border-gray-800 inline-block">

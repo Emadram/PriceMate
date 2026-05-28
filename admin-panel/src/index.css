@@ -1,3 +1,28 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    --soft-gray: #f8fafc;
+  }
+
+  html {
+    background-color: var(--soft-gray);
+  }
+
+  body {
+    background-color: var(--soft-gray);
+    color: #0f172a;
+    min-height: 100vh;
+  }
+
+  .dark html {
+    background-color: #020617;
+  }
+
+  .dark body {
+    background-color: #020617;
+    color: #e6eef8;
+  }
+}
