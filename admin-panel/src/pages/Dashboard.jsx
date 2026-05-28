@@ -13,6 +13,31 @@ import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import useFreshIndicator from '../hooks/useFreshIndicator';
 import { client, DATABASE_ID, COLLECTIONS, Query, db } from '../lib/appwrite';
 import Sidebar from '../components/Sidebar';
+import {
+    BRAND_CHART_COLORS,
+    CHART_BRAND_STROKE,
+    CHART_BRAND_STROKE_LIGHT,
+    gridStroke,
+    tickFill,
+} from '../constants/chartTheme';
+
+const resolveRelationshipId = (field) => {
+    if (!field) return null;
+    if (Array.isArray(field)) return field[0]?.$id || field[0] || null;
+    if (typeof field === 'object') return field.$id || null;
+    if (typeof field === 'string') return field;
+    return null;
+};
+
+const resolveProductIdFromPrice = (price) => {
+    if (price.productId) return price.productId;
+    return resolveRelationshipId(price.products);
+};
+
+const resolveSupermarketIdFromPrice = (price) => {
+    if (price.supermarketId) return price.supermarketId;
+    return resolveRelationshipId(price.supermarkets);
+};
 
 const Dashboard = () => {
     const admin = useAdminAuthStore((state) => state.admin);
@@ -32,6 +57,7 @@ const Dashboard = () => {
     const [loading, setLoading] = useState(true);
     const [rawProducts, setRawProducts] = useState([]);
     const [rawPrices, setRawPrices] = useState([]);
+    const [rawPricesForMarket, setRawPricesForMarket] = useState([]);
     const [rawSupermarkets, setRawSupermarkets] = useState([]);
     const [lastUpdated, setLastUpdated] = useState(null);
     const isFresh = useFreshIndicator(lastUpdated);
@@ -110,7 +136,7 @@ const Dashboard = () => {
             fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
             const pricesFrom = fourteenDaysAgo.toISOString();
 
-            const [productsDocs, pricesDocs, supermarketsDocs] = await Promise.all([
+            const [productsDocs, pricesDocs, pricesForMarketDocs, supermarketsDocs] = await Promise.all([
                 fetchAll(
                     (offset, limit) => db.products.list([
                         Query.limit(limit),
@@ -130,6 +156,20 @@ const Dashboard = () => {
                     'prices for charts'
                 ),
                 fetchAll(
+                    (offset, limit) => db.prices.list([
+                        Query.limit(limit),
+                        Query.offset(offset),
+                        Query.select([
+                            '*',
+                            'products.$id',
+                            'products.name',
+                            'supermarkets.$id',
+                            'supermarkets.name',
+                        ]),
+                    ]),
+                    'prices for market chart'
+                ),
+                fetchAll(
                     (offset, limit) => db.supermarkets.list([
                         Query.limit(limit),
                         Query.offset(offset),
@@ -141,6 +181,7 @@ const Dashboard = () => {
 
             setRawProducts(productsDocs);
             setRawPrices(pricesDocs);
+            setRawPricesForMarket(pricesForMarketDocs);
             setRawSupermarkets(supermarketsDocs);
 
             setStats({
@@ -193,38 +234,48 @@ const Dashboard = () => {
     const productTrend = useMemo(() => getWeeklyTrend(rawProducts), [rawProducts]);
     const priceTrend = useMemo(() => getWeeklyTrend(rawPrices), [rawPrices]);
 
-    // Process Market Distribution Data for Chart
     const marketChartData = useMemo(() => {
-        if (!rawProducts.length || !rawSupermarkets.length) return [];
+        if (!rawPricesForMarket.length) return [];
 
-        const counts = {};
-        rawProducts.forEach((product) => {
-            const field = product.supermarkets;
-            let marketId = null;
-            if (Array.isArray(field)) {
-                marketId = field[0]?.$id || field[0] || null;
-            } else if (typeof field === 'object' && field) {
-                marketId = field.$id || null;
-            } else if (typeof field === 'string') {
-                marketId = field;
+        const productSetsByMarket = {};
+        rawPricesForMarket.forEach((price) => {
+            const marketId = resolveSupermarketIdFromPrice(price);
+            const productId = resolveProductIdFromPrice(price);
+            if (!marketId || !productId) return;
+            if (!productSetsByMarket[marketId]) {
+                productSetsByMarket[marketId] = new Set();
             }
-
-            if (marketId) {
-                counts[marketId] = (counts[marketId] || 0) + 1;
-            }
+            productSetsByMarket[marketId].add(productId);
         });
 
-        const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
-        return rawSupermarkets
-            .map((market, i) => ({
-                name: market.name || 'Unknown Market',
-                value: counts[market.$id] || 0,
-                color: colors[i % colors.length]
+        const marketIdsWithProducts = Object.keys(productSetsByMarket);
+        if (marketIdsWithProducts.length === 0) return [];
+
+        const supermarketById = Object.fromEntries(
+            rawSupermarkets.map((market) => [market.$id, market])
+        );
+
+        const marketNameFromPrices = {};
+        rawPricesForMarket.forEach((price) => {
+            const marketId = resolveSupermarketIdFromPrice(price);
+            if (!marketId || marketNameFromPrices[marketId]) return;
+            const field = price.supermarkets;
+            const name = typeof field === 'object' && !Array.isArray(field)
+                ? field.name
+                : (Array.isArray(field) ? field[0]?.name : null);
+            if (name) marketNameFromPrices[marketId] = name;
+        });
+
+        return marketIdsWithProducts
+            .map((marketId, i) => ({
+                name: supermarketById[marketId]?.name || marketNameFromPrices[marketId] || 'Unknown Market',
+                value: productSetsByMarket[marketId].size,
+                color: BRAND_CHART_COLORS[i % BRAND_CHART_COLORS.length],
             }))
             .filter((item) => item.value > 0)
             .sort((a, b) => b.value - a.value)
-            .slice(0, 5);
-    }, [rawProducts, rawSupermarkets]);
+            .slice(0, 10);
+    }, [rawPricesForMarket, rawSupermarkets]);
 
     // Process Price Trends Data (Grouped by creation date)
     const priceTrendsData = useMemo(() => {
@@ -374,66 +425,86 @@ const Dashboard = () => {
                     {/* Analytics Section */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         {/* Traffic Overview */}
-                        <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col h-[450px]">
-                            <div className="flex justify-between items-start mb-8">
-                                <div>
-                                    <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tight">Price Activity</h3>
+                        <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col h-[450px] overflow-hidden">
+                            <div className="flex justify-between items-start mb-4 shrink-0 gap-3">
+                                <div className="min-w-0">
+                                    <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tight normal-case">Price Activity</h3>
                                     <p className="text-[10px] text-gray-400 uppercase tracking-[0.2em] font-black">Updates in the last 7 days</p>
                                 </div>
-                                <div className="flex gap-2">
-                                    <span className="flex items-center gap-1.5 text-[10px] font-black text-brand-700 bg-brand-50 px-3 py-1 rounded-full uppercase">
-                                        <div className="w-1.5 h-1.5 bg-brand-600 rounded-full"></div> Activity
+                                <div className="flex gap-2 shrink-0">
+                                    <span className="flex items-center gap-1.5 text-[10px] font-black text-brand-700 bg-brand-50 dark:bg-brand-900/30 px-3 py-1 rounded-full uppercase whitespace-nowrap">
+                                        <div className="w-1.5 h-1.5 bg-brand-600 rounded-full shrink-0"></div> Activity
                                     </span>
                                 </div>
                             </div>
-                            <div className="flex-1 w-full min-h-[240px] min-w-0 -ml-4">
-                                <div className="w-full h-full min-h-[240px]">
+                            <div className="flex-1 w-full min-h-0 min-w-0 overflow-hidden">
+                                <div className="w-full h-full min-h-[180px]">
                                     <ResponsiveContainer width="100%" height="100%">
                                         <AreaChart data={priceTrendsData}>
                                         <defs>
                                             <linearGradient id="colorSearches" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3}/>
-                                                <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
+                                                <stop offset="5%" stopColor={CHART_BRAND_STROKE} stopOpacity={0.3}/>
+                                                <stop offset="95%" stopColor={CHART_BRAND_STROKE} stopOpacity={0}/>
                                             </linearGradient>
                                         </defs>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8', fontWeight: 700}} />
-                                        <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8', fontWeight: 700}} />
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridStroke} />
+                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: tickFill, fontWeight: 700}} />
+                                        <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: tickFill, fontWeight: 700}} />
                                         <Tooltip 
                                             contentStyle={{borderRadius: '20px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', padding: '12px 16px', backgroundColor: '#fff', color: '#000'}}
                                             itemStyle={{fontSize: '12px', fontWeight: 800}}
                                         />
-                                        <Area type="monotone" dataKey="updates" stroke="#3B82F6" fillOpacity={1} fill="url(#colorSearches)" strokeWidth={4} dot={{fill: '#3B82F6', strokeWidth: 2, r: 4}} activeDot={{r: 6, strokeWidth: 0}} />
+                                        <Area type="monotone" dataKey="updates" stroke={CHART_BRAND_STROKE} fillOpacity={1} fill="url(#colorSearches)" strokeWidth={4} dot={{fill: CHART_BRAND_STROKE_LIGHT, strokeWidth: 2, r: 4}} activeDot={{r: 6, strokeWidth: 0}} />
                                     </AreaChart>
                                     </ResponsiveContainer>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Market distribution chart */}
-                        <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col h-[450px]">
-                            <div className="mb-8">
-                                <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tight">Market Distribution</h3>
-                                <p className="text-[10px] text-gray-400 uppercase tracking-[0.2em] font-black">Products per Market</p>
+                        {/* Products per market chart */}
+                        <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col h-[450px] overflow-hidden">
+                            <div className="mb-4 shrink-0 min-w-0">
+                                <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tight normal-case">Products per Market</h3>
+                                <p className="text-[10px] text-gray-400 uppercase tracking-[0.2em] font-black mt-1">Live — distinct products with prices</p>
                             </div>
-                            <div className="flex-1 w-full min-h-[240px] min-w-0">
+                            <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
                                 {marketChartData.length === 0 ? (
-                                    <div className="h-full flex flex-col items-center justify-center text-center px-6">
-                                        <div className="w-16 h-16 rounded-2xl bg-gray-50 dark:bg-gray-900 flex items-center justify-center text-gray-300 dark:text-gray-600 mb-4">
-                                            <FiPackage size={28} />
+                                    <div className="flex-1 flex flex-col items-center justify-center text-center px-4 py-6 min-h-0 overflow-hidden">
+                                        <div className="w-14 h-14 rounded-2xl bg-gray-50 dark:bg-gray-900 flex items-center justify-center text-gray-300 dark:text-gray-600 mb-3 shrink-0">
+                                            <FiPackage size={26} className="shrink-0" />
                                         </div>
-                                        <p className="text-sm font-bold text-gray-500">No market distribution yet</p>
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mt-2">Assign products to markets to populate this chart</p>
+                                        <p className="text-sm font-bold text-gray-500 dark:text-gray-400 normal-case">No market data yet</p>
+                                        <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400 mt-2 max-w-[220px] leading-relaxed">
+                                            Add prices in the Prices page to populate this chart
+                                        </p>
                                     </div>
                                 ) : (
                                     <>
-                                        <div className="w-full h-full min-h-[240px]">
+                                        <div className="flex-1 min-h-0 w-full overflow-hidden">
                                             <ResponsiveContainer width="100%" height="100%">
-                                                <BarChart data={marketChartData} layout="vertical" margin={{left: -20}}>
+                                                <BarChart
+                                                    data={marketChartData}
+                                                    layout="vertical"
+                                                    margin={{ top: 4, right: 12, left: 4, bottom: 4 }}
+                                                >
                                                 <XAxis type="number" hide />
-                                                <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fontSize: 11, fill: '#475569', fontWeight: 800}} width={100} />
-                                                <Tooltip cursor={{fill: 'transparent'}} contentStyle={{backgroundColor: '#fff', color: '#000'}} />
-                                                <Bar dataKey="value" radius={[0, 12, 12, 0]} barSize={32}>
+                                                <YAxis
+                                                    dataKey="name"
+                                                    type="category"
+                                                    axisLine={false}
+                                                    tickLine={false}
+                                                    width={72}
+                                                    tick={{ fontSize: 10, fill: tickFill, fontWeight: 700 }}
+                                                    tickFormatter={(value) => {
+                                                        const label = String(value || '');
+                                                        return label.length > 10 ? `${label.slice(0, 10)}…` : label;
+                                                    }}
+                                                />
+                                                <Tooltip
+                                                    cursor={{ fill: 'transparent' }}
+                                                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', padding: '8px 12px' }}
+                                                />
+                                                <Bar dataKey="value" radius={[0, 10, 10, 0]} barSize={24}>
                                                     {marketChartData.map((entry, index) => (
                                                         <Cell key={`cell-${index}`} fill={entry.color} />
                                                     ))}
@@ -441,14 +512,16 @@ const Dashboard = () => {
                                                 </BarChart>
                                             </ResponsiveContainer>
                                         </div>
-                                        <div className="mt-6 space-y-3">
+                                        <div className="shrink-0 mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 max-h-[108px] overflow-y-auto overflow-x-hidden space-y-2 pr-1">
                                             {marketChartData.map((market, i) => (
-                                                <div key={i} className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-gray-500">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="w-2 h-2 rounded-full" style={{backgroundColor: market.color}}></div>
-                                                        {market.name}
+                                                <div key={i} className="flex items-center justify-between gap-2 text-[10px] font-bold uppercase tracking-wide text-gray-500 min-w-0">
+                                                    <div className="flex items-center gap-2 min-w-0">
+                                                        <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: market.color }} />
+                                                        <span className="truncate normal-case">{market.name}</span>
                                                     </div>
-                                                    <span className="text-gray-900 dark:text-white">{market.value} Products</span>
+                                                    <span className="text-gray-900 dark:text-white shrink-0 whitespace-nowrap normal-case">
+                                                        {market.value} {market.value === 1 ? 'product' : 'products'}
+                                                    </span>
                                                 </div>
                                             ))}
                                         </div>

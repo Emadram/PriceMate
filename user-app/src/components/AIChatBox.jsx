@@ -448,7 +448,7 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [], t }) =
                                 {t('best', 'Best')}: {convert(best.price, 'TRY')} {getCurrencySymbol()}
                             </p>
                         ) : (
-                            <p className="text-xs text-gray-500">{t('no_price_info', 'No price info')}</p>
+                            <p className="text-xs text-gray-500">{t('no_data_yet')}</p>
                         )}
                     </div>
                 </div>
@@ -742,7 +742,7 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [], t }) =
                                             </div>
                                         </div>
                                     ) : (
-                                        <span className="text-[10px] text-gray-500 italic">{t('no_price_info', 'No price info')}</span>
+                                        <span className="text-[10px] text-gray-500 italic">{t('no_data_yet')}</span>
                                     )}
                                 </div>
                             </div>

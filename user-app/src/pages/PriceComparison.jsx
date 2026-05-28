@@ -4,13 +4,12 @@ import {
     FiArrowLeft, FiMapPin, FiShoppingCart, FiShare2, FiPackage, 
     FiShoppingBag, FiTrendingDown, FiTrendingUp, FiBox, FiHome, FiCamera, 
     FiImage, FiNavigation, FiClock, FiCheckCircle, FiAlertCircle, 
-    FiCalendar, FiTag, FiPlusCircle, FiAlertTriangle, FiInfo 
+    FiCalendar, FiTag, FiAlertTriangle, FiInfo 
 } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
 import { calculateDistance, hasValidLatLon, fetchSimilarProductsByCategory, fetchPricesForProducts, getRelationshipId, normalizeProduct, resolveCoordinates } from '../utils/productUtils';
 import { stripNutritionMeta } from '../utils/productUtils';
 import PriceHistoryChart from '../components/PriceHistoryChart';
-import AddPriceModal from '../components/AddPriceModal';
 import ReportModal from '../components/ReportModal';
 import StoreMap from '../components/StoreMap';
 import BackButton from '../components/BackButton';
@@ -112,7 +111,6 @@ const PriceComparison = () => {
     const location = useLocation();
     const [searchParams] = useSearchParams();
     const [sortBy, setSortBy] = useState('price'); // 'price' or 'distance'
-    const [isAddPriceModalOpen, setIsAddPriceModalOpen] = useState(false);
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
     const user = useAuthStore((state) => state.user);
     const { isProductFavorite, toggleProductFavorite } = useFavoritesStore();
@@ -278,10 +276,6 @@ const PriceComparison = () => {
             active = false;
         };
     }, [productId, productCategory, productIsGlobal]);
-
-    const handleRefreshData = () => {
-        fetchProductByBarcode(barcode);
-    };
 
     const handleShareClick = async () => {
         const shareUrl = window.location.href;
@@ -648,35 +642,20 @@ const PriceComparison = () => {
                     </div>
 
                     {prices.length === 0 ? (
-                        <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl p-10 md:p-16 text-center border-2 border-dashed border-gray-100 dark:border-gray-700 space-y-8 animate-in fade-in zoom-in duration-500">
-                            <div className="space-y-4">
-                                <div className="relative inline-flex items-center justify-center p-8 bg-brand-50/50 dark:bg-brand-900/10 rounded-full border border-brand-100/30">
-                                    <FiShoppingBag className="text-gray-300 text-6xl animate-pulse-slow" />
-                                    <div className="absolute -top-1 -right-1 p-3 bg-brand-600 rounded-2xl shadow-lg shadow-brand-500/30 animate-float">
-                                        <FiPlusCircle className="text-white" size={24} />
-                                    </div>
-                                </div>
-                                <div className="max-w-xs mx-auto space-y-2">
-                                    <h4 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">Help the community!</h4>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400 font-medium leading-relaxed">
-                                        Be the first to add a price for this product at your local supermarket.
-                                    </p>
-                                </div>
+                        <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl p-10 md:p-16 text-center border-2 border-dashed border-gray-100 dark:border-gray-700 space-y-4 animate-in fade-in zoom-in duration-500">
+                            <div className="inline-flex items-center justify-center p-8 bg-gray-50 dark:bg-gray-900/50 rounded-full border border-gray-100 dark:border-gray-700">
+                                <FiShoppingBag className="text-gray-300 text-6xl" />
                             </div>
-
-                            <button 
-                                onClick={() => setIsAddPriceModalOpen(true)}
-                                aria-label="Add the first price for this product"
-                                className="w-full max-w-sm inline-flex items-center justify-center gap-3 bg-brand-600 hover:bg-black text-white px-8 py-4 rounded-[1.5rem] font-black uppercase tracking-widest text-[11px] shadow-lg shadow-brand-500/30 hover:shadow-none transition-all duration-300 transform hover:scale-[0.98] active:scale-95 group"
-                            >
-                                <FiPlusCircle size={20} className="group-hover:rotate-90 transition-transform duration-300" />
-                                Add First Price
-                            </button>
-
+                            <div className="max-w-xs mx-auto space-y-2">
+                                <h4 className="text-xl font-black text-gray-900 dark:text-white tracking-tight">{t('no_data_yet')}</h4>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 font-medium leading-relaxed">
+                                    {t('no_data_yet_subtitle', 'Prices will appear when added by stores or admin.')}
+                                </p>
+                            </div>
                             {product.is_global && (
-                                <div className="flex items-center justify-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50 dark:bg-gray-900/50 py-3 px-6 rounded-2xl border border-gray-100 dark:border-gray-800/50">
+                                <div className="flex items-center justify-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50 dark:bg-gray-900/50 py-3 px-6 rounded-2xl border border-gray-100 dark:border-gray-800/50 mx-auto max-w-xs">
                                     <FiInfo size={14} className="text-accent-500" />
-                                    From our global database
+                                    {t('from_global_database', 'From our global database')}
                                 </div>
                             )}
                         </div>
@@ -890,20 +869,6 @@ const PriceComparison = () => {
                 </div>
             )}
 
-            {/* Contribution Modal */}
-            {product && (
-                <AddPriceModal 
-                    isOpen={isAddPriceModalOpen} 
-                    onClose={(wasSuccessful) => {
-                        setIsAddPriceModalOpen(false);
-                        if (wasSuccessful) {
-                            handleRefreshData();
-                        }
-                    }} 
-                    product={product}
-                    barcode={barcode}
-                />
-            )}
         </div>
     );
 };

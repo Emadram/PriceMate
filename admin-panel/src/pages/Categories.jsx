@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FiTag, FiEdit2, FiTrash2, FiPlus, FiArrowLeft, FiSearch } from 'react-icons/fi';
 import SortIcon from '../components/SortIcon';
 import useCategoriesStore from '../stores/categoriesStore';
 import Sidebar from '../components/Sidebar';
+import AdminPageHeader from '../components/AdminPageHeader';
 import { CATEGORY_ICON_ELEMENTS, CATEGORY_ICON_KEYS } from '../constants/categoryIconMap';
 
 const Categories = () => {
@@ -17,10 +18,17 @@ const Categories = () => {
 
     const [searchTerm, setSearchTerm] = useState('');
     const [sortConfig, setSortConfig] = useState({ key: null, direction: 'ascending' });
+    const [lastUpdated, setLastUpdated] = useState(null);
+
+    const loadCategories = useCallback(async () => {
+        await fetchCategories();
+        setLastUpdated(new Date().toISOString());
+    }, [fetchCategories]);
 
     useEffect(() => {
-        fetchCategories();
-    }, [fetchCategories]);
+        const t = setTimeout(() => loadCategories(), 0);
+        return () => clearTimeout(t);
+    }, [loadCategories]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -97,28 +105,34 @@ const Categories = () => {
         <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
             <Sidebar />
             <div className="flex-1 overflow-x-hidden flex flex-col h-screen overflow-y-auto custom-scrollbar">
-                <header className="sticky top-0 z-30 bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border-b border-gray-100 dark:border-gray-700 p-6 flex justify-between items-center">
-                    <div className="flex items-center gap-6 flex-1">
-                        <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight uppercase">Categories</h1>
-                        <div className="relative group max-w-md w-full ml-4 hidden md:block">
-                            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand-600 dark:group-focus-within:text-brand-300 transition-colors" />
-                            <input
-                                type="text"
-                                placeholder="Search categorized assets..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="bg-gray-100 dark:bg-gray-900 border-gray-200 dark:border-gray-700 rounded-2xl py-2.5 pl-11 pr-4 w-full text-sm focus:ring-2 focus:ring-brand-500/20 focus:bg-white dark:focus:bg-gray-900 transition-all outline-none text-gray-800 dark:text-gray-100"
-                            />
-                        </div>
+                <AdminPageHeader
+                    title="Categories"
+                    subtitle="Product taxonomy and classification"
+                    lastUpdated={lastUpdated}
+                    onRefresh={loadCategories}
+                    loading={loading}
+                    actions={(
+                        <button
+                            type="button"
+                            onClick={() => { setShowModal(true); setEditingCategory(null); setFormData({ categoryName: '', icon: '' }); }}
+                            className="bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 rounded-2xl flex items-center gap-2 transition-all shadow-lg shadow-brand-600/20 active:scale-95 text-sm font-black uppercase tracking-widest"
+                        >
+                            <FiPlus size={20} className="stroke-[3]" />
+                            <span className="hidden sm:inline">New Category</span>
+                        </button>
+                    )}
+                >
+                    <div className="relative group max-w-md w-full hidden md:block">
+                        <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand-600 dark:group-focus-within:text-brand-300 transition-colors" />
+                        <input
+                            type="text"
+                            placeholder="Search categorized assets..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="bg-gray-100 dark:bg-gray-900 border-gray-200 dark:border-gray-700 rounded-2xl py-2.5 pl-11 pr-4 w-full text-sm focus:ring-2 focus:ring-brand-500/20 focus:bg-white dark:focus:bg-gray-900 transition-all outline-none text-gray-800 dark:text-gray-100"
+                        />
                     </div>
-                    <button
-                        onClick={() => { setShowModal(true); setEditingCategory(null); setFormData({ categoryName: '', icon: '' }); }}
-                        className="bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 rounded-2xl flex items-center gap-2 transition-all shadow-lg shadow-brand-600/20 active:scale-95 text-sm font-black uppercase tracking-widest"
-                    >
-                        <FiPlus size={20} className="stroke-[3]" />
-                        <span className="hidden sm:inline">New Category</span>
-                    </button>
-                </header>
+                </AdminPageHeader>
 
                 <main className="max-w-7xl mx-auto px-6 py-8 w-full">
                     <div className="mb-8 flex items-center justify-between bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-gray-100 dark:border-gray-700 shadow-sm">

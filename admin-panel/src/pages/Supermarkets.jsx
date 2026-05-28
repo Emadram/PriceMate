@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FiPlus, FiEdit2, FiTrash2, FiMapPin, FiPhone, FiMail, FiChevronUp, FiChevronDown, FiX, FiSearch, FiShoppingBag } from 'react-icons/fi';
 import SortIcon from '../components/SortIcon';
 import useSupermarketsStore from '../stores/supermarketsStore';
 import Sidebar from '../components/Sidebar';
+import AdminPageHeader from '../components/AdminPageHeader';
 import { validateSupermarketCoordinates } from '../utils/coordinateValidation';
 
 const extractGoogleMapsEmbedSrc = (value) => {
@@ -55,11 +56,17 @@ const Supermarkets = () => {
 
     const [searchTerm, setSearchTerm] = useState('');
     const [sortConfig, setSortConfig] = useState({ key: null, direction: 'ascending' });
+    const [lastUpdated, setLastUpdated] = useState(null);
+
+    const loadSupermarkets = useCallback(async () => {
+        await fetchSupermarkets();
+        setLastUpdated(new Date().toISOString());
+    }, [fetchSupermarkets]);
 
     useEffect(() => {
-        const t = setTimeout(() => fetchSupermarkets(), 0);
+        const t = setTimeout(() => loadSupermarkets(), 0);
         return () => clearTimeout(t);
-    }, [fetchSupermarkets]);
+    }, [loadSupermarkets]);
 
     const filteredSupermarkets = supermarkets.filter(sm => 
         (sm.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
@@ -195,27 +202,33 @@ const Supermarkets = () => {
             <Sidebar />
 
             <div className="flex-1 flex flex-col h-screen overflow-y-auto custom-scrollbar">
-                <header className="bg-white dark:bg-gray-800 shadow sticky top-0 z-10 p-6 flex justify-between items-center bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border-b border-gray-100 dark:border-gray-700">
-                    <div className="flex items-center gap-6 flex-1">
-                        <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight uppercase">Supermarkets</h1>
-                        <div className="relative group max-w-md w-full ml-4 hidden md:block">
-                            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand-600 dark:group-focus-within:text-brand-300 transition-colors" />
-                            <input
-                                type="text"
-                                placeholder="Find store, brand or address..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="bg-gray-100 dark:bg-gray-900 border-gray-200 dark:border-gray-700 rounded-2xl py-2.5 pl-11 pr-4 w-full text-sm focus:ring-2 focus:ring-brand-500/20 focus:bg-white dark:focus:bg-gray-900 transition-all outline-none text-gray-800 dark:text-gray-100"
-                            />
-                        </div>
+                <AdminPageHeader
+                    title="Supermarkets"
+                    subtitle="Store branches, locations, and contact details"
+                    lastUpdated={lastUpdated}
+                    onRefresh={loadSupermarkets}
+                    loading={loading}
+                    actions={(
+                        <button
+                            type="button"
+                            onClick={() => { setEditing(null); resetForm(); setShowModal(true); }}
+                            className="bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 rounded-2xl flex items-center gap-2 transition-all shadow-lg shadow-brand-600/20 active:scale-95 text-sm font-black uppercase tracking-widest"
+                        >
+                            <FiPlus size={20} className="stroke-[3]" /> Add Branch
+                        </button>
+                    )}
+                >
+                    <div className="relative group max-w-md w-full hidden md:block">
+                        <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand-600 dark:group-focus-within:text-brand-300 transition-colors" />
+                        <input
+                            type="text"
+                            placeholder="Find store, brand or address..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="bg-gray-100 dark:bg-gray-900 border-gray-200 dark:border-gray-700 rounded-2xl py-2.5 pl-11 pr-4 w-full text-sm focus:ring-2 focus:ring-brand-500/20 focus:bg-white dark:focus:bg-gray-900 transition-all outline-none text-gray-800 dark:text-gray-100"
+                        />
                     </div>
-                    <button
-                        onClick={() => { setEditing(null); resetForm(); setShowModal(true); }}
-                        className="bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 rounded-2xl flex items-center gap-2 transition-all shadow-lg shadow-brand-600/20 active:scale-95 text-sm font-black uppercase tracking-widest"
-                    >
-                        <FiPlus size={20} className="stroke-[3]" /> Add Branch
-                    </button>
-                </header>
+                </AdminPageHeader>
 
                 <main className="max-w-7xl mx-auto px-6 py-8 w-full">
                     {loading ? (

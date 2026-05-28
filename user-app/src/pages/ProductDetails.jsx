@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import useProductStore from '../stores/productStore';
-import AddPriceModal from '../components/AddPriceModal';
 import BackButton from '../components/BackButton';
-import { FiPackage, FiCamera, FiPlusCircle } from 'react-icons/fi';
+import { FiPackage, FiCamera } from 'react-icons/fi';
 import { getAppwriteConfig } from '../lib/appwrite';
 import { useTranslation } from 'react-i18next';
 
@@ -17,7 +16,6 @@ const ProductDetails = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { product, loading, error, fetchProductByBarcode } = useProductStore();
-    const [isAddPriceOpen, setIsAddPriceOpen] = useState(false);
     const [imageFailed, setImageFailed] = useState(false);
 
     const tapFeedback = () => {
@@ -31,7 +29,6 @@ const ProductDetails = () => {
             fetchProductByBarcode(barcode);
         }
         
-        // Only redirect to price comparison when we arrived from the scanner flow
         if (location.state?.fromScan) {
             navigate(`/price-comparison/${barcode}?fromScan=1`, { replace: true, state: { fromScan: true } });
         }
@@ -92,8 +89,7 @@ const ProductDetails = () => {
     const imageSrc = imageFailed ? '' : (product.imageUrl || product.image || fallbackImageUrl);
 
     return (
-        <div className="min-h-screen bg-gray-50 pb-safe pt-safe">
-            {/* Header Info */}
+        <div className="min-h-screen bg-gray-50 pb-safe-nav pt-safe">
             <div className="bg-white px-4 sm:px-6 pt-6 sm:pt-10 pb-6 sm:pb-8 rounded-b-[2.25rem] sm:rounded-b-[3rem] shadow-sm mb-5 sm:mb-6">
                 <div className="max-w-4xl mx-auto flex items-center">
                     <BackButton label={t('go_back', 'Go Back')} className="-ml-2" />
@@ -121,35 +117,18 @@ const ProductDetails = () => {
                             {barcode}
                         </span>
                     </div>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            tapFeedback();
+                            navigate(`/price-comparison/${barcode}`);
+                        }}
+                        className="mt-2 px-6 py-3 bg-brand-600 text-white rounded-2xl font-bold shadow-lg shadow-brand-500/20 hover:bg-brand-700 active:scale-95 transition-all"
+                    >
+                        {t('open_price_comparison')}
+                    </button>
                 </div>
             </div>
-
-            <div className="fixed bottom-0 left-0 right-0 p-3 sm:p-4 pb-safe-nav bg-white/90 backdrop-blur-md border-t border-gray-100 flex gap-2.5 sm:gap-3 z-50">
-                <button
-                    onClick={() => {
-                        tapFeedback();
-                        navigate(-1);
-                    }}
-                    className="px-4 sm:px-6 py-4 bg-gray-100 text-gray-700 rounded-2xl font-bold hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
-                >
-                    {t('back', 'Back')}
-                </button>
-                <button
-                    onClick={() => {
-                        tapFeedback();
-                        setIsAddPriceOpen(true);
-                    }}
-                    className="flex-1 py-4 bg-brand-600 text-white rounded-2xl font-bold shadow-lg shadow-brand-500/20 hover:bg-brand-700 active:scale-95 transition-all flex items-center justify-center gap-2"
-                >
-                    <FiPlusCircle size={18} /> {t('add_current_price', 'Add Current Price')}
-                </button>
-            </div>
-
-            <AddPriceModal 
-                isOpen={isAddPriceOpen}
-                onClose={() => setIsAddPriceOpen(false)}
-                product={product}
-            />
         </div>
     );
 };
