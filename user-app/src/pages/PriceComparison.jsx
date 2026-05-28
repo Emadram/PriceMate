@@ -7,20 +7,23 @@ import {
     FiCalendar, FiTag, FiPlusCircle, FiAlertTriangle, FiInfo 
 } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
-import { calculateDistance, hasValidLatLon } from '../utils/productUtils';
-import Navbar from '../components/Navbar';
+import { calculateDistance, hasValidLatLon, fetchSimilarProductsByCategory, fetchPricesForProducts, getRelationshipId, normalizeProduct, resolveCoordinates } from '../utils/productUtils';
+import { stripNutritionMeta } from '../utils/productUtils';
 import PriceHistoryChart from '../components/PriceHistoryChart';
 import AddPriceModal from '../components/AddPriceModal';
 import ReportModal from '../components/ReportModal';
 import StoreMap from '../components/StoreMap';
 import BackButton from '../components/BackButton';
 import FavoriteHeartButton from '../components/FavoriteHeartButton';
+import ProductCard from '../components/ProductCard';
+import { ProductCardSkeleton } from '../components/SkeletonLoaders';
 import toast from 'react-hot-toast';
 import useAuthStore from '../stores/authStore';
 import useProductStore from '../stores/productStore';
 import useFavoritesStore from '../stores/favoritesStore';
 import useCurrencyStore from '../stores/currencyStore';
 import useUserLocation from '../hooks/useUserLocation';
+import StarRating from '../components/StarRating';
 
 const normalizeStockStatus = (status) => {
     if (!status) return 'in_stock';
@@ -47,7 +50,7 @@ const StockBranch = ({ name, status, price, distance, t, currencyLabel, supermar
     const inner = (
         <>
             <div className="flex flex-col gap-1 min-w-0">
-                <span className="font-semibold text-gray-900 dark:text-white truncate group-hover:text-blue-600 transition-colors">
+                <span className="font-semibold text-gray-900 dark:text-white truncate group-hover:text-brand-600 transition-colors">
                     {name}
                 </span>
                 <div className="flex items-center gap-2">
@@ -63,7 +66,7 @@ const StockBranch = ({ name, status, price, distance, t, currencyLabel, supermar
             </div>
             
             <div className="text-right flex flex-col items-end">
-                <span className="text-lg font-bold text-gray-900 dark:text-white">
+                <span className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
                     {price}
                 </span>
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
@@ -74,7 +77,7 @@ const StockBranch = ({ name, status, price, distance, t, currencyLabel, supermar
     );
 
     const className =
-        'flex items-center justify-between p-4 rounded-2xl bg-white dark:bg-gray-800 shadow-soft hover:shadow-soft-lg transition-all border border-transparent hover:border-gray-100 dark:hover:border-gray-700 cursor-pointer group';
+        'flex items-center justify-between p-3 sm:p-4 rounded-2xl bg-white dark:bg-gray-800 shadow-soft hover:shadow-soft-lg transition-all border border-transparent hover:border-gray-100 dark:hover:border-gray-700 cursor-pointer group';
 
     if (supermarketId) {
         return (
@@ -101,9 +104,9 @@ const StockBranch = ({ name, status, price, distance, t, currencyLabel, supermar
 };
 
 const PriceComparison = () => {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const { convert, getCurrencySymbol } = useCurrencyStore();
-    const { location: userLocation, loading: locationLoading } = useUserLocation();
+    const { location: userLocation, error: locationError, loading: locationLoading, retry: retryLocation } = useUserLocation();
     const { barcode } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
@@ -123,6 +126,8 @@ const PriceComparison = () => {
         fetchProductByBarcode 
     } = useProductStore();
     const [prices, setPrices] = useState([]);
+    const [similarProducts, setSimilarProducts] = useState([]);
+    const [similarLoading, setSimilarLoading] = useState(false);
 
     const getSupermarketFromPrice = (price) => {
         if (!price) return null;
@@ -140,7 +145,13 @@ const PriceComparison = () => {
 
     const getPriceTimestamp = (price) => price?.$updatedAt || price?.updatedAt || price?.$createdAt || price?.createdAt || null;
 
-    const getPriceCurrency = (price) => price?.currency || 'TRY';
+    const normalizePriceCurrency = (value) => {
+        if (!value) return 'TRY';
+        const upper = String(value).trim().toUpperCase();
+        return upper === 'TL' ? 'TRY' : upper;
+    };
+
+    const getPriceCurrency = (price) => normalizePriceCurrency(price?.currency);
 
     const fromScan = location.state?.fromScan || searchParams.get('fromScan') === '1';
 
@@ -170,17 +181,18 @@ const PriceComparison = () => {
                 hasValidLatLon(userLocation.latitude, userLocation.longitude) &&
                 supermarket &&
                 typeof supermarket === 'object' &&
-                hasValidLatLon(supermarket.latitude, supermarket.longitude)
+                resolveCoordinates(supermarket)
             ) {
+                const supermarketCoordinates = resolveCoordinates(supermarket);
                 distance = calculateDistance(
                     userLocation.latitude,
                     userLocation.longitude,
-                    supermarket.latitude,
-                    supermarket.longitude
+                    supermarketCoordinates.latitude,
+                    supermarketCoordinates.longitude
                 );
             }
 
-            return { ...price, distance: distance ? parseFloat(distance) : null };
+            return { ...price, distance: distance !== null ? parseFloat(distance) : null };
         });
 
         // Grouping logic for multi-branch support
@@ -226,8 +238,81 @@ const PriceComparison = () => {
         setPrices([...finalPrices, ...noStoreFallback]);
     }, [rawPrices, userLocation]);
 
+    const productId = product?.$id;
+    const productCategory = product?.categoryId;
+    const productIsGlobal = product?.is_global;
+
+    useEffect(() => {
+        let active = true;
+
+        const loadSimilar = async () => {
+            if (!productId || productIsGlobal) {
+                if (active) setSimilarProducts([]);
+                return;
+            }
+
+            const categoryId = getRelationshipId(productCategory);
+            if (!categoryId) {
+                if (active) setSimilarProducts([]);
+                return;
+            }
+
+            setSimilarLoading(true);
+            try {
+                const candidates = await fetchSimilarProductsByCategory(categoryId, productId, 6);
+                const localIds = candidates.filter((p) => p.$id).map((p) => p.$id);
+                const batchPrices = localIds.length > 0
+                    ? await fetchPricesForProducts(localIds)
+                    : [];
+                const normalized = candidates.map((p) => normalizeProduct(p, batchPrices));
+                if (active) setSimilarProducts(normalized);
+            } catch (error) {
+                console.warn('Similar products fetch failed:', error?.message || error);
+            } finally {
+                if (active) setSimilarLoading(false);
+            }
+        };
+
+        loadSimilar();
+        return () => {
+            active = false;
+        };
+    }, [productId, productCategory, productIsGlobal]);
+
     const handleRefreshData = () => {
         fetchProductByBarcode(barcode);
+    };
+
+    const handleShareClick = async () => {
+        const shareUrl = window.location.href;
+        const shareTitle = product?.name || 'PriceMate';
+        const shareText = product?.name
+            ? `${product.name} on PriceMate`
+            : 'Check this product on PriceMate';
+
+        try {
+            if (navigator.share) {
+                await navigator.share({
+                    title: shareTitle,
+                    text: shareText,
+                    url: shareUrl,
+                });
+                return;
+            }
+
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(shareUrl);
+                toast.success('Link copied to clipboard');
+                return;
+            }
+
+            window.prompt('Copy this link', shareUrl);
+        } catch (error) {
+            if (error?.name !== 'AbortError') {
+                console.error('Share failed:', error);
+                toast.error('Could not share this page right now');
+            }
+        }
     };
 
     const sortedPrices = useMemo(() => {
@@ -268,7 +353,16 @@ const PriceComparison = () => {
         return sorted;
     }, [prices, sortBy, supermarketIdParam]);
 
-    const [showMapForIndex, setShowMapForIndex] = useState(null);
+    const formatDistance = (value) => {
+        const parsed = Number(value);
+        if (!Number.isFinite(parsed)) return null;
+        return new Intl.NumberFormat(i18n?.language || undefined, {
+            minimumFractionDigits: 1,
+            maximumFractionDigits: 1
+        }).format(parsed);
+    };
+
+    const [showMapForPriceId, setShowMapForPriceId] = useState(null);
 
     const getCategoryName = () => {
         const cat = product?.categoryId;
@@ -299,23 +393,46 @@ const PriceComparison = () => {
     if (error || !product) {
         return (
             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
-                <div className="text-center">
-                    <FiPackage className="text-gray-400 text-6xl mx-auto mb-4" />
-                    <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-2 uppercase tracking-tight">
+                <div className="w-full max-w-md rounded-[2rem] bg-white dark:bg-gray-800 shadow-xl border border-gray-100 dark:border-gray-700 p-8 text-center">
+                    <div className="w-20 h-20 rounded-3xl bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center mx-auto mb-5">
+                        <FiPackage className="text-amber-500 text-4xl" />
+                    </div>
+                    <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-3">
                         {error ? t('failed_to_load_product') : t('product_not_found')}
                     </h2>
-                    <button
-                        onClick={() => navigate('/')}
-                        className="bg-blue-600 text-white px-6 py-2 rounded-full font-black uppercase tracking-widest text-[10px] hover:bg-black transition-colors"
-                    >
-                        {t('go_back_home')}
-                    </button>
+                    <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400 font-medium leading-relaxed mb-2">
+                        {error
+                            ? error
+                            : barcode
+                                ? `We could not find a product for barcode ${barcode}. Try scanning again or search manually.`
+                                : 'We could not find a product for this scan. Try scanning again or search manually.'}
+                    </p>
+                    {barcode && (
+                        <div className="mt-4 mb-6 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gray-50 dark:bg-gray-900/60 text-xs font-bold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+                            <FiAlertCircle className="text-amber-500" />
+                            {barcode}
+                        </div>
+                    )}
+                    <div className="flex flex-col sm:flex-row gap-3">
+                        <button
+                            onClick={() => navigate('/scan')}
+                            className="flex-1 inline-flex items-center justify-center gap-2 bg-brand-600 text-white px-5 py-3 rounded-2xl font-bold shadow-lg shadow-brand-500/20 hover:bg-brand-700 transition-colors"
+                        >
+                            <FiCamera />
+                            {t('scan_another_product')}
+                        </button>
+                        <button
+                            onClick={() => navigate('/')}
+                            className="flex-1 inline-flex items-center justify-center gap-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-5 py-3 rounded-2xl font-bold hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                        >
+                            <FiHome />
+                            {t('go_back_home')}
+                        </button>
+                    </div>
                 </div>
             </div>
         );
     }
-
-    const lowestPrice = getLowestPrice();
 
     const handleBack = () => {
         if (fromScan) {
@@ -334,43 +451,57 @@ const PriceComparison = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-32 md:pb-12">
-            <Navbar />
-            
-            <main className="max-w-4xl mx-auto px-4 py-4 md:py-8 space-y-4 md:space-y-8">
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-safe md:pb-12">
+            <main className="max-w-4xl mx-auto px-3 sm:px-4 pt-2 pb-6 md:py-8 space-y-3 md:space-y-8">
                 <div className="flex items-center">
-                    <BackButton label="Go Back" onClick={handleBack} />
+                    <BackButton label={t('go_back', 'Go Back')} onClick={handleBack} />
                 </div>
+                {locationError && (
+                    <div className="rounded-3xl border border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/10 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
+                        <div className="min-w-0">
+                            <p className="text-xs sm:text-sm font-semibold text-amber-900 dark:text-amber-200">Distance view is limited</p>
+                            <p className="text-[11px] sm:text-xs text-amber-800/90 dark:text-amber-100/80 leading-snug">{locationError}</p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={retryLocation}
+                            disabled={locationLoading}
+                            className="shrink-0 inline-flex items-center justify-center rounded-2xl bg-amber-600 px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-white transition-opacity disabled:opacity-60"
+                        >
+                            {t('try_again', 'Try Again')}
+                        </button>
+                    </div>
+                )}
                 {/* Product Info Card - Modern & Mobile Friendly */}
-                <div className="bg-white dark:bg-gray-800 rounded-2xl md:rounded-[2.5rem] shadow-xl overflow-hidden border border-gray-100 dark:border-gray-700">
-                    <div className="p-4 md:p-10">
-                        <div className="flex flex-col md:flex-row gap-8 items-center md:items-start text-center md:text-left">
+                <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl md:rounded-[2.5rem] shadow-xl overflow-hidden border border-gray-100 dark:border-gray-700">
+                    <div className="p-3 sm:p-6 md:p-10">
+                        <div className="flex flex-col md:flex-row gap-4 sm:gap-6 md:gap-8 items-center md:items-start text-center md:text-left">
                             {/* Product Image */}
-                            <div className="w-40 h-40 md:w-64 md:h-64 bg-gray-50 dark:bg-gray-900 rounded-3xl md:rounded-[3rem] flex items-center justify-center flex-shrink-0 overflow-hidden shadow-inner border border-gray-100 dark:border-gray-800/50 relative group">
+                            <div className="w-[6.75rem] h-[6.75rem] sm:w-36 sm:h-36 md:w-56 md:h-56 lg:w-64 lg:h-64 bg-gray-50 dark:bg-gray-900 rounded-2xl md:rounded-[3rem] flex items-center justify-center flex-shrink-0 overflow-hidden shadow-inner border border-gray-100 dark:border-gray-800/50 relative group">
                                 {product.imageUrl ? (
                                     <img
                                         src={product.imageUrl}
                                         alt={product.name}
-                                        className="w-full h-full object-contain p-6 transition-transform group-hover:scale-110 duration-500"
+                                        className="w-full h-full object-contain p-2.5 sm:p-6 md:p-8 transition-transform group-hover:scale-110 duration-500"
                                     />
                                 ) : (
-                                    <FiPackage className="text-gray-300 text-6xl" />
+                                    <FiPackage className="text-gray-300 text-3xl sm:text-6xl" />
                                 )}
                             </div>
 
                             {/* Product Details */}
-                            <div className="flex-1 space-y-5">
+                            <div className="flex-1 space-y-2.5 sm:space-y-4 md:space-y-5 w-full max-w-full">
                                 <div className="space-y-2">
                                     <div className="flex items-center justify-center md:justify-start gap-2 flex-wrap">
-                                        <span className="bg-blue-600/10 text-blue-600 dark:text-blue-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-blue-600/20">
+                                        <span className="bg-brand-600/10 text-brand-600 dark:text-brand-500 text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest border border-brand-600/20">
                                             {getCategoryName()}
                                         </span>
                                         {product.stockQuantity > 0 && (
-                                            <span className="bg-green-600/10 text-green-600 dark:text-green-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-green-600/20">
+                                            <span className="bg-green-600/10 text-green-600 dark:text-green-400 text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest border border-green-600/20">
                                                 In Stock
                                             </span>
                                         )}
-                                        <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border ${
+                                        <span className={`text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest border ${
                                             typeof product.stockQuantity === 'number' && product.stockQuantity <= 0
                                                 ? 'bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800'
                                                 : typeof product.stockQuantity === 'number' && product.stockQuantity <= 5
@@ -380,48 +511,62 @@ const PriceComparison = () => {
                                             {typeof product.stockQuantity === 'number' ? `${product.stockQuantity} Units` : 'Stock count unavailable'}
                                         </span>
                                     </div>
-                                    <div className="flex items-start justify-center md:justify-start gap-3">
-                                        <h2 className="flex-1 min-w-0 text-2xl md:text-5xl font-black text-gray-900 dark:text-white tracking-tighter leading-tight text-center md:text-left">
+                                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+                                        <h2 className="flex-1 min-w-0 text-xl sm:text-2xl md:text-4xl lg:text-5xl font-black text-gray-900 dark:text-white tracking-tighter leading-tight text-center md:text-left">
                                             {product.name}
                                         </h2>
-                                        <FavoriteHeartButton
-                                            className="mt-1"
-                                            pressed={isProductFavorite(product.$id)}
-                                            onClick={handleFavoriteClick}
-                                        />
+                                        <div className="flex items-center justify-center md:justify-end gap-2 sm:gap-3 shrink-0">
+                                            <button
+                                                type="button"
+                                                onClick={handleShareClick}
+                                                className="inline-flex items-center gap-2 text-[9px] sm:text-xs font-bold text-gray-400 hover:text-brand-600 transition-colors uppercase tracking-widest border border-gray-100 dark:border-gray-700 hover:border-brand-100 dark:hover:border-brand-900/30 px-2.5 sm:px-4 py-2 rounded-xl bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm shadow-sm"
+                                                aria-label="Share product"
+                                                title="Share product"
+                                            >
+                                                <FiShare2 size={14} />
+                                                Share
+                                            </button>
+                                            {user && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsReportModalOpen(true)}
+                                                    className="inline-flex items-center gap-2 text-[9px] sm:text-xs font-bold text-gray-400 hover:text-red-500 transition-colors uppercase tracking-widest border border-gray-100 dark:border-gray-700 hover:border-red-100 dark:hover:border-red-900/30 px-2.5 sm:px-4 py-2 rounded-xl bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm shadow-sm"
+                                                >
+                                                    <FiAlertTriangle size={14} />
+                                                    Report
+                                                </button>
+                                            )}
+                                            <FavoriteHeartButton
+                                                className="shrink-0"
+                                                pressed={isProductFavorite(product.$id)}
+                                                onClick={handleFavoriteClick}
+                                            />
+                                        </div>
                                     </div>
                                 </div>
 
                         {user && (
-                        <>
-                        <div className="flex justify-center md:justify-start">
-                            <button
-                                type="button"
-                                onClick={() => setIsReportModalOpen(true)}
-                                className="inline-flex items-center gap-2 text-xs font-bold text-gray-400 hover:text-red-500 transition-colors uppercase tracking-widest border border-gray-100 dark:border-gray-700 hover:border-red-100 dark:hover:border-red-900/30 px-4 py-2 rounded-xl bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm shadow-sm"
-                            >
-                                <FiAlertTriangle size={14} />
-                                Report Issue with this product
-                            </button>
-                        </div>
-                        <ReportModal 
-                            isOpen={isReportModalOpen} 
-                            onClose={() => setIsReportModalOpen(false)} 
-                            targetName={product.name}
-                            targetType="product"
-                            targetId={product.$id}
-                        />
-                        </>
+                            <ReportModal
+                                isOpen={isReportModalOpen} 
+                                onClose={() => setIsReportModalOpen(false)} 
+                                targetName={product.name}
+                                targetType="product"
+                                targetId={product.$id}
+                            />
                         )}
                         
-                        {product.description && (
-                                    <p className="text-sm md:text-base text-gray-500 dark:text-gray-400 leading-relaxed max-w-xl font-medium italic">
-                                        "{product.description}"
-                                    </p>
-                                )}
+                        {(() => {
+                            const displayDescription = stripNutritionMeta(product.description || '');
+                            if (!displayDescription) return null;
+                            return (
+                                <p className="text-xs sm:text-sm md:text-base text-gray-500 dark:text-gray-400 leading-relaxed max-w-xl font-medium italic">
+                                    "{displayDescription}"
+                                </p>
+                            );
+                        })()}
 
                                 {/* Global Database Health & Nutrition Info */}
-                                {(product.nutriscore || product.allergens || product.is_global) && (
+                                {(product.nutriscore || product.is_global) && (
                                     <div className="pt-2 flex flex-wrap gap-3 items-center justify-center md:justify-start" aria-label="Product Nutrition and Information">
                                         {/* Nutriscore Badge */}
                                         {product.nutriscore && (
@@ -445,21 +590,9 @@ const PriceComparison = () => {
                                             </div>
                                         )}
 
-                                        {/* Allergens List */}
-                                        {product.allergens && product.allergens.length > 0 && (
-                                            <div className="flex flex-wrap gap-1 items-center" aria-label={`Contains allergens: ${Array.isArray(product.allergens) ? product.allergens.join(', ') : product.allergens}`}>
-                                                <FiAlertTriangle className="text-amber-500 mr-1" size={14} aria-hidden="true" />
-                                                {(Array.isArray(product.allergens) ? product.allergens : product.allergens.split(',')).map((allergen, i) => (
-                                                    <span key={i} className="bg-amber-50 dark:bg-amber-900/10 text-amber-700 dark:text-amber-400 text-[9px] font-black px-2 py-1 rounded-md uppercase tracking-wider border border-amber-200/50">
-                                                        {allergen.trim().replace('en:', '')}
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        )}
-
                                         {/* Global Product Disclaimer */}
                                         {product.is_global && (
-                                            <div className="flex items-center gap-1.5 text-[9px] font-bold text-blue-500/70 uppercase tracking-widest bg-blue-50/50 dark:bg-blue-900/10 px-3 py-1.5 rounded-xl border border-blue-100/30">
+                                            <div className="flex items-center gap-1.5 text-[9px] font-bold text-brand-500/70 uppercase tracking-widest bg-brand-50/50 dark:bg-brand-900/10 px-3 py-1.5 rounded-xl border border-brand-100/30">
                                                 <FiInfo size={12} />
                                                 Global Database Source
                                             </div>
@@ -490,14 +623,14 @@ const PriceComparison = () => {
                     {/* Prices List & Sorting Controls */}
                     <div className="flex items-center justify-between mb-4 px-1">
                         <h3 className="text-lg font-black text-gray-800 dark:text-white uppercase tracking-tight">
-                            {t('available_stores')} <span className="ml-1 text-blue-600 opacity-50">({prices.length})</span>
+                            {t('available_stores')} <span className="ml-1 text-brand-600 opacity-50">({prices.length})</span>
                         </h3>
                         
                         <div className="flex items-center gap-1 bg-white dark:bg-gray-800 p-0.5 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
                             <button 
                                 type="button"
                                 onClick={() => setSortBy('price')}
-                                className={`p-2 rounded-lg transition-all ${sortBy === 'price' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-400 hover:text-blue-600'}`}
+                                className={`tap-target h-11 w-11 p-2 rounded-lg transition-all ${sortBy === 'price' ? 'bg-brand-600 text-white shadow-md' : 'text-gray-400 hover:text-brand-600'}`}
                                 title="By Price"
                             >
                                 <FiTrendingDown size={14} />
@@ -505,7 +638,7 @@ const PriceComparison = () => {
                             <button 
                                 type="button"
                                 onClick={() => setSortBy('distance')}
-                                className={`p-2 rounded-lg transition-all ${sortBy === 'distance' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-400 hover:text-blue-600'}`}
+                                className={`tap-target h-11 w-11 p-2 rounded-lg transition-all ${sortBy === 'distance' ? 'bg-brand-600 text-white shadow-md' : 'text-gray-400 hover:text-brand-600'}`}
                                 disabled={!userLocation}
                                 title="By Distance"
                             >
@@ -517,9 +650,9 @@ const PriceComparison = () => {
                     {prices.length === 0 ? (
                         <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl p-10 md:p-16 text-center border-2 border-dashed border-gray-100 dark:border-gray-700 space-y-8 animate-in fade-in zoom-in duration-500">
                             <div className="space-y-4">
-                                <div className="relative inline-flex items-center justify-center p-8 bg-blue-50/50 dark:bg-blue-900/10 rounded-full border border-blue-100/30">
+                                <div className="relative inline-flex items-center justify-center p-8 bg-brand-50/50 dark:bg-brand-900/10 rounded-full border border-brand-100/30">
                                     <FiShoppingBag className="text-gray-300 text-6xl animate-pulse-slow" />
-                                    <div className="absolute -top-1 -right-1 p-3 bg-blue-600 rounded-2xl shadow-lg shadow-blue-500/30 animate-float">
+                                    <div className="absolute -top-1 -right-1 p-3 bg-brand-600 rounded-2xl shadow-lg shadow-brand-500/30 animate-float">
                                         <FiPlusCircle className="text-white" size={24} />
                                     </div>
                                 </div>
@@ -534,7 +667,7 @@ const PriceComparison = () => {
                             <button 
                                 onClick={() => setIsAddPriceModalOpen(true)}
                                 aria-label="Add the first price for this product"
-                                className="w-full max-w-sm inline-flex items-center justify-center gap-3 bg-blue-600 hover:bg-black text-white px-8 py-4 rounded-[1.5rem] font-black uppercase tracking-widest text-[11px] shadow-lg shadow-blue-500/30 hover:shadow-none transition-all duration-300 transform hover:scale-[0.98] active:scale-95 group"
+                                className="w-full max-w-sm inline-flex items-center justify-center gap-3 bg-brand-600 hover:bg-black text-white px-8 py-4 rounded-[1.5rem] font-black uppercase tracking-widest text-[11px] shadow-lg shadow-brand-500/30 hover:shadow-none transition-all duration-300 transform hover:scale-[0.98] active:scale-95 group"
                             >
                                 <FiPlusCircle size={20} className="group-hover:rotate-90 transition-transform duration-300" />
                                 Add First Price
@@ -542,14 +675,14 @@ const PriceComparison = () => {
 
                             {product.is_global && (
                                 <div className="flex items-center justify-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50 dark:bg-gray-900/50 py-3 px-6 rounded-2xl border border-gray-100 dark:border-gray-800/50">
-                                    <FiInfo size={14} className="text-blue-500" />
+                                    <FiInfo size={14} className="text-accent-500" />
                                     From our global database
                                 </div>
                             )}
                         </div>
                     ) : (
                         <div className="space-y-4">
-                            {sortedPrices.map((priceEntry, index) => {
+                                {sortedPrices.map((priceEntry) => {
                                     const supermarket = getSupermarketFromPrice(priceEntry);
                                     const supermarketId = typeof supermarket === 'string' ? supermarket : supermarket?.$id;
                                     const supermarketName = typeof supermarket === 'object' ? supermarket?.name : 'Store';
@@ -559,9 +692,12 @@ const PriceComparison = () => {
                                         hasValidLatLon(supermarket?.latitude, supermarket?.longitude);
                                     const isSelectedContext = supermarketIdParam && supermarketId === supermarketIdParam;
                                     const isLowest = getLowestPrice()?.$id === priceEntry.$id;
-                                    const normalizedStatus = normalizeStockStatus(priceEntry.stockStatus);
+                                    // status text removed per UX decision; keep status normalization in branch details only
                                     const priceCurrency = getPriceCurrency(priceEntry);
                                     const convertedPrice = convert(priceEntry.price, priceCurrency);
+                                    const ratingValue = typeof supermarket === 'object' ? (supermarket.rating ?? supermarket.avgRating ?? supermarket.averageRating ?? null) : null;
+                                    const reviewsCount = typeof supermarket === 'object' ? (supermarket.reviewsCount ?? supermarket.reviews ?? null) : null;
+                                    const isMapVisible = showMapForPriceId === priceEntry.$id;
                                     
                                     const updatedAtValue = getPriceTimestamp(priceEntry);
                                     const updatedAt = updatedAtValue ? new Date(updatedAtValue) : new Date();
@@ -572,32 +708,41 @@ const PriceComparison = () => {
                                     return (
                                         <div
                                             key={priceEntry.$id}
-                                            className={`group relative bg-white dark:bg-gray-800 rounded-3xl p-5 shadow-soft hover:shadow-soft-lg hover:-translate-y-1 transition-all duration-300 border-2 
-                                                ${isSelectedContext ? 'border-blue-500 shadow-blue-500/10' : 'border-transparent'}
+                                            className={`group relative bg-white dark:bg-gray-800 rounded-2xl sm:rounded-3xl p-3 sm:p-5 shadow-soft hover:shadow-soft-lg hover:-translate-y-1 transition-all duration-300 border-2 
+                                                ${isSelectedContext ? 'border-brand-500 shadow-brand-500/10' : 'border-transparent'}
                                                 ${isLowest && !isSelectedContext ? 'border-green-500 shadow-green-500/10' : ''}
                                             `}
                                         >
-                                                <div className="flex items-center gap-4">
+                                                <div className="flex items-center gap-2.5 sm:gap-4">
                                                     <Link 
                                                         to={supermarketId ? `/supermarket/${supermarketId}` : '#'}
-                                                        className="relative w-16 h-16 bg-gray-50 dark:bg-gray-900 rounded-2xl flex items-center justify-center flex-shrink-0 overflow-hidden"
+                                                        className="relative w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 bg-gray-50 dark:bg-gray-900 rounded-xl sm:rounded-2xl flex items-center justify-center flex-shrink-0 overflow-hidden"
                                                     >
                                                         {typeof supermarket === 'object' && (supermarket.icon || supermarket.logoUrl) ? (
-                                                            <img src={supermarket.icon || supermarket.logoUrl} className="w-12 h-12 object-contain" alt="" />
+                                                            <img src={supermarket.icon || supermarket.logoUrl} className="w-9 h-9 sm:w-11 sm:h-11 md:w-12 md:h-12 object-contain" alt="" />
                                                         ) : (
-                                                            <FiShoppingBag className="text-gray-200 text-xl" />
+                                                            <FiShoppingBag className="text-gray-200 text-lg sm:text-xl" />
                                                         )}
                                                     </Link>
                                                 
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2 mb-1">
-                                                        <h4 className="text-base font-bold text-gray-900 dark:text-white truncate">
+                                                        <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white truncate">
                                                             {supermarketName}
                                                         </h4>
                                                         {typeof supermarket === 'object' && supermarket?.branchName && (
                                                             <span className="text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-500 px-2 py-0.5 rounded-full font-bold">
                                                                 {supermarket.branchName}
                                                             </span>
+                                                        )}
+                                                        {ratingValue !== null && ratingValue !== undefined && (
+                                                            <div className="mt-1 flex items-center gap-2">
+                                                                <StarRating value={ratingValue} size={14} />
+                                                                <span className="text-[11px] text-gray-500">{ratingValue}</span>
+                                                                {reviewsCount !== null && reviewsCount !== undefined && (
+                                                                    <span className="text-[10px] text-gray-400">· {reviewsCount}</span>
+                                                                )}
+                                                            </div>
                                                         )}
                                                     </div>
 
@@ -609,44 +754,16 @@ const PriceComparison = () => {
                                                     )}
 
                                                     <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                                                        {hasCoordinates ? (
-                                                            <a
-                                                                href={`https://www.google.com/maps/dir/?api=1&destination=${supermarket.latitude},${supermarket.longitude}`}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700"
-                                                                title="Get Directions"
-                                                                onClick={(e) => e.stopPropagation()}
-                                                            >
-                                                                <FiNavigation size={12} />
-                                                                {distanceDisplay}
-                                                            </a>
-                                                        ) : (
-                                                            <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-400">
-                                                                <FiNavigation size={12} />
-                                                                {distanceDisplay}
-                                                            </span>
-                                                        )}
-                                                        <span className={`inline-flex items-center gap-1.5 text-xs font-bold ${
-                                                            normalizedStatus === 'out_of_stock' ? 'text-red-500' : 
-                                                            normalizedStatus === 'low_stock' ? 'text-amber-500' : 
-                                                            'text-green-600'
-                                                        }`}>
-                                                            <div className={`w-1.5 h-1.5 rounded-full ${
-                                                                normalizedStatus === 'out_of_stock' ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]' : 
-                                                                normalizedStatus === 'low_stock' ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.4)]' : 
-                                                                'bg-green-600 shadow-[0_0_8px_rgba(22,163,74,0.4)]'
-                                                            }`} />
-                                                            {normalizedStatus === 'out_of_stock' ? t('out_of_stock') : 
-                                                             normalizedStatus === 'low_stock' ? t('low_stock') : 
-                                                             t('in_stock')}
+                                                        <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400">
+                                                            <FiNavigation size={12} />
+                                                            {distanceDisplay}
                                                         </span>
                                                     </div>
                                                 </div>
 
                                                 <div className="text-right flex flex-col items-end">
                                                     <div className="flex items-baseline gap-1">
-                                                        <span className={`text-2xl font-bold ${isLowest ? 'text-green-600' : 'text-gray-900 dark:text-white'}`}>
+                                                        <span className={`text-lg sm:text-xl md:text-2xl font-bold ${isLowest ? 'text-green-600' : 'text-gray-900 dark:text-white'}`}>
                                                             {convertedPrice}
                                                         </span>
                                                         <span className="text-xs font-semibold text-gray-400">{getCurrencySymbol()}</span>
@@ -659,23 +776,23 @@ const PriceComparison = () => {
 
                                             {/* Simplified branch details - keeping hidden by default for minimalism */}
                                             <details className="mt-4 group/details border-t border-gray-50 dark:border-gray-700/50 pt-3">
-                                                <summary className="list-none cursor-pointer flex items-center justify-between py-2 px-4 bg-gray-50 dark:bg-gray-900/40 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors">
-                                                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 group-hover/details:text-blue-600 flex items-center gap-2">
+                                                        <summary className="list-none cursor-pointer flex items-center justify-between py-2 px-4 bg-gray-50 dark:bg-gray-900/40 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors">
+                                                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 group-hover/details:text-brand-600 flex items-center gap-2">
                                                         {hasCoordinates ? (
                                                             <button
                                                                 type="button"
                                                                 onClick={(e) => {
                                                                     e.preventDefault();
                                                                     e.stopPropagation();
-                                                                    setShowMapForIndex(showMapForIndex === index ? null : index);
+                                                                    setShowMapForPriceId(isMapVisible ? null : priceEntry.$id);
                                                                 }}
-                                                                className={`h-5 w-5 rounded-full flex items-center justify-center transition-all ${
-                                                                    showMapForIndex === index
-                                                                        ? 'bg-blue-600 text-white'
-                                                                        : 'bg-gray-900/70 text-white hover:bg-blue-600'
+                                                                        className={`tap-target h-8 w-8 rounded-full flex items-center justify-center transition-all ${
+                                                                    isMapVisible
+                                                                        ? 'bg-brand-600 text-white'
+                                                                        : 'bg-gray-900/70 text-white hover:bg-brand-600'
                                                                 }`}
-                                                                title={showMapForIndex === index ? 'Hide Map' : 'Show Map'}
-                                                                aria-label={showMapForIndex === index ? 'Hide Map' : 'Show Map'}
+                                                                title={isMapVisible ? 'Hide Map' : 'Show Map'}
+                                                                aria-label={isMapVisible ? 'Hide Map' : 'Show Map'}
                                                             >
                                                                 <FiMapPin size={10} />
                                                             </button>
@@ -687,7 +804,7 @@ const PriceComparison = () => {
                                                 </summary>
                                                 <div className="mt-4 space-y-4">
                                                     {/* Local Map showing branches - only when toggled */}
-                                                        {showMapForIndex === index && hasCoordinates && (
+                                                        {isMapVisible && hasCoordinates && (
                                                         <div className="h-44 rounded-2xl overflow-hidden shadow-inner border border-gray-100 dark:border-gray-800/50 animate-in zoom-in-95 duration-300">
                                                             <StoreMap 
                                                                 supermarkets={[supermarket]} 
@@ -711,7 +828,7 @@ const PriceComparison = () => {
                                                                     t={t}
                                                                     price={`${bConverted}`}
                                                                     currencyLabel={getCurrencySymbol()}
-                                                                    distance={branchPrice.distance !== null ? `${branchPrice.distance}` : null}
+                                                                    distance={branchPrice.distance !== null ? formatDistance(branchPrice.distance) : null}
                                                                     supermarketId={branchSupermarketId}
                                                                 />
                                                             );
@@ -725,24 +842,47 @@ const PriceComparison = () => {
                             </div>
                         )}
                     </div>
+
+                {/* Similar Products */}
+                {(similarLoading || similarProducts.length > 0) && (
+                    <div className="space-y-4 md:space-y-6">
+                        <div className="px-2">
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.4em]">Similar</p>
+                            <h3 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white mt-1 tracking-tight">Similar Products</h3>
+                        </div>
+                        {similarLoading ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                                {[1, 2, 3, 4].map((i) => (
+                                    <ProductCardSkeleton key={i} />
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                                {similarProducts.map((item) => (
+                                    <ProductCard key={item.$id} product={item} prices={item.prices} />
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
             </main>
 
 
             {/* Quick actions only when coming from scanner */}
             {fromScan && (
-                <div className="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur border-t border-gray-200 dark:border-gray-700 z-40">
+                <div className="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur border-t border-gray-200 dark:border-gray-700 z-40 pb-safe-nav">
                     <div className="max-w-4xl mx-auto px-4 py-3 flex gap-3">
                         <button
                             onClick={handleGoHome}
                             aria-label="Go to home page"
-                            className="flex-1 inline-flex items-center justify-center gap-2 py-3 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+                            className="tap-target flex-1 inline-flex items-center justify-center gap-2 py-3 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
                         >
                             <FiHome /> Home
                         </button>
                         <button
                             onClick={handleScanAnother}
                             aria-label="Scan another product"
-                            className="flex-1 inline-flex items-center justify-center gap-2 py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-500/30 transition"
+                            className="tap-target flex-1 inline-flex items-center justify-center gap-2 py-3 rounded-lg bg-brand-600 text-white hover:bg-brand-700 shadow-lg shadow-brand-500/30 transition"
                         >
                             <FiCamera /> Scan Another
                         </button>

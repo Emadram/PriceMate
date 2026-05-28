@@ -1,11 +1,61 @@
-import { db, Query, COLLECTIONS } from '../lib/appwrite';
+import { db, Query, COLLECTIONS, functions } from '../lib/appwrite';
 
 const cacheStore = new Map();
+const inflightRequests = new Map();
 const CACHE_TTL = {
     products: 60 * 1000,
     prices: 30 * 1000,
     categories: 5 * 60 * 1000,
-    allPrices: 30 * 1000
+    allPrices: 30 * 1000,
+    search: 30 * 1000,
+    similar: 60 * 1000
+};
+const OFF_CACHE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+const OFF_MEMORY_TTL_MS = 5 * 60 * 1000;
+const OFF_SEARCH_TTL_MS = 2 * 60 * 1000;
+const OFF_API_BASE = 'https://world.openfoodfacts.org';
+const OFF_DEBUG = import.meta.env.VITE_OFF_DEBUG === 'true';
+const OFF_PROXY_FUNCTION_ID = import.meta.env.VITE_APPWRITE_FUNCTION_OFF_PROXY || '';
+const OFF_RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
+const NUTRITION_META_MARKER = '\n\n[PriceMate Nutrition]\n';
+
+export const stripNutritionMeta = (value) => {
+    const text = String(value || '');
+    const markerIndex = text.indexOf(NUTRITION_META_MARKER);
+    return markerIndex >= 0 ? text.slice(0, markerIndex).trimEnd() : text.trimEnd();
+};
+
+const extractNutritionMeta = (value) => {
+    const text = String(value || '');
+    const markerIndex = text.indexOf(NUTRITION_META_MARKER);
+    if (markerIndex < 0) return null;
+    const jsonText = text.slice(markerIndex + NUTRITION_META_MARKER.length).trim();
+    if (!jsonText) return null;
+    try {
+        return JSON.parse(jsonText);
+    } catch {
+        return null;
+    }
+};
+
+const logOffDebug = (...args) => {
+    if (OFF_DEBUG) console.info('[OFF]', ...args);
+};
+
+const callOffProxy = async (payload) => {
+    if (!OFF_PROXY_FUNCTION_ID) return null;
+    try {
+        const execution = await functions.createExecution(
+            OFF_PROXY_FUNCTION_ID,
+            JSON.stringify(payload),
+            false
+        );
+        if (!execution?.response) return null;
+        return JSON.parse(execution.response);
+    } catch (error) {
+        logOffDebug('proxy-error', { message: error?.message || String(error) });
+        return { ok: false, status: 0, error: 'Proxy error' };
+    }
 };
 
 const getCachedValue = (key) => {
@@ -25,27 +75,201 @@ const setCachedValue = (key, data, ttlMs) => {
     });
 };
 
+const withInflight = async (key, fetcher) => {
+    if (inflightRequests.has(key)) {
+        return inflightRequests.get(key);
+    }
+    const promise = fetcher().finally(() => inflightRequests.delete(key));
+    inflightRequests.set(key, promise);
+    return promise;
+};
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const parseRetryAfterMs = (value) => {
+    if (!value) return null;
+    const seconds = Number(value);
+    if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
+    const dateMs = Date.parse(value);
+    if (Number.isFinite(dateMs)) return Math.max(0, dateMs - Date.now());
+    return null;
+};
+
+const fetchWithBackoff = async (url, options = {}, config = {}) => {
+    const {
+        retries = 2,
+        baseDelayMs = 400,
+        maxDelayMs = 2000,
+    } = config;
+
+    for (let attempt = 0; attempt <= retries; attempt += 1) {
+        try {
+            const response = await fetch(url, options);
+            if (response.ok || !OFF_RETRY_STATUSES.has(response.status) || attempt === retries) {
+                return response;
+            }
+
+            const retryAfterMs = parseRetryAfterMs(response.headers.get('Retry-After'));
+            const backoffMs = retryAfterMs ?? Math.min(
+                baseDelayMs * (2 ** attempt) * (0.75 + Math.random() * 0.5),
+                maxDelayMs
+            );
+            logOffDebug('api-backoff', { status: response.status, delayMs: Math.round(backoffMs), attempt: attempt + 1 });
+            await sleep(backoffMs);
+        } catch {
+            if (attempt === retries) return null;
+            const backoffMs = Math.min(
+                baseDelayMs * (2 ** attempt) * (0.75 + Math.random() * 0.5),
+                maxDelayMs
+            );
+            logOffDebug('api-backoff', { status: 'network', delayMs: Math.round(backoffMs), attempt: attempt + 1 });
+            await sleep(backoffMs);
+        }
+    }
+
+    return null;
+};
+
+export const buildDirectionsUrl = (latitude, longitude, googleMapsUrl = null, embedHtml = null) => {
+    const destinationCoords = extractGoogleMapsCoordinates(googleMapsUrl);
+    if (destinationCoords) {
+        return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${destinationCoords.latitude},${destinationCoords.longitude}`)}`;
+    }
+    const embedCoords = extractGoogleMapsCoordinates(embedHtml);
+    if (embedCoords) {
+        return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${embedCoords.latitude},${embedCoords.longitude}`)}`;
+    }
+    if (googleMapsUrl && googleMapsUrl.trim()) return googleMapsUrl.trim();
+    if (hasValidLatLon(latitude, longitude)) {
+        return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${latitude},${longitude}`)}`;
+    }
+    return '';
+};
+
+const toFiniteCoordinate = (value) => {
+    const numeric = typeof value === 'number' ? value : parseFloat(String(value ?? ''));
+    return Number.isFinite(numeric) ? numeric : null;
+};
+
+const coordinatePairFromMatch = (match, order = 'latlon') => {
+    if (!match || match.length < 3) return null;
+    const first = toFiniteCoordinate(match[1]);
+    const second = toFiniteCoordinate(match[2]);
+    const latitude = order === 'lonlat' ? second : first;
+    const longitude = order === 'lonlat' ? first : second;
+    if (latitude === null || longitude === null) return null;
+    return hasValidLatLon(latitude, longitude) ? { latitude, longitude } : null;
+};
+
+export const extractGoogleMapsCoordinates = (value) => {
+    const text = String(value || '').trim();
+    if (!text) return null;
+
+    const patterns = [
+        { regex: /!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/i, order: 'latlon' },
+        { regex: /!2d(-?\d+(?:\.\d+)?)!3d(-?\d+(?:\.\d+)?)/i, order: 'lonlat' },
+        { regex: /@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)(?:,[^/?#]*)?/i, order: 'latlon' },
+        { regex: /[?&](?:q|query|ll|saddr|daddr|destination|origin|center)=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/i, order: 'latlon' },
+    ];
+
+    for (const { regex, order } of patterns) {
+        const match = text.match(regex);
+        const coordinates = coordinatePairFromMatch(match, order);
+        if (coordinates) return coordinates;
+    }
+
+    try {
+        const decoded = decodeURIComponent(text);
+        if (decoded !== text) {
+            return extractGoogleMapsCoordinates(decoded);
+        }
+    } catch {
+        // ignore malformed escape sequences
+    }
+
+    return null;
+};
+
+export const resolveCoordinates = (entity) => {
+    if (!entity) return null;
+
+    if (hasValidLatLon(entity.latitude, entity.longitude)) {
+        return {
+            latitude: Number(entity.latitude),
+            longitude: Number(entity.longitude)
+        };
+    }
+
+    return (
+        extractGoogleMapsCoordinates(entity.googleMapsUrl) ||
+        extractGoogleMapsCoordinates(entity.embedHtml) ||
+        extractGoogleMapsCoordinates(entity)
+    );
+};
+
+const getOffCacheTimestamp = (doc) => doc?.sourceUpdatedAt || doc?.$updatedAt || doc?.$createdAt || '';
+
+const isOffCacheFresh = (doc) => {
+    if (!doc) return false;
+    const stamp = getOffCacheTimestamp(doc);
+    if (!stamp) return true;
+    const ms = Date.parse(stamp);
+    if (!Number.isFinite(ms)) return true;
+    return Date.now() - ms <= OFF_CACHE_TTL_MS;
+};
+
 /**
  * Fetch product details from OpenFoodFacts API (Global Fallback)
  * @param {string} barcode
  * @returns {Promise<Object|null>}
  */
 export const fetchGlobalProduct = async (barcode) => {
-    try {
-        const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${encodeURIComponent(barcode)}.json`);
-        const data = await response.json();
-
-        if (data.status === 1) {
-            return {
-                ...data.product,
-                is_global: true,
-            };
-        }
-        return null;
-    } catch (error) {
-        console.error('Error fetching global product:', error);
-        return null;
+    if (!barcode) return null;
+    const cacheKey = `off:barcode:${barcode}`;
+    const cached = getCachedValue(cacheKey);
+    if (cached) {
+        logOffDebug('memory-hit', { kind: 'barcode', barcode });
+        return cached;
     }
+
+    return withInflight(cacheKey, async () => {
+        try {
+            logOffDebug('api-fetch', { kind: 'barcode', barcode });
+            if (OFF_PROXY_FUNCTION_ID) {
+                const proxyResult = await callOffProxy({ kind: 'barcode', barcode });
+                if (!proxyResult?.ok) return null;
+                const data = proxyResult.data;
+                if (data?.status === 1) {
+                    const product = {
+                        ...data.product,
+                        is_global: true,
+                    };
+                    setCachedValue(cacheKey, product, OFF_MEMORY_TTL_MS);
+                    return product;
+                }
+                return null;
+            }
+
+            const response = await fetchWithBackoff(
+                `${OFF_API_BASE}/api/v0/product/${encodeURIComponent(barcode)}.json`
+            );
+            if (!response?.ok) return null;
+            const data = await response.json();
+
+            if (data.status === 1) {
+                const product = {
+                    ...data.product,
+                    is_global: true,
+                };
+                setCachedValue(cacheKey, product, OFF_MEMORY_TTL_MS);
+                return product;
+            }
+            return null;
+        } catch (error) {
+            console.error('Error fetching global product:', error);
+            return null;
+        }
+    });
 };
 
 /** Try common barcode variants for OFF (leading zeros, EAN-12→13). */
@@ -67,11 +291,14 @@ const collectBarcodeVariants = (raw) => {
 };
 
 export const fetchGlobalProductWithRetries = async (barcode) => {
-    for (const variant of collectBarcodeVariants(barcode)) {
-        const product = await fetchGlobalProduct(variant);
-        if (product) return product;
-    }
-    return null;
+    if (!barcode) return null;
+    return withInflight(`off:barcode:variants:${barcode}`, async () => {
+        for (const variant of collectBarcodeVariants(barcode)) {
+            const product = await fetchGlobalProduct(variant);
+            if (product) return product;
+        }
+        return null;
+    });
 };
 
 const normalizeIngredientsPayload = (product, fallbackBarcode) => {
@@ -149,11 +376,332 @@ const normalizeIngredientsPayload = (product, fallbackBarcode) => {
     };
 };
 
+const normalizeOffCacheRecord = (product, fallbackBarcode) => {
+    if (!product) return null;
+    const barcode = product.code || product.barcode || fallbackBarcode || '';
+    const name = product.product_name || product.name || product.productName || 'Unknown Product';
+    const brand = product.brands || product.brand || '';
+    const imageUrl = product.image_url || product.image_front_url || product.imageUrl || product.image || '';
+    const categories = product.categories || (Array.isArray(product.categories_tags) ? product.categories_tags.join(',') : '');
+    const ingredientsText = product.ingredients_text || product.ingredients_text_en || product.ingredients_text_tr || '';
+    const allergensTags = Array.isArray(product.allergens_tags) ? product.allergens_tags : [];
+    const allergens = allergensTags
+        .map((tag) => tag.replace(/^[a-z]{2}:/, '').replace(/_/g, ' ').trim())
+        .filter(Boolean);
+    const nutriments = product.nutriments ? JSON.stringify(product.nutriments) : '';
+    const sourceUrl = barcode ? `https://world.openfoodfacts.org/product/${barcode}` : 'https://world.openfoodfacts.org';
+    const sourceLang = product.lang || product.lc || '';
+    const updatedAt = product.last_modified_t
+        ? new Date(product.last_modified_t * 1000).toISOString()
+        : new Date().toISOString();
+
+    return {
+        barcode,
+        name,
+        brand,
+        imageUrl,
+        categories,
+        ingredientsText,
+        allergens,
+        nutriments,
+        sourceUrl,
+        sourceLang,
+        source: 'OpenFoodFacts',
+        sourceUpdatedAt: updatedAt,
+    };
+};
+
+export const normalizeOffCacheDoc = (doc) => {
+    if (!doc) return null;
+    return {
+        ...doc,
+        barcode: doc.barcode || doc.$id || '',
+        name: doc.name || doc.productName || 'Unknown Product',
+        brand: doc.brand || '',
+        imageUrl: doc.imageUrl || doc.image || '',
+        categories: doc.categories || doc.category || '',
+        is_global: true,
+        is_off_cache: true,
+        prices: [],
+    };
+};
+
+export const ingredientPayloadFromOffCache = (doc) => {
+    if (!doc) return null;
+    const ingredientsText = doc.ingredientsText || '';
+    const allergens = Array.isArray(doc.allergens)
+        ? doc.allergens
+        : (doc.allergens ? [doc.allergens] : []);
+    let nutriments = {};
+    if (doc.nutriments) {
+        try {
+            nutriments = typeof doc.nutriments === 'string' ? JSON.parse(doc.nutriments) : doc.nutriments;
+        } catch {
+            nutriments = {};
+        }
+    }
+
+    const payload = normalizeIngredientsPayload(
+        {
+            code: doc.barcode,
+            product_name: doc.name,
+            brands: doc.brand,
+            ingredients_text: ingredientsText,
+            allergens_tags: allergens,
+            nutriments,
+        },
+        doc.barcode
+    );
+
+    return {
+        ...payload,
+        source: 'OpenFoodFacts',
+        sourceUrl: doc.sourceUrl || payload.sourceUrl,
+    };
+};
+
+export const fetchOffCacheByBarcode = async (barcode) => {
+    if (!barcode) return null;
+    try {
+        const res = await db.offCache.list([
+            Query.equal('barcode', String(barcode)),
+            Query.limit(1)
+        ]);
+        const doc = res.documents[0] || null;
+        if (doc && isOffCacheFresh(doc)) {
+            logOffDebug('appwrite-hit', { kind: 'barcode', barcode });
+            return doc;
+        }
+        if (doc) {
+            logOffDebug('appwrite-stale', { kind: 'barcode', barcode });
+        }
+        return null;
+    } catch (error) {
+        console.warn('OFF cache lookup failed:', error?.message || error);
+        return null;
+    }
+};
+
+export const searchOffCacheByName = async (name, limit = 5) => {
+    const term = String(name || '').trim();
+    if (!term) return [];
+    try {
+        const res = await db.offCache.list([
+            Query.search('name', term),
+            Query.limit(limit)
+        ]);
+        const docs = res.documents || [];
+        const fresh = docs.filter((doc) => isOffCacheFresh(doc));
+        if (fresh.length > 0) {
+            logOffDebug('appwrite-hit', { kind: 'name', query: term, hits: fresh.length });
+        }
+        return fresh;
+    } catch (error) {
+        console.warn('OFF cache name search failed:', error?.message || error);
+        return [];
+    }
+};
+
+export const fetchOffCacheSnapshot = async (limit = 30) => {
+    try {
+        const res = await db.offCache.list([
+            Query.limit(limit),
+            Query.orderDesc('$updatedAt')
+        ]);
+        const docs = res.documents || [];
+        return docs.filter((doc) => isOffCacheFresh(doc));
+    } catch (error) {
+        console.warn('OFF cache snapshot failed:', error?.message || error);
+        return [];
+    }
+};
+
+const saveOffCacheRecord = async (record) => {
+    if (!record || !record.barcode) return null;
+    try {
+        const existing = await db.offCache.list([
+            Query.equal('barcode', record.barcode),
+            Query.limit(1)
+        ]);
+        const current = existing.documents?.[0];
+        if (current?.$id) {
+            await db.offCache.update(current.$id, record);
+            return current.$id;
+        }
+        const created = await db.offCache.create(record);
+        return created?.$id || null;
+    } catch (error) {
+        console.warn('OFF cache save failed:', error?.message || error);
+        return null;
+    }
+};
+
+export const saveOffCacheFromProduct = async (product, fallbackBarcode) => {
+    const record = normalizeOffCacheRecord(product, fallbackBarcode);
+    return saveOffCacheRecord(record);
+};
+
+export const saveOffCacheFromIngredientPayload = async (payload) => {
+    if (!payload) return null;
+    const record = normalizeOffCacheRecord(
+        {
+            code: payload.barcode,
+            product_name: payload.name,
+            brands: payload.brand,
+            ingredients_text: payload.ingredientsText,
+            allergens_tags: payload.allergens || [],
+            nutriments: payload.nutriments || {},
+        },
+        payload.barcode
+    );
+    return saveOffCacheRecord(record);
+};
+
+export const resolveOffCacheProductForIngredients = async (userMessage) => {
+    const empty = { product: null, barcode: '', name: '' };
+    const trimmed = String(userMessage || '').trim();
+    if (!trimmed) return empty;
+
+    const barcodeMatch = trimmed.match(/\b(\d{8,14})\b/);
+    if (barcodeMatch) {
+        const doc = await fetchOffCacheByBarcode(barcodeMatch[1]);
+        if (doc) {
+            return {
+                product: doc,
+                barcode: doc.barcode || barcodeMatch[1],
+                name: doc.name || '',
+            };
+        }
+    }
+
+    const candidates = await searchOffCacheByName(trimmed, 5);
+    const best = candidates.find((d) => (d.name || '').toLowerCase().includes(trimmed.toLowerCase())) || candidates[0];
+    if (best) {
+        return {
+            product: best,
+            barcode: best.barcode || '',
+            name: best.name || '',
+        };
+    }
+
+    return empty;
+};
+
 export const fetchIngredientsByBarcode = async (barcode) => {
     if (!barcode) return null;
-    const product = await fetchGlobalProductWithRetries(barcode);
-    if (!product) return null;
-    return normalizeIngredientsPayload(product, barcode);
+    const cacheKey = `off:ingredients:${barcode}`;
+    const cachedPayload = getCachedValue(cacheKey);
+    if (cachedPayload) {
+        logOffDebug('memory-hit', { kind: 'ingredients', barcode });
+        return cachedPayload;
+    }
+
+    return withInflight(cacheKey, async () => {
+        const cached = await fetchOffCacheByBarcode(barcode);
+        if (cached) {
+            const payload = ingredientPayloadFromOffCache(cached);
+            logOffDebug('appwrite-hit', { kind: 'ingredients', barcode });
+            setCachedValue(cacheKey, payload, OFF_MEMORY_TTL_MS);
+            return payload;
+        }
+        const product = await fetchGlobalProductWithRetries(barcode);
+        if (!product) return null;
+        const payload = normalizeIngredientsPayload(product, barcode);
+        await saveOffCacheFromProduct(product, barcode);
+        logOffDebug('api-fetch', { kind: 'ingredients', barcode });
+        setCachedValue(cacheKey, payload, OFF_MEMORY_TTL_MS);
+        return payload;
+    });
+};
+
+const parseNutritionNumber = (value) => {
+    if (value === null || value === undefined || value === '') return null;
+    const num = typeof value === 'number' ? value : parseFloat(String(value).replace(',', '.'));
+    return Number.isFinite(num) ? num : null;
+};
+
+const hasIngredientPayloadContent = (payload) => {
+    if (!payload) return false;
+    const ingredientsText = String(payload.ingredientsText || '').trim();
+    const nutriments = payload.nutriments || {};
+    const sugar = parseNutritionNumber(nutriments.sugarsPer100g);
+    const sodium = parseNutritionNumber(nutriments.sodiumMgPer100g);
+    const caffeine = parseNutritionNumber(nutriments.caffeineMgPerL);
+    return ingredientsText.length > 0 || sugar !== null || sodium !== null || caffeine !== null;
+};
+
+/**
+ * Persist ingredient/nutrition info into catalog product document.
+ * We store nutrition in the hidden JSON block under `description` to avoid schema mismatch.
+ * Best-effort only: failures should never break chat responses.
+ */
+export const persistIngredientPayloadToCatalogProduct = async (productDoc, payload) => {
+    if (!productDoc?.$id || !hasIngredientPayloadContent(payload)) return false;
+
+    try {
+        const hiddenNutrition = extractNutritionMeta(productDoc.description);
+        const currentNutrition = {
+            sugarsPer100g: parseNutritionNumber(
+                productDoc?.nutrition?.sugarsPer100g ?? hiddenNutrition?.sugarsPer100g ?? productDoc.sugarsPer100g
+            ),
+            sodiumMgPer100g: parseNutritionNumber(
+                productDoc?.nutrition?.sodiumMgPer100g ?? hiddenNutrition?.sodiumMgPer100g ?? productDoc.sodiumMgPer100g
+            ),
+            caffeineMgPerL: parseNutritionNumber(
+                productDoc?.nutrition?.caffeineMgPerL ?? hiddenNutrition?.caffeineMgPerL ?? productDoc.caffeineMgPerL
+            ),
+            ingredientsText: String(
+                productDoc?.nutrition?.ingredientsText ??
+                hiddenNutrition?.ingredientsText ??
+                productDoc.ingredientsText ??
+                ''
+            ).trim(),
+            nutritionSource: String(
+                productDoc?.nutrition?.nutritionSource ??
+                hiddenNutrition?.nutritionSource ??
+                productDoc.nutritionSource ??
+                ''
+            ).trim(),
+        };
+
+        const incomingNutrition = {
+            sugarsPer100g: parseNutritionNumber(payload?.nutriments?.sugarsPer100g),
+            sodiumMgPer100g: parseNutritionNumber(payload?.nutriments?.sodiumMgPer100g),
+            caffeineMgPerL: parseNutritionNumber(payload?.nutriments?.caffeineMgPerL),
+            ingredientsText: String(payload?.ingredientsText || '').trim(),
+            nutritionSource: String(payload?.source || '').trim(),
+        };
+
+        const mergedNutrition = {
+            sugarsPer100g: incomingNutrition.sugarsPer100g ?? currentNutrition.sugarsPer100g ?? null,
+            sodiumMgPer100g: incomingNutrition.sodiumMgPer100g ?? currentNutrition.sodiumMgPer100g ?? null,
+            caffeineMgPerL: incomingNutrition.caffeineMgPerL ?? currentNutrition.caffeineMgPerL ?? null,
+            ingredientsText: incomingNutrition.ingredientsText || currentNutrition.ingredientsText || '',
+            nutritionSource: incomingNutrition.nutritionSource || currentNutrition.nutritionSource || '',
+        };
+
+        const hasMergedData =
+            mergedNutrition.sugarsPer100g !== null ||
+            mergedNutrition.sodiumMgPer100g !== null ||
+            mergedNutrition.caffeineMgPerL !== null ||
+            mergedNutrition.ingredientsText.length > 0 ||
+            mergedNutrition.nutritionSource.length > 0;
+
+        if (!hasMergedData) return false;
+
+        const baseDescription = stripNutritionMeta(productDoc.description || '');
+        const nextDescription = `${baseDescription}${NUTRITION_META_MARKER}${JSON.stringify(mergedNutrition)}`;
+
+        if (String(productDoc.description || '') === nextDescription) {
+            return false;
+        }
+
+        await db.products.update(productDoc.$id, { description: nextDescription });
+        return true;
+    } catch (error) {
+        console.warn('Catalog nutrition save failed:', error?.message || error);
+        return false;
+    }
 };
 
 /**
@@ -163,18 +711,16 @@ export const fetchIngredientsByBarcode = async (barcode) => {
 export const ingredientPayloadFromAppwriteProduct = (doc) => {
     if (!doc) return null;
 
-    const parseNumber = (value) => {
-        if (value === null || value === undefined || value === '') return null;
-        const num = typeof value === 'number' ? value : parseFloat(String(value).replace(',', '.'));
-        return Number.isFinite(num) ? num : null;
-    };
+    const hiddenNutrition = extractNutritionMeta(doc.description);
 
-    const sugarsPer100g = parseNumber(doc.sugarsPer100g);
-    const sodiumMgPer100g = parseNumber(doc.sodiumMgPer100g);
-    const ingredientsText = String(doc.ingredientsText || '').trim();
+    // Prefer nested `nutrition` object (new format), then the hidden description block, then legacy top-level fields
+    const sugarsPer100g = parseNutritionNumber(doc?.nutrition?.sugarsPer100g ?? hiddenNutrition?.sugarsPer100g ?? doc.sugarsPer100g);
+    const sodiumMgPer100g = parseNutritionNumber(doc?.nutrition?.sodiumMgPer100g ?? hiddenNutrition?.sodiumMgPer100g ?? doc.sodiumMgPer100g);
+    const caffeineMgPerL = parseNutritionNumber(doc?.nutrition?.caffeineMgPerL ?? hiddenNutrition?.caffeineMgPerL ?? doc.caffeineMgPerL);
+    const ingredientsText = String(doc?.nutrition?.ingredientsText ?? hiddenNutrition?.ingredientsText ?? (doc.ingredientsText || '')).trim();
 
     const hasData =
-        sugarsPer100g !== null || sodiumMgPer100g !== null || ingredientsText.length > 0;
+        sugarsPer100g !== null || sodiumMgPer100g !== null || caffeineMgPerL !== null || ingredientsText.length > 0;
     if (!hasData) return null;
 
     return {
@@ -189,13 +735,13 @@ export const ingredientPayloadFromAppwriteProduct = (doc) => {
         nutriments: {
             sugarsPer100g,
             sodiumMgPer100g,
-            caffeineMgPerL: null,
-            caffeineMgPer100g: null,
+            caffeineMgPerL,
+            caffeineMgPer100g: caffeineMgPerL !== null ? caffeineMgPerL / 10 : null,
             saltGPer100g: null,
         },
         source: 'PriceMate',
         sourceUrl: '',
-        nutritionSourceLabel: String(doc.nutritionSource || '').trim(),
+        nutritionSourceLabel: String(doc?.nutrition?.nutritionSource ?? hiddenNutrition?.nutritionSource ?? (doc.nutritionSource || '')).trim(),
     };
 };
 
@@ -287,22 +833,53 @@ export const resolveCatalogProductForIngredients = async (userMessage) => {
 };
 
 export const searchIngredientsByName = async (name) => {
-    if (!name) return null;
-    try {
-        const response = await fetch(
-            `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(name)}&search_simple=1&action=process&json=1&page_size=5`
-        );
-        const data = await response.json();
-        const products = Array.isArray(data?.products) ? data.products : [];
-        if (products.length === 0) return null;
-
-        const normalizedQuery = name.toLowerCase();
-        const bestMatch = products.find((p) => (p.product_name || '').toLowerCase().includes(normalizedQuery)) || products[0];
-        return normalizeIngredientsPayload(bestMatch);
-    } catch (error) {
-        console.error('Error searching OpenFoodFacts by name:', error);
-        return null;
+    const term = String(name || '').trim();
+    if (!term) return null;
+    const cacheKey = `off:search:${term.toLowerCase()}`;
+    const cached = getCachedValue(cacheKey);
+    if (cached) {
+        logOffDebug('memory-hit', { kind: 'search', query: term });
+        return cached;
     }
+
+    return withInflight(cacheKey, async () => {
+        const cachedHits = await searchOffCacheByName(term, 3);
+        if (cachedHits.length > 0) {
+            const payload = ingredientPayloadFromOffCache(cachedHits[0]);
+            if (payload) {
+                logOffDebug('appwrite-hit', { kind: 'search', query: term });
+                setCachedValue(cacheKey, payload, OFF_SEARCH_TTL_MS);
+                return payload;
+            }
+        }
+        try {
+            logOffDebug('api-fetch', { kind: 'search', query: term });
+            let data = null;
+            if (OFF_PROXY_FUNCTION_ID) {
+                const proxyResult = await callOffProxy({ kind: 'search', query: term, pageSize: 5 });
+                if (!proxyResult?.ok) return null;
+                data = proxyResult.data;
+            } else {
+                const response = await fetchWithBackoff(
+                    `${OFF_API_BASE}/cgi/search.pl?search_terms=${encodeURIComponent(term)}&search_simple=1&action=process&json=1&page_size=5`
+                );
+                if (!response?.ok) return null;
+                data = await response.json();
+            }
+            const products = Array.isArray(data?.products) ? data.products : [];
+            if (products.length === 0) return null;
+
+            const normalizedQuery = term.toLowerCase();
+            const bestMatch = products.find((p) => (p.product_name || '').toLowerCase().includes(normalizedQuery)) || products[0];
+            const payload = normalizeIngredientsPayload(bestMatch);
+            await saveOffCacheFromProduct(bestMatch, payload?.barcode);
+            setCachedValue(cacheKey, payload, OFF_SEARCH_TTL_MS);
+            return payload;
+        } catch (error) {
+            console.error('Error searching OpenFoodFacts by name:', error);
+            return null;
+        }
+    });
 };
 
 // Helper to safely get ID from a relationship field (which could be an object, array, or string ID)
@@ -432,6 +1009,37 @@ export const fetchProducts = async (limit = 50) => {
 };
 
 /**
+ * Fetch similar products for a category (excluding the current product).
+ */
+export const fetchSimilarProductsByCategory = async (categoryId, excludeId = null, limit = 6) => {
+    if (!categoryId) return [];
+    const cacheKey = `similar:${categoryId}:${excludeId || 'none'}:${limit}`;
+    const cached = getCachedValue(cacheKey);
+    if (cached) return cached;
+
+    return withInflight(cacheKey, async () => {
+        try {
+            const response = await db.products.list([
+                Query.equal('categoryId', categoryId),
+                Query.limit(limit + 1),
+                Query.orderDesc('$createdAt'),
+                Query.select(['*', 'categoryId.*'])
+            ]);
+
+            const filtered = response.documents
+                .filter((doc) => doc.$id !== excludeId)
+                .slice(0, limit);
+
+            setCachedValue(cacheKey, filtered, CACHE_TTL.similar);
+            return filtered;
+        } catch (error) {
+            console.error('Error fetching similar products:', error);
+            return [];
+        }
+    });
+};
+
+/**
  * True if lat/lon are finite numbers within WGS84 ranges (string/number inputs OK).
  */
 export const hasValidLatLon = (lat, lon) => {
@@ -494,6 +1102,7 @@ export const normalizeProduct = (product, prices = []) => {
         id: productId,
         name,
         image,
+        description: stripNutritionMeta(product.description || ''),
         brand,
         category: categoryName,
         cheapestPrice: cheapest ? cheapest.price : null,
@@ -684,55 +1293,78 @@ export const fetchPriceHistory = async (productId, branchId = null) => {
  * Search products by name, barcode, or category with optimized server-side query
  */
 export const searchProducts = async (query = '', categoryId = null, limit = 20, sortBy = 'relevance') => {
-    try {
-        const queries = [Query.limit(limit)];
+    const normalizedQuery = String(query || '').trim().toLowerCase();
+    const normalizedCategory = categoryId || 'all';
+    const cacheKey = `search:${normalizedQuery || 'all'}:${normalizedCategory}:${limit}:${sortBy}`;
+    const cached = getCachedValue(cacheKey);
+    if (cached) return cached;
 
-        if (categoryId) {
-            queries.push(Query.equal('categoryId', categoryId));
-        }
+    return withInflight(cacheKey, async () => {
+        try {
+            const queries = [
+                Query.limit(limit),
+                Query.select(['*', 'categoryId.*'])
+            ];
 
-        // Handle Sorting Server-Side where possible
-        if (sortBy === 'name') {
-            queries.push(Query.orderAsc('name'));
-        } else if (sortBy === 'newest') {
-            queries.push(Query.orderDesc('$createdAt'));
-        }
-
-        // Optimized Search Strategy:
-        // If query is a digit sequence, suspect barcode
-        if (/^\d+$/.test(query)) {
-            queries.push(Query.equal('barcode', query));
-        } else if (query.trim()) {
-            // First attempt server-side search indexing
-            try {
-                const results = await db.products.list(
-                    [...queries, Query.contains('name', query)]
-                );
-                
-                // If we have results, return them. If not, don't fallback to "all latest" 
-                // because it confuses users to see unrelated products when they searched for something specific.
-                if (results.documents.length > 0) return results.documents;
-                if (query.trim().length > 2) return []; // Stop fallback for specific queries
-            } catch (error) {
-                console.warn('Server-side search index issue:', error.message);
+            if (categoryId) {
+                queries.push(Query.equal('categoryId', categoryId));
             }
+
+            // Handle Sorting Server-Side where possible
+            if (sortBy === 'name') {
+                queries.push(Query.orderAsc('name'));
+            } else if (sortBy === 'newest') {
+                queries.push(Query.orderDesc('$createdAt'));
+            }
+
+            let results = null;
+
+            // Optimized Search Strategy:
+            // If query is a digit sequence, suspect barcode
+            if (/^\d+$/.test(normalizedQuery)) {
+                queries.push(Query.equal('barcode', normalizedQuery));
+            } else if (normalizedQuery) {
+                // First attempt server-side search indexing
+                try {
+                    results = await db.products.list(
+                        [...queries, Query.contains('name', normalizedQuery)]
+                    );
+
+                    // If we have results, return them. If not, don't fallback to "all latest" 
+                    // because it confuses users to see unrelated products when they searched for something specific.
+                    if (results.documents.length > 0) {
+                        setCachedValue(cacheKey, results.documents, CACHE_TTL.search);
+                        return results.documents;
+                    }
+                    if (normalizedQuery.length > 2) {
+                        setCachedValue(cacheKey, [], CACHE_TTL.search);
+                        return [];
+                    }
+                } catch (error) {
+                    console.warn('Server-side search index issue:', error.message);
+                }
+            }
+
+            // Fallback: Fetch latest and filter (best for small datasets or missing indexes)
+            const response = results || await db.products.list(queries);
+
+            if (!normalizedQuery) {
+                setCachedValue(cacheKey, response.documents, CACHE_TTL.search);
+                return response.documents;
+            }
+
+            const filtered = response.documents.filter(product =>
+                product.name.toLowerCase().includes(normalizedQuery) ||
+                product.barcode?.includes(normalizedQuery)
+            );
+
+            setCachedValue(cacheKey, filtered, CACHE_TTL.search);
+            return filtered;
+        } catch (error) {
+            console.error('Error searching products:', error);
+            return [];
         }
-
-        // Fallback: Fetch latest and filter (best for small datasets or missing indexes)
-        const response = await db.products.list(queries);
-
-        const normalizedQuery = query.toLowerCase().trim();
-        if (!normalizedQuery) return response.documents;
-
-        return response.documents.filter(product =>
-            product.name.toLowerCase().includes(normalizedQuery) ||
-            product.barcode?.includes(query)
-        );
-
-    } catch (error) {
-        console.error('Error searching products:', error);
-        return [];
-    }
+    });
 };
 
 /**
@@ -746,26 +1378,28 @@ export const fetchPricesForProducts = async (productIds) => {
     const cached = getCachedValue(cacheKey);
     if (cached) return cached;
 
-    // Appwrite Query.equal supports arrays, but large arrays should be chunked
-    const CHUNK_SIZE = 25;
-    const allPrices = [];
+    return withInflight(cacheKey, async () => {
+        // Appwrite Query.equal supports arrays, but large arrays should be chunked
+        const CHUNK_SIZE = 25;
+        const allPrices = [];
 
-    try {
-        for (let i = 0; i < normalizedIds.length; i += CHUNK_SIZE) {
-            const chunk = normalizedIds.slice(i, i + CHUNK_SIZE);
-            const response = await db.prices.list([
-                Query.equal('products', chunk),
-                Query.limit(100),
-                Query.select(['*', 'supermarkets.*'])
-            ]);
-            allPrices.push(...response.documents);
+        try {
+            for (let i = 0; i < normalizedIds.length; i += CHUNK_SIZE) {
+                const chunk = normalizedIds.slice(i, i + CHUNK_SIZE);
+                const response = await db.prices.list([
+                    Query.equal('products', chunk),
+                    Query.limit(100),
+                    Query.select(['*', 'supermarkets.*'])
+                ]);
+                allPrices.push(...response.documents);
+            }
+            setCachedValue(cacheKey, allPrices, CACHE_TTL.prices);
+            return allPrices;
+        } catch (error) {
+            console.error('Error fetching prices for batch products:', error);
+            return [];
         }
-        setCachedValue(cacheKey, allPrices, CACHE_TTL.prices);
-        return allPrices;
-    } catch (error) {
-        console.error('Error fetching prices for batch products:', error);
-        return [];
-    }
+    });
 };
 
 /**
@@ -934,7 +1568,6 @@ export const updatePriceWithHistory = async (priceId, productId, supermarketId, 
  */
 export const fetchPriceHistoryExtended = async (productId, branchId = null) => {
     try {
-        const historyColl = COLLECTIONS.PRICE_HISTORY || 'price_history';
         const queries = [
             Query.equal('products', productId),
             Query.orderDesc('recordedAt'),

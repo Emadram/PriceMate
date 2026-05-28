@@ -9,7 +9,8 @@ import {
     CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell 
 } from 'recharts';
 import useAdminAuthStore from '../stores/adminAuthStore';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import useFreshIndicator from '../hooks/useFreshIndicator';
 import { client, DATABASE_ID, COLLECTIONS, Query, db } from '../lib/appwrite';
 import Sidebar from '../components/Sidebar';
 
@@ -33,10 +34,36 @@ const Dashboard = () => {
     const [rawPrices, setRawPrices] = useState([]);
     const [rawSupermarkets, setRawSupermarkets] = useState([]);
     const [lastUpdated, setLastUpdated] = useState(null);
-    const [isFresh, setIsFresh] = useState(false);
+    const isFresh = useFreshIndicator(lastUpdated);
+    const inFlightRef = useRef(false);
+    const subscriptionRefreshTimerRef = useRef(null);
+    const lastUpdatedMsRef = useRef(0);
 
-    const fetchStats = async () => {
-        setLoading(true);
+    const fetchAll = useCallback(async (listFn, label) => {
+        const limit = 100;
+        const documents = [];
+        let offset = 0;
+
+        try {
+            while (true) {
+                const res = await listFn(offset, limit);
+                const batch = res?.documents || [];
+                documents.push(...batch);
+                if (batch.length < limit) break;
+                offset += limit;
+            }
+        } catch (error) {
+            console.warn(`Dashboard: Failed to fetch ${label}:`, error.message);
+            return [];
+        }
+
+        return documents;
+    }, []);
+
+    const fetchStats = useCallback(async ({ showLoader = false } = {}) => {
+        if (inFlightRef.current) return;
+        inFlightRef.current = true;
+        if (showLoader) setLoading(true);
         try {
             const safeList = async (listFn, label) => {
                 try {
@@ -58,19 +85,14 @@ const Dashboard = () => {
                 chatsRes
             ] = await Promise.all([
                 safeList(() => db.products.list([
-                    Query.limit(200),
-                    Query.orderDesc('$createdAt'),
-                    Query.select(['$id', '$createdAt', 'categoryId', 'categoryId.$id'])
+                    Query.limit(1)
                 ]), 'products'),
                 safeList(() => db.prices.list([
-                    Query.limit(200),
-                    Query.orderDesc('$createdAt'),
-                    Query.select(['$id', '$createdAt'])
+                    Query.limit(1)
                 ]), 'prices'),
                 safeList(() => db.categories.list([Query.limit(1)]), 'categories'),
                 safeList(() => db.supermarkets.list([
-                    Query.limit(200),
-                    Query.select(['$id', 'name'])
+                    Query.limit(1)
                 ]), 'supermarkets'),
                 safeList(() => db.feedback.list([
                     Query.equal('status', 'pending'),
@@ -84,9 +106,42 @@ const Dashboard = () => {
                 safeList(() => db.chatHistory.list([Query.limit(1)]), 'chat history')
             ]);
 
-            setRawProducts(productsRes.documents || []);
-            setRawPrices(pricesRes.documents || []);
-            setRawSupermarkets(supermarketsRes.documents || []);
+            const fourteenDaysAgo = new Date();
+            fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+            const pricesFrom = fourteenDaysAgo.toISOString();
+
+            const [productsDocs, pricesDocs, supermarketsDocs] = await Promise.all([
+                fetchAll(
+                    (offset, limit) => db.products.list([
+                        Query.limit(limit),
+                        Query.offset(offset),
+                        Query.orderDesc('$createdAt')
+                    ]),
+                    'products for charts'
+                ),
+                fetchAll(
+                    (offset, limit) => db.prices.list([
+                        Query.limit(limit),
+                        Query.offset(offset),
+                        Query.greaterThanEqual('$createdAt', pricesFrom),
+                        Query.orderDesc('$createdAt'),
+                        Query.select(['$id', '$createdAt'])
+                    ]),
+                    'prices for charts'
+                ),
+                fetchAll(
+                    (offset, limit) => db.supermarkets.list([
+                        Query.limit(limit),
+                        Query.offset(offset),
+                        Query.select(['$id', 'name'])
+                    ]),
+                    'supermarkets for charts'
+                )
+            ]);
+
+            setRawProducts(productsDocs);
+            setRawPrices(pricesDocs);
+            setRawSupermarkets(supermarketsDocs);
 
             setStats({
                 products: productsRes.total || 0,
@@ -98,12 +153,18 @@ const Dashboard = () => {
                 announcements: announcementsRes.total || 0,
                 chats: chatsRes.total || 0
             });
-            setLastUpdated(new Date().toISOString());
+            const now = Date.now();
+            if (now - lastUpdatedMsRef.current >= 1500) {
+                setLastUpdated(new Date(now).toISOString());
+                lastUpdatedMsRef.current = now;
+            }
         } catch (error) {
             console.error('Error fetching dashboard stats:', error);
+        } finally {
+            if (showLoader) setLoading(false);
+            inFlightRef.current = false;
         }
-        setLoading(false);
-    };
+    }, [fetchAll]);
 
     const getWeeklyTrend = (items = [], dateField = '$createdAt') => {
         if (!items.length) return null;
@@ -188,7 +249,7 @@ const Dashboard = () => {
     }, [rawPrices]);
 
     useEffect(() => {
-        fetchStats();
+        const t = setTimeout(() => fetchStats({ showLoader: true }), 0);
         const channels = [
             `databases.${DATABASE_ID}.collections.${COLLECTIONS.PRODUCTS}.documents`,
             `databases.${DATABASE_ID}.collections.${COLLECTIONS.PRICES}.documents`,
@@ -199,17 +260,24 @@ const Dashboard = () => {
             `databases.${DATABASE_ID}.collections.${COLLECTIONS.CHAT_HISTORY}.documents`
         ];
         const unsubscribe = client.subscribe(channels, () => {
-            fetchStats();
+            if (subscriptionRefreshTimerRef.current) {
+                clearTimeout(subscriptionRefreshTimerRef.current);
+            }
+            subscriptionRefreshTimerRef.current = setTimeout(() => {
+                fetchStats({ showLoader: false });
+                subscriptionRefreshTimerRef.current = null;
+            }, 900);
         });
-        return () => unsubscribe();
-    }, []);
+        return () => {
+            clearTimeout(t);
+            if (subscriptionRefreshTimerRef.current) {
+                clearTimeout(subscriptionRefreshTimerRef.current);
+            }
+            unsubscribe();
+        };
+    }, [fetchStats]);
 
-    useEffect(() => {
-        if (!lastUpdated) return;
-        setIsFresh(true);
-        const timer = setTimeout(() => setIsFresh(false), 1200);
-        return () => clearTimeout(timer);
-    }, [lastUpdated]);
+    // `isFresh` indicator handled by useFreshIndicator to avoid rapid flicker
 
     const handleLogout = async () => {
         await logout();
@@ -245,7 +313,7 @@ const Dashboard = () => {
                         </div>
                         <div className="flex items-center gap-2">
                             <button 
-                                onClick={fetchStats}
+                                onClick={() => fetchStats({ showLoader: true })}
                                 className="p-2.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-2xl transition-all active:scale-95 border border-gray-200 dark:border-gray-600 shadow-sm"
                                 title="Sync Data"
                             >
@@ -313,14 +381,15 @@ const Dashboard = () => {
                                     <p className="text-[10px] text-gray-400 uppercase tracking-[0.2em] font-black">Updates in the last 7 days</p>
                                 </div>
                                 <div className="flex gap-2">
-                                    <span className="flex items-center gap-1.5 text-[10px] font-black text-blue-600 bg-blue-50 px-3 py-1 rounded-full uppercase">
-                                        <div className="w-1.5 h-1.5 bg-blue-600 rounded-full"></div> Activity
+                                    <span className="flex items-center gap-1.5 text-[10px] font-black text-brand-700 bg-brand-50 px-3 py-1 rounded-full uppercase">
+                                        <div className="w-1.5 h-1.5 bg-brand-600 rounded-full"></div> Activity
                                     </span>
                                 </div>
                             </div>
-                            <div className="flex-1 w-full -ml-4">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <AreaChart data={priceTrendsData}>
+                            <div className="flex-1 w-full min-h-[240px] min-w-0 -ml-4">
+                                <div className="w-full h-full min-h-[240px]">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <AreaChart data={priceTrendsData}>
                                         <defs>
                                             <linearGradient id="colorSearches" x1="0" y1="0" x2="0" y2="1">
                                                 <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3}/>
@@ -336,7 +405,8 @@ const Dashboard = () => {
                                         />
                                         <Area type="monotone" dataKey="updates" stroke="#3B82F6" fillOpacity={1} fill="url(#colorSearches)" strokeWidth={4} dot={{fill: '#3B82F6', strokeWidth: 2, r: 4}} activeDot={{r: 6, strokeWidth: 0}} />
                                     </AreaChart>
-                                </ResponsiveContainer>
+                                    </ResponsiveContainer>
+                                </div>
                             </div>
                         </div>
 
@@ -346,7 +416,7 @@ const Dashboard = () => {
                                 <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tight">Market Distribution</h3>
                                 <p className="text-[10px] text-gray-400 uppercase tracking-[0.2em] font-black">Products per Market</p>
                             </div>
-                            <div className="flex-1 w-full">
+                            <div className="flex-1 w-full min-h-[240px] min-w-0">
                                 {marketChartData.length === 0 ? (
                                     <div className="h-full flex flex-col items-center justify-center text-center px-6">
                                         <div className="w-16 h-16 rounded-2xl bg-gray-50 dark:bg-gray-900 flex items-center justify-center text-gray-300 dark:text-gray-600 mb-4">
@@ -357,8 +427,9 @@ const Dashboard = () => {
                                     </div>
                                 ) : (
                                     <>
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <BarChart data={marketChartData} layout="vertical" margin={{left: -20}}>
+                                        <div className="w-full h-full min-h-[240px]">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <BarChart data={marketChartData} layout="vertical" margin={{left: -20}}>
                                                 <XAxis type="number" hide />
                                                 <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fontSize: 11, fill: '#475569', fontWeight: 800}} width={100} />
                                                 <Tooltip cursor={{fill: 'transparent'}} contentStyle={{backgroundColor: '#fff', color: '#000'}} />
@@ -367,8 +438,9 @@ const Dashboard = () => {
                                                         <Cell key={`cell-${index}`} fill={entry.color} />
                                                     ))}
                                                 </Bar>
-                                            </BarChart>
-                                        </ResponsiveContainer>
+                                                </BarChart>
+                                            </ResponsiveContainer>
+                                        </div>
                                         <div className="mt-6 space-y-3">
                                             {marketChartData.map((market, i) => (
                                                 <div key={i} className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-gray-500">
@@ -419,9 +491,10 @@ const Dashboard = () => {
     );
 };
 
-const MetricCard = ({ title, value, icon: Icon, trend, isUp, color, loading }) => {
+const MetricCard = ({ title, value, icon, trend, isUp, color, loading }) => {
+    const IconComponent = icon;
     const colorMap = {
-        blue: 'text-blue-600 bg-blue-50 border-blue-100 dark:bg-blue-900/30 dark:border-blue-800',
+        blue: 'text-brand-700 bg-brand-50 border-brand-100 dark:bg-brand-900/30 dark:border-brand-800',
         emerald: 'text-emerald-600 bg-emerald-50 border-emerald-100 dark:bg-emerald-900/30 dark:border-emerald-800',
         rose: 'text-rose-600 bg-rose-50 border-rose-100 dark:bg-rose-900/30 dark:border-rose-800',
         amber: 'text-amber-600 bg-amber-50 border-amber-100 dark:bg-amber-900/30 dark:border-amber-800',
@@ -430,10 +503,10 @@ const MetricCard = ({ title, value, icon: Icon, trend, isUp, color, loading }) =
     return (
         <div className="bg-white dark:bg-gray-800 p-7 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm relative group overflow-hidden transition-all hover:scale-[1.02] hover:shadow-xl">
             <div className="absolute -top-4 -right-4 p-4 opacity-[0.03] group-hover:scale-150 transition-transform duration-500">
-                <Icon size={120} />
+                <IconComponent size={120} />
             </div>
             <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 border-2 ${colorMap[color]}`}>
-                <Icon size={26} strokeWidth={2.5} />
+                <IconComponent size={26} strokeWidth={2.5} />
             </div>
             <h4 className="text-gray-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2">{title}</h4>
             <div className="flex items-baseline gap-3">
@@ -450,9 +523,10 @@ const MetricCard = ({ title, value, icon: Icon, trend, isUp, color, loading }) =
     );
 };
 
-const QuickStatus = ({ title, value, subText, icon: Icon, color, onClick }) => {
+const QuickStatus = ({ title, value, subText, icon, color, onClick }) => {
+    const IconComponent = icon;
     const colorMap = {
-        blue: 'bg-blue-600 shadow-blue-500/30',
+        blue: 'bg-brand-600 shadow-brand-600/30',
         amber: 'bg-amber-500 shadow-amber-500/30',
         rose: 'bg-rose-500 shadow-rose-500/30',
     };
@@ -463,10 +537,10 @@ const QuickStatus = ({ title, value, subText, icon: Icon, color, onClick }) => {
             className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm flex items-center gap-6 group hover:translate-y-[-6px] transition-all text-left w-full"
         >
             <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center text-white shadow-2xl transition-transform group-hover:rotate-12 ${colorMap[color]}`}>
-                <Icon size={28} strokeWidth={2.5} />
+                <IconComponent size={28} strokeWidth={2.5} />
             </div>
             <div>
-                <h4 className="text-2xl font-black text-gray-900 dark:text-white leading-none mb-1.5 group-hover:text-blue-600 transition-colors">{value}</h4>
+                <h4 className="text-2xl font-black text-gray-900 dark:text-white leading-none mb-1.5 group-hover:text-brand-700 dark:group-hover:text-brand-300 transition-colors">{value}</h4>
                 <p className="text-sm font-black text-gray-500 tracking-tight leading-none mb-2">{title}</p>
                 <div className="flex items-center gap-1.5 opacity-60">
                     <div className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>

@@ -75,7 +75,33 @@ Object.entries(APP_PATHS).forEach(([appName, appPath]) => {
         }
     });
 
-    console.log(`Usages successfully found for: ${Array.from(usages).join(', ') || 'None'}`);
+    console.log(`Usages successfully found for collections: ${Array.from(usages).join(', ') || 'None'}`);
+
+    // Scan for relationship queries and error-prone attribute usage
+    let hasRelationshipAccess = false;
+    let relationshipFlaws = 0;
+    files.forEach(file => {
+        if (file.endsWith('.js') || file.endsWith('.jsx')) {
+            const content = fs.readFileSync(file, 'utf8');
+            if (content.includes('categoryId.$id') || content.includes('products.$id') || content.includes('supermarkets.$id')) {
+                hasRelationshipAccess = true;
+            }
+            // Warning for unprotected optional chaining when checking relation IDs
+            // Matches something like `p.categoryId.$id` but requires it to be carefully handled.
+            if (content.match(/(?<!\?)\.(categoryId|products|supermarkets)\.\$id/)) {
+                // Actually they might be protected upstream, so just count potential flaws
+                relationshipFlaws++;
+            }
+        }
+    });
+
+    if (hasRelationshipAccess) {
+        console.log(`Info: Found relationship expansions (e.g. categoryId.$id) across endpoints.`);
+    }
+    if (relationshipFlaws > 0) {
+        console.log(`[!] Warning: Found ${relationshipFlaws} direct accesses to relation properties (e.g., .products.$id) without optional chaining (?).`);
+        issueCount += relationshipFlaws;
+    }
 });
 
 console.log('\n--- Consistency Summary ---');

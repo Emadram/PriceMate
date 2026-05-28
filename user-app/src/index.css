@@ -2,13 +2,118 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  :root {
+    --brand-50:  #eef2ff;
+    --brand-100: #e0e7ff;
+    --brand-400: #818cf8;
+    --brand-500: #6366f1;
+    --brand-600: #4f46e5; /* Indigo */
+    --brand-700: #4338ca;
+    --accent-500: #8b5cf6;
+    --accent-600: #7c3aed; /* Violet */
+    --mint-500:  #2dd4bf; /* Accent Mint */
+    --slate-850: #1e293b; /* Dark Slate */
+    --soft-gray: #f8fafc; /* Soft Gray */
+  }
+
+  ::selection {
+    background-color: #818cf8; /* brand-400 */
+    color: #fff;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    background-color: var(--soft-gray);
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
+    overscroll-behavior-y: none;
+  }
+}
+
+@layer base {
+  body {
+    background-color: var(--soft-gray);
+    color: #0f172a;
+    min-height: 100vh;
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
+    overscroll-behavior-y: none;
+  }
+
+  html.pricemate-splash-active,
+  body.pricemate-splash-active {
+    overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: none;
+  }
+
+  body.pricemate-splash-active #pricemate-ai-launcher {
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+
+  .dark body {
+    background-color: #020617;
+    color: #e6eef8;
+  }
+
+  .dark html {
+    background-color: #020617;
+  }
+}
+
 @layer utilities {
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .pl-safe {
+    padding-left: env(safe-area-inset-left);
+  }
+
+  .pr-safe {
+    padding-right: env(safe-area-inset-right);
+  }
+
+  .px-safe {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  .pb-safe {
+    padding-bottom: calc(env(safe-area-inset-bottom) + 5rem);
+  }
+
+  .pb-safe-nav {
+    padding-bottom: calc(env(safe-area-inset-bottom) + 1rem);
+  }
+
+  .tap-target {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* small helper to ensure z-60 utility exists */
+  .z-60 { z-index: 60; }
+  /* high z-index helpers used by fixed navbar/logo */
+  .z-9998 { z-index: 9998; }
+  .z-9999 { z-index: 9999; }
+
   .animate-pulse-soft {
     animation: pulse-soft 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
 
   .animate-float {
     animation: float 4s ease-in-out infinite;
+  }
+
+  .animate-splash-ripple {
+    animation: splash-ripple 1.8s ease-out infinite;
+  }
+
+  .animate-splash-glow {
+    animation: splash-glow 2.2s ease-in-out infinite;
   }
 
   @keyframes pulse-soft {
@@ -20,4 +125,35 @@
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-10px); }
   }
+
+  @keyframes splash-ripple {
+    0% {
+      transform: scale(0.92);
+      opacity: 0.28;
+    }
+    70% {
+      transform: scale(1.14);
+      opacity: 0.08;
+    }
+    100% {
+      transform: scale(1.2);
+      opacity: 0;
+    }
+  }
+
+  @keyframes splash-glow {
+    0%, 100% {
+      opacity: 0.5;
+      transform: scale(0.96);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.04);
+    }
+  }
+}
+
+/* Premium Dark Mode Map Styling */
+.dark .map-dark-invert .map-tiles {
+  filter: invert(0.92) hue-rotate(180deg) brightness(0.92) contrast(1.12);
 }

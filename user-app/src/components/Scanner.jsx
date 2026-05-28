@@ -292,7 +292,7 @@ const Scanner = ({ onDetected, paused = false }) => {
             candidateRef.current = { text: null, count: 0, firstTs: 0, lastTs: 0 };
             try {
                 stopStream();
-            } catch (err) {
+            } catch {
                 // Swallow cleanup errors
             }
             isStartingRef.current = false;
@@ -309,7 +309,7 @@ const Scanner = ({ onDetected, paused = false }) => {
     }, [paused]);
 
     return (
-        <div className="relative w-full h-64 bg-black rounded-lg overflow-hidden">
+        <div className="relative w-full h-[48vh] sm:h-64 md:h-80 lg:h-96 bg-black rounded-lg overflow-hidden">
             <video
                 ref={videoRef}
                 className="w-full h-full object-cover"
@@ -331,7 +331,7 @@ const Scanner = ({ onDetected, paused = false }) => {
                     <button
                         type="button"
                         onClick={() => setTorch(!torchOn)}
-                        className="text-white text-xs bg-black/55 hover:bg-black/70 px-3 py-2 rounded-lg transition"
+                        className="tap-target min-h-11 text-white text-xs bg-black/55 hover:bg-black/70 px-3 py-2 rounded-lg transition"
                     >
                         {torchOn ? 'Torch: On' : 'Torch: Off'}
                     </button>

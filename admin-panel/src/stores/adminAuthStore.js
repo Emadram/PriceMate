@@ -36,7 +36,7 @@ const useAdminAuthStore = create((set, get) => ({
             } else {
                 set({ loading: false });
             }
-        } catch (error) {
+        } catch {
             set({ admin: null, loading: false });
         }
     },

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { FiUser, FiLogOut, FiMoon, FiSun, FiMenu, FiX, FiGlobe, FiDollarSign, FiHome, FiSearch, FiCamera, FiHeart } from 'react-icons/fi';
+import { FiUser, FiLogOut, FiMoon, FiSun, FiGlobe, FiHome, FiCamera, FiCpu, FiSearch } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
 import useAuthStore from '../stores/authStore';
 import useCurrencyStore from '../stores/currencyStore';
@@ -14,16 +14,31 @@ const Navbar = () => {
     const { theme, toggleTheme } = useThemeStore();
     const navigate = useNavigate();
     const location = useLocation();
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
-    const [isCurrencyMenuOpen, setIsCurrencyMenuOpen] = useState(false);
+    const bottomNavRef = useRef(null);
 
     useEffect(() => {
         fetchRates();
     }, [fetchRates]);
 
-    const toggleCurrency = () => {
-        setIsCurrencyMenuOpen(!isCurrencyMenuOpen);
-    };
+    useEffect(() => {
+        const el = bottomNavRef.current;
+        if (!el || typeof document === 'undefined') return undefined;
+
+        const root = document.documentElement;
+        const setVar = () => {
+            const h = Math.round(el.getBoundingClientRect().height || 0);
+            if (h > 0) root.style.setProperty('--bottom-nav-h', `${h}px`);
+        };
+
+        setVar();
+        window.addEventListener('resize', setVar, { passive: true });
+        window.addEventListener('orientationchange', setVar, { passive: true });
+
+        return () => {
+            window.removeEventListener('resize', setVar);
+            window.removeEventListener('orientationchange', setVar);
+        };
+    }, []);
 
     const toggleLanguage = () => {
         const currentLang = i18n.resolvedLanguage || i18n.language;
@@ -36,16 +51,46 @@ const Navbar = () => {
         navigate('/login');
     };
 
+    const tapFeedback = () => {
+        if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+            navigator.vibrate(10);
+        }
+    };
+
     return (
         <>
-            <nav className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md shadow-sm sticky top-0 z-50 transition-colors duration-200 border-b border-gray-100 dark:border-gray-700">
+            {/* Top mobile header: show logo here (visible) and make background dark in dark mode */}
+            <div className="md:hidden fixed top-0 inset-x-0 z-9999 pt-safe px-safe">
+                <div className="mx-2 px-4 py-3 bg-transparent dark:bg-gray-900/95 rounded-b-[1.4rem] backdrop-blur-xl border-b border-gray-800/20">
+                        <Link to="/" className="flex items-center justify-center gap-2 min-w-0">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/90 dark:bg-gray-900/60 shadow-sm shadow-brand-500/15 shrink-0 border border-gray-100/70 dark:border-gray-800/60 overflow-hidden">
+                            <img
+                                src="/LogoPriceMate.png"
+                                alt="PriceMate"
+                                className="h-full w-full object-contain p-1"
+                                loading="eager"
+                                decoding="async"
+                            />
+                        </div>
+                        <span className="text-sm font-black tracking-tight text-gray-900 dark:text-white truncate">PriceMate</span>
+                    </Link>
+                </div>
+            </div>
+
+                <nav className="hidden md:block fixed top-0 left-0 right-0 pt-safe z-9999 bg-transparent dark:bg-gray-900/95 backdrop-blur-md transition-colors duration-200">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between h-16">
                         {/* Logo */}
                         <div className="flex items-center">
-                            <Link to="/" className="flex-shrink-0 flex items-center gap-2 group">
-                                <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-lg shadow-blue-500/30 group-hover:scale-105 transition-transform">
-                                    P
+                                <Link to="/" className="flex-shrink-0 flex items-center gap-2 group">
+                                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/90 dark:bg-gray-900/60 shadow-lg shadow-brand-500/20 group-hover:scale-105 transition-transform border border-gray-100/70 dark:border-gray-800/60 overflow-hidden">
+                                    <img
+                                        src="/LogoPriceMate.png"
+                                        alt="PriceMate"
+                                        className="h-full w-full object-contain p-1"
+                                        loading="eager"
+                                        decoding="async"
+                                    />
                                 </div>
                                 <span className="font-black text-2xl text-gray-900 dark:text-white hidden sm:block tracking-tighter">
                                     PriceMate
@@ -63,11 +108,11 @@ const Navbar = () => {
                                         onClick={() => setCurrency(curr)}
                                         className={`px-3 py-1.5 text-[10px] font-black rounded-lg transition-all ${
                                             currency === curr 
-                                                ? 'bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-sm' 
-                                                : 'text-gray-500 dark:text-gray-400 hover:text-blue-600'
+                                                ? 'bg-white dark:bg-gray-800 text-brand-600 dark:text-brand-500 shadow-sm' 
+                                                : 'text-gray-500 dark:text-gray-400 hover:text-brand-600'
                                         }`}
                                     >
-                                        {curr === 'TRY' ? 'TL' : curr}
+                                        {curr}
                                     </button>
                                 ))}
                             </div>
@@ -77,7 +122,7 @@ const Navbar = () => {
                                 onClick={toggleLanguage}
                                 className="flex items-center gap-1.5 px-3 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 rounded-xl transition-all border border-gray-100 dark:border-gray-700 shadow-sm group"
                             >
-                                <FiGlobe className="w-4 h-4 text-blue-500 group-hover:rotate-12 transition-transform" />
+                                <FiGlobe className="w-4 h-4 text-accent-500 group-hover:rotate-12 transition-transform" />
                                 <span className="text-[10px] font-black uppercase tracking-widest leading-none">
                                     {(i18n.resolvedLanguage || i18n.language) === 'en' ? 'EN' : 'TR'}
                                 </span>
@@ -86,7 +131,7 @@ const Navbar = () => {
                             <button
                                 onClick={toggleTheme}
                                 className="p-2.5 text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl transition-all shadow-sm hover:scale-105"
-                                aria-label="Toggle Dark Mode"
+                                aria-label={t('toggle_dark_mode', 'Toggle Dark Mode')}
                             >
                                 {theme === 'dark' ? <FiSun size={20} /> : <FiMoon size={20} />}
                             </button>
@@ -95,13 +140,13 @@ const Navbar = () => {
                                 <div className="flex items-center gap-2">
                                     <Link
                                         to="/profile"
-                                        className="flex items-center gap-2.5 pl-2.5 pr-1.5 py-1.5 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl hover:border-blue-500/50 transition-all shadow-sm group"
+                                        className="flex items-center gap-2.5 pl-2.5 pr-1.5 py-1.5 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl hover:border-brand-500/50 transition-all shadow-sm group"
                                     >
-                                        <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/50 rounded-xl flex items-center justify-center text-blue-600 dark:text-blue-400 font-black group-hover:scale-95 transition-transform overflow-hidden">
+                                            <div className="w-10 h-10 bg-brand-100 dark:bg-brand-900/50 rounded-xl flex items-center justify-center text-brand-600 dark:text-brand-500 font-black group-hover:scale-95 transition-transform overflow-hidden">
                                             {user.name?.charAt(0).toUpperCase()}
                                         </div>
                                         <div className="flex flex-col">
-                                            <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">Account</span>
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">{t('account', 'Account')}</span>
                                             <span className="text-xs font-black text-gray-900 dark:text-white leading-none max-w-[80px] truncate tracking-tight">{user.name}</span>
                                         </div>
                                     </Link>
@@ -116,100 +161,56 @@ const Navbar = () => {
                             ) : (
                                 <Link
                                     to="/login"
-                                    className="bg-blue-600 text-white px-8 py-3 rounded-2xl hover:bg-black transition-all font-black uppercase tracking-widest text-[10px] shadow-lg shadow-blue-500/25 active:scale-95"
+                                    className="bg-brand-600 text-white px-8 py-3 rounded-2xl hover:bg-black transition-all font-black uppercase tracking-widest text-[10px] shadow-lg shadow-brand-500/25 active:scale-95"
                                 >
                                     {t('login')}
                                 </Link>
                             )}
                         </div>
 
-                        {/* Mobile Logo Only Center */}
-                        <div className="md:hidden flex flex-1 justify-center items-center -mr-16">
-                            <span className="font-black text-xl text-gray-900 dark:text-white tracking-tighter">
-                                PriceMate
-                            </span>
-                        </div>
-
-                        {/* Mobile Actions Right */}
-                        <div className="flex items-center md:hidden gap-2">
-                             <button
-                                onClick={toggleCurrency}
-                                className={`p-2.5 text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl shadow-sm transition-all ${isCurrencyMenuOpen ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 !border-blue-200' : ''}`}
-                            >
-                                <span className="text-[10px] font-black uppercase">{currency}</span>
-                            </button>
-                             <button
-                                onClick={toggleLanguage}
-                                className="p-2.5 text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl shadow-sm"
-                            >
-                                <span className="text-[10px] font-black uppercase">{i18n.resolvedLanguage || i18n.language}</span>
-                            </button>
-                            <button
-                                onClick={toggleTheme}
-                                className="p-2.5 text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl shadow-sm"
-                            >
-                                {theme === 'dark' ? <FiSun size={20} /> : <FiMoon size={20} />}
-                            </button>
-                        </div>
                     </div>
                 </div>
-
-                {/* Mobile Currency Quick Select Drawer */}
-                {isCurrencyMenuOpen && (
-                    <div className="md:hidden border-t border-gray-100 dark:border-gray-700 bg-gray-50/90 dark:bg-gray-900/90 backdrop-blur-sm animate-in slide-in-from-top duration-300 overflow-hidden">
-                        <div className="px-4 py-3 flex items-center justify-between gap-2">
-                            {['TRY', 'USD', 'EUR', 'GBP'].map((curr) => (
-                                <button
-                                    key={curr}
-                                    onClick={() => {
-                                        setCurrency(curr);
-                                        setIsCurrencyMenuOpen(false);
-                                    }}
-                                    className={`flex-1 py-3 text-xs font-black rounded-2xl transition-all ${
-                                        currency === curr 
-                                            ? 'bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-sm border border-blue-100 dark:border-blue-900/50' 
-                                            : 'text-gray-500 dark:text-gray-400 border border-transparent'
-                                    }`}
-                                >
-                                    {curr}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                )}
             </nav>
 
             {/* Mobile Bottom Navigation */}
-            <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg border-t border-gray-100 dark:border-gray-800 px-6 py-4 shadow-soft">
-                <div className="flex justify-between items-center max-w-md mx-auto">
-                    <NavItem to="/" icon={FiHome} label={t('home')} currentPath={location.pathname} />
-                    <NavItem to="/search" icon={FiSearch} label={t('search')} currentPath={location.pathname} />
+            <div ref={bottomNavRef} className="md:hidden fixed bottom-0 inset-x-0 z-9998 px-safe">
+              <div className="mx-2 mb-2 px-4 py-3 pb-safe-nav bg-transparent dark:bg-gray-900/95 rounded-t-[1.75rem] backdrop-blur-md">
+                <div className="flex items-center justify-between max-w-md mx-auto">
+                    <NavItem to="/" icon={FiHome} label={t('home')} currentPath={location.pathname} onTap={tapFeedback} />
+                    <NavItem to="/search" icon={FiSearch} label={t('search', 'Search')} currentPath={location.pathname} onTap={tapFeedback} />
                     <Link
                         to="/scan"
-                        className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-soft -mt-10 relative border-8 border-white dark:border-gray-900 active:scale-90 transition-all duration-300"
+                        onClick={tapFeedback}
+                        className="w-15 h-15 bg-brand-600 rounded-[1.35rem] flex items-center justify-center text-white shadow-soft -mt-9 relative border-[6px] border-white dark:border-gray-900 active:scale-90 transition-all duration-300"
                     >
-                        <FiCamera size={28} strokeWidth={2.5} />
+                        <FiCamera size={26} strokeWidth={2.5} />
                     </Link>
-                    <NavItem to="/favorites" icon={FiHeart} label={t('favorites')} currentPath={location.pathname} />
-                    <NavItem to="/profile" icon={FiUser} label={t('profile')} currentPath={location.pathname} />
+                    <NavItem to="/ai-chat" icon={FiCpu} label={t('ai_chat_tab', 'AI')} currentPath={location.pathname} onTap={tapFeedback} />
+                    <NavItem to="/profile" icon={FiUser} label={t('profile')} currentPath={location.pathname} onTap={tapFeedback} />
                 </div>
+              </div>
             </div>
         </>
     );
 };
 
-const NavItem = ({ to, icon: Icon, label, currentPath }) => {
+const NavItem = ({ to, icon, label, currentPath, state, onTap }) => {
+    const IconComponent = icon;
     const isActive = currentPath === to;
     return (
         <Link
-            to={to}
-            className={`flex flex-col items-center justify-center gap-1.5 transition-all active:scale-90 ${
-                isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'
-            }`}
-        >
-            <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />
-            <span className={`text-[10px] font-semibold tracking-tight ${isActive ? 'opacity-100' : 'opacity-80'}`}>
+                to={to}
+                state={state}
+                onClick={onTap}
+                className={`tap-target min-h-11 min-w-11 px-1.5 flex flex-col items-center justify-center gap-1 transition-colors duration-200 ease-out ${
+                    isActive ? 'text-brand-600 dark:text-brand-500' : 'text-gray-400 dark:text-gray-200'
+                }`}> 
+            <IconComponent size={21} strokeWidth={isActive ? 2.5 : 2} />
+            <span className={`text-[9px] font-semibold tracking-tight uppercase ${isActive ? 'opacity-100' : 'opacity-80'}`}>
                 {label}
+            </span>
+            <span className="block mt-1.5 h-1.5 w-full">
+                <span className={`mx-auto block h-[2px] w-5 origin-center transform transition-transform duration-200 ease-out rounded-full ${isActive ? 'bg-brand-600 scale-x-100' : 'bg-transparent scale-x-0'}`} />
             </span>
         </Link>
     );

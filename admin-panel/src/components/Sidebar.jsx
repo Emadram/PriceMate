@@ -10,6 +10,7 @@ import {
     FiBell, 
     FiCpu 
 } from 'react-icons/fi';
+import ThemeToggle from './ThemeToggle';
 
 const Sidebar = () => {
     const location = useLocation();
@@ -29,10 +30,24 @@ const Sidebar = () => {
     return (
         <aside className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 min-h-screen hidden lg:block sticky top-0 overflow-y-auto">
             <div className="p-6 flex items-center gap-3 border-b border-gray-100 dark:border-gray-700 mb-6">
-                <div className="bg-blue-600 p-2 rounded-lg text-white">
-                    <FiPackage size={20} />
+                <div className="h-10 w-10 rounded-xl flex items-center justify-center bg-white dark:bg-gray-900 shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+                    <img
+                        src="/LogoPriceMate.png"
+                        alt="PriceMate"
+                        className="h-full w-full object-contain p-1"
+                        loading="eager"
+                        decoding="async"
+                    />
                 </div>
-                <h1 className="text-xl font-bold text-gray-800 dark:text-white">PriceMate</h1>
+                <div className="flex-1 min-w-0">
+                    <h1 className="text-xl font-bold text-gray-800 dark:text-white truncate">PriceMate</h1>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mt-0.5">
+                        Admin
+                    </p>
+                </div>
+                <div className="shrink-0">
+                    <ThemeToggle />
+                </div>
             </div>
 
             <nav className="px-3 space-y-1">
@@ -50,11 +65,11 @@ const Sidebar = () => {
                             to={item.path}
                             className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
                                 isActive 
-                                ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 font-semibold shadow-sm' 
+                                ? 'bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300 font-semibold shadow-sm' 
                                 : 'text-gray-500 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-700 hover:text-gray-800 dark:hover:text-gray-200'
                             }`}
                         >
-                            <Icon size={18} className={isActive ? 'text-blue-600' : 'text-gray-400'} />
+                            <Icon size={18} className={isActive ? 'text-brand-600 dark:text-brand-300' : 'text-gray-400'} />
                             <span>{item.label}</span>
                         </Link>
                     );

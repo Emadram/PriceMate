@@ -1,15 +1,667 @@
+const PROMPT_STOPWORDS = new Set([
+    'is', 'this', 'that', 'the', 'a', 'an', 'of', 'in', 'on', 'for', 'with', 'to', 'and', 'or', 'but',
+    'what', 'which', 'who', 'whom', 'where', 'when', 'why', 'how', 'do', 'does', 'did', 'are', 'isnt',
+    'can', 'could', 'would', 'should', 'please', 'tell', 'me', 'about', 'show', 'find', 'compare',
+    'check', 'look', 'up', 'give', 'need', 'want', 'know', 'question', 'answer', 'again', 'same',
+]);
+
+const tokenizePromptIntent = (value) => {
+    const text = String(value || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9ğüşöçıİĞÜŞÖÇ\s]/g, ' ');
+
+    return text
+        .split(/\s+/)
+        .map((token) => token.trim())
+        .filter((token) => token.length >= 2 && !PROMPT_STOPWORDS.has(token))
+        .filter((token, index, array) => array.indexOf(token) === index)
+        .slice(0, 16);
+};
+
+const buildIntentSummary = (value) => {
+    const tokens = tokenizePromptIntent(value);
+    if (tokens.length === 0) return String(value || '').trim();
+    return tokens.join(' ');
+};
+
+const NO_ALLERGY_PREFERENCE_VALUES = new Set([
+    'none',
+    'no allergy',
+    'no allergies',
+    'no known allergy',
+    'no known allergies',
+    'no_known_allergies',
+    'bilinen alerjim yok',
+]);
+const ALLERGY_KEYWORDS = ['allergy', 'allergic', 'alerji', 'alerjik', 'intolerant', 'intolerance', 'cannot eat', "can't eat", 'cant eat', 'avoid'];
+const ALLERGEN_GROUPS = [
+    { label: 'peanut', terms: ['peanut', 'peanuts', 'yer fıstığı', 'yer fistik', 'fıstık', 'fistik'] },
+    { label: 'tree nuts', terms: ['almond', 'walnut', 'hazelnut', 'cashew', 'pistachio', 'pecan', 'badem', 'ceviz', 'fındık', 'findik', 'kaju', 'antep fıstığı'] },
+    { label: 'milk', terms: ['milk', 'dairy', 'whey', 'casein', 'butter', 'cheese', 'cream', 'yogurt', 'süt', 'sut', 'peynir', 'yoğurt', 'yogurt', 'tereyağ', 'tereyag', 'krema', 'kazein'] },
+    { label: 'lactose', terms: ['lactose', 'laktoz', 'milk', 'dairy', 'whey', 'casein', 'süt', 'sut'] },
+    { label: 'egg', terms: ['egg', 'eggs', 'yumurta'] },
+    { label: 'soy', terms: ['soy', 'soya'] },
+    { label: 'gluten', terms: ['gluten', 'wheat', 'buğday', 'bugday', 'barley', 'arpa', 'rye', 'çavdar', 'cavdar', 'malt'] },
+    { label: 'fish', terms: ['fish', 'balık', 'balik'] },
+    { label: 'shellfish', terms: ['shrimp', 'prawn', 'crab', 'lobster', 'shellfish', 'karides', 'yengeç', 'yengec', 'ıstakoz', 'istakoz'] },
+    { label: 'sesame', terms: ['sesame', 'susam'] },
+    { label: 'mustard', terms: ['mustard', 'hardal'] },
+    { label: 'celery', terms: ['celery', 'kereviz'] },
+    { label: 'lupin', terms: ['lupin', 'acı bakla', 'aci bakla'] },
+    { label: 'sulfites', terms: ['sulfite', 'sulphite', 'sülfit', 'sulfit'] }
+];
+const ALLERGEN_GROUP_BY_LABEL = new Map(
+    ALLERGEN_GROUPS.map((group) => [group.label, group])
+);
+
+const normalizeAllergyLabel = (value) => String(value || '').trim().toLowerCase().replace(/_/g, ' ');
+
+const resolveAllergyPreferenceLabel = (value) => {
+    const normalized = normalizeAllergyLabel(value);
+    if (!normalized || NO_ALLERGY_PREFERENCE_VALUES.has(normalized)) return '';
+    if (ALLERGEN_GROUP_BY_LABEL.has(normalized)) return normalized;
+    if (normalized === 'nuts' || normalized === 'nut') return 'tree nuts';
+    if (normalized === 'dairy') return 'milk';
+    return normalized;
+};
+
+const getAllergenTermsForLabels = (labels = []) => {
+    const terms = labels.flatMap((label) => {
+        const resolved = resolveAllergyPreferenceLabel(label);
+        const group = ALLERGEN_GROUP_BY_LABEL.get(resolved);
+        return group?.terms || [resolved];
+    });
+    return Array.from(new Set(terms.filter(Boolean)));
+};
+// Simple in-memory intent cache with optional persistence to avoid repeating identical assistant calls
+const DEFAULT_INTENT_CACHE_TTL_MS = 1000 * 60 * 60; // 1 hour
+const INTENT_CACHE_FORMAT_VERSION = 'v5';
+const INTENT_CACHE_STORAGE_KEY = `pricemate_intent_cache_${INTENT_CACHE_FORMAT_VERSION}`;
+const INTENT_CACHE_TTL_SETTING_KEY = 'pricemate_intent_cache_ttl_ms';
+
+const intentCache = new Map();
+
+const makeIntentKey = (intentSummary, barcode, userKey = 'guest', allergyKey = 'none') =>
+    `${INTENT_CACHE_FORMAT_VERSION}::USER:${String(userKey || 'guest').trim()}::ALLERGY:${String(allergyKey || 'none').trim()}::${String(intentSummary || '').trim()}::BARCODE:${String(barcode || '').trim()}`;
+
+const sanitizeAssistantReply = (value) => {
+    const text = String(value || '').replace(/\r\n/g, '\n').trim();
+    if (!text) return '';
+
+    const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
+    const kept = [];
+    let sourceAdded = false;
+
+    for (const line of lines) {
+        if (/^note\s*:/i.test(line)) {
+            continue;
+        }
+
+        if (/^source\s*:/i.test(line)) {
+            if (!sourceAdded) {
+                kept.push('Source: PriceMate');
+                sourceAdded = true;
+            }
+            continue;
+        }
+
+        kept.push(line);
+    }
+
+    // Keep source explicit and single-line for ingredient-style responses.
+    const looksLikeIngredientCheck = /ingredients?\s*:|allergens?\s*:|suitability\s*:|checks?(?:\s*for)?\s*:/i.test(text);
+    if (looksLikeIngredientCheck && !sourceAdded) {
+        kept.push('Source: PriceMate');
+    }
+
+    return kept.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+};
+
+const truncateText = (value, max = 140) => {
+    const text = String(value || '').replace(/\s+/g, ' ').trim();
+    if (text.length <= max) return text;
+    return `${text.slice(0, max).trim()}...`;
+};
+
+const emphasizeImportantIngredients = (value) => {
+    const text = String(value || '');
+    if (!text) return '';
+
+    const importantTerms = [
+        'sugar', 'glucose', 'fructose', 'syrup', 'corn syrup', 'honey', 'dextrose', 'sucrose',
+        'salt', 'sodium', 'msg', 'monosodium',
+        'caffeine', 'alcohol',
+        'gluten', 'wheat', 'barley', 'rye', 'malt',
+        'milk', 'dairy', 'lactose', 'whey', 'casein', 'butter', 'cheese', 'cream', 'yogurt',
+        'peanut', 'nuts', 'soy', 'egg', 'fish', 'shellfish', 'sesame',
+        'şeker', 'seker', 'glikoz', 'fruktoz', 'şurup', 'surup', 'bal',
+        'tuz', 'sodyum', 'kafein',
+        'buğday', 'bugday', 'arpa', 'çavdar', 'cavdar',
+        'süt', 'sut', 'laktoz', 'peynir', 'yoğurt', 'yogurt'
+    ];
+
+    const escaped = importantTerms
+        .map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        .sort((a, b) => b.length - a.length);
+
+    if (escaped.length === 0) return text;
+
+    const rx = new RegExp(`\\b(${escaped.join('|')})\\b`, 'giu');
+    return text.replace(rx, '**$1**');
+};
+
+const renderInlineBoldText = (value, keyPrefix = 'txt') => {
+    const parts = String(value || '').split(/(\*\*[^*]+\*\*)/g);
+    return parts.map((part, index) => {
+        if (/^\*\*[^*]+\*\*$/.test(part)) {
+            return (
+                <strong key={`${keyPrefix}-b-${index}`} className="font-black text-gray-900 dark:text-white">
+                    {part.slice(2, -2)}
+                </strong>
+            );
+        }
+        return <span key={`${keyPrefix}-t-${index}`}>{part}</span>;
+    });
+};
+
+const parseIngredientCardData = (value) => {
+    const text = String(value || '').replace(/\r\n/g, '\n').trim();
+    if (!text) return null;
+
+    const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
+    const data = {
+        product: '',
+        suitability: '',
+        checks: '',
+        triggers: '',
+        reasons: [],
+        ingredients: '',
+        allergens: '',
+        source: '',
+        tip: '',
+    };
+
+    let collectingReasons = false;
+
+    for (const line of lines) {
+        if (/^product\s*:/i.test(line)) {
+            data.product = line.replace(/^product\s*:/i, '').trim();
+            collectingReasons = false;
+            continue;
+        }
+        if (/^suitability\s*:/i.test(line)) {
+            data.suitability = line.replace(/^suitability\s*:/i, '').trim();
+            collectingReasons = false;
+            continue;
+        }
+        if (/^checks?(?:\s*for)?\s*:/i.test(line)) {
+            data.checks = line.replace(/^checks?(?:\s*for)?\s*:/i, '').trim();
+            collectingReasons = false;
+            continue;
+        }
+        if (/^triggers?\s*:/i.test(line)) {
+            data.triggers = line.replace(/^triggers?\s*:/i, '').trim();
+            collectingReasons = false;
+            continue;
+        }
+        if (/^reasons?\s*:/i.test(line)) {
+            collectingReasons = true;
+            const inlineReason = line.replace(/^reasons?\s*:/i, '').trim();
+            if (inlineReason) data.reasons.push(inlineReason);
+            continue;
+        }
+        if (/^ingredients?\s*:/i.test(line)) {
+            data.ingredients = line.replace(/^ingredients?\s*:/i, '').trim();
+            collectingReasons = false;
+            continue;
+        }
+        if (/^allergens?\s*:/i.test(line)) {
+            data.allergens = line.replace(/^allergens?\s*:/i, '').trim();
+            collectingReasons = false;
+            continue;
+        }
+        if (/^source\s*:/i.test(line)) {
+            data.source = line.replace(/^source\s*:/i, '').trim();
+            collectingReasons = false;
+            continue;
+        }
+        if (/^tip\s*:/i.test(line)) {
+            data.tip = line.replace(/^tip\s*:/i, '').trim();
+            collectingReasons = false;
+            continue;
+        }
+
+        if (collectingReasons) {
+            const cleaned = line.replace(/^\d+\.\s*/, '').replace(/^[-•]\s*/, '').trim();
+            if (cleaned) data.reasons.push(cleaned);
+        }
+    }
+
+    const looksStructured = !!data.suitability && (!!data.ingredients || data.reasons.length > 0);
+    if (!looksStructured) return null;
+    if (!data.source) data.source = 'PriceMate';
+    return data;
+};
+
+const hasFunctionalLocalStorage = () =>
+    typeof window !== 'undefined' &&
+    window.localStorage &&
+    typeof window.localStorage.getItem === 'function' &&
+    typeof window.localStorage.setItem === 'function';
+
+const readConfiguredTtl = () => {
+    try {
+        if (!hasFunctionalLocalStorage()) return DEFAULT_INTENT_CACHE_TTL_MS;
+        const raw = localStorage.getItem(INTENT_CACHE_TTL_SETTING_KEY);
+        if (!raw) return DEFAULT_INTENT_CACHE_TTL_MS;
+        const parsed = Number(raw);
+        if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_INTENT_CACHE_TTL_MS;
+        return parsed;
+    } catch {
+        return DEFAULT_INTENT_CACHE_TTL_MS;
+    }
+};
+
+const persistCacheToStorage = () => {
+    try {
+        if (!hasFunctionalLocalStorage()) return;
+        const obj = {};
+        for (const [k, v] of intentCache.entries()) {
+            obj[k] = v; // { value, expiresAt }
+        }
+        localStorage.setItem(INTENT_CACHE_STORAGE_KEY, JSON.stringify(obj));
+    } catch (e) {
+        // best-effort; don't block
+        console.debug('Failed to persist intent cache', e);
+    }
+};
+
+const hydrateCacheFromStorage = () => {
+    try {
+        if (!hasFunctionalLocalStorage()) return;
+        const raw = localStorage.getItem(INTENT_CACHE_STORAGE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        const now = Date.now();
+        for (const k of Object.keys(parsed)) {
+            const rec = parsed[k];
+            if (!rec || !rec.expiresAt) continue;
+            if (now > rec.expiresAt) continue;
+            intentCache.set(k, rec);
+        }
+    } catch (e) {
+        console.debug('Failed to hydrate intent cache', e);
+    }
+};
+
+// Initialize cache from storage on module load
+if (hasFunctionalLocalStorage()) {
+    hydrateCacheFromStorage();
+}
+
+const getCachedIntent = (key) => {
+    const rec = intentCache.get(key);
+    if (!rec) return null;
+    if (Date.now() > rec.expiresAt) {
+        intentCache.delete(key);
+        persistCacheToStorage();
+        return null;
+    }
+    return rec.value;
+};
+
+const setCachedIntent = (key, value, ttl) => {
+    try {
+        const effectiveTtl = Number.isFinite(Number(ttl)) ? Number(ttl) : readConfiguredTtl();
+        const rec = { value, expiresAt: Date.now() + effectiveTtl };
+        intentCache.set(key, rec);
+        persistCacheToStorage();
+    } catch (e) {
+        console.debug('Intent cache set failed', e);
+    }
+};
+
 import { useState, useEffect, useRef } from 'react';
-import { FiX, FiSend, FiMessageSquare, FiLoader, FiExternalLink, FiPackage, FiShoppingBag, FiPlus, FiTrash2, FiChevronLeft } from 'react-icons/fi';
+import { FiX, FiSend, FiList, FiLoader, FiExternalLink, FiPackage, FiShoppingBag, FiPlus, FiTrash2, FiChevronLeft, FiCpu, FiMapPin, FiCheckCircle, FiSearch, FiCamera, FiClipboard } from 'react-icons/fi';
 import OpenAI from "openai";
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { fetchProducts, fetchAllPrices, fetchIngredientsByBarcode, searchIngredientsByName, resolveCatalogProductForIngredients, ingredientPayloadFromAppwriteProduct } from '../utils/productUtils';
+import {
+    fetchProducts,
+    fetchAllPrices,
+    fetchIngredientsByBarcode,
+    searchIngredientsByName,
+    resolveCatalogProductForIngredients,
+    ingredientPayloadFromAppwriteProduct,
+    persistIngredientPayloadToCatalogProduct,
+    fetchOffCacheSnapshot,
+    normalizeOffCacheDoc,
+    resolveOffCacheProductForIngredients,
+    ingredientPayloadFromOffCache,
+} from '../utils/productUtils';
+import {
+    buildAiProfileCacheKey,
+    buildAiCheckFingerprint,
+    parseAiCheckResponse,
+    readStoredAiProfile,
+    readStoredAllergyProfile,
+    serializeAiCheckResponse,
+} from '../utils/aiCheckUtils';
+import { functions as appwriteFunctions } from '../lib/appwrite';
 import useCurrencyStore from '../stores/currencyStore';
 import useAuthStore from '../stores/authStore';
 import useChatStore, { CHAT_ERROR_MISSING_CONVERSATION_ID } from '../stores/chatStore';
+import { MobileHeader } from './MobilePageLayout';
 
-const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [] }) => {
+const AI_CHECK_FUNCTION_ID = import.meta.env.VITE_APPWRITE_FUNCTION_AI_CHECK || '';
+const AI_CHECK_MODE = import.meta.env.VITE_AI_CHECK_MODE || 'legacy';
+
+const runAiCheckFunction = async (payload) => {
+    if (AI_CHECK_MODE !== 'hybrid' || !AI_CHECK_FUNCTION_ID) return null;
+    try {
+        const execution = await appwriteFunctions.createExecution(
+            AI_CHECK_FUNCTION_ID,
+            JSON.stringify(payload),
+            false
+        );
+        if (!execution?.response) return null;
+        const parsed = JSON.parse(execution.response);
+        return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch (error) {
+        console.debug('AI check function unavailable, falling back locally:', error?.message || error);
+        return null;
+    }
+};
+
+const profileHasPersonalization = (profile = {}) =>
+    [
+        profile.dietaryPreferences,
+        profile.nutritionPriorities,
+        profile.avoidIngredients,
+        profile.preferredStores,
+        profile.preferredBrands,
+        profile.dislikedBrands,
+    ].some((items) => Array.isArray(items) && items.length > 0) ||
+    profile.budgetPreference !== 'balanced' ||
+    profile.responseStyle !== 'balanced';
+
+const formatAiProfileForPrompt = (profile = {}) => {
+    if (!profileHasPersonalization(profile)) {
+        return 'No optional AI shopping profile preferences saved.';
+    }
+
+    return [
+        `Dietary preferences: ${profile.dietaryPreferences?.join(', ') || 'none'}`,
+        `Nutrition priorities: ${profile.nutritionPriorities?.join(', ') || 'none'}`,
+        `Avoid ingredients: ${profile.avoidIngredients?.join(', ') || 'none'}`,
+        `Budget preference: ${profile.budgetPreference || 'balanced'}`,
+        `Preferred stores: ${profile.preferredStores?.join(', ') || 'none'}`,
+        `Preferred brands: ${profile.preferredBrands?.join(', ') || 'none'}`,
+        `Disliked brands: ${profile.dislikedBrands?.join(', ') || 'none'}`,
+        `Response style: ${profile.responseStyle || 'balanced'}`,
+    ].join('\n');
+};
+
+const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [], t }) => {
+    const extractBarcodeFromText = (value) => {
+        const match = String(value || '').match(/\[BARCODE:([\w\d-]+)\]/i);
+        return match ? match[1] : '';
+    };
+
+    const renderBarcodeProductCard = (barcode, key = 'barcode-card') => {
+        const product = allProducts.find((p) => String(p.barcode || '') === String(barcode || ''));
+        if (!barcode) return null;
+
+        if (!product) {
+            return (
+                <Link
+                    key={key}
+                    to={`/price-comparison/${barcode}`}
+                    className="mt-2 inline-flex items-center gap-1 rounded-full bg-brand-50 dark:bg-brand-900/30 px-3 py-1.5 text-xs font-bold text-brand-700 dark:text-brand-300 border border-brand-100 dark:border-brand-800/30"
+                >
+                    View Product <FiExternalLink size={12} />
+                </Link>
+            );
+        }
+
+        const sortedPrices = [...(product.prices || [])].sort((a, b) => a.price - b.price);
+        const best = sortedPrices.length > 0 ? sortedPrices[0] : null;
+
+        return (
+            <Link
+                key={key}
+                to={`/price-comparison/${barcode}`}
+                className="mt-2 block rounded-xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/10 overflow-hidden hover:shadow-md transition-all"
+            >
+                <div className="flex items-center gap-3 p-2.5">
+                    <div className="w-12 h-12 bg-white dark:bg-gray-800 rounded-lg flex items-center justify-center overflow-hidden border border-gray-100 dark:border-gray-900/50 shrink-0">
+                        {product.imageUrl ? (
+                            <img src={product.imageUrl} alt={product.name} className="w-full h-full object-contain" />
+                        ) : (
+                            <FiPackage className="text-gray-400 text-lg" />
+                        )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-gray-800 dark:text-white truncate">{product.name || product.productName}</p>
+                        {best ? (
+                            <p className="text-xs text-green-700 dark:text-green-300 font-black">
+                                {t('best', 'Best')}: {convert(best.price, 'TRY')} {getCurrencySymbol()}
+                            </p>
+                        ) : (
+                            <p className="text-xs text-gray-500">{t('no_price_info', 'No price info')}</p>
+                        )}
+                    </div>
+                </div>
+            </Link>
+        );
+    };
+
+    const renderIngredientCard = (data) => {
+        const productBarcode = extractBarcodeFromText(data.product);
+        const suitabilityLower = (data.suitability || '').toLowerCase();
+        const tone =
+            suitabilityLower.includes('not suitable') || suitabilityLower.includes('avoid')
+                ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                : suitabilityLower.includes('caution')
+                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                    : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300';
+
+        const shouldShowTriggers =
+            !!data.triggers &&
+            (suitabilityLower.includes('not suitable') ||
+                suitabilityLower.includes('avoid') ||
+                suitabilityLower.includes('caution'));
+
+        return (
+            <div className="my-1.5 rounded-2xl border border-brand-100 dark:border-brand-800/30 bg-gradient-to-br from-white to-brand-50/40 dark:from-gray-800 dark:to-brand-900/10 p-3 sm:p-4 shadow-soft">
+                <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-[0.18em] text-brand-600 dark:text-brand-300">{t('ai_ingredient_check', 'Ingredient Check')}</span>
+                    <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${tone}`}>
+                        {data.suitability || t('ai_status_unknown', 'Unknown')}
+                    </span>
+                </div>
+                {productBarcode ? renderBarcodeProductCard(productBarcode, `ingredient-${productBarcode}`) : null}
+                {data.checks && (
+                    <p className="mt-1 text-[11px] font-semibold text-gray-500 dark:text-gray-300">
+                        {t('ai_checks', 'Checks')}: {renderInlineBoldText(data.checks, 'ic-checks')}
+                    </p>
+                )}
+                {shouldShowTriggers && (
+                    <p className="mt-1.5 text-[11px] font-semibold text-gray-500 dark:text-gray-300">
+                        {t('ai_triggers', 'Detected')}: {renderInlineBoldText(data.triggers, 'ic-triggers')}
+                    </p>
+                )}
+                {data.reasons.length > 0 && (
+                    <div className="mt-3">
+                        <p className="text-[11px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">{t('ai_reasons', 'Reasons')}</p>
+                        <ol className="mt-1 space-y-1 text-[13px] text-gray-700 dark:text-gray-200">
+                            {data.reasons.map((reason, index) => (
+                                <li key={`reason-${index}`} className="leading-5">
+                                    <span className="font-black mr-1.5">{index + 1}.</span>
+                                    {renderInlineBoldText(reason, `ic-reason-${index}`)}
+                                </li>
+                            ))}
+                        </ol>
+                    </div>
+                )}
+                <details className="mt-3 rounded-2xl border border-gray-100 bg-white/70 dark:border-gray-700/70 dark:bg-gray-900/30 px-3 py-2 group">
+                    <summary className="cursor-pointer list-none text-[11px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                        {t('ai_ingredients_allergens', 'Ingredients & allergens')}
+                    </summary>
+                    <div className="mt-2 space-y-2">
+                        <p className="text-[12px] leading-5 text-gray-700 dark:text-gray-200">
+                            <span className="font-black text-gray-500 dark:text-gray-400">{t('ai_ingredients', 'Ingredients')}: </span>
+                            {renderInlineBoldText(data.ingredients || t('ai_no_ingredients', 'No ingredients listed'), 'ic-ingredients')}
+                        </p>
+                        <p className="text-[12px] leading-5 text-gray-700 dark:text-gray-200">
+                            <span className="font-black text-gray-500 dark:text-gray-400">{t('ai_allergens', 'Allergens')}: </span>
+                            {renderInlineBoldText(data.allergens || t('ai_no_allergens', 'No allergens listed'), 'ic-allergens')}
+                        </p>
+                    </div>
+                </details>
+                <p className="mt-3 text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                    {t('ai_source_pricemate', 'Source: PriceMate')}
+                </p>
+                {data.tip && (
+                    <p className="mt-2 rounded-2xl bg-brand-50 px-3 py-2 text-[11px] font-bold text-brand-700 dark:bg-brand-900/20 dark:text-brand-300">
+                        {data.tip}
+                    </p>
+                )}
+            </div>
+        );
+    };
+
+    const statusLabel = (status) => {
+        if (status === 'avoid') return t('ai_status_avoid', 'Not suitable');
+        if (status === 'caution') return t('ai_status_caution', 'Use caution');
+        if (status === 'safe') return t('ai_status_safe', 'Likely suitable');
+        if (status === 'ok') return t('available', 'Available');
+        return t('ai_status_unknown', 'Unknown');
+    };
+
+    const checkLabel = (value) => {
+        const labels = {
+            high_sugar: t('check_sugar', 'sugar'),
+            high_sodium: t('check_sodium', 'sodium'),
+            high_caffeine: t('check_caffeine', 'caffeine'),
+            allergy: t('condition_allergy', 'allergy'),
+            gluten: t('condition_gluten', 'gluten'),
+            lactose: t('condition_lactose', 'lactose'),
+            pregnancy: t('condition_pregnancy', 'pregnancy'),
+            ingredients: t('ai_ingredients', 'ingredients'),
+        };
+        return labels[value] || String(value || '').replace(/_/g, ' ');
+    };
+
+    const renderStructuredIngredientCard = (result) => {
+        const product = result.product || {};
+        const check = result.ingredientCheck || {};
+        const checks = Array.isArray(check.checks) ? check.checks : [];
+        const checkNames = check.allergenTargets?.length
+            ? checks.filter((item) => item !== 'allergy')
+            : checks;
+        return renderIngredientCard({
+            product: product.barcode
+                ? `${product.name || t('unknown_product', 'Unknown Product')} [BARCODE:${product.barcode}]`
+                : (product.name || t('unknown_product', 'Unknown Product')),
+            suitability: statusLabel(check.status || result.status),
+            checks: [
+                ...checkNames.map(checkLabel),
+                ...(check.allergenTargets?.length ? [`allergy (${check.allergenTargets.join(', ')})`] : []),
+            ].join(', '),
+            reasons: check.reasons || result.reasons || [],
+            ingredients: emphasizeImportantIngredients(truncateText(check.ingredients || t('ai_no_ingredients', 'No ingredients listed'), 180)),
+            allergens: emphasizeImportantIngredients(
+                Array.isArray(check.allergens) && check.allergens.length > 0
+                    ? truncateText(check.allergens.join(', '), 120)
+                    : t('ai_no_allergens', 'No allergens listed')
+            ),
+            source: 'PriceMate',
+        });
+    };
+
+    const renderStructuredPriceCard = (result) => {
+        const product = result.product || {};
+        const check = result.priceCheck || {};
+        const rows = Array.isArray(check.items) ? check.items : [];
+        const headline = check.type === 'highest' ? check.highest : check.best;
+        const tone = result.errorCode
+            ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+            : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300';
+
+        return (
+            <div className="my-1.5 rounded-2xl border border-brand-100 dark:border-brand-800/30 bg-gradient-to-br from-white to-brand-50/40 dark:from-gray-800 dark:to-brand-900/10 p-3 sm:p-4 shadow-soft">
+                <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-[0.18em] text-brand-600 dark:text-brand-300">{t('ai_price_check', 'Price Check')}</span>
+                    <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${tone}`}>
+                        {result.stale ? t('cached', 'Cached') : statusLabel(result.status)}
+                    </span>
+                </div>
+                {product.barcode ? renderBarcodeProductCard(product.barcode, `price-${product.barcode}`) : null}
+                <div className="mt-3">
+                    <p className="text-sm font-black text-gray-900 dark:text-white">
+                        {product.name || t('product', 'Product')}
+                    </p>
+                    {headline ? (
+                        <p className="mt-1 text-[13px] font-semibold text-gray-700 dark:text-gray-200">
+                            {check.type === 'highest' ? t('highest', 'Highest') : t('best', 'Best')}: <strong>{convert(headline.price, headline.currency || 'TRY')} {getCurrencySymbol()}</strong>
+                            <span className="text-gray-400"> {t('at_store', 'at')} {headline.supermarketName || t('store', 'Store')}</span>
+                        </p>
+                    ) : (
+                        <p className="mt-1 text-[13px] font-semibold text-amber-700 dark:text-amber-300">
+                            {result.reasons?.[0] || t('price_temporarily_unavailable', 'Price temporarily unavailable.')}
+                        </p>
+                    )}
+                </div>
+                {rows.length > 0 && (
+                    <div className="mt-3 space-y-1.5">
+                        {rows.slice(0, 4).map((item, index) => (
+                            <div
+                                key={`${item.supermarketId || item.supermarketName || 'store'}-${index}`}
+                                className="flex items-center justify-between gap-3 rounded-xl bg-white/70 dark:bg-gray-900/40 border border-gray-100 dark:border-gray-700/60 px-3 py-2"
+                            >
+                                <span className="min-w-0 truncate text-[12px] font-bold text-gray-700 dark:text-gray-200">
+                                    {item.supermarketName || t('store', 'Store')}
+                                    {item.isPreferredStore ? (
+                                        <span className="ml-1 rounded-full bg-brand-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
+                                            {t('preferred', 'preferred')}
+                                        </span>
+                                    ) : null}
+                                </span>
+                                <span className="shrink-0 text-[13px] font-black text-gray-900 dark:text-white">
+                                    {convert(item.price, item.currency || 'TRY')} {getCurrencySymbol()}
+                                </span>
+                            </div>
+                        ))}
+                        {product.barcode && rows.length > 4 && (
+                            <Link
+                                to={`/price-comparison/${product.barcode}`}
+                                className="mt-2 inline-flex min-h-10 items-center rounded-full bg-brand-50 px-3 text-[11px] font-black uppercase tracking-widest text-brand-700 dark:bg-brand-900/30 dark:text-brand-300"
+                            >
+                                {t('view_all_prices', 'View all prices')}
+                            </Link>
+                        )}
+                    </div>
+                )}
+                <p className="mt-3 text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                    {t('ai_source_pricemate', 'Source: PriceMate')}
+                </p>
+            </div>
+        );
+    };
+
+    const renderStructuredAiCheck = (result) => {
+        if (result.mode === 'price_check') return renderStructuredPriceCard(result);
+        if (result.mode === 'ingredient_safety') return renderStructuredIngredientCard(result);
+        return null;
+    };
+
     const renderContent = (content) => {
+        const structuredAiCheck = msg.role === 'assistant' ? parseAiCheckResponse(content) : null;
+        if (structuredAiCheck) {
+            return renderStructuredAiCheck(structuredAiCheck);
+        }
+
         // First step: CLEANING
         // 1. Remove redundancy: remove lines that the cards will handle
         let text = content;
@@ -23,6 +675,11 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [] }) => {
         // Remove empty lines created by removals
         text = text.replace(/\n\s*\n/g, '\n').trim();
 
+        const ingredientCardData = msg.role === 'assistant' ? parseIngredientCardData(text) : null;
+        if (ingredientCardData) {
+            return renderIngredientCard(ingredientCardData);
+        }
+
         // 2. PARSING TAGS
         const barcodeRegex = /\[(?:BARCODE|ID):([\w\d-]+)\]/g;
         const parts = text.split(barcodeRegex);
@@ -32,7 +689,7 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [] }) => {
 
         return parts.map((part, i) => {
             if (i % 2 === 0) {
-                return part;
+                return <span key={`msg-part-${i}`}>{renderInlineBoldText(part, `plain-${i}`)}</span>;
             } else {
                 const barcode = part;
                 const product = allProducts.find(p => p.barcode === barcode);
@@ -43,7 +700,7 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [] }) => {
                     const highestPrice = sortedPrices.length > 0 ? sortedPrices[sortedPrices.length - 1] : null;
                     
                     const priceToShow = isMostExpensiveRequest ? highestPrice : lowestPrice;
-                    const badgeText = isMostExpensiveRequest ? "Most Expensive" : (isCheapestRequest ? "Cheapest" : null);
+                    const badgeText = isMostExpensiveRequest ? t('most_expensive', 'Most Expensive') : (isCheapestRequest ? t('cheapest', 'Cheapest') : null);
                     const badgeColor = isMostExpensiveRequest ? "bg-red-600" : "bg-green-600";
 
                     return (
@@ -62,7 +719,7 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [] }) => {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-1.5 mb-0.5">
-                                        <h4 className="text-sm font-bold text-gray-800 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                                        <h4 className="text-sm font-bold text-gray-800 dark:text-white truncate group-hover:text-brand-600 dark:group-hover:text-brand-500">
                                             {product.name || product.productName}
                                         </h4>
                                         {badgeText && (
@@ -72,7 +729,7 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [] }) => {
                                     {priceToShow ? (
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-baseline gap-1">
-                                                <span className="text-xs text-gray-500 dark:text-gray-400">{isMostExpensiveRequest ? 'High:' : 'Best:'}</span>
+                                                <span className="text-xs text-gray-500 dark:text-gray-400">{isMostExpensiveRequest ? t('high', 'High') : t('best', 'Best')}:</span>
                                                 <span className={`text-base font-black ${isMostExpensiveRequest ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
                                                     {convert(priceToShow.price, 'TRY')} {getCurrencySymbol()}
                                                 </span>
@@ -80,12 +737,12 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [] }) => {
                                             <div className="flex items-center gap-1 text-[10px] font-bold text-gray-500 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-700">
                                                 <FiShoppingBag className="shrink-0" size={10} />
                                                 <span className="truncate max-w-[70px]">
-                                                    {Array.isArray(priceToShow.supermarkets) ? priceToShow.supermarkets[0]?.name : (priceToShow.supermarketName || "Store")}
+                                                    {Array.isArray(priceToShow.supermarkets) ? priceToShow.supermarkets[0]?.name : (priceToShow.supermarketName || t('store', 'Store'))}
                                                 </span>
                                             </div>
                                         </div>
                                     ) : (
-                                        <span className="text-[10px] text-gray-500 italic">No price info</span>
+                                        <span className="text-[10px] text-gray-500 italic">{t('no_price_info', 'No price info')}</span>
                                     )}
                                 </div>
                             </div>
@@ -100,7 +757,7 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [] }) => {
                         to={`/price-comparison/${barcode}`}
                         className="inline-flex items-center gap-0.5 bg-white/20 hover:bg-white/30 px-1.5 py-0.5 rounded text-xs font-bold underline transition-colors"
                     >
-                        View Product <FiExternalLink size={10} />
+                        {t('view_product', 'View Product')} <FiExternalLink size={10} />
                     </Link>
                 );
             }
@@ -109,12 +766,12 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [] }) => {
 
     return (
         <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[85%] p-3 rounded-2xl ${
+            <div className={`max-w-[92%] sm:max-w-[85%] px-3.5 py-2.5 sm:p-3 rounded-[1.25rem] ${
                 msg.role === 'user' 
-                    ? 'bg-blue-600 text-white rounded-tr-none shadow-md' 
+                    ? 'bg-brand-600 text-white rounded-tr-none shadow-md' 
                     : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 shadow-sm border border-gray-100 dark:border-gray-700 rounded-tl-none'
             }`}>
-                <div className="text-sm leading-relaxed whitespace-pre-wrap">
+                <div className="text-[15px] sm:text-sm leading-6 whitespace-pre-wrap">
                     {renderContent(msg.content)}
                 </div>
             </div>
@@ -126,25 +783,53 @@ const SUGAR_THRESHOLD_G_PER_100G = 22.5;
 const SODIUM_THRESHOLD_MG_PER_100G = 600;
 const CAFFEINE_THRESHOLD_MG_PER_L = 150;
 
+const DIETARY_RESTRICTION_TERMS = {
+    vegan: ['milk', 'dairy', 'lactose', 'whey', 'casein', 'butter', 'cheese', 'cream', 'yogurt', 'egg', 'honey', 'gelatin', 'süt', 'sut', 'yumurta', 'bal', 'jelatin'],
+    vegetarian: ['beef', 'chicken', 'pork', 'fish', 'shellfish', 'meat', 'gelatin', 'beef gelatin', 'tavuk', 'sığır', 'sigir', 'domuz', 'balık', 'balik', 'jelatin'],
+    halal: ['pork', 'bacon', 'ham', 'lard', 'alcohol', 'wine', 'beer', 'gelatin', 'domuz', 'alkol', 'şarap', 'sarap', 'bira', 'jelatin'],
+    kosher: ['pork', 'bacon', 'ham', 'lard', 'shellfish', 'shrimp', 'crab', 'lobster', 'domuz', 'karides', 'yengeç', 'yengec'],
+};
+
 /** Prefer products that match the user message; fall back to a short sample (prompt cap + relevance). */
-const buildRankedProductContextLines = (products, userHint) => {
+const buildRankedProductContextLines = (products, userHint, aiProfile = {}) => {
     const norm = (s) =>
         String(s || '')
             .toLowerCase()
             .replace(/[^a-z0-9ğüşöçı]/gi, ' ');
     const words = new Set(norm(userHint).split(/\s+/).filter((w) => w.length > 2));
+    const avoidWords = new Set(
+        (Array.isArray(aiProfile.avoidIngredients) ? aiProfile.avoidIngredients : [])
+            .flatMap((term) => norm(term).split(/\s+/))
+            .filter((w) => w.length > 2)
+            .slice(0, 24)
+    );
+    const dietaryBoostWords = new Set(
+        (Array.isArray(aiProfile.dietaryPreferences) ? aiProfile.dietaryPreferences : [])
+            .flatMap((pref) => {
+                const key = String(pref || '').toLowerCase();
+                if (key === 'vegan') return ['vegan'];
+                if (key === 'vegetarian') return ['vegetarian', 'veggie'];
+                return [];
+            })
+    );
     const scored = products.map((p) => {
-        const blob = norm(`${p.name || ''} ${p.productName || ''}`);
+        const blob = norm(`${p.name || ''} ${p.productName || ''} ${p.categoryId?.categoryName || ''}`);
         let score = 0;
         for (const w of words) {
             if (blob.includes(w)) score++;
+        }
+        for (const w of dietaryBoostWords) {
+            if (blob.includes(w)) score += 2;
+        }
+        for (const w of avoidWords) {
+            if (blob.includes(w)) score -= 1;
         }
         return { p, score };
     });
     scored.sort((a, b) => b.score - a.score);
     const picked = scored.filter((x) => x.score > 0).slice(0, 25).map((x) => x.p);
     const list = picked.length > 0 ? picked : products.slice(0, 15);
-    return list
+        return list
         .map((p) => {
             const category = Array.isArray(p.categoryId)
                 ? p.categoryId[0]?.categoryName
@@ -158,14 +843,15 @@ const buildRankedProductContextLines = (products, userHint) => {
                 })
                 .join(', ');
             const barcodeTag = p.barcode || p.code || p.$id || '';
-            return `- [BARCODE:${barcodeTag}] ${p.name || p.productName}: [${category}] ${priceDetails || 'No current price'}`;
+            const sourceTag = p.is_off_cache || p.is_global ? 'OpenFoodFacts' : 'PriceMate';
+            return `- [SOURCE:${sourceTag}] [BARCODE:${barcodeTag}] ${p.name || p.productName}: [${category}] ${priceDetails || 'No current price'}`;
         })
         .join('\n');
 };
 
-const AIChatBox = ({ isOpen, onClose }) => {
-    const { t } = useTranslation();
-    const { convert, getCurrencySymbol } = useCurrencyStore();
+const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
+    const { t, i18n } = useTranslation();
+    const { convert, getCurrencySymbol, currency } = useCurrencyStore();
     const user = useAuthStore(state => state.user);
     const {
         messages: history,
@@ -188,6 +874,70 @@ const AIChatBox = ({ isOpen, onClose }) => {
     const [mobileListOpen, setMobileListOpen] = useState(false);
     const [fullProductList, setFullProductList] = useState([]);
     const messagesEndRef = useRef(null);
+    const inputRef = useRef(null);
+    const formRef = useRef(null);
+    const quickPromptsRowRef = useRef(null);
+
+    useEffect(() => {
+        if (!quickPromptsRowRef.current) return;
+        // iOS can preserve horizontal scroll position; always start at the beginning.
+        try {
+            quickPromptsRowRef.current.scrollTo({ left: 0 });
+        } catch {
+            quickPromptsRowRef.current.scrollLeft = 0;
+        }
+    }, [activeConversationId, isLoading, input]);
+
+    const mobileQuickPrompts = [
+        {
+            key: 'cheapest',
+            Icon: FiMapPin,
+            label: t('ai_chat_quick_cheapest', 'Cheapest nearby'),
+            description: t('ai_chat_quick_cheapest_desc', 'Find the lowest available price.'),
+            prompt: t('ai_chat_prompt_cheapest_nearby', 'Find the cheapest nearby option'),
+        },
+        {
+            key: 'ingredients',
+            Icon: FiClipboard,
+            label: t('ai_chat_quick_ingredients', 'Check ingredients'),
+            description: t('ai_chat_quick_ingredients_desc', 'Review ingredients and key nutrition.'),
+            prompt: t('ai_chat_prompt_ingredients', 'Check ingredients for me'),
+        },
+        {
+            key: 'suitable',
+            Icon: FiCheckCircle,
+            label: t('ai_chat_quick_suitable', 'Suitable for me?'),
+            description: t('ai_chat_quick_suitable_desc', 'Use your saved allergies and preferences.'),
+            prompt: t('ai_chat_prompt_suitable', 'Is this suitable for me?'),
+        },
+        {
+            key: 'compare',
+            Icon: FiSearch,
+            label: t('ai_chat_quick_compare', 'Compare prices'),
+            description: t('ai_chat_quick_compare_desc', 'See stores ranked by price.'),
+            prompt: t('ai_chat_prompt_compare', 'Compare prices for this product'),
+        },
+        {
+            key: 'scan',
+            Icon: FiCamera,
+            label: t('ai_chat_quick_scan', 'Scan barcode'),
+            description: t('ai_chat_quick_scan_desc', 'Paste or scan a barcode to check.'),
+            prompt: t('ai_chat_prompt_scan_barcode', 'I scanned a product. Check this barcode: '),
+        },
+    ];
+
+    const mobileEmptyActions = mobileQuickPrompts.slice(0, 4);
+
+    const beginNewConversation = () => {
+        startNewConversation();
+        setMobileListOpen(false);
+    };
+
+    const applyQuickPrompt = (prompt) => {
+        if (!activeConversationId) beginNewConversation();
+        setInput(prompt);
+        requestAnimationFrame(() => inputRef.current?.focus());
+    };
 
     const maxChatIndex = conversationSummaries.reduce(
         (m, s) => Math.max(m, s.chatIndex ?? 0),
@@ -241,6 +991,13 @@ const AIChatBox = ({ isOpen, onClose }) => {
         if (!isOpen) setMobileListOpen(false);
     }, [isOpen]);
 
+    useEffect(() => {
+        const el = inputRef.current;
+        if (!el) return;
+        el.style.height = 'auto';
+        el.style.height = `${Math.min(el.scrollHeight, 132)}px`;
+    }, [input]);
+
     // Auto-scroll to bottom
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -254,9 +1011,10 @@ const AIChatBox = ({ isOpen, onClose }) => {
     useEffect(() => {
         const loadContext = async () => {
             try {
-                const [products, prices] = await Promise.all([
+                const [products, prices, offCache] = await Promise.all([
                     fetchProducts(50), 
-                    fetchAllPrices()
+                    fetchAllPrices(),
+                    fetchOffCacheSnapshot(20)
                 ]);
                 
                 // Keep the structural product list for the component to use
@@ -268,7 +1026,12 @@ const AIChatBox = ({ isOpen, onClose }) => {
                     return { ...p, prices: productPrices };
                 });
 
-                setFullProductList(productsWithData);
+                const offCacheProducts = (offCache || [])
+                    .map((doc) => normalizeOffCacheDoc(doc))
+                    .filter(Boolean)
+                    .map((p) => ({ ...p, prices: [] }));
+
+                setFullProductList([...productsWithData, ...offCacheProducts]);
             } catch (error) {
                 console.error("Error loading chat context:", error);
             }
@@ -286,7 +1049,7 @@ const AIChatBox = ({ isOpen, onClose }) => {
             .toLowerCase()
             .replace(/[^a-z0-9ğüşöçı]/gi, '');
 
-    const findProductMatch = (message) => {
+    const findProductMatch = (message, extraCandidates = []) => {
         const lowered = message.toLowerCase();
         let best = null;
         let bestLength = 0;
@@ -299,7 +1062,10 @@ const AIChatBox = ({ isOpen, onClose }) => {
             }
         };
 
-        fullProductList.forEach((product) => {
+        const primaryList = fullProductList;
+        const secondaryList = Array.isArray(extraCandidates) ? extraCandidates : [];
+
+        primaryList.forEach((product) => {
             const rawName = product.name || product.productName || '';
             const name = rawName.toLowerCase();
             if (!name) return;
@@ -315,13 +1081,31 @@ const AIChatBox = ({ isOpen, onClose }) => {
             }
         });
 
+        if (!best && secondaryList.length > 0) {
+            secondaryList.forEach((product) => {
+                const rawName = product.name || product.productName || '';
+                const name = rawName.toLowerCase();
+                if (!name) return;
+
+                if (lowered.includes(name)) {
+                    consider(product, name.length);
+                    return;
+                }
+
+                const nName = normalizeProductKey(rawName);
+                if (nName.length >= 4 && nMsg.includes(nName)) {
+                    consider(product, nName.length);
+                }
+            });
+        }
+
         if (!best && /\bcoke\b/i.test(lowered)) {
             const cokeMatch =
-                fullProductList.find((p) => {
+                primaryList.find((p) => {
                     const n = normalizeProductKey(p.name || p.productName || '');
                     return n.includes('coca') && n.includes('cola');
                 }) ||
-                fullProductList.find((p) =>
+                primaryList.find((p) =>
                     normalizeProductKey(p.name || p.productName || '').includes('coca')
                 );
             if (cokeMatch) best = cokeMatch;
@@ -335,17 +1119,27 @@ const AIChatBox = ({ isOpen, onClose }) => {
         return match ? match[1].trim() : '';
     };
 
-    const detectConditions = (message) => {
+    const getUserAllergyPreferences = () => {
+        const prefs = user?.prefs && typeof user.prefs === 'object' ? user.prefs : {};
+        return readStoredAllergyProfile(prefs).allergies;
+    };
+
+    const getUserAiProfile = () => {
+        const prefs = user?.prefs && typeof user.prefs === 'object' ? user.prefs : {};
+        return readStoredAiProfile(prefs).profile;
+    };
+
+    const detectConditions = (message, preferredAllergies = []) => {
         const lowered = message.toLowerCase();
         const conditions = new Set();
 
         const hasAny = (keywords) => keywords.some((word) => lowered.includes(word));
 
-        if (hasAny(['gluten', 'celiac', 'coeliac', 'çölyak', 'glutensiz'])) {
+        if (hasAny(['gluten', 'gluten free', 'gluten-free', 'celiac', 'coeliac', 'çölyak', 'glutensiz'])) {
             conditions.add('gluten');
         }
 
-        if (hasAny(['lactose', 'laktoz', 'dairy', 'süt', 'sut', 'yoğurt', 'yogurt', 'peynir'])) {
+        if (hasAny(['lactose', 'laktoz', 'lactose free', 'lactose-free', 'dairy free', 'dairy-free'])) {
             conditions.add('lactose');
         }
 
@@ -415,34 +1209,33 @@ const AIChatBox = ({ isOpen, onClose }) => {
             conditions.add('high_caffeine');
         }
 
-        const allergyKeywords = ['allergy', 'allergic', 'alerji', 'alerjik'];
-        const allergenGroups = [
-            { label: 'peanut', terms: ['peanut', 'peanuts', 'yer fıstığı', 'yer fistik', 'fıstık', 'fistik'] },
-            { label: 'tree nuts', terms: ['almond', 'walnut', 'hazelnut', 'cashew', 'pistachio', 'pecan', 'badem', 'ceviz', 'fındık', 'findik', 'kaju', 'antep fıstığı'] },
-            { label: 'milk', terms: ['milk', 'dairy', 'lactose', 'whey', 'casein', 'butter', 'cheese', 'cream', 'yogurt', 'süt', 'sut', 'laktoz', 'peynir', 'yoğurt', 'yogurt', 'tereyağ', 'tereyag', 'krema', 'kazein'] },
-            { label: 'egg', terms: ['egg', 'eggs', 'yumurta'] },
-            { label: 'soy', terms: ['soy', 'soya'] },
-            { label: 'wheat', terms: ['wheat', 'buğday', 'bugday', 'gluten', 'barley', 'arpa', 'rye', 'çavdar', 'cavdar', 'malt'] },
-            { label: 'fish', terms: ['fish', 'balık', 'balik'] },
-            { label: 'shellfish', terms: ['shrimp', 'prawn', 'crab', 'lobster', 'shellfish', 'karides', 'yengeç', 'yengec', 'ıstakoz', 'istakoz'] },
-            { label: 'sesame', terms: ['sesame', 'susam'] },
-            { label: 'mustard', terms: ['mustard', 'hardal'] },
-            { label: 'celery', terms: ['celery', 'kereviz'] },
-            { label: 'lupin', terms: ['lupin', 'acı bakla', 'aci bakla'] },
-            { label: 'sulfites', terms: ['sulfite', 'sulphite', 'sülfit', 'sulfit'] }
+        const preferenceAllergenTargets = Array.from(
+            new Set(
+                (Array.isArray(preferredAllergies) ? preferredAllergies : [])
+                    .map((item) => resolveAllergyPreferenceLabel(item))
+                    .filter(Boolean)
+            )
+        );
+
+        const explicitAllergyIntent = hasAny(ALLERGY_KEYWORDS);
+        const allergySafetyKeywords = [
+            'ingredient', 'ingredients', 'allergen', 'allergens', 'içerik', 'icerik', 'içindekiler',
+            'suitable', 'uygun', 'safe', 'güvenli', 'guvenli', 'contains', 'has', 'good for me', 'better for me'
         ];
+        const allergySafetyIntent = explicitAllergyIntent || hasAny(allergySafetyKeywords);
+        // Personal safety verdicts must come from the saved profile. Mentioning
+        // "milk" in a question should not turn into a personal milk allergy.
+        const allergenTargets = allergySafetyIntent
+            ? Array.from(new Set(preferenceAllergenTargets))
+            : [];
 
-        const allergenTargets = allergenGroups
-            .filter((group) => group.terms.some((term) => lowered.includes(term)))
-            .map((group) => group.label);
-
-        if (hasAny(allergyKeywords) || allergenTargets.length > 0) {
+        if (allergySafetyIntent && preferenceAllergenTargets.length > 0) {
             conditions.add('allergy');
         }
 
         const medicalKeywords = [
             'ingredient', 'ingredients', 'allergen', 'allergens', 'içerik', 'icerik', 'içindekiler', 'suitable', 'uygun', 'safe', 'güvenli',
-            'sugar', 'sugary', 'şeker', 'seker', 'sodium', 'sodyum', 'salt', 'tuz', 'caffeine', 'kafein'
+            'good for me', 'better for me', 'sugar', 'sugary', 'şeker', 'seker', 'sodium', 'sodyum', 'salt', 'tuz', 'caffeine', 'kafein'
         ];
         const isMedical = hasAny(medicalKeywords) || conditions.size > 0;
 
@@ -465,7 +1258,7 @@ const AIChatBox = ({ isOpen, onClose }) => {
             'is', 'this', 'that', 'product', 'for', 'with', 'can', 'i', 'eat', 'drink', 'safe', 'suitable',
             'ingredients', 'ingredient', 'contains', 'has', 'please', 'need', 'check', 'about', 'my', 'me', 'the',
             'a', 'an', 'of', 'in', 'on', 'too', 'very', 'really', 'much', 'many', 'lot',
-            'sugar', 'sugary', 'salt', 'sodium', 'caffeine', 'high', 'low', 'level', 'content', 'amount',
+            'good', 'better', 'sugar', 'sugary', 'salt', 'sodium', 'caffeine', 'high', 'low', 'level', 'content', 'amount',
             'bu', 'şu', 'su', 'ürün', 'urun', 'icerik', 'içerik', 'içindekiler', 'uygun', 'güvenli', 'var', 'mi',
             'nedir', 'içinde', 'kadar',
         ]);
@@ -481,11 +1274,12 @@ const AIChatBox = ({ isOpen, onClose }) => {
         return cleaned.length >= 3 ? cleaned : '';
     };
 
-    const evaluateSuitability = (payload, conditions, allergenTargets) => {
+    const evaluateSuitability = (payload, conditions, allergenTargets, aiProfile = {}) => {
         if (!payload) {
             return {
                 status: 'unknown',
-                reasons: [t('ai_reason_no_ingredients')]
+                reasons: [t('ai_reason_no_ingredients')],
+                triggers: { allergy: [], avoidIngredients: [], dietary: {} },
             };
         }
 
@@ -502,13 +1296,15 @@ const AIChatBox = ({ isOpen, onClose }) => {
         if (!hasIngredientBlob && !hasNutriments) {
             return {
                 status: 'unknown',
-                reasons: [t('ai_reason_no_ingredients')]
+                reasons: [t('ai_reason_no_ingredients')],
+                triggers: { allergy: [], avoidIngredients: [], dietary: {} },
             };
         }
 
         const severityRank = { safe: 0, caution: 1, avoid: 2 };
         let status = 'safe';
         const reasons = [];
+        const triggers = { allergy: [], avoidIngredients: [], dietary: {} };
 
         const bumpStatus = (next) => {
             if (severityRank[next] > severityRank[status]) {
@@ -527,25 +1323,41 @@ const AIChatBox = ({ isOpen, onClose }) => {
             return `${limited.join(', ')}${matches.length > 6 ? '...' : ''}`;
         };
 
-        const formatThresholdReason = (nutrientLabel, valueText, thresholdText, isHigh) =>
-            isHigh
-                ? t('ai_reason_above_threshold', { nutrient: nutrientLabel, value: valueText, threshold: thresholdText })
-                : t('ai_reason_below_threshold', { nutrient: nutrientLabel, value: valueText, threshold: thresholdText });
+        const formatNutrientLevel = (nutrientLabel, valueText, isHigh) =>
+            `${nutrientLabel}: ${isHigh ? 'high' : 'within limit'} (${valueText})`;
 
-        const formatMissingNutrition = (nutrientLabel) =>
-            t('ai_reason_nutrition_missing', { nutrient: nutrientLabel });
+        const profileAvoids = Array.isArray(aiProfile.avoidIngredients) ? aiProfile.avoidIngredients : [];
+        const avoidMatches = collectMatches(profileAvoids);
+        if (avoidMatches.length > 0) {
+            reasons.push(`Preference: avoid ingredient found (${formatMatches(avoidMatches)})`);
+            triggers.avoidIngredients = avoidMatches;
+            bumpStatus('caution');
+        }
+
+        for (const dietary of aiProfile.dietaryPreferences || []) {
+            const terms = DIETARY_RESTRICTION_TERMS[dietary] || [];
+            const matches = collectMatches(terms);
+            if (matches.length > 0) {
+                reasons.push(`Preference (${dietary}): may not match (${formatMatches(matches)})`);
+                triggers.dietary[dietary] = matches;
+                bumpStatus('caution');
+            }
+        }
 
         if (conditions.includes('allergy')) {
             if (allergenTargets.length > 0) {
-                const matches = collectMatches(allergenTargets);
+                const allergyTerms = getAllergenTermsForLabels(allergenTargets);
+                const matches = collectMatches(allergyTerms);
                 if (matches.length > 0) {
                     reasons.push(`${t('condition_allergy')}: ${t('ai_reason_found', { items: formatMatches(matches) })}`);
+                    triggers.allergy = matches;
                     bumpStatus('avoid');
                 } else {
                     reasons.push(`${t('condition_allergy')}: ${t('ai_reason_none_found', { items: allergenTargets.join(', ') })}`);
                 }
             } else if (payload.allergens?.length > 0) {
                 reasons.push(`${t('condition_allergy')}: ${t('ai_reason_found', { items: formatMatches(payload.allergens) })}`);
+                triggers.allergy = payload.allergens.slice(0, 10);
                 bumpStatus('caution');
             }
         }
@@ -584,20 +1396,19 @@ const AIChatBox = ({ isOpen, onClose }) => {
             const labelKey = conditions.includes('diabetes') ? 'condition_diabetes' : 'condition_high_sugar';
             if (sugarPer100g !== null && sugarPer100g !== undefined) {
                 const valueText = `${Number(sugarPer100g).toFixed(1)}g/100g`;
-                const thresholdText = `${SUGAR_THRESHOLD_G_PER_100G}g/100g`;
                 const isHigh = sugarPer100g >= SUGAR_THRESHOLD_G_PER_100G;
-                reasons.push(`${t(labelKey)}: ${formatThresholdReason(t('nutrient_sugar'), valueText, thresholdText, isHigh)}`);
+                reasons.push(`${t(labelKey)}: ${formatNutrientLevel(t('nutrient_sugar'), valueText, isHigh)}`);
                 if (isHigh) bumpStatus('caution');
             } else if (hasIngredientBlob) {
                 const matches = collectMatches(sugarTerms);
                 if (matches.length > 0) {
-                    reasons.push(`${t(labelKey)}: ${t('ai_reason_found', { items: formatMatches(matches) })}`);
+                    reasons.push(`${t(labelKey)}: ${t('nutrient_sugar')} found in ingredients (${formatMatches(matches)})`);
                     bumpStatus('caution');
                 } else {
-                    reasons.push(`${t(labelKey)}: ${t('ai_reason_none_found', { items: t('nutrient_sugar') })}`);
+                    reasons.push(`${t(labelKey)}: ${t('nutrient_sugar')} not listed`);
                 }
             } else {
-                reasons.push(`${t(labelKey)}: ${formatMissingNutrition(t('nutrient_sugar'))}`);
+                reasons.push(`${t(labelKey)}: ${t('nutrient_sugar')} unknown`);
             }
         }
 
@@ -605,20 +1416,19 @@ const AIChatBox = ({ isOpen, onClose }) => {
             const labelKey = conditions.includes('hypertension') ? 'condition_hypertension' : 'condition_high_sodium';
             if (sodiumMgPer100g !== null && sodiumMgPer100g !== undefined) {
                 const valueText = `${Math.round(sodiumMgPer100g)}mg/100g`;
-                const thresholdText = `${SODIUM_THRESHOLD_MG_PER_100G}mg/100g`;
                 const isHigh = sodiumMgPer100g >= SODIUM_THRESHOLD_MG_PER_100G;
-                reasons.push(`${t(labelKey)}: ${formatThresholdReason(t('nutrient_sodium'), valueText, thresholdText, isHigh)}`);
+                reasons.push(`${t(labelKey)}: ${formatNutrientLevel(t('nutrient_sodium'), valueText, isHigh)}`);
                 if (isHigh) bumpStatus('caution');
             } else if (hasIngredientBlob) {
                 const matches = collectMatches(sodiumTerms);
                 if (matches.length > 0) {
-                    reasons.push(`${t(labelKey)}: ${t('ai_reason_found', { items: formatMatches(matches) })}`);
+                    reasons.push(`${t(labelKey)}: ${t('nutrient_sodium')} found in ingredients (${formatMatches(matches)})`);
                     bumpStatus('caution');
                 } else {
-                    reasons.push(`${t(labelKey)}: ${t('ai_reason_none_found', { items: t('nutrient_sodium') })}`);
+                    reasons.push(`${t(labelKey)}: ${t('nutrient_sodium')} not listed`);
                 }
             } else {
-                reasons.push(`${t(labelKey)}: ${formatMissingNutrition(t('nutrient_sodium'))}`);
+                reasons.push(`${t(labelKey)}: ${t('nutrient_sodium')} unknown`);
             }
         }
 
@@ -626,20 +1436,19 @@ const AIChatBox = ({ isOpen, onClose }) => {
             const labelKey = 'condition_high_caffeine';
             if (caffeineMgPerL !== null && caffeineMgPerL !== undefined) {
                 const valueText = `${Math.round(caffeineMgPerL)}mg/L`;
-                const thresholdText = `${CAFFEINE_THRESHOLD_MG_PER_L}mg/L`;
                 const isHigh = caffeineMgPerL >= CAFFEINE_THRESHOLD_MG_PER_L;
-                reasons.push(`${t(labelKey)}: ${formatThresholdReason(t('nutrient_caffeine'), valueText, thresholdText, isHigh)}`);
+                reasons.push(`${t(labelKey)}: ${formatNutrientLevel(t('nutrient_caffeine'), valueText, isHigh)}`);
                 if (isHigh) bumpStatus('caution');
             } else if (hasIngredientBlob) {
                 const matches = collectMatches(caffeineTerms);
                 if (matches.length > 0) {
-                    reasons.push(`${t(labelKey)}: ${t('ai_reason_found', { items: formatMatches(matches) })}`);
+                    reasons.push(`${t(labelKey)}: ${t('nutrient_caffeine')} found in ingredients (${formatMatches(matches)})`);
                     bumpStatus('caution');
                 } else {
-                    reasons.push(`${t(labelKey)}: ${t('ai_reason_none_found', { items: t('nutrient_caffeine') })}`);
+                    reasons.push(`${t(labelKey)}: ${t('nutrient_caffeine')} not listed`);
                 }
             } else {
-                reasons.push(`${t(labelKey)}: ${formatMissingNutrition(t('nutrient_caffeine'))}`);
+                reasons.push(`${t(labelKey)}: ${t('nutrient_caffeine')} unknown`);
             }
         }
 
@@ -654,7 +1463,7 @@ const AIChatBox = ({ isOpen, onClose }) => {
             }
         }
 
-        return { status, reasons };
+        return { status, reasons, triggers };
     };
 
     const handleSend = async (e) => {
@@ -668,15 +1477,17 @@ const AIChatBox = ({ isOpen, onClose }) => {
         const barcodeFromMessage = extractBarcode(userMessage);
         const productMatch = findProductMatch(userMessage);
         const catalog = await resolveCatalogProductForIngredients(userMessage);
-        const mergedProductProfile = productMatch || catalog.product;
+        const offCache = await resolveOffCacheProductForIngredients(userMessage);
+        const mergedProductProfile = productMatch || catalog.product || offCache.product;
         const effectiveBarcode =
             barcodeFromMessage ||
             catalog.catalogBarcode ||
+            offCache.barcode ||
             productMatch?.barcode ||
             productMatch?.code ||
             '';
         const catalogDisplayName =
-            catalog.catalogName || productMatch?.name || productMatch?.productName || '';
+            catalog.catalogName || offCache.name || productMatch?.name || productMatch?.productName || '';
 
         // Use store to add user message
         if (user?.$id) {
@@ -688,65 +1499,173 @@ const AIChatBox = ({ isOpen, onClose }) => {
 
         setIsLoading(true);
 
-        const { conditions, allergenTargets, isMedical } = detectConditions(userMessage);
+        const userAllergyPreferences = getUserAllergyPreferences();
+        const userAiProfile = getUserAiProfile();
+        const { conditions, allergenTargets, isMedical } = detectConditions(userMessage, userAllergyPreferences);
+        const explicitNutrientOrMedicalConditions = new Set([
+            'gluten',
+            'lactose',
+            'diabetes',
+            'hypertension',
+            'high_sugar',
+            'high_sodium',
+            'high_caffeine',
+            'pregnancy'
+        ]);
+        const hasExplicitNutrientOrMedicalCondition = conditions.some((condition) =>
+            explicitNutrientOrMedicalConditions.has(condition)
+        );
+        const shouldRunDefaultIngredientCheck = isMedical && !hasExplicitNutrientOrMedicalCondition;
+        const profileNutritionConditions = (userAiProfile.nutritionPriorities || []).flatMap((priority) => {
+            if (priority === 'low sugar') return ['high_sugar'];
+            if (priority === 'low sodium') return ['high_sodium'];
+            if (priority === 'low caffeine') return ['high_caffeine'];
+            return [];
+        });
+        const effectiveConditions = shouldRunDefaultIngredientCheck
+            ? Array.from(new Set([...conditions, ...profileNutritionConditions, 'high_sugar', 'high_sodium', 'high_caffeine']))
+            : Array.from(new Set([...conditions, ...profileNutritionConditions]));
+
+        // Build intent summary and check cache to avoid duplicate API calls
+        const intentSummary = buildIntentSummary(userMessage);
+        const allergyKey = userAllergyPreferences.length > 0
+            ? [...userAllergyPreferences].sort().join('|')
+            : 'none';
+        const profileKey = buildAiProfileCacheKey(userAiProfile);
+        const intentKey = makeIntentKey(intentSummary, effectiveBarcode, user?.$id || 'guest', `${allergyKey}::PROFILE:${profileKey}`);
+
+        const aiCheckResult = await runAiCheckFunction({
+            query: userMessage,
+            userId: user.$id,
+            locale: i18n.resolvedLanguage || i18n.language || 'en',
+            currency,
+            allergyPrefs: userAllergyPreferences,
+            userProfile: userAiProfile,
+            barcodeHint: effectiveBarcode,
+            nameHint: catalogDisplayName || mergedProductProfile?.name || mergedProductProfile?.productName || '',
+        });
+
+        if (aiCheckResult && aiCheckResult.mode && aiCheckResult.mode !== 'generic') {
+            const structuredReply = serializeAiCheckResponse(aiCheckResult);
+            if (user?.$id) {
+                await addMessage(user.$id, 'assistant', structuredReply, user);
+                setCachedIntent(
+                    `${intentKey}::DATA:${buildAiCheckFingerprint(aiCheckResult)}`,
+                    structuredReply,
+                    1000 * 60
+                );
+            }
+            setIsLoading(false);
+            return;
+        }
+
+        const cachedReply = getCachedIntent(intentKey);
+        if (cachedReply) {
+            const sanitizedCachedReply = sanitizeAssistantReply(cachedReply);
+            if (user?.$id) {
+                await addMessage(user.$id, 'assistant', sanitizedCachedReply, user);
+            }
+            setIsLoading(false);
+            return;
+        }
 
         if (isMedical) {
-            if (conditions.length === 0) {
-                if (user?.$id) {
-                    await addMessage(user.$id, 'assistant', t('ai_need_condition'), user);
-                }
-                setIsLoading(false);
-                return;
-            }
-
             const queryName = buildIngredientQuery(userMessage, mergedProductProfile);
+            const hasIngredientContent = (payload) =>
+                String(payload?.ingredientsText || '').trim().length > 0;
+            const hasAllergenContent = (payload) =>
+                Array.isArray(payload?.allergens) && payload.allergens.length > 0;
+            const pickDefined = (primary, fallback) =>
+                primary !== null && primary !== undefined && primary !== '' ? primary : fallback;
+            const mergeIngredientPayload = (base, extra) => {
+                if (!base) return extra;
+                if (!extra) return base;
+                return {
+                    ...base,
+                    ingredientsText: hasIngredientContent(base) ? base.ingredientsText : (extra.ingredientsText || ''),
+                    ingredientsList:
+                        Array.isArray(base.ingredientsList) && base.ingredientsList.length > 0
+                            ? base.ingredientsList
+                            : (extra.ingredientsList || []),
+                    allergens: hasAllergenContent(base) ? base.allergens : (extra.allergens || []),
+                    nutriments: {
+                        sugarsPer100g: pickDefined(base?.nutriments?.sugarsPer100g, extra?.nutriments?.sugarsPer100g ?? null),
+                        sodiumMgPer100g: pickDefined(base?.nutriments?.sodiumMgPer100g, extra?.nutriments?.sodiumMgPer100g ?? null),
+                        caffeineMgPerL: pickDefined(base?.nutriments?.caffeineMgPerL, extra?.nutriments?.caffeineMgPerL ?? null),
+                        caffeineMgPer100g: pickDefined(base?.nutriments?.caffeineMgPer100g, extra?.nutriments?.caffeineMgPer100g ?? null),
+                        saltGPer100g: pickDefined(base?.nutriments?.saltGPer100g, extra?.nutriments?.saltGPer100g ?? null),
+                    },
+                };
+            };
 
-            if (!effectiveBarcode && !queryName && !catalog.product) {
+            // Catalog-only policy: only answer ingredient/safety questions for products available in PriceMate.
+            if (!catalog.product) {
                 if (user?.$id) {
-                    await addMessage(user.$id, 'assistant', t('ai_need_product'), user);
+                    await addMessage(user.$id, 'assistant', t('ai_catalog_only_refusal'), user);
                 }
                 setIsLoading(false);
                 return;
             }
 
-            let ingredientPayload = ingredientPayloadFromAppwriteProduct(catalog.product) || null;
+            let ingredientPayload =
+                ingredientPayloadFromAppwriteProduct(catalog.product) ||
+                ingredientPayloadFromOffCache(offCache.product) ||
+                null;
 
             if (!ingredientPayload && effectiveBarcode) {
                 ingredientPayload = await fetchIngredientsByBarcode(effectiveBarcode);
             }
 
-            if (!ingredientPayload) {
-                const primarySearch = catalogDisplayName || queryName;
-                if (primarySearch) {
-                    ingredientPayload = await searchIngredientsByName(primarySearch);
+            // If we have nutrition-only data (e.g., from Appwrite) but no ingredient text,
+            // enrich it from OFF so ingredients/allergens still show in the card.
+            if (ingredientPayload && !hasIngredientContent(ingredientPayload)) {
+                if (effectiveBarcode) {
+                    const offByBarcode = await fetchIngredientsByBarcode(effectiveBarcode);
+                    ingredientPayload = mergeIngredientPayload(ingredientPayload, offByBarcode);
                 }
-            }
 
-            if (!ingredientPayload && queryName && queryName !== (catalogDisplayName || '')) {
-                ingredientPayload = await searchIngredientsByName(queryName);
+                if (!hasIngredientContent(ingredientPayload)) {
+                    const fallbackSearch = catalogDisplayName || queryName || ingredientPayload?.name || '';
+                    if (fallbackSearch) {
+                        const offByName = await searchIngredientsByName(fallbackSearch);
+                        ingredientPayload = mergeIngredientPayload(ingredientPayload, offByName);
+                    }
+                }
             }
 
             if (!ingredientPayload) {
                 if (user?.$id) {
-                    if (catalog.product) {
-                        await addMessage(
-                            user.$id,
-                            'assistant',
-                            t('ai_off_miss_catalog_hit', {
-                                name: catalogDisplayName || catalog.product.name || '',
-                                barcode: catalog.catalogBarcode || t('ai_barcode_unknown'),
-                            }),
-                            user
-                        );
-                    } else {
-                        await addMessage(user.$id, 'assistant', t('ai_barcode_not_found'), user);
-                    }
+                    await addMessage(
+                        user.$id,
+                        'assistant',
+                        t('ai_off_miss_catalog_hit', {
+                            name: catalogDisplayName || catalog.product.name || '',
+                            barcode: catalog.catalogBarcode || t('ai_barcode_unknown'),
+                        }),
+                        user
+                    );
                 }
                 setIsLoading(false);
                 return;
             }
 
-            const conditionLabels = conditions.map((condition) => t(`condition_${condition}`));
+            // Persist resolved ingredient data to catalog product so future checks can be served locally.
+            if (catalog.product?.$id) {
+                try {
+                    await persistIngredientPayloadToCatalogProduct(catalog.product, ingredientPayload);
+                } catch {
+                    // best-effort only; ingredient check must still return
+                }
+            }
+
+            const conditionLabels = effectiveConditions.map((condition) => t(`condition_${condition}`));
+            const allergyChecksText = userAllergyPreferences.length > 0
+                ? `allergy (${userAllergyPreferences.join(', ')})`
+                : '';
+            const baseChecksText = shouldRunDefaultIngredientCheck
+                ? t('ai_default_ingredient_checks', 'sugar, sodium, caffeine')
+                : conditionLabels.join(', ');
+            const checksForText = [baseChecksText, allergyChecksText].filter(Boolean).join(', ');
             const resolvedProductName =
                 catalogDisplayName ||
                 mergedProductProfile?.name ||
@@ -757,24 +1676,32 @@ const AIChatBox = ({ isOpen, onClose }) => {
                 : (resolvedProductName || ingredientPayload.name);
 
             const ingredientPreview = ingredientPayload.ingredientsText
-                ? (ingredientPayload.ingredientsText.length > 220
-                    ? `${ingredientPayload.ingredientsText.slice(0, 220)}...`
-                    : ingredientPayload.ingredientsText)
+                ? truncateText(ingredientPayload.ingredientsText, 140)
                 : t('ai_no_ingredients');
 
-            const allergenPreview = ingredientPayload.allergens?.length
-                ? ingredientPayload.allergens.slice(0, 6).join(', ')
-                : t('ai_no_allergens');
+            const { status, reasons, triggers } = evaluateSuitability(
+                ingredientPayload,
+                effectiveConditions,
+                allergenTargets,
+                userAiProfile
+            );
 
-            const { status, reasons } = evaluateSuitability(ingredientPayload, conditions, allergenTargets);
-            const sourceText =
-                ingredientPayload.source === 'PriceMate'
-                    ? ingredientPayload.nutritionSourceLabel
-                        ? `${t('ai_source_pricemate')}: ${ingredientPayload.nutritionSourceLabel}`
-                        : t('ai_source_pricemate')
-                    : ingredientPayload.barcode
-                      ? `Open Food Facts - ${ingredientPayload.sourceUrl}`
-                      : `Open Food Facts search result - ${ingredientPayload.sourceUrl}`;
+            const allergenPreview = ingredientPayload.allergens?.length
+                ? truncateText(ingredientPayload.allergens.slice(0, 4).join(', '), 90)
+                : (triggers?.allergy?.length
+                    ? truncateText(triggers.allergy.slice(0, 6).join(', '), 90)
+                    : t('ai_no_allergens'));
+
+            const triggerTerms = Array.from(
+                new Set([
+                    ...(Array.isArray(triggers?.allergy) ? triggers.allergy : []),
+                    ...(Array.isArray(triggers?.avoidIngredients) ? triggers.avoidIngredients : []),
+                    ...Object.values(triggers?.dietary || {}).flatMap((items) => items || []),
+                ].filter(Boolean))
+            );
+            const triggersText = triggerTerms.length > 0
+                ? emphasizeImportantIngredients(truncateText(triggerTerms.slice(0, 6).join(', '), 120))
+                : '';
 
             const statusKey = status === 'avoid'
                 ? 'ai_status_avoid'
@@ -784,24 +1711,80 @@ const AIChatBox = ({ isOpen, onClose }) => {
                         ? 'ai_status_unknown'
                         : 'ai_status_safe';
 
+            const formattedReasons = (reasons.length > 0 ? reasons : [t('ai_reason_no_ingredients')])
+                .slice(0, 2)
+                .map((reason, index) => `${index + 1}. ${emphasizeImportantIngredients(truncateText(reason, 120))}`)
+                .join('\n');
+
             const responseLines = [
-                t('ai_suitability_title'),
-                `${t('ai_product')}: ${productLabel}`,
-                `${t('ai_checks_for', { conditions: conditionLabels.join(', ') })}`,
-                `${t('ai_suitability')}: ${t(statusKey)}`,
-                `${t('ai_reasons')}: ${reasons.join(' | ')}`,
-                `${t('ai_ingredients')}: ${ingredientPreview}`,
-                `${t('ai_allergens')}: ${allergenPreview}`,
-                `${t('ai_source')}: ${sourceText}`,
-                `${t('ai_note')}: ${t('ai_note_text')}`
+                `Product: ${productLabel}`,
+                `Suitability: ${t(statusKey)}`,
+                `Checks: ${checksForText}`,
+                ...(triggersText && (status === 'avoid' || status === 'caution')
+                    ? [`Triggers: ${triggersText}`]
+                    : []),
+                'Reasons:',
+                formattedReasons,
+                `Ingredients: ${emphasizeImportantIngredients(ingredientPreview)}`,
+                `Allergens: ${emphasizeImportantIngredients(allergenPreview)}`,
+                'Source: PriceMate'
             ];
 
+            if (!profileHasPersonalization(userAiProfile)) {
+                responseLines.push('Tip: Add shopping preferences to personalize future answers.');
+            }
+
             if (user?.$id) {
-                await addMessage(user.$id, 'assistant', responseLines.join('\n'), user);
+                const respText = sanitizeAssistantReply(responseLines.join('\n'));
+                await addMessage(user.$id, 'assistant', respText, user);
+                try {
+                    setCachedIntent(intentKey, respText);
+                } catch (e) {
+                    // caching should never block the user flow
+                    console.debug('Intent cache set failed', e);
+                }
             }
 
             setIsLoading(false);
             return;
+        }
+
+        // Catalog-only policy: for product-related questions, refuse if the product is not in PriceMate.
+        // We use the full-catalog resolver (Appwrite) rather than the in-chat 50-item sample.
+        const loweredMessage = String(userMessage || '').toLowerCase();
+        const isProductSpecific =
+            /\b\d{8,14}\b/.test(loweredMessage) ||
+            loweredMessage.includes('ingredient') ||
+            loweredMessage.includes('ingredients') ||
+            loweredMessage.includes('allergen') ||
+            loweredMessage.includes('allergens') ||
+            loweredMessage.includes('suitable') ||
+            loweredMessage.includes('safe') ||
+            loweredMessage.includes('compare') ||
+            loweredMessage.includes('cheapest') ||
+            loweredMessage.includes('price') ||
+            loweredMessage.includes('barcode') ||
+            loweredMessage.includes('içerik') ||
+            loweredMessage.includes('icerik') ||
+            loweredMessage.includes('içindekiler') ||
+            loweredMessage.includes('uygun') ||
+            loweredMessage.includes('en ucuz') ||
+            loweredMessage.includes('fiyat') ||
+            loweredMessage.includes('barkod');
+
+        if (isProductSpecific) {
+            try {
+                const catalogOnly = await resolveCatalogProductForIngredients(userMessage);
+                if (!catalogOnly?.product) {
+                    if (user?.$id) {
+                        await addMessage(user.$id, 'assistant', t('ai_catalog_only_refusal'), user);
+                    }
+                    setIsLoading(false);
+                    return;
+                }
+            } catch {
+                // If catalog lookup fails, fall back to normal behavior rather than blocking all chat.
+            }
         }
 
         try {
@@ -821,16 +1804,37 @@ const AIChatBox = ({ isOpen, onClose }) => {
                 }
             });
 
-            const promptContext = buildRankedProductContextLines(fullProductList, userMessage);
+            const promptContext = buildRankedProductContextLines(fullProductList, userMessage, userAiProfile);
+            const intentSummary = buildIntentSummary(userMessage);
+            const aiProfileContext = formatAiProfileForPrompt(userAiProfile);
+            const maxGenericReplyWords = userAiProfile.responseStyle === 'detailed'
+                ? 110
+                : userAiProfile.responseStyle === 'concise'
+                    ? 45
+                    : 60;
 
             const prompt = `
                 You are the official PriceMate assistant. Your primary goal is to help users find products and compare prices.
+
+                RESPONSE RULES (STRICT):
+                - Answer the latest user intent directly.
+                - Do not repeat the user's exact sentence or echo the same question back.
+                - If the same intent already appears earlier in the chat history, do not ask the user to repeat it.
+                - Use the token summary below to understand the request, not to paraphrase it.
+                - Keep normal replies concise: maximum 4 short lines or about ${maxGenericReplyWords} words.
+                - No filler, no long intros, no repeated disclaimers.
+
+                USER AI SHOPPING PROFILE:
+                ${aiProfileContext}
+                - Use these preferences to rank suggestions and tailor tone.
+                - Dietary preferences are preferences, not allergy safety verdicts.
+                - If no optional profile preferences are saved, add at most one short line: "Add shopping preferences to personalize future answers."
                 
                 WEBSITE PRODUCT DATA (sample; catalog has many more items):
                 ${promptContext}
 
                 PRODUCT LIMITS (STRICT):
-                - Mention at most five [BARCODE:...] products per reply; prefer one to three when possible.
+                - Mention at most three [BARCODE:...] products per reply.
                 - Never dump long lists. If the request is broad (category, "cheapest X", "show me Y") and many items could match,
                   choose only the best few matches from WEBSITE PRODUCT DATA above, then add one short friendly sentence inviting the user
                   to narrow down (brand, exact name, pack size, or barcode) so you can refine—warm tone, not lecturing.
@@ -840,15 +1844,17 @@ const AIChatBox = ({ isOpen, onClose }) => {
                 - When the user names a product (e.g. Coca-Cola), look it up in WEBSITE PRODUCT DATA first and use its [BARCODE:...] line.
                 - For questions like "is the sugar high?", "how much salt?", or "is it high in caffeine?", answer using that product's barcode:
                   tie the answer to the catalog match when possible instead of asking which health condition they mean.
-                - If the product is not in WEBSITE PRODUCT DATA, ask for a barcode or a clearer product name—not a generic "what condition?" prompt.
+                - If the product is not available in the PriceMate catalog, refuse and ask the user to ask about an available product (or share its barcode).
                 - If the data is insufficient for a nutrient, say unknown and suggest scanning or checking the label.
 
                 RESPONSE FORMAT FOR INGREDIENT IMPACT QUESTIONS:
+                Product: <name + [BARCODE:...]>
                 Suitability: <Likely suitable | Use caution | Not suitable | Unknown>
-                Reasons: <short reasons based on ingredients/allergens/nutrition>
+                Checks For: <short list>
+                Reasons: <at most 2 short points>
                 Ingredients: <brief ingredient summary>
                 Allergens: <brief allergen summary>
-                Source: <product barcode or source used>
+                Source: PriceMate
 
                 INSTRUCTIONS:
                 1. Answer questions about products, prices, shopping, and ingredient suitability within the PriceMate app.
@@ -856,7 +1862,7 @@ const AIChatBox = ({ isOpen, onClose }) => {
                 3. Recommend specific products using the data provided—respect the PRODUCT LIMITS above.
                 4. If the user asks for "cheapest" or "best deal", highlight at most a few; do not list everything.
                 5. If the user asks for "most expensive" or "premium", highlight at most a few; do not list everything.
-                6. For category-style questions, suggest at most five relevant items from the sample, then briefly ask the user to be more specific if the catalog is huge.
+                6. For category-style questions, suggest at most three relevant items from the sample, then briefly ask the user to be more specific if the catalog is huge.
                 7. For every product you mention, you must include its barcode ID in square brackets like this: [BARCODE:123456].
                 8. Do not use [ID:123456], only use the word BARCODE in the brackets.
                 9. Minimize text. Do not describe features or give long intros. Just a short sentence and the barcode(s).
@@ -865,11 +1871,12 @@ const AIChatBox = ({ isOpen, onClose }) => {
                 12. If ingredient suitability data is provided, summarize it briefly and do not refuse to answer.
                 13. If you are unsure, ask the user for the barcode or exact product name instead of giving a generic refusal.
                 14. For ingredient safety answers, treat Open Food Facts as the source of truth and mention it in the source line.
+                15. Never restate the full user question; keep the answer short and direct.
             `;
 
             const openRouterMessage = effectiveBarcode && !barcodeFromMessage
-                ? `${userMessage}\nKnown barcode: [BARCODE:${effectiveBarcode}]`
-                : userMessage;
+                ? `Intent: ${intentSummary || userMessage}\nKnown barcode: [BARCODE:${effectiveBarcode}]`
+                : `Intent: ${intentSummary || userMessage}`;
 
             const threadForApi = useChatStore
                 .getState()
@@ -890,9 +1897,15 @@ const AIChatBox = ({ isOpen, onClose }) => {
             });
 
             const text = completion.choices[0]?.message?.content || "No response received.";
+            const sanitizedText = sanitizeAssistantReply(text);
 
             if (user?.$id) {
-                await addMessage(user.$id, 'assistant', text, user);
+                await addMessage(user.$id, 'assistant', sanitizedText, user);
+                try {
+                    setCachedIntent(intentKey, sanitizedText);
+                } catch (e) {
+                    console.debug('Intent cache set failed', e);
+                }
             }
         } catch (error) {
             console.error("AI Error details:", error);
@@ -915,27 +1928,17 @@ const AIChatBox = ({ isOpen, onClose }) => {
 
     if (!isOpen) return null;
 
+    const effectiveOnClose = typeof onClose === 'function' ? onClose : () => {};
+    const isPage = variant === 'page';
+
     const renderConversationList = (afterPick) => {
         if (!user?.$id) return null;
         return (
             <div className="flex flex-col h-full min-h-0 bg-gray-100 dark:bg-gray-900/80">
-                <div className="p-2 border-b border-gray-200 dark:border-gray-700 shrink-0">
-                    <button
-                        type="button"
-                        onClick={() => {
-                            startNewConversation();
-                            afterPick?.();
-                        }}
-                        className="w-full flex items-center justify-center gap-1 py-2 rounded-lg bg-blue-600 text-white text-[10px] font-black uppercase tracking-wide"
-                    >
-                        <FiPlus size={14} />
-                        {t('ai_chat_new_short')}
-                    </button>
-                </div>
-                <div className="flex-1 overflow-y-auto p-1 space-y-1">
+                <div className="flex-1 overflow-y-auto p-3 sm:p-2 space-y-2.5 sm:space-y-2">
                     {summariesLoading && conversationRows.length === 0 ? (
                         <div className="flex justify-center p-4">
-                            <FiLoader className="animate-spin text-blue-600" />
+                            <FiLoader className="animate-spin text-brand-600" />
                         </div>
                     ) : (
                         conversationRows.map((row) => {
@@ -943,9 +1946,9 @@ const AIChatBox = ({ isOpen, onClose }) => {
                             return (
                                 <div
                                     key={row.id}
-                                    className={`group relative rounded-lg border ${
+                                    className={`group relative rounded-2xl border ${
                                         selected
-                                            ? 'border-blue-500 bg-white dark:bg-gray-800 shadow-sm'
+                                            ? 'border-brand-500 bg-white dark:bg-gray-800 shadow-sm'
                                             : 'border-transparent bg-transparent hover:bg-white/60 dark:hover:bg-gray-800/60'
                                     }`}
                                 >
@@ -957,9 +1960,9 @@ const AIChatBox = ({ isOpen, onClose }) => {
                                             }
                                             afterPick?.();
                                         }}
-                                        className="w-full text-left p-2 pr-7"
+                                        className="w-full min-h-16 sm:min-h-14 text-left p-4 pr-11 sm:p-3 sm:pr-9"
                                     >
-                                        <span className="block text-[10px] font-bold text-gray-900 dark:text-white line-clamp-2 leading-tight">
+                                        <span className="block text-[13px] sm:text-[12px] font-black text-gray-900 dark:text-white line-clamp-2 leading-tight">
                                             {labelForRow(row)}
                                         </span>
                                     </button>
@@ -973,7 +1976,7 @@ const AIChatBox = ({ isOpen, onClose }) => {
                                                     afterPick?.();
                                                 }
                                             }}
-                                            className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 opacity-70 group-hover:opacity-100"
+                                            className="absolute right-2 top-1/2 min-h-10 min-w-10 -translate-y-1/2 rounded-xl text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 opacity-80 group-hover:opacity-100 flex items-center justify-center"
                                             aria-label={t('ai_chat_delete_thread')}
                                         >
                                             <FiTrash2 size={12} />
@@ -989,37 +1992,109 @@ const AIChatBox = ({ isOpen, onClose }) => {
     };
 
     return (
-        <div className="fixed inset-0 sm:inset-auto sm:bottom-4 sm:right-4 sm:w-[400px] md:w-[448px] sm:h-[min(640px,90vh)] h-full bg-white dark:bg-gray-800 sm:rounded-2xl shadow-2xl flex flex-col z-[2000] border border-gray-200 dark:border-gray-700 overflow-hidden animate-in sm:slide-in-from-bottom-5 slide-in-from-right duration-300">
-            <div className="p-4 sm:p-5 bg-blue-600 dark:bg-blue-700 text-white flex justify-between items-center shrink-0 shadow-md gap-2">
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                    {user && (
-                        <button
-                            type="button"
-                            className="sm:hidden p-2 hover:bg-white/20 rounded-xl shrink-0"
-                            onClick={() => setMobileListOpen(true)}
-                            aria-label={t('ai_chat_chats')}
-                        >
-                            <FiMessageSquare size={20} />
-                        </button>
-                    )}
-                    <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm shrink-0 hidden sm:flex">
-                        <FiMessageSquare className="text-xl" />
+        <>
+            {!isPage && (
+                <div
+                    className="fixed inset-0 z-[9998] bg-black/40 backdrop-blur-[2px] sm:hidden"
+                    onClick={effectiveOnClose}
+                    aria-hidden="true"
+                />
+            )}
+            <div
+                className={
+                    isPage
+                        ? 'w-full flex flex-col h-full min-h-0 overflow-hidden'
+                        : 'fixed bottom-0 left-0 right-0 z-[9999] flex h-[85dvh] max-h-[85dvh] w-full touch-pan-y flex-col overflow-hidden rounded-t-2xl border-0 bg-white shadow-2xl animate-in slide-in-from-bottom-4 duration-300 dark:border-gray-700 dark:bg-gray-800 sm:inset-auto sm:bottom-4 sm:right-4 sm:z-[2000] sm:h-[min(640px,90vh)] sm:max-h-none sm:w-[400px] sm:rounded-2xl sm:border sm:border-gray-200 sm:shadow-2xl sm:slide-in-from-bottom-5 sm:slide-in-from-right md:w-[448px]'
+                }
+            >
+            {isPage ? (
+                <MobileHeader
+                    title={t('ai_chat_title', 'PriceMate AI')}
+                    icon={FiCpu}
+                    dense
+                    right={
+                        <div className="flex items-center gap-2">
+                            {user ? (
+                                <>
+                                    <button
+                                        type="button"
+                                        className="tap-target min-h-11 min-w-11 inline-flex items-center justify-center rounded-2xl hover:bg-gray-100/60 dark:hover:bg-white/5 transition sm:hidden"
+                                        onClick={() => setMobileListOpen(true)}
+                                        aria-label={t('ai_chat_chats')}
+                                    >
+                                        <FiList size={20} />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="tap-target min-h-11 min-w-11 inline-flex items-center justify-center rounded-2xl hover:bg-gray-100/60 dark:hover:bg-white/5 transition"
+                                        onClick={beginNewConversation}
+                                        aria-label={t('ai_chat_new')}
+                                    >
+                                        <FiPlus size={20} />
+                                    </button>
+                                </>
+                            ) : (
+                                <span className="w-11" aria-hidden />
+                            )}
+                        </div>
+                    }
+                />
+            ) : (
+                <>
+                    <div className="sm:hidden flex justify-center pt-2.5 pb-1 shrink-0" aria-hidden="true">
+                        <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
                     </div>
-                    <div className="min-w-0">
-                        <span className="font-bold block text-sm truncate">PriceMate AI</span>
-                        <span className="text-[10px] opacity-80 uppercase tracking-widest font-black truncate block">
-                            Powered by Gemini
-                        </span>
+                    <div className="border-b border-black/5 bg-gradient-to-r from-brand-700 via-brand-600 to-accent-600 px-3.5 pb-3 pt-2.5 sm:pt-[calc(0.65rem+env(safe-area-inset-top,0px))] text-white shadow-md shrink-0 sm:px-5 sm:py-4">
+                        <div className="flex items-center gap-3 min-w-0">
+                            {user && (
+                                <button
+                                    type="button"
+                                    className="sm:hidden p-2.5 rounded-2xl bg-white/10 backdrop-blur-sm shrink-0 active:scale-95"
+                                    onClick={() => setMobileListOpen(true)}
+                                    aria-label={t('ai_chat_chats')}
+                                >
+                                    <FiList size={20} />
+                                </button>
+                            )}
+                            <div className="hidden sm:flex w-8 h-8 bg-white/12 rounded-2xl items-center justify-center backdrop-blur-sm shrink-0">
+                                <FiCpu className="text-xl text-white/85" />
+                            </div>
+                            <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                <div className="flex items-center gap-2 min-w-0 leading-none">
+                                    <span className="font-black block text-sm sm:text-[15px] truncate">
+                                        {t('ai_chat_title', 'PriceMate AI')}
+                                    </span>
+                                    <span className="hidden sm:inline-flex text-[9px] uppercase tracking-[0.22em] font-black bg-white/15 px-2 py-0.5 rounded-full">
+                                        {t('ai_chat_powered_by', 'Powered by Gemini')}
+                                    </span>
+                                </div>
+                                <p className="mt-1 text-[11px] text-white/80 leading-relaxed hidden sm:block">
+                                    {t('ai_chat_subtitle', 'Ask for cheaper picks, compare products, or check ingredients instantly.')}
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                                {user && (
+                                    <button
+                                        type="button"
+                                        onClick={beginNewConversation}
+                                        className="p-2.5 hover:bg-white/15 rounded-2xl transition-all active:scale-95 shrink-0"
+                                        aria-label={t('ai_chat_new')}
+                                    >
+                                        <FiPlus size={20} />
+                                    </button>
+                                )}
+                                <button
+                                    onClick={effectiveOnClose}
+                                    className="p-2.5 hover:bg-white/15 rounded-2xl transition-all active:scale-95 shrink-0"
+                                    aria-label={t('ai_chat_close')}
+                                >
+                                    <FiX size={24} />
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                </div>
-                <button
-                    onClick={onClose}
-                    className="p-2 hover:bg-white/20 rounded-xl transition-all active:scale-95 shrink-0"
-                    aria-label={t('ai_chat_close')}
-                >
-                    <FiX size={24} />
-                </button>
-            </div>
+                </>
+            )}
 
             <div className="flex flex-1 min-h-0">
                 {user && (
@@ -1031,43 +2106,90 @@ const AIChatBox = ({ isOpen, onClose }) => {
                 <div className="flex flex-col flex-1 min-w-0 min-h-0 relative">
                     {user && mobileListOpen && (
                         <div className="absolute inset-0 z-20 flex flex-col sm:hidden bg-white dark:bg-gray-800">
-                            <div className="flex items-center gap-2 p-3 border-b border-gray-200 dark:border-gray-700 shrink-0">
+                            <div className="flex items-center gap-2 p-3 border-b border-gray-200 dark:border-gray-700 shrink-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm">
                                 <button
                                     type="button"
                                     onClick={() => setMobileListOpen(false)}
-                                    className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+                                    className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700"
                                     aria-label={t('ai_chat_back')}
                                 >
                                     <FiChevronLeft size={22} />
                                 </button>
-                                <span className="font-bold text-sm">{t('ai_chat_chats')}</span>
+                                <span className="font-black text-sm uppercase tracking-widest text-gray-700 dark:text-gray-200">
+                                    {t('ai_chat_chats')}
+                                </span>
+                                <div className="ml-auto">
+                                    <button
+                                        type="button"
+                                        onClick={() => { beginNewConversation(); setMobileListOpen(false); }}
+                                        className="p-2 rounded-xl bg-brand-600 text-white hover:bg-brand-700"
+                                        aria-label={t('ai_chat_new')}
+                                    >
+                                        <FiPlus size={18} />
+                                    </button>
+                                </div>
                             </div>
                             <div className="flex-1 min-h-0 overflow-hidden">{renderConversationList(() => setMobileListOpen(false))}</div>
                         </div>
                     )}
 
-                    <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-gray-900 min-h-0">
+                    <div className="flex-1 overflow-y-auto overscroll-contain scroll-pb-[calc(var(--bottom-nav-h,0px)+7.5rem)] px-4 pt-2.5 pb-[calc(0.875rem+var(--bottom-nav-h,0px))] sm:px-5 sm:pt-3 sm:pb-[calc(1rem+var(--bottom-nav-h,0px))] space-y-3.5 bg-gray-50 dark:bg-gray-900 min-h-0">
                         {!user && (
-                            <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/30 text-center">
-                                <p className="text-xs text-amber-700 dark:text-amber-300">
-                                    Log in to save your chat history and get personalized recommendations!
+                            <div className="p-4 rounded-[1.5rem] bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/30 text-center">
+                                <p className="text-xs sm:text-sm text-amber-700 dark:text-amber-300 leading-relaxed">
+                                    {t('ai_chat_login_hint', 'Log in to save your chat history and get personalized recommendations.')}
                                 </p>
                             </div>
                         )}
                         {user && !activeConversationId && (
                             summariesLoading ? (
                                 <div className="flex justify-center py-12">
-                                    <FiLoader className="animate-spin text-blue-600" />
+                                    <FiLoader className="animate-spin text-brand-600" />
                                 </div>
                             ) : (
-                                <div className="p-6 text-center text-sm text-gray-600 dark:text-gray-400 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 mx-auto max-w-sm">
-                                    {t('ai_chat_idle_hint')}
+                                <div className="mx-auto w-full max-w-md space-y-4 pt-2">
+                                    <div className="rounded-[1.75rem] bg-gradient-to-br from-brand-600 via-brand-600 to-brand-700 p-5 text-white shadow-xl shadow-brand-600/20">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-11 w-11 rounded-2xl bg-white/10 flex items-center justify-center backdrop-blur-sm shrink-0">
+                                                <FiCpu size={22} className="text-white/85" />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <h2 className="text-lg font-black tracking-tight">{t('ai_chat_empty_title', 'What do you want to check?')}</h2>
+                                                <p className="text-white/80 text-xs sm:text-sm mt-0.5 leading-relaxed">
+                                                    {t('ai_chat_empty_description', 'Pick a shortcut or type your own shopping question.')}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        {/* Removed large 'NEW' button per request; use plus icons in the list to start new chats. */}
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {mobileEmptyActions.map((item) => {
+                                            const Icon = item.Icon;
+                                            return (
+                                            <button
+                                                key={item.key}
+                                                type="button"
+                                                onClick={() => applyQuickPrompt(item.prompt)}
+                                                className="min-h-24 rounded-3xl border border-gray-200 bg-white px-4 py-3.5 text-left text-gray-800 shadow-sm transition active:scale-[0.98] dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                                            >
+                                                <span className="mb-2 flex h-9 w-9 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 dark:bg-brand-900/30 dark:text-brand-300">
+                                                    <Icon size={17} />
+                                                </span>
+                                                <span className="block text-[12px] font-black leading-tight">{item.label}</span>
+                                                <span className="mt-1 block text-[10px] font-semibold leading-4 text-gray-500 dark:text-gray-400">{item.description}</span>
+                                            </button>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {/* Guide text removed per request. */}
                                 </div>
                             )
                         )}
                         {user && activeConversationId && historyLoading && (
                             <div className="flex justify-center py-12">
-                                <FiLoader className="animate-spin text-blue-600" />
+                                <FiLoader className="animate-spin text-brand-600" />
                             </div>
                         )}
                         {user && activeConversationId && !historyLoading && (
@@ -1084,12 +2206,13 @@ const AIChatBox = ({ isOpen, onClose }) => {
                                         convert={convert}
                                         getCurrencySymbol={getCurrencySymbol}
                                         allProducts={fullProductList}
+                                        t={t}
                                     />
                                 ))}
                                 {isLoading && (
                                     <div className="flex justify-start">
                                         <div className="bg-white dark:bg-gray-800 p-3 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 rounded-tl-none">
-                                            <FiLoader className="animate-spin text-blue-600" />
+                                            <FiLoader className="animate-spin text-brand-600" />
                                         </div>
                                     </div>
                                 )}
@@ -1099,7 +2222,7 @@ const AIChatBox = ({ isOpen, onClose }) => {
                     </div>
 
                     {user && chatWriteError && (
-                        <div className="shrink-0 px-4 py-2 bg-red-50 dark:bg-red-900/20 border-t border-red-100 dark:border-red-800/40 flex gap-2 items-start justify-between">
+                        <div className="shrink-0 px-4 py-2.5 bg-red-50 dark:bg-red-900/20 border-t border-red-100 dark:border-red-800/40 flex gap-2 items-start justify-between">
                             <p className="text-xs text-red-800 dark:text-red-200 flex-1 leading-relaxed">
                                 {chatWriteError === CHAT_ERROR_MISSING_CONVERSATION_ID
                                     ? t('chat_error_schema_conversation_id')
@@ -1117,14 +2240,40 @@ const AIChatBox = ({ isOpen, onClose }) => {
                     )}
 
                     <form
+                        ref={formRef}
                         onSubmit={handleSend}
-                        className="p-4 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 shrink-0"
+                        className="px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px)+var(--bottom-nav-h,0px))] sm:px-5 sm:py-4 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 shrink-0"
                     >
-                        <div className="relative flex items-center gap-2">
-                            <input
-                                type="text"
+                        {user && activeConversationId && !input.trim() && !isLoading && (
+                            <div
+                                ref={quickPromptsRowRef}
+                                className="mb-3 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none]"
+                            >
+                                {mobileQuickPrompts.map((item) => (
+                                    <button
+                                        key={item.key}
+                                        type="button"
+                                        onClick={() => applyQuickPrompt(item.prompt)}
+                                        className="shrink-0 min-h-11 rounded-full border border-brand-100 bg-brand-50 px-4 py-2.5 text-[11px] font-black text-brand-700 dark:border-brand-800/50 dark:bg-brand-900/20 dark:text-brand-300 flex items-center gap-2"
+                                    >
+                                        <item.Icon size={14} />
+                                        {item.label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        <div className="relative flex items-end gap-2">
+                            <textarea
+                                ref={inputRef}
+                                rows={1}
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        formRef.current?.requestSubmit();
+                                    }
+                                }}
                                 placeholder={
                                     !user
                                         ? t('ai_chat_login_placeholder')
@@ -1133,14 +2282,14 @@ const AIChatBox = ({ isOpen, onClose }) => {
                                           : t('ai_chat_input_placeholder')
                                 }
                                 disabled={isLoading || !user || !activeConversationId}
-                                className="flex-1 bg-gray-50 dark:bg-gray-900 border-none rounded-xl py-3 px-4 text-sm focus:ring-2 focus:ring-blue-500 transition-all dark:text-white disabled:opacity-50"
+                                className="flex-1 max-h-32 min-h-12 resize-none bg-gray-50 dark:bg-gray-900 border-none rounded-[1.25rem] py-3.5 px-4 text-[16px] sm:text-sm leading-6 sm:leading-5 focus:ring-2 focus:ring-brand-500 transition-all dark:text-white disabled:opacity-50"
                             />
                             <button
                                 type="submit"
                                 disabled={
                                     !input.trim() || isLoading || !user || !activeConversationId
                                 }
-                                className="bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-xl transition-all active:scale-90 disabled:opacity-50 disabled:active:scale-100 shadow-lg shadow-blue-200 dark:shadow-none"
+                                className="min-h-12 min-w-12 bg-brand-600 hover:bg-brand-700 text-white px-4 rounded-[1.15rem] transition-all active:scale-90 disabled:opacity-50 disabled:active:scale-100 shadow-lg shadow-brand-200 dark:shadow-none flex items-center justify-center"
                             >
                                 <FiSend />
                             </button>
@@ -1149,6 +2298,7 @@ const AIChatBox = ({ isOpen, onClose }) => {
                 </div>
             </div>
         </div>
+        </>
     );
 };
 

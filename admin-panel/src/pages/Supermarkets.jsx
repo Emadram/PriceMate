@@ -1,14 +1,39 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FiPlus, FiEdit2, FiTrash2, FiMapPin, FiPhone, FiMail, FiChevronUp, FiChevronDown, FiX, FiSearch, FiShoppingBag } from 'react-icons/fi';
+import SortIcon from '../components/SortIcon';
 import useSupermarketsStore from '../stores/supermarketsStore';
 import Sidebar from '../components/Sidebar';
+import { validateSupermarketCoordinates } from '../utils/coordinateValidation';
+
+const extractGoogleMapsEmbedSrc = (value) => {
+    const text = String(value || '').trim();
+    if (!text) return '';
+
+    const iframeMatch = text.match(/<iframe[^>]*src=["']([^"']+)["'][^>]*>/i);
+    if (iframeMatch) {
+        const src = iframeMatch[1].trim();
+        return /google\.com\/maps\/embed/i.test(src) ? src : '';
+    }
+
+    return /google\.com\/maps\/embed/i.test(text) ? text : '';
+};
+
+const normalizeGoogleMapsEmbed = (value) => {
+    const src = extractGoogleMapsEmbedSrc(value);
+    if (!src) return '';
+
+    return `<iframe src="${src}" width="100%" height="100%" style="border:0;" loading="lazy" allowfullscreen referrerpolicy="no-referrer-when-downgrade"></iframe>`;
+};
+
+const isValidEmbedHtml = (value) => !!extractGoogleMapsEmbedSrc(value);
 
 const Supermarkets = () => {
-    const { supermarkets, loading, fetchSupermarkets, deleteSupermarket, uploadSupermarketLogo } = useSupermarketsStore();
+    const { supermarkets, loading, fetchSupermarkets, deleteSupermarket, uploadSupermarketLogo, setSupermarketStatus } = useSupermarketsStore();
     const [showModal, setShowModal] = useState(false);
     const [editing, setEditing] = useState(null);
     const [uploading, setUploading] = useState(false);
+    const [coordinateError, setCoordinateError] = useState('');
 
     const [formData, setFormData] = useState({
         name: '',
@@ -17,18 +42,23 @@ const Supermarkets = () => {
         latitude: '',
         longitude: '',
         address: '',
+        embedHtml: '',
         phoneNumber: '',
         email: '',
         icon: '',
         isParent: false,
-        parentId: ''
+        parentId: '',
+        googleMapsUrl: '',
+        rating: '',
+        reviewsCount: ''
     });
 
     const [searchTerm, setSearchTerm] = useState('');
     const [sortConfig, setSortConfig] = useState({ key: null, direction: 'ascending' });
 
     useEffect(() => {
-        fetchSupermarkets();
+        const t = setTimeout(() => fetchSupermarkets(), 0);
+        return () => clearTimeout(t);
     }, [fetchSupermarkets]);
 
     const filteredSupermarkets = supermarkets.filter(sm => 
@@ -58,41 +88,51 @@ const Supermarkets = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         const store = useSupermarketsStore.getState();
-        const lat = parseFloat(formData.latitude);
-        const lon = parseFloat(formData.longitude);
-        if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-            alert('Enter valid numeric latitude and longitude.');
+        const trimmedEmbed = String(formData.embedHtml || '').trim();
+        const hasEmbed = trimmedEmbed.length > 0;
+        if (hasEmbed && !isValidEmbedHtml(trimmedEmbed)) {
+            setCoordinateError('Paste a Google Maps embed iframe or embed src URL.');
             return;
         }
-        if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
-            alert('Latitude must be between -90 and 90, longitude between -180 and 180.');
+        const nextCoordinateError = hasEmbed ? '' : validateSupermarketCoordinates(formData.latitude, formData.longitude);
+        if (nextCoordinateError) {
+            setCoordinateError(nextCoordinateError);
             return;
         }
-        if (lat === 0 && lon === 0) {
-            alert('Coordinates (0, 0) are not allowed—they look like a placeholder. Set the real store location.');
-            return;
-        }
+        const parseOptionalNumber = (value, parser) => {
+            if (value === '' || value === null || value === undefined) return null;
+            const parsed = parser(value);
+            return Number.isFinite(parsed) ? parsed : null;
+        };
         const data = {
             ...formData,
-            latitude: lat,
-            longitude: lon,
+            latitude: parseOptionalNumber(formData.latitude, Number.parseFloat),
+            longitude: parseOptionalNumber(formData.longitude, Number.parseFloat),
             isParent: formData.isParent,
-            parentId: formData.isParent ? null : formData.parentId
+            parentId: formData.isParent ? null : formData.parentId,
+            embedHtml: hasEmbed ? normalizeGoogleMapsEmbed(trimmedEmbed) : null,
+            rating: parseOptionalNumber(formData.rating, Number.parseFloat),
+            reviewsCount: parseOptionalNumber(formData.reviewsCount, (value) => Number.parseInt(value, 10))
         };
 
-        if (editing) {
-            await store.updateSupermarket(editing.$id, data);
-        } else {
-            await store.addSupermarket(data);
+        const saved = editing
+            ? await store.updateSupermarket(editing.$id, data)
+            : await store.addSupermarket(data);
+
+        if (!saved) {
+            setCoordinateError(useSupermarketsStore.getState().error || nextCoordinateError || 'Unable to save supermarket.');
+            return;
         }
 
         setShowModal(false);
         setEditing(null);
+        setCoordinateError('');
         resetForm();
     };
 
     const resetForm = () => {
-        setFormData({ name: '', brand: '', branchName: '', latitude: '', longitude: '', address: '', phoneNumber: '', email: '', icon: '', isParent: false, parentId: '' });
+        setFormData({ name: '', brand: '', branchName: '', latitude: '', longitude: '', address: '', embedHtml: '', phoneNumber: '', email: '', icon: '', isParent: false, parentId: '', googleMapsUrl: '', rating: '', reviewsCount: '' });
+        setCoordinateError('');
     };
 
     const handleEdit = (supermarket) => {
@@ -104,12 +144,17 @@ const Supermarkets = () => {
             latitude: supermarket.latitude ?? '',
             longitude: supermarket.longitude ?? '',
             address: supermarket.address || '',
+            embedHtml: supermarket.embedHtml || '',
             phoneNumber: supermarket.phoneNumber || '',
             email: supermarket.email || '',
             icon: supermarket.icon || '',
             isParent: supermarket.isParent || false,
-            parentId: supermarket.parentId || ''
+            parentId: supermarket.parentId || '',
+            googleMapsUrl: supermarket.googleMapsUrl || '',
+            rating: supermarket.rating ?? '',
+            reviewsCount: supermarket.reviewsCount ?? supermarket.reviewCount ?? ''
         });
+        setCoordinateError('');
         setShowModal(true);
     };
 
@@ -143,10 +188,7 @@ const Supermarkets = () => {
         setSortConfig({ key, direction });
     };
 
-    const SortIcon = ({ columnKey }) => {
-        if (sortConfig.key !== columnKey) return null;
-        return sortConfig.direction === 'ascending' ? <FiChevronUp className="inline ml-1" /> : <FiChevronDown className="inline ml-1" />;
-    };
+    // SortIcon hoisted to ../components/SortIcon
 
     return (
         <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex">
@@ -157,19 +199,19 @@ const Supermarkets = () => {
                     <div className="flex items-center gap-6 flex-1">
                         <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight uppercase">Supermarkets</h1>
                         <div className="relative group max-w-md w-full ml-4 hidden md:block">
-                            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand-600 dark:group-focus-within:text-brand-300 transition-colors" />
                             <input
                                 type="text"
                                 placeholder="Find store, brand or address..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="bg-gray-100 dark:bg-gray-900 border-gray-200 dark:border-gray-700 rounded-2xl py-2.5 pl-11 pr-4 w-full text-sm focus:ring-2 focus:ring-blue-500/20 focus:bg-white dark:focus:bg-gray-900 transition-all outline-none text-gray-800 dark:text-gray-100"
+                                className="bg-gray-100 dark:bg-gray-900 border-gray-200 dark:border-gray-700 rounded-2xl py-2.5 pl-11 pr-4 w-full text-sm focus:ring-2 focus:ring-brand-500/20 focus:bg-white dark:focus:bg-gray-900 transition-all outline-none text-gray-800 dark:text-gray-100"
                             />
                         </div>
                     </div>
                     <button
                         onClick={() => { setEditing(null); resetForm(); setShowModal(true); }}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl flex items-center gap-2 transition-all shadow-lg shadow-blue-500/20 active:scale-95 text-sm font-black uppercase tracking-widest"
+                        className="bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 rounded-2xl flex items-center gap-2 transition-all shadow-lg shadow-brand-600/20 active:scale-95 text-sm font-black uppercase tracking-widest"
                     >
                         <FiPlus size={20} className="stroke-[3]" /> Add Branch
                     </button>
@@ -178,7 +220,7 @@ const Supermarkets = () => {
                 <main className="max-w-7xl mx-auto px-6 py-8 w-full">
                     {loading ? (
                         <div className="flex h-64 items-center justify-center">
-                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-600"></div>
                         </div>
                     ) : (
                         <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
@@ -186,24 +228,23 @@ const Supermarkets = () => {
                                 <thead className="bg-gray-50/50 dark:bg-gray-900/50">
                                     <tr>
                                         <th
-                                            className="px-8 py-5 text-left text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] cursor-pointer hover:text-blue-600 transition-colors"
+                                            className="px-8 py-5 text-left text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] cursor-pointer hover:text-brand-700 dark:hover:text-brand-300 transition-colors"
                                             onClick={() => requestSort('name')}
                                         >
-                                            Supermarket <SortIcon columnKey="name" />
+                                            Supermarket <SortIcon columnKey="name" currentKey={sortConfig.key} direction={sortConfig.direction} />
                                         </th>
                                         <th
-                                            className="px-8 py-5 text-left text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] cursor-pointer hover:text-blue-600 transition-colors"
+                                            className="px-8 py-5 text-left text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] cursor-pointer hover:text-brand-700 dark:hover:text-brand-300 transition-colors"
                                             onClick={() => requestSort('address')}
                                         >
-                                            Contact <SortIcon columnKey="address" />
+                                            Contact <SortIcon columnKey="address" currentKey={sortConfig.key} direction={sortConfig.direction} />
                                         </th>
-                                        <th className="px-8 py-5 text-left text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em]">Coordinates</th>
                                         <th className="px-8 py-5 text-right text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em]">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-50 dark:divide-gray-700/50">
                                     {sortedSupermarkets.map((item) => (
-                                        <tr key={item.$id} className="hover:bg-blue-50/20 dark:hover:bg-blue-900/10 transition-colors group">
+                                        <tr key={item.$id} className="hover:bg-brand-50/40 dark:hover:bg-brand-900/10 transition-colors group">
                                             <td className="px-8 py-6 whitespace-nowrap">
                                                 <div className="flex items-center">
                                                     <div className="h-14 w-14 flex-shrink-0 group-hover:scale-105 transition-transform duration-300">
@@ -219,30 +260,35 @@ const Supermarkets = () => {
                                                         <div className="text-base font-black text-gray-900 dark:text-white tracking-tight uppercase">
                                                             {item.brand ? `${item.brand}` : item.name}
                                                         </div>
-                                                        <div className="text-[10px] font-black text-blue-500 dark:text-blue-400 uppercase tracking-widest mt-0.5">
+                                                        <div className="text-[10px] font-black text-brand-600 dark:text-brand-300 uppercase tracking-widest mt-0.5">
                                                             {item.branchName || 'Primary Store'}
                                                         </div>
                                                     </div>
                                                 </div>
                                             </td>
                                             <td className="px-8 py-6 whitespace-nowrap">
-                                                <div className="text-sm text-gray-800 dark:text-gray-200 flex items-center gap-2 font-bold mb-1.5"><FiMapPin className="text-blue-500 text-xs" /> {item.address || 'Location Hidden'}</div>
+                                                <div className="text-sm text-gray-800 dark:text-gray-200 flex items-center gap-2 font-bold mb-1.5"><FiMapPin className="text-brand-600 dark:text-brand-300 text-xs" /> {item.address || 'Location Hidden'}</div>
                                                 <div className="text-[10px] text-gray-400 dark:text-gray-500 flex items-center gap-2 font-black uppercase tracking-widest"><FiPhone className="text-gray-300" /> {item.phoneNumber || 'No Contact'}</div>
-                                            </td>
-                                            <td className="px-8 py-6 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 font-mono text-xs">
-                                                <span className="bg-gray-50/80 dark:bg-gray-900/80 px-3 py-1.5 rounded-xl border border-gray-100 dark:border-gray-800 font-black">
-                                                    {Number.isFinite(Number(item.latitude)) && Number.isFinite(Number(item.longitude))
-                                                        ? `${Number(item.latitude).toFixed(4)}, ${Number(item.longitude).toFixed(4)}`
-                                                        : '—'}
-                                                </span>
                                             </td>
                                             <td className="px-8 py-6 whitespace-nowrap text-right text-sm font-medium">
                                                 <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button onClick={() => handleEdit(item)} className="p-3 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-2xl transition-all active:scale-95 border border-transparent hover:border-blue-100 dark:hover:border-blue-800/50">
+                                                    <button onClick={() => handleEdit(item)} className="p-3 text-brand-700 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-900/30 rounded-2xl transition-all active:scale-95 border border-transparent hover:border-brand-100 dark:hover:border-brand-800/50">
                                                         <FiEdit2 size={18} />
                                                     </button>
                                                     <button onClick={() => handleDelete(item.$id)} className="p-3 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-2xl transition-all active:scale-95 border border-transparent hover:border-red-100 dark:hover:border-red-800/50">
                                                         <FiTrash2 size={18} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-6 whitespace-nowrap text-right text-sm font-medium">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <button
+                                                        onClick={async () => {
+                                                            const newStatus = (item.status || 'open') === 'open' ? 'close' : 'open';
+                                                            await setSupermarketStatus(item.$id, newStatus);
+                                                        }}
+                                                        className={`px-3 py-2 rounded-2xl font-bold text-sm transition-colors ${((item.status||'open') === 'open') ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                                                        {((item.status||'open') === 'open') ? 'Open' : 'Closed'}
                                                     </button>
                                                 </div>
                                             </td>
@@ -256,7 +302,7 @@ const Supermarkets = () => {
 
             {showModal && (
                 <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[1000]">
-                    <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] max-w-lg w-full p-10 shadow-2xl border border-gray-100 dark:border-gray-700 animate-in zoom-in-95 duration-200">
+                    <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] max-w-5xl w-full p-10 shadow-2xl border border-gray-100 dark:border-gray-700 animate-in zoom-in-95 duration-200 max-h-[92vh] overflow-y-auto custom-scrollbar">
                         <div className="flex justify-between items-center mb-8">
                             <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight uppercase">{editing ? 'Edit Store' : 'Add Store'}</h2>
                             <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-900 transition-colors bg-gray-50 dark:bg-gray-900 p-2 rounded-xl"><FiX size={20} /></button>
@@ -281,9 +327,9 @@ const Supermarkets = () => {
                                             accept="image/*"
                                             onChange={handleImageUpload}
                                             disabled={uploading}
-                                            className="block w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-900 dark:file:text-blue-300"
+                                            className="block w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100 dark:file:bg-brand-900/30 dark:file:text-brand-300"
                                         />
-                                        {uploading && <p className="text-xs text-blue-600 mt-1 animate-pulse">Uploading...</p>}
+                                        {uploading && <p className="text-xs text-brand-700 dark:text-brand-300 mt-1 animate-pulse">Uploading...</p>}
                                     </div>
                                     <div className="relative">
                                         <div className="absolute inset-0 flex items-center" aria-hidden="true">
@@ -372,28 +418,37 @@ const Supermarkets = () => {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Latitude *</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Latitude</label>
                                     <input
                                         type="number"
                                         step="any"
                                         value={formData.latitude}
-                                        onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
+                                        onChange={(e) => {
+                                            setFormData({ ...formData, latitude: e.target.value });
+                                            setCoordinateError('');
+                                        }}
                                         className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                        required
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Longitude *</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Longitude</label>
                                     <input
                                         type="number"
                                         step="any"
                                         value={formData.longitude}
-                                        onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
+                                        onChange={(e) => {
+                                            setFormData({ ...formData, longitude: e.target.value });
+                                            setCoordinateError('');
+                                        }}
                                         className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                        required
                                     />
                                 </div>
                             </div>
+                            {coordinateError && (
+                                <p className="text-sm font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-2xl px-4 py-3">
+                                    {coordinateError}
+                                </p>
+                            )}
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Address</label>
@@ -403,6 +458,62 @@ const Supermarkets = () => {
                                     className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                                     rows="2"
                                 />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Google maps embed</label>
+                                <textarea
+                                    value={formData.embedHtml}
+                                    onChange={(e) => {
+                                        setFormData({ ...formData, embedHtml: e.target.value });
+                                        setCoordinateError('');
+                                    }}
+                                    className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                    rows="3"
+                                    placeholder={'Paste a Google Maps iframe or the embed src URL from Google Maps'}
+                                />
+                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                    Use the Google Maps embed link, not the normal share link.
+                                </p>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Google Maps URL</label>
+                                <input
+                                    type="url"
+                                    placeholder="https://maps.google.com/?q=..."
+                                    value={formData.googleMapsUrl}
+                                    onChange={(e) => setFormData({ ...formData, googleMapsUrl: e.target.value })}
+                                    className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Rating</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="5"
+                                        step="0.1"
+                                        placeholder="4.5"
+                                        value={formData.rating}
+                                        onChange={(e) => setFormData({ ...formData, rating: e.target.value })}
+                                        className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Review Count</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="1"
+                                        placeholder="128"
+                                        value={formData.reviewsCount}
+                                        onChange={(e) => setFormData({ ...formData, reviewsCount: e.target.value })}
+                                        className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                    />
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
@@ -436,7 +547,11 @@ const Supermarkets = () => {
                                 </button>
                                 <button
                                     type="submit"
-                                    disabled={uploading}
+                                    disabled={
+                                        uploading ||
+                                        (!formData.embedHtml.trim() &&
+                                            Boolean(validateSupermarketCoordinates(formData.latitude, formData.longitude)))
+                                    }
                                     className="flex-1 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-50"
                                 >
                                     {editing ? 'Update' : 'Create'}

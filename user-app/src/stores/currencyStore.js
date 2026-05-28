@@ -1,6 +1,12 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+const normalizeCurrency = (value) => {
+    if (!value) return value;
+    const upper = String(value).trim().toUpperCase();
+    return upper === 'TL' ? 'TRY' : upper;
+};
+
 const useCurrencyStore = create(
     persist(
         (set, get) => ({
@@ -10,7 +16,7 @@ const useCurrencyStore = create(
             lastUpdated: null,
             loading: false,
 
-            setCurrency: (currency) => set({ currency }),
+            setCurrency: (currency) => set({ currency: normalizeCurrency(currency) }),
 
             fetchRates: async () => {
                 const now = Date.now();
@@ -43,28 +49,37 @@ const useCurrencyStore = create(
             },
 
             convert: (amount, from = 'TRY') => {
-                const { rates, currency: to } = get();
-                if (!rates || !rates[to] || !rates[from]) return amount;
+                const { rates, currency: rawTo } = get();
+                const to = normalizeCurrency(rawTo) || 'TRY';
+                const normalizedFrom = normalizeCurrency(from) || 'TRY';
+                if (!rates || !rates[to] || !rates[normalizedFrom]) return amount;
                 
                 // Base amount in TRY
-                const baseAmount = from === 'TRY' ? amount : amount / rates[from];
+                const baseAmount = normalizedFrom === 'TRY' ? amount : amount / rates[normalizedFrom];
                 // Convert to target currency
                 return (baseAmount * rates[to]).toFixed(2);
             },
 
             getCurrencySymbol: () => {
                 const { currency } = get();
+                const normalized = normalizeCurrency(currency) || 'TRY';
                 const symbols = {
                     TRY: '₺',
                     USD: '$',
                     EUR: '€',
                     GBP: '£'
                 };
-                return symbols[currency] || currency;
+                return symbols[normalized] || normalized;
             }
         }),
         {
             name: 'currency-storage',
+            onRehydrateStorage: () => (state) => {
+                const normalized = normalizeCurrency(state?.currency);
+                if (normalized && normalized !== state?.currency) {
+                    state.setCurrency(normalized);
+                }
+            }
         }
     )
 );

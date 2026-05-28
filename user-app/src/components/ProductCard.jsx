@@ -5,13 +5,15 @@ import { useState } from 'react';
 import useCurrencyStore from '../stores/currencyStore';
 import useAuthStore from '../stores/authStore';
 import ReportModal from '../components/ReportModal';
+import StarRating from './StarRating';
 import CategoryIconLabel from '../components/CategoryIconLabel';
 
 const ProductCard = ({ product, prices = [] }) => {
     const { t } = useTranslation();
-    const { convert } = useCurrencyStore();
+    const { convert, currency } = useCurrencyStore();
     const user = useAuthStore((state) => state.user);
     const [isReportOpen, setIsReportOpen] = useState(false);
+    const displayCurrency = String(currency || 'TRY').trim().toUpperCase() === 'TL' ? 'TRY' : String(currency || 'TRY').trim().toUpperCase();
     
     // Get the lowest price for this product
     const lowestPrice = prices.length > 0
@@ -33,18 +35,11 @@ const ProductCard = ({ product, prices = [] }) => {
         const dateToUse = lowestPrice?.updatedAt || product.updatedAt || product.$createdAt;
         if (!dateToUse) return t('recently_updated', 'Recently updated');
 
-        const diffInMs = Date.now() - new Date(dateToUse).getTime();
-        const diffInMins = Math.floor(diffInMs / (1000 * 60));
-        const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
-        const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+        const parsed = new Date(dateToUse);
+        if (Number.isNaN(parsed.getTime())) return t('recently_updated', 'Recently updated');
 
-        if (diffInMins < 60) {
-            return `${diffInMins}m ${t('ago', 'ago')}`;
-        } else if (diffInHours < 24) {
-            return `${diffInHours}h ${t('ago', 'ago')}`;
-        } else {
-            return `${diffInDays}d ${t('ago', 'ago')}`;
-        }
+        const formatted = parsed.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' });
+        return `${t('updated', 'Updated')} ${formatted}`;
     };
 
     const freshnessText = getFreshnessText();
@@ -53,41 +48,41 @@ const ProductCard = ({ product, prices = [] }) => {
         <div className="relative group">
             <Link
                 to={`/price-comparison/${productKey}`}
-                className="group block bg-white dark:bg-gray-800 rounded-3xl p-4 shadow-soft hover:shadow-soft-lg hover:-translate-y-1 transition-all duration-300 border border-transparent hover:border-gray-100 dark:hover:border-gray-700 overflow-hidden"
+                className="group block bg-white dark:bg-gray-800 rounded-2xl sm:rounded-3xl p-2.5 sm:p-4 shadow-soft hover:shadow-soft-lg hover:-translate-y-1 transition-all duration-300 border border-transparent hover:border-gray-100 dark:hover:border-gray-700 overflow-hidden"
             >
-                <div className="flex items-center gap-5">
+                <div className="flex items-center gap-2.5 sm:gap-4 md:gap-5">
                 {/* Product Image Wrapper */}
-                <div className="relative w-24 h-24 sm:w-28 sm:h-28 bg-gray-50 dark:bg-gray-900 rounded-2xl flex items-center justify-center flex-shrink-0 overflow-hidden">
+                <div className="relative w-[4.25rem] h-[4.25rem] sm:w-24 sm:h-24 md:w-28 md:h-28 bg-gray-50 dark:bg-gray-900 rounded-xl sm:rounded-2xl flex items-center justify-center flex-shrink-0 overflow-hidden">
                     {imageUrl && !imageFailed ? (
                         <img
                             src={imageUrl}
                             alt={product.name}
-                            className="w-20 h-20 sm:w-24 sm:h-24 object-contain mix-blend-multiply dark:mix-blend-normal transform group-hover:scale-110 transition-transform duration-500"
+                            className="w-[3.35rem] h-[3.35rem] sm:w-20 sm:h-20 md:w-24 md:h-24 object-contain mix-blend-multiply dark:mix-blend-normal transform group-hover:scale-110 transition-transform duration-500"
                             onError={() => setImageFailed(true)}
                             loading="lazy"
                         />
                     ) : (
-                        <FiPackage className="text-gray-300 text-3xl" />
+                        <FiPackage className="text-gray-300 text-xl sm:text-3xl" />
                     )}
 
                     {/* Global Badge */}
                     {product.is_global && (
-                        <div className="absolute top-1 right-1 bg-blue-500 text-white p-1 rounded-full shadow-lg z-10" title="Global Database">
+                        <div className="absolute top-1 right-1 bg-accent-500 text-white p-1 rounded-full shadow-lg z-10" title="Global Database">
                             <FiGlobe size={10} />
                         </div>
                     )}
                 </div>
 
                 {/* Content Area */}
-                <div className="flex-1 min-w-0 flex flex-col h-full py-1">
+                <div className="flex-1 min-w-0 flex flex-col h-full py-0.5 sm:py-1">
                     <div className="mb-auto">
-                        <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start justify-between gap-2.5 sm:gap-3">
                             <div className="flex flex-col min-w-0 flex-1">
-                                <h3 className="font-semibold text-gray-900 dark:text-white text-base sm:text-lg truncate group-hover:text-blue-600 transition-colors leading-tight">
+                                <h3 className="font-semibold text-gray-900 dark:text-white text-[13px] sm:text-base md:text-lg truncate group-hover:text-brand-600 transition-colors leading-tight">
                                     {product.name}
                                 </h3>
                                 {product.is_global && (
-                                    <span className="text-[10px] text-blue-500 font-bold uppercase tracking-tighter mt-0.5">Global DB</span>
+                                    <span className="text-[10px] text-accent-500 font-bold uppercase tracking-tighter mt-0.5">Global DB</span>
                                 )}
                             </div>
                             {user && (
@@ -98,17 +93,17 @@ const ProductCard = ({ product, prices = [] }) => {
                                     e.stopPropagation();
                                     setIsReportOpen(true);
                                 }}
-                                className="shrink-0 flex h-10 w-10 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 shadow-sm transition-all hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-400 dark:hover:bg-red-500/25"
+                                className="tap-target shrink-0 flex h-10 w-10 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 shadow-sm transition-all hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-400 dark:hover:bg-red-500/25"
                                 title="Report Issue"
                                 aria-label="Report issue"
                             >
-                                <FiAlertTriangle size={18} />
+                                <FiAlertTriangle className="w-3.5 h-3.5 sm:w-[18px] sm:h-[18px]" />
                             </button>
                             )}
                         </div>
 
-                        <div className="flex flex-col gap-1 mt-1.5">
-                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1.5">
+                        <div className="flex flex-col gap-1 mt-1.25">
+                            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 mt-1.25">
                                 <CategoryIconLabel categoryId={product.categoryId} fallbackName={categoryName} />
                                 {product.brand && (
                                     <>
@@ -117,22 +112,22 @@ const ProductCard = ({ product, prices = [] }) => {
                                     </>
                                 )}
                             </div>
-                            <span className="text-[10px] text-green-600 dark:text-green-400 font-bold flex items-center gap-1 uppercase tracking-tight">
-                                <FiClock size={10} /> {freshnessText}
+                            <span className="text-[9px] sm:text-[10px] text-green-600 dark:text-green-400 font-bold flex items-center gap-1 uppercase tracking-tight truncate">
+                                <FiClock size={10} /> <span className="truncate">{freshnessText}</span>
                             </span>
                         </div>
                     </div>
 
                     {/* Footer / Price Section */}
-                    <div className="flex items-end justify-between mt-4">
+                    <div className="flex flex-col gap-2.5 mt-3 sm:mt-4 sm:flex-row sm:items-end sm:justify-between">
                         {lowestPrice ? (
-                            <div className="flex flex-col">
-                                <span className="text-[10px] uppercase font-bold tracking-widest text-gray-400 mb-0.5">{t('starting_from')}</span>
+                            <div className="flex flex-col min-w-0">
+                                <span className="text-[9px] sm:text-[10px] uppercase font-bold tracking-widest text-gray-400 mb-0.5">{t('starting_from')}</span>
                                 <div className="flex items-baseline gap-1">
-                                        <span className="text-xl font-bold text-gray-900 dark:text-white leading-none">
+                                    <span className="text-[1.05rem] sm:text-xl font-bold text-gray-900 dark:text-white leading-none">
                                         {convert(lowestPrice.price, 'TRY')}
                                     </span>
-                                    <span className="text-sm font-medium text-gray-400">TRY</span>
+                                    <span className="text-xs sm:text-sm font-medium text-gray-400">{displayCurrency}</span>
                                 </div>
                             </div>
                         ) : (
@@ -142,11 +137,20 @@ const ProductCard = ({ product, prices = [] }) => {
                         )}
                         
                         {prices.length > 0 && (
-                            <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-full border border-blue-100 dark:border-blue-800/30">
-                                <FiShoppingBag size={12} />
+                            <div className="flex w-full sm:w-auto items-center justify-center gap-1 text-[10px] sm:text-xs font-semibold text-brand-600 dark:text-brand-500 bg-brand-50 dark:bg-brand-900/30 px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-full border border-brand-100 dark:border-brand-800/30 shrink-0">
+                                <FiShoppingBag className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                                 <span>{prices.length} {prices.length === 1 ? t('supermarket') : t('supermarket') + 's'}</span>
                             </div>
                         )}
+                        {/* Compact star-only rating for mobile-first UI */}
+                        {(() => {
+                            const ratingValue = product.rating ?? product.avgRating ?? product.averageRating ?? null;
+                            return ratingValue !== null && ratingValue !== undefined ? (
+                                <div className="flex items-center sm:ml-4">
+                                    <StarRating value={ratingValue} size={12} />
+                                </div>
+                            ) : null;
+                        })()}
                     </div>
                 </div>
                 </div>

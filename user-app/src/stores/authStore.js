@@ -2,6 +2,22 @@ import { create } from 'zustand';
 import { account } from '../lib/appwrite';
 import { ID } from 'appwrite';
 import toast from 'react-hot-toast';
+import useNavHistoryStore from './navHistoryStore';
+import { buildStoredAiProfilePrefs, buildStoredAllergyPrefs, normalizeAiProfile, normalizeAllergyProfile } from '../utils/aiCheckUtils';
+
+const normalizeAllergyPrefs = (value) => {
+    return normalizeAllergyProfile(value);
+};
+
+const clearAiChatIntentCache = () => {
+    try {
+        Object.keys(window.localStorage || {})
+            .filter((key) => key.startsWith('pricemate_intent_cache_'))
+            .forEach((key) => window.localStorage.removeItem(key));
+    } catch {
+        // Cache clearing is best-effort; preference saving should not fail because of storage.
+    }
+};
 
 const useAuthStore = create((set, get) => ({
     user: null,
@@ -50,7 +66,7 @@ const useAuthStore = create((set, get) => ({
         }
     },
 
-    signup: async (email, password, name) => {
+    signup: async (email, password, name, allergies = []) => {
         set({ loading: true, error: null, errorCode: null });
         try {
             if (!password || password.length < 8) {
@@ -59,6 +75,8 @@ const useAuthStore = create((set, get) => ({
                 toast.error(message);
                 return false;
             }
+
+            const allergyPrefs = buildStoredAllergyPrefs(allergies);
             // Create account
             await account.create(ID.unique(), email, password, name);
             
@@ -67,6 +85,12 @@ const useAuthStore = create((set, get) => ({
             await account.createEmailPasswordSession(email, password);
             
             try {
+                try {
+                    await account.updatePrefs(allergyPrefs);
+                } catch (prefsError) {
+                    console.error('Could not persist allergy preferences during signup:', prefsError);
+                }
+
                 await account.createVerification(`${window.location.origin}/verify-email`);
                 
                 // CRITICAL: Log out immediately after triggering verification
@@ -192,6 +216,8 @@ const useAuthStore = create((set, get) => ({
         try {
             await account.deleteSession('current');
             set({ user: null, loading: false, errorCode: null });
+            // Clear navigation history on logout to avoid leaking previous routes
+            try { useNavHistoryStore.getState().clear(); } catch { void 0; }
             toast.success('Logged out');
         } catch (error) {
             const message = error.message || 'Logout failed';
@@ -239,6 +265,77 @@ const useAuthStore = create((set, get) => ({
             return true;
         } catch (error) {
             const message = error.message || 'Could not update password';
+            set({ error: message, errorCode: null });
+            toast.error(message);
+            return false;
+        }
+    },
+
+    updateAllergyPreferences: async (allergies = []) => {
+        const normalizedPrefs = buildStoredAllergyPrefs(normalizeAllergyPrefs(allergies));
+        try {
+            const currentUser = get().user;
+            const currentPrefs = currentUser?.prefs && typeof currentUser.prefs === 'object'
+                ? currentUser.prefs
+                : {};
+            const nextPrefs = {
+                ...currentPrefs,
+                ...normalizedPrefs
+            };
+            const user = await account.updatePrefs(nextPrefs);
+            clearAiChatIntentCache();
+            set({ user, error: null, errorCode: null });
+            toast.success('AI allergy preferences updated');
+            return true;
+        } catch (error) {
+            const message = error.message || 'Could not update allergy preferences';
+            set({ error: message, errorCode: null });
+            toast.error(message);
+            return false;
+        }
+    },
+
+    updateAiProfilePreferences: async (profile = {}) => {
+        const normalizedPrefs = buildStoredAiProfilePrefs(normalizeAiProfile(profile));
+        try {
+            const currentUser = get().user;
+            const currentPrefs = currentUser?.prefs && typeof currentUser.prefs === 'object'
+                ? currentUser.prefs
+                : {};
+            const nextPrefs = {
+                ...currentPrefs,
+                ...normalizedPrefs
+            };
+            const user = await account.updatePrefs(nextPrefs);
+            clearAiChatIntentCache();
+            set({ user, error: null, errorCode: null });
+            toast.success('AI shopping profile updated');
+            return true;
+        } catch (error) {
+            const message = error.message || 'Could not update AI shopping profile';
+            set({ error: message, errorCode: null });
+            toast.error(message);
+            return false;
+        }
+    },
+
+    updateUiPreferences: async (partial = {}) => {
+        try {
+            const currentUser = get().user;
+            const currentPrefs = currentUser?.prefs && typeof currentUser.prefs === 'object'
+                ? currentUser.prefs
+                : {};
+
+            const nextPrefs = {
+                ...currentPrefs,
+                ...partial,
+            };
+
+            const user = await account.updatePrefs(nextPrefs);
+            set({ user, error: null, errorCode: null });
+            return true;
+        } catch (error) {
+            const message = error.message || 'Could not update preferences';
             set({ error: message, errorCode: null });
             toast.error(message);
             return false;

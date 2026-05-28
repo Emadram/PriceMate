@@ -25,19 +25,29 @@ const getIconFromCategoryName = (categoryName) => {
     return CATEGORY_ICON_ELEMENTS.default;
 };
 
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
 const useCategoriesStore = create((set, get) => ({
     categories: [],
     loading: false,
     error: null,
+    lastFetchedAt: 0,
 
     fetchCategories: async () => {
+        const now = Date.now();
+        const { lastFetchedAt, categories } = get();
+        if (Array.isArray(categories) && categories.length > 0 && now - lastFetchedAt < CACHE_TTL_MS) {
+            return categories;
+        }
         set({ loading: true, error: null });
         try {
             const allCategories = await fetchCategories();
-            set({ categories: allCategories, loading: false });
+            set({ categories: allCategories, loading: false, lastFetchedAt: now });
+            return allCategories;
         } catch (error) {
             console.error('Failed to fetch categories:', error);
             set({ error: error.message, loading: false });
+            return [];
         }
     },
 

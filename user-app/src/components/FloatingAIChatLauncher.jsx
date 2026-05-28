@@ -1,28 +1,124 @@
-import { useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { FiCpu } from 'react-icons/fi';
-import AIChatBox from './AIChatBox';
+
+const AIChatBox = lazy(() => import('./AIChatBox'));
 
 const FloatingAIChatLauncher = () => {
     const [isOpen, setIsOpen] = useState(false);
+    const [enabled, setEnabled] = useState(true);
+
+    // No DOM duplicate detection — App renders a single launcher via AppShell.
+
+    // Track whether the mobile splash is present so we can visually attach the launcher
+    const [attachedToSplash, setAttachedToSplash] = useState(false);
+    // Hide the launcher while the splash is visible to avoid overlap
+    const [hideWhileSplash, setHideWhileSplash] = useState(false);
+
+    useEffect(() => {
+        if (typeof document === 'undefined') return undefined;
+
+        const detect = () => {
+            const splash = document.getElementById('pricemate-mobile-splash');
+            const exists = !!splash;
+            // Consider splash visible if it exists and has bounding rects / is not hidden
+            let visible = false;
+            try {
+                if (splash) {
+                    const rects = splash.getClientRects();
+                    const style = window.getComputedStyle(splash);
+                    visible = rects.length > 0 && style.visibility !== 'hidden' && parseFloat(style.opacity || '1') > 0;
+                }
+            } catch {
+                visible = exists;
+            }
+
+            setAttachedToSplash(exists && visible);
+            setHideWhileSplash(exists && visible);
+        };
+
+        detect();
+        const observer = new MutationObserver(detect);
+        observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true });
+
+        const openHandler = () => setIsOpen(true);
+        window.addEventListener('pricemate-open-ai', openHandler);
+
+        return () => {
+            observer.disconnect();
+            window.removeEventListener('pricemate-open-ai', openHandler);
+        };
+    }, []);
+
+    // Disable launcher on mobile now that AI is in the tab bar.
+    useEffect(() => {
+        if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+        const mq = window.matchMedia('(min-width: 768px)');
+
+        const update = () => setEnabled(!!mq.matches);
+        update();
+
+        try {
+            mq.addEventListener('change', update);
+            return () => mq.removeEventListener('change', update);
+        } catch {
+            mq.addListener(update);
+            return () => mq.removeListener(update);
+        }
+    }, []);
+
+    useEffect(() => {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('openAI') === '1') {
+                // schedule async to avoid sync setState in effect
+                Promise.resolve().then(() => setIsOpen(true));
+                // remove the param to avoid reopening on navigation
+                params.delete('openAI');
+                const newQs = params.toString();
+                const newUrl = window.location.pathname + (newQs ? `?${newQs}` : '') + window.location.hash;
+                window.history.replaceState({}, '', newUrl);
+            }
+        } catch {
+            // ignore
+        }
+    }, []);
+
+    // We always render the launcher; AppShell ensures a single instance.
+
+    const wrapperClass = attachedToSplash
+        ? 'fixed left-1/2 -translate-x-1/2 bottom-[40%] z-[2710]'
+        : 'fixed z-[2710] right-[max(1rem,env(safe-area-inset-right,0px))] max-md:bottom-[calc(7.25rem+env(safe-area-inset-bottom,0px))] md:bottom-[max(1rem,env(safe-area-inset-bottom,0px))]';
+
+    // Only lock scroll on desktop; mobile drawer must keep the underlying page scrollable
+    useEffect(() => {
+        if (typeof document === 'undefined') return undefined;
+        const isDesktop = window.matchMedia('(min-width: 640px)').matches;
+        if (isOpen && isDesktop) document.body.classList.add('ai-open');
+        else document.body.classList.remove('ai-open');
+        return () => document.body.classList.remove('ai-open');
+    }, [isOpen]);
 
     return (
         <>
-            <button
-                type="button"
-                onClick={() => setIsOpen(true)}
-                className="fixed z-[60] flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg shadow-blue-500/30 transition hover:bg-blue-700 active:scale-95 md:h-16 md:w-16"
-                style={{
-                    right: 'max(1rem, env(safe-area-inset-right))',
-                    bottom: 'max(1rem, env(safe-area-inset-bottom))',
-                }}
-                title="AI Assistant"
-                aria-label="Open AI Assistant"
-            >
-                <FiCpu className="h-7 w-7 md:h-8 md:w-8" aria-hidden />
-            </button>
-            <AIChatBox isOpen={isOpen} onClose={() => setIsOpen(false)} />
+            <div id="pricemate-ai-launcher" className={wrapperClass}>
+                {enabled && !isOpen && !hideWhileSplash && (
+                    <button
+                        type="button"
+                        onClick={() => setIsOpen(true)}
+                        className="flex items-center justify-center rounded-full bg-gradient-to-br from-brand-600 to-brand-700 text-white shadow-xl shadow-brand-600/25 transition hover:from-brand-700 hover:to-brand-800 active:scale-95 md:h-16 md:w-16 h-14 w-14 touch-none md:touch-auto"
+                        title="AI Assistant"
+                        aria-label="Open AI Assistant"
+                    >
+                        <FiCpu className="h-7 w-7 md:h-8 md:w-8" aria-hidden />
+                    </button>
+                )}
+            </div>
+            <Suspense fallback={null}>
+                {enabled && isOpen ? <AIChatBox isOpen={isOpen} onClose={() => setIsOpen(false)} /> : null}
+            </Suspense>
         </>
     );
 };
+
 
 export default FloatingAIChatLauncher;

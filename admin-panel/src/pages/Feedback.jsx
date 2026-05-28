@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
+import useFreshIndicator from '../hooks/useFreshIndicator';
 import { Link } from 'react-router-dom';
-import { FiMessageSquare, FiTrash2, FiChevronUp, FiChevronDown, FiEye, FiCheckCircle, FiClock, FiAlertTriangle, FiArrowLeft, FiFilter, FiSearch, FiX } from 'react-icons/fi';
+import { FiMessageSquare, FiTrash2, FiEye, FiCheckCircle, FiClock, FiAlertTriangle, FiArrowLeft, FiFilter, FiSearch, FiX } from 'react-icons/fi';
+import SortIcon from '../components/SortIcon';
 import useFeedbackStore from '../stores/feedbackStore';
 import Sidebar from '../components/Sidebar';
 import { client, DATABASE_ID, COLLECTIONS } from '../lib/appwrite';
@@ -12,7 +14,7 @@ const Feedback = () => {
     const [filterStatus, setFilterStatus] = useState('all');
     const [sortConfig, setSortConfig] = useState({ key: '$createdAt', direction: 'descending' });
     const [lastUpdated, setLastUpdated] = useState(null);
-    const [isFresh, setIsFresh] = useState(false);
+    const isFresh = useFreshIndicator(lastUpdated);
 
     const refreshData = useCallback(async () => {
         await fetchFeedback();
@@ -20,23 +22,19 @@ const Feedback = () => {
     }, [fetchFeedback]);
 
     useEffect(() => {
-        refreshData();
+        const t = setTimeout(() => refreshData(), 0);
+        return () => clearTimeout(t);
     }, [refreshData]);
 
     useEffect(() => {
         const channel = `databases.${DATABASE_ID}.collections.${COLLECTIONS.FEEDBACK}.documents`;
         const unsubscribe = client.subscribe(channel, () => {
-            refreshData();
+            setTimeout(() => refreshData(), 0);
         });
         return () => unsubscribe();
     }, [refreshData]);
 
-    useEffect(() => {
-        if (!lastUpdated) return;
-        setIsFresh(true);
-        const timer = setTimeout(() => setIsFresh(false), 1200);
-        return () => clearTimeout(timer);
-    }, [lastUpdated]);
+    // `isFresh` indicator handled by useFreshIndicator to avoid rapid flicker
 
     const handleDelete = async (id) => {
         if (confirm('Are you sure you want to delete this record?')) {
@@ -90,10 +88,7 @@ const Feedback = () => {
         setSortConfig({ key, direction });
     };
 
-    const SortIcon = ({ columnKey }) => {
-        if (sortConfig.key !== columnKey) return null;
-        return sortConfig.direction === 'ascending' ? <FiChevronUp className="inline ml-1" /> : <FiChevronDown className="inline ml-1" />;
-    };
+    // SortIcon hoisted to ../components/SortIcon
 
     return (
         <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
@@ -110,13 +105,13 @@ const Feedback = () => {
                             Updated {lastUpdated ? new Date(lastUpdated).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
                         </span>
                         <div className="relative group max-w-md w-full ml-4 hidden md:block">
-                            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand-600 dark:group-focus-within:text-brand-300 transition-colors" />
                             <input
                                 type="text"
                                 placeholder="Search feedback, issues or user IDs..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="bg-gray-100 dark:bg-gray-900 border-gray-200 dark:border-gray-700 rounded-2xl py-2.5 pl-11 pr-4 w-full text-sm focus:ring-2 focus:ring-blue-500/20 focus:bg-white dark:focus:bg-gray-900 transition-all outline-none text-gray-800 dark:text-gray-100"
+                                className="bg-gray-100 dark:bg-gray-900 border-gray-200 dark:border-gray-700 rounded-2xl py-2.5 pl-11 pr-4 w-full text-sm focus:ring-2 focus:ring-brand-500/20 focus:bg-white dark:focus:bg-gray-900 transition-all outline-none text-gray-800 dark:text-gray-100"
                             />
                         </div>
                     </div>
@@ -127,7 +122,7 @@ const Feedback = () => {
                         <div className="flex flex-wrap items-center gap-3 bg-gray-50 dark:bg-gray-900 p-1.5 rounded-2xl border border-gray-100 dark:border-gray-800">
                             <button 
                                 onClick={() => setFilterStatus('all')}
-                                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filterStatus === 'all' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'}`}
+                                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filterStatus === 'all' ? 'bg-brand-600 text-white shadow-lg shadow-brand-600/20' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'}`}
                             >
                                 All Feedback
                             </button>
@@ -148,7 +143,7 @@ const Feedback = () => {
 
                     {loading ? (
                         <div className="flex flex-col items-center justify-center py-20">
-                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-600 mb-4"></div>
                             <p className="text-gray-500">Retrieving moderation queue...</p>
                         </div>
                     ) : (
@@ -159,13 +154,13 @@ const Feedback = () => {
                                         <tr className="bg-gray-50/50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-700">
                                             <th onClick={() => requestSort('type')} className="px-8 py-6 cursor-pointer group">
                                                 <div className="flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
-                                                    Classification <SortIcon columnKey="type" />
+                                                    Classification <SortIcon columnKey="type" currentKey={sortConfig.key} direction={sortConfig.direction} />
                                                 </div>
                                             </th>
                                             <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Report Details</th>
                                             <th onClick={() => requestSort('status')} className="px-8 py-6 cursor-pointer group text-center">
                                                 <div className="flex items-center justify-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
-                                                    Status <SortIcon columnKey="status" />
+                                                    Status <SortIcon columnKey="status" currentKey={sortConfig.key} direction={sortConfig.direction} />
                                                 </div>
                                             </th>
                                             <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Actions</th>
@@ -173,7 +168,7 @@ const Feedback = () => {
                                     </thead>
                                     <tbody className="divide-y divide-gray-50 dark:divide-gray-700/50">
                                         {sortedFeedback.map((item) => (
-                                            <tr key={item.$id} className="hover:bg-blue-50/30 dark:hover:bg-blue-900/10 transition-colors group">
+                                            <tr key={item.$id} className="hover:bg-brand-50/40 dark:hover:bg-brand-900/10 transition-colors group">
                                                 <td className="px-8 py-6 whitespace-nowrap">
                                                     <span className={`px-4 py-2 text-[10px] rounded-xl inline-flex items-center gap-2 font-black uppercase tracking-widest ${
                                                         item.type === 'bug' || item.targetType === 'product' 
@@ -214,7 +209,7 @@ const Feedback = () => {
                                                     <div className="flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
                                                         <button
                                                             onClick={() => setSelectedFeedback(item)}
-                                                            className="p-3 bg-blue-50 dark:bg-gray-900 text-blue-600 hover:bg-blue-600 hover:text-white rounded-2xl transition-all shadow-sm"
+                                                            className="p-3 bg-brand-50 dark:bg-gray-900 text-brand-700 dark:text-brand-300 hover:bg-brand-600 hover:text-white rounded-2xl transition-all shadow-sm"
                                                             title="Inspect Log"
                                                         >
                                                             <FiEye size={18} />

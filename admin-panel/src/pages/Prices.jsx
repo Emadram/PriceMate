@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
+import useFreshIndicator from '../hooks/useFreshIndicator';
 import { Link } from 'react-router-dom';
 import { FiDollarSign, FiPlus, FiTrash2, FiChevronUp, FiChevronDown, FiEdit2, FiX, FiSearch, FiFilter, FiArrowLeft, FiShoppingBag } from 'react-icons/fi';
+import SortIcon from '../components/SortIcon';
 import usePricesStore from '../stores/pricesStore';
 import useProductsStore from '../stores/productsStore';
 import useSupermarketsStore from '../stores/supermarketsStore';
@@ -28,7 +30,7 @@ const Prices = () => {
     const [editingPrice, setEditingPrice] = useState(null);
     const [formData, setFormData] = useState({
         price: '',
-        currency: 'EGP',
+        currency: 'TRY',
         products: '',
         supermarkets: '',
         stockStatus: 'in_stock',
@@ -40,7 +42,7 @@ const Prices = () => {
     const [filterSupermarket, setFilterSupermarket] = useState('');
     const [sortConfig, setSortConfig] = useState({ key: null, direction: 'ascending' });
     const [lastUpdated, setLastUpdated] = useState(null);
-    const [isFresh, setIsFresh] = useState(false);
+    const isFresh = useFreshIndicator(lastUpdated);
 
     const refreshData = useCallback(async () => {
         await Promise.all([
@@ -52,15 +54,11 @@ const Prices = () => {
     }, [fetchPrices, fetchProducts, fetchSupermarkets, page]);
 
     useEffect(() => {
-        refreshData();
+        const t = setTimeout(() => refreshData(), 0);
+        return () => clearTimeout(t);
     }, [refreshData]);
 
-    useEffect(() => {
-        if (!lastUpdated) return;
-        setIsFresh(true);
-        const timer = setTimeout(() => setIsFresh(false), 1200);
-        return () => clearTimeout(timer);
-    }, [lastUpdated]);
+    // `isFresh` indicator handled by useFreshIndicator to avoid rapid flicker
 
     useEffect(() => {
         const channels = [
@@ -70,7 +68,7 @@ const Prices = () => {
         ];
 
         const unsubscribe = client.subscribe(channels, () => {
-            refreshData();
+            setTimeout(() => refreshData(), 0);
         });
 
         return () => unsubscribe();
@@ -83,7 +81,8 @@ const Prices = () => {
 
     useEffect(() => {
         if (adminUser) {
-            setFormData(prev => ({ ...prev, userId: adminUser.$id }));
+            const t = setTimeout(() => setFormData(prev => ({ ...prev, userId: adminUser.$id })), 0);
+            return () => clearTimeout(t);
         }
     }, [adminUser]);
 
@@ -98,7 +97,7 @@ const Prices = () => {
             setEditingPrice(null);
             setFormData({
                 price: '',
-                currency: 'EGP',
+                currency: 'TRY',
                 products: '',
                 supermarkets: '',
                 stockStatus: 'in_stock',
@@ -118,11 +117,12 @@ const Prices = () => {
     const handleEdit = (price) => {
         const productId = price.products && typeof price.products === 'object' ? price.products.$id : '';
         const supermarketId = price.supermarkets && typeof price.supermarkets === 'object' ? price.supermarkets.$id : '';
+        const displayCurrency = price.currency === 'TL' ? 'TRY' : (price.currency || 'TRY');
 
         setEditingPrice(price);
         setFormData({
             price: price.price ?? '',
-            currency: price.currency || 'EGP',
+            currency: displayCurrency,
             products: productId,
             supermarkets: supermarketId,
             stockStatus: price.stockStatus || 'in_stock',
@@ -135,12 +135,17 @@ const Prices = () => {
         setEditingPrice(null);
         setFormData({
             price: '',
-            currency: 'EGP',
+            currency: 'TRY',
             products: '',
             supermarkets: '',
             stockStatus: 'in_stock',
             userId: adminUser?.$id || ''
         });
+    };
+
+    const formatCurrencyLabel = (value) => {
+        if (!value) return 'TRY';
+        return value === 'TL' ? 'TRY' : value;
     };
 
     const getProductName = (price) => {
@@ -205,10 +210,7 @@ const Prices = () => {
         setSortConfig({ key, direction });
     };
 
-    const SortIcon = ({ columnKey }) => {
-        if (sortConfig.key !== columnKey) return null;
-        return sortConfig.direction === 'ascending' ? <FiChevronUp className="inline ml-1" /> : <FiChevronDown className="inline ml-1" />;
-    };
+    // SortIcon hoisted to ../components/SortIcon
 
     return (
         <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -225,19 +227,19 @@ const Prices = () => {
                             Updated {lastUpdated ? new Date(lastUpdated).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
                         </span>
                         <div className="relative group max-w-md w-full ml-4 hidden md:block">
-                            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand-600 dark:group-focus-within:text-brand-300 transition-colors" />
                             <input
                                 type="text"
                                 placeholder="Search by product, store or tag..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="bg-gray-100 dark:bg-gray-900 border-gray-200 dark:border-gray-700 rounded-2xl py-2.5 pl-11 pr-4 w-full text-sm focus:ring-2 focus:ring-blue-500/20 focus:bg-white dark:focus:bg-gray-900 transition-all outline-none text-gray-800 dark:text-gray-100"
+                                className="bg-gray-100 dark:bg-gray-900 border-gray-200 dark:border-gray-700 rounded-2xl py-2.5 pl-11 pr-4 w-full text-sm focus:ring-2 focus:ring-brand-500/20 focus:bg-white dark:focus:bg-gray-900 transition-all outline-none text-gray-800 dark:text-gray-100"
                             />
                         </div>
                     </div>
                     <button
                         onClick={() => { resetForm(); setShowModal(true); }}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl flex items-center gap-2 transition-all shadow-lg shadow-blue-500/20 active:scale-95 text-sm font-black uppercase tracking-widest"
+                        className="bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 rounded-2xl flex items-center gap-2 transition-all shadow-lg shadow-brand-600/20 active:scale-95 text-sm font-black uppercase tracking-widest"
                     >
                         <FiPlus size={20} className="stroke-[3]" />
                         <span className="hidden sm:inline">Add Valuation</span>
@@ -248,15 +250,15 @@ const Prices = () => {
                     <div className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-100 dark:border-gray-700 p-8 rounded-[2.5rem] shadow-sm mb-8 grid grid-cols-1 md:grid-cols-2 gap-8">
                         <div className="space-y-4">
                             <label className="flex items-center gap-3 text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">
-                                <FiFilter className="text-blue-500" />
+                                <FiFilter className="text-brand-600 dark:text-brand-300" />
                                 Asset Selection
                             </label>
                             <div className="relative group">
-                                <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors z-10" />
+                                <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand-600 dark:group-focus-within:text-brand-300 transition-colors z-10" />
                                 <select
                                     value={filterProduct}
                                     onChange={(e) => setFilterProduct(e.target.value)}
-                                    className="w-full pl-11 pr-4 py-4 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm font-bold text-gray-900 dark:text-white appearance-none cursor-pointer hover:bg-white dark:hover:bg-gray-900"
+                                    className="w-full pl-11 pr-4 py-4 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl focus:ring-2 focus:ring-brand-500/20 outline-none transition-all text-sm font-bold text-gray-900 dark:text-white appearance-none cursor-pointer hover:bg-white dark:hover:bg-gray-900"
                                 >
                                     <option value="">All products</option>
                                     {products.map(p => (
@@ -267,15 +269,15 @@ const Prices = () => {
                         </div>
                         <div className="space-y-4">
                             <label className="flex items-center gap-3 text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">
-                                <FiShoppingBag className="text-blue-500" />
+                                <FiShoppingBag className="text-brand-600 dark:text-brand-300" />
                                 Marketplace Node
                             </label>
                             <div className="relative group">
-                                <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors z-10" />
+                                <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand-600 dark:group-focus-within:text-brand-300 transition-colors z-10" />
                                 <select
                                     value={filterSupermarket}
                                     onChange={(e) => setFilterSupermarket(e.target.value)}
-                                    className="w-full pl-11 pr-4 py-4 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm font-bold text-gray-900 dark:text-white appearance-none cursor-pointer hover:bg-white dark:hover:bg-gray-900"
+                                    className="w-full pl-11 pr-4 py-4 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl focus:ring-2 focus:ring-brand-500/20 outline-none transition-all text-sm font-bold text-gray-900 dark:text-white appearance-none cursor-pointer hover:bg-white dark:hover:bg-gray-900"
                                 >
                                     <option value="">All Market Nodes</option>
                                     {supermarkets.map(s => (
@@ -288,7 +290,7 @@ const Prices = () => {
 
                     {loading ? (
                         <div className="flex flex-col items-center justify-center py-24 space-y-4">
-                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-600"></div>
                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest animate-pulse">Syncing Price Matrix...</p>
                         </div>
                     ) : (
@@ -298,27 +300,27 @@ const Prices = () => {
                                     <thead className="bg-gray-50/50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-700">
                                         <tr>
                                             <th
-                                                className="px-8 py-5 text-[10px] font-black text-gray-400 dark:text-gray-400 uppercase tracking-[0.2em] cursor-pointer hover:text-blue-600 transition-colors"
+                                                className="px-8 py-5 text-[10px] font-black text-gray-400 dark:text-gray-400 uppercase tracking-[0.2em] cursor-pointer hover:text-brand-700 dark:hover:text-brand-300 transition-colors"
                                                 onClick={() => requestSort('product')}
                                             >
                                                 <div className="flex items-center gap-2">
-                                                    Product <SortIcon columnKey="product" />
+                                                    Product <SortIcon columnKey="product" currentKey={sortConfig.key} direction={sortConfig.direction} />
                                                 </div>
                                             </th>
                                             <th
-                                                className="px-8 py-5 text-[10px] font-black text-gray-400 dark:text-gray-400 uppercase tracking-[0.2em] cursor-pointer hover:text-blue-600 transition-colors"
+                                                className="px-8 py-5 text-[10px] font-black text-gray-400 dark:text-gray-400 uppercase tracking-[0.2em] cursor-pointer hover:text-brand-700 dark:hover:text-brand-300 transition-colors"
                                                 onClick={() => requestSort('supermarket')}
                                             >
                                                 <div className="flex items-center gap-2">
-                                                    Store Node <SortIcon columnKey="supermarket" />
+                                                    Store Node <SortIcon columnKey="supermarket" currentKey={sortConfig.key} direction={sortConfig.direction} />
                                                 </div>
                                             </th>
                                             <th
-                                                className="px-8 py-5 text-[10px] font-black text-gray-400 dark:text-gray-400 uppercase tracking-[0.2em] cursor-pointer hover:text-blue-600 transition-colors"
+                                                className="px-8 py-5 text-[10px] font-black text-gray-400 dark:text-gray-400 uppercase tracking-[0.2em] cursor-pointer hover:text-brand-700 dark:hover:text-brand-300 transition-colors"
                                                 onClick={() => requestSort('price')}
                                             >
                                                 <div className="flex items-center gap-2">
-                                                    Last Trade <SortIcon columnKey="price" />
+                                                    Last Trade <SortIcon columnKey="price" currentKey={sortConfig.key} direction={sortConfig.direction} />
                                                 </div>
                                             </th>
                                             <th className="px-8 py-5 text-[10px] font-black text-gray-400 dark:text-gray-400 uppercase tracking-[0.2em]">Provenance</th>
@@ -328,7 +330,7 @@ const Prices = () => {
                                     </thead>
                                     <tbody className="divide-y divide-gray-50 dark:divide-gray-700/50">
                                         {sortedPrices.map((price) => (
-                                            <tr key={price.$id} className="hover:bg-blue-50/20 dark:hover:bg-blue-900/10 transition-colors group">
+                                            <tr key={price.$id} className="hover:bg-brand-50/40 dark:hover:bg-brand-900/10 transition-colors group">
                                                 <td className="px-8 py-6 whitespace-nowrap">
                                                     <div className="flex flex-col">
                                                         <span className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-tight">{getProductName(price)}</span>
@@ -337,13 +339,13 @@ const Prices = () => {
                                                 </td>
                                                 <td className="px-8 py-6 whitespace-nowrap text-gray-600 dark:text-gray-400 font-bold text-xs uppercase tracking-widest">
                                                     <div className="flex items-center gap-2">
-                                                        <FiShoppingBag className="text-blue-500 opacity-50" />
+                                                        <FiShoppingBag className="text-brand-600 dark:text-brand-300 opacity-50" />
                                                         {getSupermarketName(price)}
                                                     </div>
                                                 </td>
                                                 <td className="px-8 py-6 whitespace-nowrap">
                                                     <div className="text-base font-black text-green-600 dark:text-green-400">
-                                                        {price.price} <span className="text-[10px] font-black opacity-70 uppercase tracking-widest ml-1">{price.currency || 'EGP'}</span>
+                                                        {price.price} <span className="text-[10px] font-black opacity-70 uppercase tracking-widest ml-1">{formatCurrencyLabel(price.currency)}</span>
                                                     </div>
                                                 </td>
                                                 <td className="px-8 py-6 whitespace-nowrap">
@@ -366,7 +368,7 @@ const Prices = () => {
                                                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                         <button
                                                             onClick={() => handleEdit(price)}
-                                                            className="p-3 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-2xl transition-all active:scale-95 border border-transparent hover:border-blue-100 dark:hover:border-blue-800/50"
+                                                            className="p-3 text-brand-700 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-900/30 rounded-2xl transition-all active:scale-95 border border-transparent hover:border-brand-100 dark:hover:border-brand-800/50"
                                                         >
                                                             <FiEdit2 size={18} />
                                                         </button>
@@ -398,7 +400,7 @@ const Prices = () => {
                                     className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
                                         page === 1 
                                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                                        : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-blue-600 hover:text-white shadow-sm border border-gray-100 dark:border-gray-700'
+                                        : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-brand-600 hover:text-white shadow-sm border border-gray-100 dark:border-gray-700'
                                     }`}
                                 >
                                     Previous
@@ -409,7 +411,7 @@ const Prices = () => {
                                     className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
                                         page * limit >= total 
                                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                                        : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-blue-600 hover:text-white shadow-sm border border-gray-100 dark:border-gray-700'
+                                        : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-brand-600 hover:text-white shadow-sm border border-gray-100 dark:border-gray-700'
                                     }`}
                                 >
                                     Next
@@ -437,7 +439,7 @@ const Prices = () => {
                                 <select
                                     value={formData.products}
                                     onChange={(e) => setFormData({ ...formData, products: e.target.value })}
-                                    className="w-full bg-gray-50 dark:bg-gray-900 border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm font-bold text-gray-900 dark:text-white appearance-none cursor-pointer"
+                                    className="w-full bg-gray-50 dark:bg-gray-900 border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-500/20 outline-none text-sm font-bold text-gray-900 dark:text-white appearance-none cursor-pointer"
                                     required
                                 >
                                     <option value="">Select Asset</option>
@@ -454,7 +456,7 @@ const Prices = () => {
                                 <select
                                     value={formData.supermarkets}
                                     onChange={(e) => setFormData({ ...formData, supermarkets: e.target.value })}
-                                    className="w-full bg-gray-50 dark:bg-gray-900 border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm font-bold text-gray-900 dark:text-white appearance-none cursor-pointer"
+                                    className="w-full bg-gray-50 dark:bg-gray-900 border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-500/20 outline-none text-sm font-bold text-gray-900 dark:text-white appearance-none cursor-pointer"
                                     required
                                 >
                                     <option value="">Select Store</option>
@@ -474,7 +476,7 @@ const Prices = () => {
                                         step="0.01"
                                         value={formData.price}
                                         onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                                        className="w-full bg-gray-50 dark:bg-gray-900 border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-blue-500/20 outline-none text-gray-900 dark:text-white font-bold transition-all"
+                                        className="w-full bg-gray-50 dark:bg-gray-900 border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-500/20 outline-none text-gray-900 dark:text-white font-bold transition-all"
                                         placeholder="0.00"
                                         required
                                     />
@@ -485,8 +487,8 @@ const Prices = () => {
                                         type="text"
                                         value={formData.currency}
                                         onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                                        className="w-full bg-gray-50 dark:bg-gray-900 border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-blue-500/20 outline-none text-gray-900 dark:text-white font-bold transition-all text-center uppercase"
-                                        placeholder="EGP"
+                                        className="w-full bg-gray-50 dark:bg-gray-900 border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-500/20 outline-none text-gray-900 dark:text-white font-bold transition-all text-center uppercase"
+                                        placeholder="TRY"
                                     />
                                 </div>
                             </div>
@@ -496,7 +498,7 @@ const Prices = () => {
                                 <select
                                     value={formData.stockStatus || 'in_stock'}
                                     onChange={(e) => setFormData({ ...formData, stockStatus: e.target.value })}
-                                    className="w-full bg-gray-50 dark:bg-gray-900 border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm font-bold text-gray-900 dark:text-white appearance-none cursor-pointer uppercase tracking-widest"
+                                    className="w-full bg-gray-50 dark:bg-gray-900 border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-500/20 outline-none text-sm font-bold text-gray-900 dark:text-white appearance-none cursor-pointer uppercase tracking-widest"
                                 >
                                     <option value="in_stock">In Stock / High Availability</option>
                                     <option value="low_stock">Low Stock / Warning</option>
@@ -507,7 +509,7 @@ const Prices = () => {
                             <div className="flex gap-4 pt-4">
                                 <button
                                     type="submit"
-                                    className="flex-1 bg-blue-600 text-white px-6 py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 active:scale-95"
+                                    className="flex-1 bg-brand-600 text-white px-6 py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 active:scale-95"
                                 >
                                     {editingPrice ? 'Commit Sync' : 'Initialize Node'}
                                 </button>
