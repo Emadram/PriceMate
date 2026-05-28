@@ -63,7 +63,7 @@ const UserChatDetail = () => {
                         <div className="space-y-2">
                             <Link
                                 to={`/chat-history/${userId}`}
-                                className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 hover:gap-3 transition-all"
+                                className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-brand-700 dark:text-brand-300 hover:gap-3 transition-all"
                             >
                                 <FiArrowLeft size={14} /> Back to conversations
                             </Link>
@@ -127,7 +127,7 @@ const UserChatDetail = () => {
                             <p className="text-gray-500 mt-2 mb-6">It may have been deleted or the link is invalid.</p>
                             <Link
                                 to={`/chat-history/${userId}`}
-                                className="text-blue-600 dark:text-blue-400 font-bold text-sm uppercase tracking-widest"
+                                className="text-brand-700 dark:text-brand-300 font-bold text-sm uppercase tracking-widest"
                             >
                                 Back to conversations
                             </Link>

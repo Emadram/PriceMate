@@ -23,7 +23,7 @@ const ProtectedRoute = ({ children }) => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center space-y-4">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-brand-600"></div>
         <span className="text-gray-400 font-medium">Verifying Credentials...</span>
       </div>
     );
@@ -60,7 +60,7 @@ function App() {
       <Suspense
         fallback={
           <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
+            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-brand-600"></div>
           </div>
         }
       >

@@ -90,7 +90,7 @@ const UserChatSessions = () => {
             <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900 font-sans">
                 <Sidebar />
                 <div className="flex-1 flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" />
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-600" />
                 </div>
             </div>
         );
@@ -105,7 +105,7 @@ const UserChatSessions = () => {
                     <div>
                         <Link
                             to="/chat-history"
-                            className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 mb-3 hover:gap-3 transition-all"
+                            className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-brand-700 dark:text-brand-300 mb-3 hover:gap-3 transition-all"
                         >
                             <FiArrowLeft size={14} /> All AI chat logs
                         </Link>
@@ -138,13 +138,13 @@ const UserChatSessions = () => {
 
                     <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
                         <div className="relative group max-w-md w-full hidden md:block">
-                            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand-600 dark:group-focus-within:text-brand-300 transition-colors" />
                             <input
                                 type="text"
                                 placeholder="Search conversations…"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="bg-gray-100 dark:bg-gray-900/50 border-gray-200 dark:border-gray-700 rounded-2xl py-2.5 pl-11 pr-4 w-full text-sm focus:ring-2 focus:ring-blue-500/20 focus:bg-white dark:focus:bg-gray-900 transition-all outline-none text-gray-800 dark:text-gray-100"
+                                className="bg-gray-100 dark:bg-gray-900/50 border-gray-200 dark:border-gray-700 rounded-2xl py-2.5 pl-11 pr-4 w-full text-sm focus:ring-2 focus:ring-brand-500/20 focus:bg-white dark:focus:bg-gray-900 transition-all outline-none text-gray-800 dark:text-gray-100"
                             />
                         </div>
                         <button
@@ -176,7 +176,7 @@ const UserChatSessions = () => {
                             {filteredThreads.map((t) => (
                                 <div
                                     key={t.threadKey}
-                                    className="group relative bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-5 text-left transition-all hover:border-blue-400 hover:shadow-lg"
+                                    className="group relative bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-5 text-left transition-all hover:border-brand-400 hover:shadow-lg"
                                 >
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="flex items-center gap-3 min-w-0">
@@ -224,7 +224,7 @@ const UserChatSessions = () => {
                                                 `/chat-history/${userId}/${encodeURIComponent(t.threadKey)}`
                                             )
                                         }
-                                        className="mt-4 w-full flex items-center justify-between text-xs font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400"
+                                        className="mt-4 w-full flex items-center justify-between text-xs font-bold uppercase tracking-widest text-brand-700 dark:text-brand-300"
                                     >
                                         Open conversation
                                         <FiChevronRight className="transition-transform group-hover:translate-x-1" />

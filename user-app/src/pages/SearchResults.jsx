@@ -3,9 +3,12 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { FiArrowLeft, FiSearch, FiFilter } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
 import { fetchPricesForProducts, searchProducts, fetchCategories, normalizeProduct } from '../utils/productUtils';
+import { getCacheEntry, swrGetOrFetch } from '../utils/swrCache';
 import ProductCard from '../components/ProductCard';
 import { ProductCardSkeleton } from '../components/SkeletonLoaders';
 import BackButton from '../components/BackButton';
+
+const SEARCH_CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes
 
 const SearchResults = () => {
     const { t } = useTranslation();
@@ -16,6 +19,7 @@ const SearchResults = () => {
 
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [categories, setCategories] = useState([]);
 
     // Search form states
@@ -25,6 +29,7 @@ const SearchResults = () => {
 
     const prevProductIds = useRef('');
     const prevPrices = useRef([]);
+    const requestSeq = useRef(0);
 
     // Debounce search input changes to automatically update URL
     useEffect(() => {
@@ -42,8 +47,10 @@ const SearchResults = () => {
     }, [searchInput, selectedCategory, query, categoryIdFromUrl, navigate]);
 
     const loadInitialData = useCallback(async () => {
-        setLoading(true);
-        try {
+        const seq = ++requestSeq.current;
+        const key = `search:${encodeURIComponent(query)}:${encodeURIComponent(categoryIdFromUrl)}:${encodeURIComponent(sortBy)}`;
+
+        const fetcher = async () => {
             // Fetch categories if not already fetched
             const [searchResults, allCategories] = await Promise.all([
                 searchProducts(query, categoryIdFromUrl, 40, sortBy),
@@ -98,16 +105,54 @@ const SearchResults = () => {
                 normalizedResults.sort((a, b) => (b.cheapestPrice || 0) - (a.cheapestPrice || 0));
             }
 
-            setProducts(normalizedResults);
-            if (categories.length === 0) setCategories(allCategories);
+            return {
+                products: normalizedResults,
+                categories: allCategories || [],
+                query,
+                categoryIdFromUrl,
+            };
+        };
+
+        const applyData = (payload, { isRefresh } = {}) => {
+            if (seq !== requestSeq.current) return;
+            if (!payload) return;
+
+            setProducts(Array.isArray(payload.products) ? payload.products : []);
+            if (Array.isArray(payload.categories) && payload.categories.length > 0) {
+                setCategories(payload.categories);
+            }
 
             // Sync local input with URL
-            setSearchInput(query);
-            setSelectedCategory(categoryIdFromUrl);
+            setSearchInput(payload.query ?? query);
+            setSelectedCategory(payload.categoryIdFromUrl ?? categoryIdFromUrl);
+
+            setLoading(false);
+            setRefreshing(!!isRefresh);
+        };
+
+        // Try to show cached immediately (if present)
+        try {
+            const { data, fromCache, refreshing: willRefresh } = await swrGetOrFetch(key, {
+                ttlMs: SEARCH_CACHE_TTL_MS,
+                fetcher,
+                onUpdate: (next) => applyData(next, { isRefresh: false }),
+            });
+
+            if (fromCache && data) {
+                applyData(data, { isRefresh: willRefresh });
+            } else {
+                setLoading(true);
+                setRefreshing(false);
+                const entry = getCacheEntry(key);
+                const awaited = entry?.promise ? await entry.promise : await fetcher();
+                applyData(awaited, { isRefresh: false });
+            }
         } catch (error) {
+            if (seq !== requestSeq.current) return;
             console.error('Data loading error:', error);
+            setLoading(false);
+            setRefreshing(false);
         }
-        setLoading(false);
     }, [query, categoryIdFromUrl, sortBy, categories]);
 
     useEffect(() => {
@@ -218,7 +263,14 @@ const SearchResults = () => {
                             </div>
                             <div className="hidden md:block text-right">
                                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('found', 'Found')}</p>
-                                <p className="text-sm font-bold text-brand-600 dark:text-brand-500">{t('items_count_lower', { count: products.length, defaultValue: '{{count}} items' })}</p>
+                                <div className="flex items-center justify-end gap-2">
+                                    <p className="text-sm font-bold text-brand-600 dark:text-brand-500">{t('items_count_lower', { count: products.length, defaultValue: '{{count}} items' })}</p>
+                                    {refreshing && (
+                                        <span className="text-[9px] font-black uppercase tracking-[0.28em] text-gray-400">
+                                            {t('updating', 'Updating')}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
@@ -289,7 +341,7 @@ const SearchResults = () => {
                         </div>
                     </div>
                 ) : (
-                    <div>
+                    <div className={`transition-opacity duration-200 ${refreshing ? 'opacity-70' : 'opacity-100'}`}>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                             {products.map((product) => (
                                 <ProductCard

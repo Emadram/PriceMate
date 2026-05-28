@@ -159,13 +159,13 @@ const PriceHistory = () => {
                             Updated {lastUpdated ? new Date(lastUpdated).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
                         </span>
                         <div className="relative group max-w-md w-full ml-4 hidden md:block">
-                            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand-600 dark:group-focus-within:text-brand-300 transition-colors" />
                             <input
                                 type="text"
                                 placeholder="Search product, store or reason..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="bg-gray-100 dark:bg-gray-900 border-gray-200 dark:border-gray-700 rounded-2xl py-2.5 pl-11 pr-4 w-full text-sm focus:ring-2 focus:ring-blue-500/20 focus:bg-white dark:focus:bg-gray-900 transition-all outline-none text-gray-800 dark:text-gray-100"
+                                className="bg-gray-100 dark:bg-gray-900 border-gray-200 dark:border-gray-700 rounded-2xl py-2.5 pl-11 pr-4 w-full text-sm focus:ring-2 focus:ring-brand-500/20 focus:bg-white dark:focus:bg-gray-900 transition-all outline-none text-gray-800 dark:text-gray-100"
                             />
                         </div>
                     </div>
@@ -191,7 +191,7 @@ const PriceHistory = () => {
                             });
                             setShowModal(true);
                         }}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl flex items-center gap-2 transition-all shadow-lg shadow-blue-500/20 active:scale-95 text-sm font-black uppercase tracking-widest"
+                        className="bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 rounded-2xl flex items-center gap-2 transition-all shadow-lg shadow-brand-600/20 active:scale-95 text-sm font-black uppercase tracking-widest"
                     >
                         <FiPlus size={20} className="stroke-[3]" /> Add Entry
                     </button>
@@ -200,7 +200,7 @@ const PriceHistory = () => {
                 <main className="max-w-7xl mx-auto px-6 py-8 w-full">
                     {loading ? (
                         <div className="flex h-64 items-center justify-center">
-                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-600"></div>
                         </div>
                     ) : (
                         <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
@@ -218,7 +218,7 @@ const PriceHistory = () => {
                                 </thead>
                                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-50 dark:divide-gray-700/50">
                                     {filteredHistory.map((item) => (
-                                        <tr key={item.$id} className="hover:bg-blue-50/20 dark:hover:bg-blue-900/10 transition-colors group">
+                                        <tr key={item.$id} className="hover:bg-brand-50/40 dark:hover:bg-brand-900/10 transition-colors group">
                                             <td className="px-8 py-6 whitespace-nowrap">
                                                 <div className="text-sm font-black text-gray-900 dark:text-white">
                                                     {getProductName(item.productId)}
@@ -262,7 +262,7 @@ const PriceHistory = () => {
                                                 <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <button
                                                         onClick={() => handleEdit(item)}
-                                                        className="p-3 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-2xl transition-all active:scale-95 border border-transparent hover:border-blue-100 dark:hover:border-blue-800/50"
+                                                        className="p-3 text-brand-700 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-900/30 rounded-2xl transition-all active:scale-95 border border-transparent hover:border-brand-100 dark:hover:border-brand-800/50"
                                                     >
                                                         <FiEdit2 size={18} />
                                                     </button>
@@ -301,7 +301,7 @@ const PriceHistory = () => {
                                     <select
                                         value={formData.productId}
                                         onChange={(e) => setFormData({ ...formData, productId: e.target.value })}
-                                        className="w-full bg-gray-50 dark:bg-gray-900 border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm font-bold text-gray-900 dark:text-white appearance-none cursor-pointer"
+                                        className="w-full bg-gray-50 dark:bg-gray-900 border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-500/20 outline-none text-sm font-bold text-gray-900 dark:text-white appearance-none cursor-pointer"
                                         required
                                     >
                                         <option value="">Select Product</option>
@@ -315,7 +315,7 @@ const PriceHistory = () => {
                                     <select
                                         value={formData.supermarketId}
                                         onChange={(e) => setFormData({ ...formData, supermarketId: e.target.value })}
-                                        className="w-full bg-gray-50 dark:bg-gray-900 border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm font-bold text-gray-900 dark:text-white appearance-none cursor-pointer"
+                                        className="w-full bg-gray-50 dark:bg-gray-900 border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-500/20 outline-none text-sm font-bold text-gray-900 dark:text-white appearance-none cursor-pointer"
                                         required
                                     >
                                         <option value="">Select Supermarket</option>
@@ -334,7 +334,7 @@ const PriceHistory = () => {
                                         step="0.01"
                                         value={formData.price}
                                         onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                                        className="w-full bg-gray-50 dark:bg-gray-900 border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-blue-500/20 outline-none text-gray-900 dark:text-white font-bold transition-all"
+                                        className="w-full bg-gray-50 dark:bg-gray-900 border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-500/20 outline-none text-gray-900 dark:text-white font-bold transition-all"
                                         required
                                     />
                                 </div>
@@ -344,7 +344,7 @@ const PriceHistory = () => {
                                         type="datetime-local"
                                         value={formData.timestamp}
                                         onChange={(e) => setFormData({ ...formData, timestamp: e.target.value })}
-                                        className="w-full bg-gray-50 dark:bg-gray-900 border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-blue-500/20 outline-none text-gray-900 dark:text-white font-bold transition-all"
+                                        className="w-full bg-gray-50 dark:bg-gray-900 border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-500/20 outline-none text-gray-900 dark:text-white font-bold transition-all"
                                         required
                                     />
                                 </div>
@@ -357,7 +357,7 @@ const PriceHistory = () => {
                                         type="text"
                                         value={formData.priceId}
                                         onChange={(e) => setFormData({ ...formData, priceId: e.target.value })}
-                                        className="w-full bg-gray-50 dark:bg-gray-900 border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-blue-500/20 outline-none text-gray-900 dark:text-white font-bold transition-all"
+                                        className="w-full bg-gray-50 dark:bg-gray-900 border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-500/20 outline-none text-gray-900 dark:text-white font-bold transition-all"
                                         placeholder="Optional"
                                     />
                                 </div>
@@ -366,7 +366,7 @@ const PriceHistory = () => {
                                     <select
                                         value={formData.isPromotional ? 'yes' : 'no'}
                                         onChange={(e) => setFormData({ ...formData, isPromotional: e.target.value === 'yes' })}
-                                        className="w-full bg-gray-50 dark:bg-gray-900 border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm font-bold text-gray-900 dark:text-white appearance-none cursor-pointer"
+                                        className="w-full bg-gray-50 dark:bg-gray-900 border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-500/20 outline-none text-sm font-bold text-gray-900 dark:text-white appearance-none cursor-pointer"
                                     >
                                         <option value="no">Standard</option>
                                         <option value="yes">Promotional</option>
@@ -380,7 +380,7 @@ const PriceHistory = () => {
                                     type="text"
                                     value={formData.priceChangeReason}
                                     onChange={(e) => setFormData({ ...formData, priceChangeReason: e.target.value })}
-                                    className="w-full bg-gray-50 dark:bg-gray-900 border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-blue-500/20 outline-none text-gray-900 dark:text-white font-bold transition-all"
+                                    className="w-full bg-gray-50 dark:bg-gray-900 border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-500/20 outline-none text-gray-900 dark:text-white font-bold transition-all"
                                     placeholder="Optional reason"
                                 />
                             </div>
@@ -388,7 +388,7 @@ const PriceHistory = () => {
                             <div className="flex gap-4 pt-4">
                                 <button
                                     type="submit"
-                                    className="flex-1 bg-blue-600 text-white px-6 py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 active:scale-95"
+                                    className="flex-1 bg-brand-600 text-white px-6 py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 active:scale-95"
                                 >
                                     {editing ? 'Update Entry' : 'Create Entry'}
                                 </button>

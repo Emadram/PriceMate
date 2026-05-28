@@ -669,7 +669,7 @@ const Products = () => {
                                             </td>
                                             <td className="px-8 py-6 text-right whitespace-nowrap">
                                                 <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button onClick={() => handleEdit(item)} className="p-3 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-2xl transition-all active:scale-95 border border-transparent hover:border-blue-100 dark:hover:border-blue-800/50">
+                                                    <button onClick={() => handleEdit(item)} className="p-3 text-brand-700 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-900/30 rounded-2xl transition-all active:scale-95 border border-transparent hover:border-brand-100 dark:hover:border-brand-800/50">
                                                         <FiEdit2 size={18} />
                                                     </button>
                                                     <button onClick={() => handleDelete(item.$id)} className="p-3 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-2xl transition-all active:scale-95 border border-transparent hover:border-red-100 dark:hover:border-red-800/50">
@@ -696,7 +696,7 @@ const Products = () => {
                                     className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
                                         page === 1 
                                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                                        : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-blue-600 hover:text-white shadow-sm border border-gray-100 dark:border-gray-700'
+                                        : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-brand-600 hover:text-white shadow-sm border border-gray-100 dark:border-gray-700'
                                     }`}
                                 >
                                     Previous
@@ -707,7 +707,7 @@ const Products = () => {
                                     className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
                                         page * limit >= total 
                                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                                        : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-blue-600 hover:text-white shadow-sm border border-gray-100 dark:border-gray-700'
+                                        : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-brand-600 hover:text-white shadow-sm border border-gray-100 dark:border-gray-700'
                                     }`}
                                 >
                                     Next
@@ -745,7 +745,7 @@ const Products = () => {
                                                 type="text"
                                                 value={formData.name}
                                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                                className="w-full bg-gray-50 dark:bg-gray-900 border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-blue-500/20 outline-none text-gray-900 dark:text-white font-bold transition-all"
+                                                className="w-full bg-gray-50 dark:bg-gray-900 border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-500/20 outline-none text-gray-900 dark:text-white font-bold transition-all"
                                                 placeholder="Enter product title..."
                                                 required
                                             />
@@ -757,7 +757,7 @@ const Products = () => {
                                                     type="button"
                                                     onClick={handleOffLookup}
                                                     disabled={offLookup.loading}
-                                                    className="text-[10px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-700 disabled:opacity-50"
+                                                    className="text-[10px] font-black uppercase tracking-widest text-brand-700 hover:text-brand-800 dark:text-brand-300 disabled:opacity-50"
                                                 >
                                                     {offLookup.loading ? 'Searching...' : 'Autofill'}
                                                 </button>
@@ -766,7 +766,7 @@ const Products = () => {
                                                 type="text"
                                                 value={formData.barcode}
                                                 onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
-                                                className="w-full bg-gray-50 dark:bg-gray-900 border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-blue-500/20 outline-none text-gray-900 dark:text-white font-bold transition-all"
+                                                className="w-full bg-gray-50 dark:bg-gray-900 border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-500/20 outline-none text-gray-900 dark:text-white font-bold transition-all"
                                                 placeholder="Scan or type barcode..."
                                                 required
                                             />
@@ -774,14 +774,14 @@ const Products = () => {
                                                 <p className="text-[11px] text-red-600 font-semibold">{offLookup.error}</p>
                                             )}
                                             {offLookup.results.length > 0 && (
-                                                <div className="mt-2 rounded-2xl border border-blue-100 dark:border-blue-900/60 bg-blue-50/40 dark:bg-blue-900/20 p-3 space-y-2">
-                                                    <div className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Open Food Facts matches</div>
+                                                <div className="mt-2 rounded-2xl border border-brand-100 dark:border-brand-900/60 bg-brand-50/40 dark:bg-brand-900/20 p-3 space-y-2">
+                                                    <div className="text-[10px] font-black text-brand-700 dark:text-brand-300 uppercase tracking-widest">Open Food Facts matches</div>
                                                     {offLookup.results.map((hit) => (
                                                         <button
                                                             key={hit.barcode}
                                                             type="button"
                                                             onClick={() => applyOffCandidate(hit)}
-                                                            className="w-full text-left p-2 rounded-xl bg-white/70 dark:bg-gray-900/60 hover:bg-white dark:hover:bg-gray-900 border border-transparent hover:border-blue-200 dark:hover:border-blue-800 transition"
+                                                            className="w-full text-left p-2 rounded-xl bg-white/70 dark:bg-gray-900/60 hover:bg-white dark:hover:bg-gray-900 border border-transparent hover:border-brand-200 dark:hover:border-brand-800 transition"
                                                         >
                                                             <div className="text-xs font-bold text-gray-900 dark:text-white truncate">{hit.name}</div>
                                                             <div className="flex items-center justify-between text-[10px] text-gray-500 dark:text-gray-400">
@@ -802,7 +802,7 @@ const Products = () => {
                                                 type="text"
                                                 value={formData.brand}
                                                 onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-                                                className="w-full bg-gray-50 dark:bg-gray-900 border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-blue-500/20 outline-none text-gray-900 dark:text-white font-bold transition-all"
+                                                className="w-full bg-gray-50 dark:bg-gray-900 border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-500/20 outline-none text-gray-900 dark:text-white font-bold transition-all"
                                                 placeholder="Brand name..."
                                             />
                                         </div>
@@ -813,7 +813,7 @@ const Products = () => {
                                                     type="checkbox"
                                                     checked={useOffImage}
                                                     onChange={(e) => setUseOffImage(e.target.checked)}
-                                                    className="h-4 w-4 accent-blue-600"
+                                                    className="h-4 w-4 accent-brand-600"
                                                 />
                                                 <span className="text-xs font-bold text-gray-700 dark:text-gray-200">
                                                     Apply OFF image when selecting a match
@@ -828,7 +828,7 @@ const Products = () => {
                                             <select
                                                 value={formData.categoryId}
                                                 onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-                                                className="w-full bg-gray-50 dark:bg-gray-900 border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm font-bold text-gray-900 dark:text-white appearance-none cursor-pointer"
+                                                className="w-full bg-gray-50 dark:bg-gray-900 border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-500/20 outline-none text-sm font-bold text-gray-900 dark:text-white appearance-none cursor-pointer"
                                             >
                                                 <option value="">Select Category</option>
                                                 {categories.map((cat) => (
@@ -842,7 +842,7 @@ const Products = () => {
                                                 type="number"
                                                 value={formData.stockQuantity}
                                                 onChange={(e) => setFormData({ ...formData, stockQuantity: parseInt(e.target.value) })}
-                                                className="w-full bg-gray-50 dark:bg-gray-900 border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-blue-500/20 outline-none text-gray-900 dark:text-white font-bold transition-all"
+                                                className="w-full bg-gray-50 dark:bg-gray-900 border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-500/20 outline-none text-gray-900 dark:text-white font-bold transition-all"
                                                 min="0"
                                             />
                                         </div>
@@ -853,7 +853,7 @@ const Products = () => {
                                         <textarea
                                             value={formData.description}
                                             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                            className="w-full bg-gray-50 dark:bg-gray-900 border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-blue-500/20 outline-none text-gray-900 dark:text-white font-bold transition-all min-h-[120px]"
+                                            className="w-full bg-gray-50 dark:bg-gray-900 border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-500/20 outline-none text-gray-900 dark:text-white font-bold transition-all min-h-[120px]"
                                             placeholder="Provide additional details..."
                                         />
                                     </div>
@@ -873,7 +873,7 @@ const Products = () => {
                                                     inputMode="decimal"
                                                     value={formData.sugarsPer100g}
                                                     onChange={(e) => setFormData({ ...formData, sugarsPer100g: e.target.value })}
-                                                    className="w-full bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-blue-500/20 outline-none text-gray-900 dark:text-white font-bold transition-all"
+                                                    className="w-full bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-500/20 outline-none text-gray-900 dark:text-white font-bold transition-all"
                                                     placeholder="e.g. 12.5"
                                                 />
                                             </div>
@@ -884,7 +884,7 @@ const Products = () => {
                                                     inputMode="decimal"
                                                     value={formData.sodiumMgPer100g}
                                                     onChange={(e) => setFormData({ ...formData, sodiumMgPer100g: e.target.value })}
-                                                    className="w-full bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-blue-500/20 outline-none text-gray-900 dark:text-white font-bold transition-all"
+                                                    className="w-full bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-500/20 outline-none text-gray-900 dark:text-white font-bold transition-all"
                                                     placeholder="e.g. 400"
                                                 />
                                             </div>
@@ -894,7 +894,7 @@ const Products = () => {
                                             <textarea
                                                 value={formData.ingredientsText}
                                                 onChange={(e) => setFormData({ ...formData, ingredientsText: e.target.value })}
-                                                className="w-full bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-blue-500/20 outline-none text-gray-900 dark:text-white font-bold transition-all min-h-[100px]"
+                                                className="w-full bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-500/20 outline-none text-gray-900 dark:text-white font-bold transition-all min-h-[100px]"
                                                 placeholder="Comma-separated or label-style ingredient list..."
                                             />
                                         </div>
@@ -904,7 +904,7 @@ const Products = () => {
                                                 type="text"
                                                 value={formData.nutritionSource}
                                                 onChange={(e) => setFormData({ ...formData, nutritionSource: e.target.value })}
-                                                className="w-full bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-blue-500/20 outline-none text-gray-900 dark:text-white font-bold transition-all"
+                                                className="w-full bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-500/20 outline-none text-gray-900 dark:text-white font-bold transition-all"
                                                 placeholder="e.g. Manufacturer label 2025"
                                             />
                                         </div>
@@ -913,7 +913,7 @@ const Products = () => {
                                     <div className="flex gap-4 pt-4">
                                         <button
                                             type="submit"
-                                            className="flex-1 bg-blue-600 text-white px-6 py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 active:scale-95"
+                                            className="flex-1 bg-brand-600 text-white px-6 py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 active:scale-95"
                                         >
                                             {editingProduct ? 'Commit Changes' : 'Launch Product'}
                                         </button>

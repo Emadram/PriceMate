@@ -381,8 +381,8 @@ const Dashboard = () => {
                                     <p className="text-[10px] text-gray-400 uppercase tracking-[0.2em] font-black">Updates in the last 7 days</p>
                                 </div>
                                 <div className="flex gap-2">
-                                    <span className="flex items-center gap-1.5 text-[10px] font-black text-blue-600 bg-blue-50 px-3 py-1 rounded-full uppercase">
-                                        <div className="w-1.5 h-1.5 bg-blue-600 rounded-full"></div> Activity
+                                    <span className="flex items-center gap-1.5 text-[10px] font-black text-brand-700 bg-brand-50 px-3 py-1 rounded-full uppercase">
+                                        <div className="w-1.5 h-1.5 bg-brand-600 rounded-full"></div> Activity
                                     </span>
                                 </div>
                             </div>
@@ -494,7 +494,7 @@ const Dashboard = () => {
 const MetricCard = ({ title, value, icon, trend, isUp, color, loading }) => {
     const IconComponent = icon;
     const colorMap = {
-        blue: 'text-blue-600 bg-blue-50 border-blue-100 dark:bg-blue-900/30 dark:border-blue-800',
+        blue: 'text-brand-700 bg-brand-50 border-brand-100 dark:bg-brand-900/30 dark:border-brand-800',
         emerald: 'text-emerald-600 bg-emerald-50 border-emerald-100 dark:bg-emerald-900/30 dark:border-emerald-800',
         rose: 'text-rose-600 bg-rose-50 border-rose-100 dark:bg-rose-900/30 dark:border-rose-800',
         amber: 'text-amber-600 bg-amber-50 border-amber-100 dark:bg-amber-900/30 dark:border-amber-800',
@@ -526,7 +526,7 @@ const MetricCard = ({ title, value, icon, trend, isUp, color, loading }) => {
 const QuickStatus = ({ title, value, subText, icon, color, onClick }) => {
     const IconComponent = icon;
     const colorMap = {
-        blue: 'bg-blue-600 shadow-blue-500/30',
+        blue: 'bg-brand-600 shadow-brand-600/30',
         amber: 'bg-amber-500 shadow-amber-500/30',
         rose: 'bg-rose-500 shadow-rose-500/30',
     };
@@ -540,7 +540,7 @@ const QuickStatus = ({ title, value, subText, icon, color, onClick }) => {
                 <IconComponent size={28} strokeWidth={2.5} />
             </div>
             <div>
-                <h4 className="text-2xl font-black text-gray-900 dark:text-white leading-none mb-1.5 group-hover:text-blue-600 transition-colors">{value}</h4>
+                <h4 className="text-2xl font-black text-gray-900 dark:text-white leading-none mb-1.5 group-hover:text-brand-700 dark:group-hover:text-brand-300 transition-colors">{value}</h4>
                 <p className="text-sm font-black text-gray-500 tracking-tight leading-none mb-2">{title}</p>
                 <div className="flex items-center gap-1.5 opacity-60">
                     <div className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>

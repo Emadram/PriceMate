@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { FiChevronRight, FiPackage, FiZap, FiBell, FiInfo, FiAlertTriangle, FiClock, FiSearch } from 'react-icons/fi';
@@ -7,9 +7,12 @@ import useCategoriesStore from '../stores/categoriesStore';
 import useNavHistoryStore from '../stores/navHistoryStore';
 import useFavoritesStore from '../stores/favoritesStore';
 import { fetchProducts, fetchPricesForProducts, normalizeProduct } from '../utils/productUtils';
+import { getCacheEntry, swrGetOrFetch } from '../utils/swrCache';
 import ProductCard from '../components/ProductCard';
 import { ProductCardSkeleton } from '../components/SkeletonLoaders';
 import MarketsSection from '../components/MarketsSection';
+
+const HOME_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
 
 const Home = () => {
     const { t } = useTranslation();
@@ -23,6 +26,7 @@ const Home = () => {
     const [featuredProducts, setFeaturedProducts] = useState([]);
     const [marketInsights, setMarketInsights] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState(null);
     const navigationStack = useNavHistoryStore((state) => state.stack);
     const [webSearch, setWebSearch] = useState('');
@@ -77,10 +81,19 @@ const Home = () => {
         }
     };
 
-    const loadData = useCallback(async () => {
-        setLoading(true);
-        setError(null);
+    const favoritesKey = useMemo(() => {
         try {
+            return Array.isArray(favoriteProductIds) ? favoriteProductIds.slice().sort().join(',') : '';
+        } catch {
+            return '';
+        }
+    }, [favoriteProductIds]);
+
+    const loadData = useCallback(async () => {
+        setError(null);
+        const key = `home:v1:${favoritesKey}`;
+
+        const fetcher = async () => {
             // Fetch products and categories (Announcements handled by store)
             const [products, fetchedAnnouncements] = await Promise.all([
                 fetchProducts(12),
@@ -108,9 +121,6 @@ const Home = () => {
             // Batch fetch prices for these products
             const productIds = products.map(p => p.$id);
             const batchPrices = await fetchPricesForProducts(productIds);
-
-            // Announcements are backend-only (no dynamic price insights)
-            setMarketInsights(announcementInsights);
 
             // Normalize
             const normalizedProducts = products.map((p) => normalizeProduct(p, batchPrices));
@@ -154,16 +164,52 @@ const Home = () => {
                 return String(a.name || a.productName || '').localeCompare(String(b.name || b.productName || ''), undefined, { sensitivity: 'base' });
             });
 
-            setFeaturedProducts(personalizedProducts.slice(0, 4));
+            return {
+                featuredProducts: personalizedProducts.slice(0, 4),
+                marketInsights: announcementInsights,
+            };
+        };
+
+        const applyPayload = (payload, { isRefresh } = {}) => {
+            if (!payload) return;
+            setFeaturedProducts(Array.isArray(payload.featuredProducts) ? payload.featuredProducts : []);
+            setMarketInsights(Array.isArray(payload.marketInsights) ? payload.marketInsights : []);
+            setLoading(false);
+            setRefreshing(!!isRefresh);
+        };
+
+        try {
+            const { data, fromCache, refreshing: willRefresh } = await swrGetOrFetch(key, {
+                ttlMs: HOME_CACHE_TTL_MS,
+                fetcher,
+                onUpdate: (next) => applyPayload(next, { isRefresh: false }),
+            });
+
+            if (fromCache && data) {
+                applyPayload(data, { isRefresh: willRefresh });
+            } else {
+                setLoading(true);
+                setRefreshing(false);
+                const entry = getCacheEntry(key);
+                const awaited = entry?.promise ? await entry.promise : await fetcher();
+                applyPayload(awaited, { isRefresh: false });
+            }
         } catch (error) {
             console.error('Error loading data:', error);
             setError('Failed to load products. Please check your connection.');
+            setLoading(false);
+            setRefreshing(false);
         }
-        setLoading(false);
-    }, [fetchActiveAnnouncements, fetchCategories, favoriteProductIds]);
+    }, [fetchActiveAnnouncements, fetchCategories, favoritesKey, favoriteProductIds]);
 
     useEffect(() => {
-        loadData();
+        let cancelled = false;
+        Promise.resolve().then(() => {
+            if (!cancelled) loadData();
+        });
+        return () => {
+            cancelled = true;
+        };
     }, [loadData]);
 
     const greetingKey = getGreetingKey();
@@ -320,6 +366,11 @@ const Home = () => {
                         <div className="flex flex-col min-w-0 pr-2">
                             <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-3">
                                 {t('featured_products', 'Featured Picks')}
+                                {!loading && refreshing && (
+                                    <span className="text-[9px] font-black uppercase tracking-[0.28em] text-gray-400">
+                                        {t('updating', 'Updating')}
+                                    </span>
+                                )}
                             </h2>
                             <p className="text-sm font-semibold text-gray-400 mt-1 uppercase tracking-widest leading-none">
                                 {t('personalized_deals', 'DEALS PICKED FOR YOU')}
@@ -357,7 +408,7 @@ const Home = () => {
                             <p className="text-gray-400 font-bold text-lg">{t('no_products')}</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 md:gap-6 lg:gap-8 px-1 pb-10">
+                        <div className={`grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 md:gap-6 lg:gap-8 px-1 pb-10 transition-opacity duration-200 ${refreshing ? 'opacity-70' : 'opacity-100'}`}>
                             {featuredProducts.slice(0, 4).map((product) => (
                                 <ProductCard
                                     key={product.$id}

@@ -80,13 +80,13 @@ const ChatHistory = () => {
                     </div>
                     
                     <div className="relative group max-w-md w-full ml-8 hidden md:block">
-                        <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                        <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand-600 dark:group-focus-within:text-brand-300 transition-colors" />
                         <input
                             type="text"
                             placeholder="Find interaction or user..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="bg-gray-100 dark:bg-gray-900/50 border-gray-200 dark:border-gray-700 rounded-2xl py-2.5 pl-11 pr-4 w-full text-sm focus:ring-2 focus:ring-blue-500/20 focus:bg-white dark:focus:bg-gray-900 transition-all outline-none text-gray-800 dark:text-gray-100"
+                            className="bg-gray-100 dark:bg-gray-900/50 border-gray-200 dark:border-gray-700 rounded-2xl py-2.5 pl-11 pr-4 w-full text-sm focus:ring-2 focus:ring-brand-500/20 focus:bg-white dark:focus:bg-gray-900 transition-all outline-none text-gray-800 dark:text-gray-100"
                         />
                     </div>
                 </header>
@@ -103,18 +103,18 @@ const ChatHistory = () => {
 
                     {loading ? (
                         <div className="flex h-64 items-center justify-center">
-                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-600"></div>
                         </div>
                     ) : filteredSessions.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                             {filteredSessions.map((session) => (
                                 <div
                                     key={session.userId}
-                                    className="group relative bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-5 text-left transition-all hover:border-blue-400 hover:shadow-lg"
+                                    className="group relative bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-5 text-left transition-all hover:border-brand-400 hover:shadow-lg"
                                 >
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="flex items-center gap-3 min-w-0">
-                                            <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                                            <div className="w-10 h-10 rounded-xl bg-brand-100 dark:bg-brand-900/40 flex items-center justify-center text-brand-700 dark:text-brand-300">
                                                 <FiUser size={18} />
                                             </div>
                                             <div className="min-w-0">
@@ -154,7 +154,7 @@ const ChatHistory = () => {
                                     <button
                                         type="button"
                                         onClick={() => navigate(`/chat-history/${session.userId}`)}
-                                        className="mt-4 w-full flex items-center justify-between text-xs font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400"
+                                        className="mt-4 w-full flex items-center justify-between text-xs font-bold uppercase tracking-widest text-brand-700 dark:text-brand-300"
                                     >
                                         View conversations
                                         <FiChevronRight className="transition-transform group-hover:translate-x-1" />
