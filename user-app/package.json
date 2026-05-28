@@ -12,7 +12,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@ericblade/quagga2": "^1.8.4",
     "@google/generative-ai": "^0.24.1",
     "@zxing/browser": "^0.1.5",
     "@zxing/library": "^0.21.3",
