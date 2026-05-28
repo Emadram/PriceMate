@@ -27,8 +27,14 @@ const AdminLogin = () => {
                         <div className="absolute right-5 top-5">
                             <ThemeToggle />
                         </div>
-                        <div className="w-16 h-16 bg-brand-600 rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-lg shadow-brand-600/20">
-                            <span className="text-2xl font-bold text-white">PM</span>
+                        <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-lg shadow-brand-600/20 border border-gray-100 dark:border-gray-800 bg-white/90 dark:bg-gray-900/60 overflow-hidden">
+                            <img
+                                src="/LogoPriceMate.png"
+                                alt="PriceMate"
+                                className="h-full w-full object-contain p-2"
+                                loading="eager"
+                                decoding="async"
+                            />
                         </div>
                         <h1 className="text-2xl font-black text-gray-900 dark:text-white mb-1">PriceMate Admin</h1>
                         <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">Management System</p>
