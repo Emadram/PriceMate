@@ -1,12 +1,20 @@
 import { create } from 'zustand';
 import { db, Query } from '../lib/appwrite';
 
-const useAnnouncementStore = create((set) => ({
+const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes (announcements change often)
+
+const useAnnouncementStore = create((set, get) => ({
     announcements: [],
     loading: false,
     error: null,
+    lastFetchedAt: 0,
 
     fetchActiveAnnouncements: async (limit = 5) => {
+        const now = Date.now();
+        const { lastFetchedAt, announcements } = get();
+        if (Array.isArray(announcements) && announcements.length > 0 && now - lastFetchedAt < CACHE_TTL_MS) {
+            return announcements.slice(0, limit);
+        }
         set({ loading: true, error: null });
         try {
             const response = await db.announcements.list(
@@ -16,7 +24,7 @@ const useAnnouncementStore = create((set) => ({
                     Query.orderDesc('$createdAt')
                 ]
             );
-            set({ announcements: response.documents, loading: false });
+            set({ announcements: response.documents, loading: false, lastFetchedAt: now });
             return response.documents;
         } catch (error) {
             console.error('Failed to fetch announcements:', error);

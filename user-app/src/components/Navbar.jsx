@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { FiUser, FiLogOut, FiMoon, FiSun, FiGlobe, FiHome, FiSearch, FiCamera, FiHeart, FiCpu } from 'react-icons/fi';
+import { FiUser, FiLogOut, FiMoon, FiSun, FiGlobe, FiHome, FiCamera, FiCpu } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
 import useAuthStore from '../stores/authStore';
 import useCurrencyStore from '../stores/currencyStore';
@@ -142,9 +142,9 @@ const Navbar = () => {
             {/* Mobile Bottom Navigation */}
             <div className="md:hidden fixed bottom-0 inset-x-0 z-9998 px-safe">
               <div className="mx-2 mb-2 px-4 py-3 pb-safe-nav bg-transparent dark:bg-gray-900/95 rounded-t-[1.75rem] backdrop-blur-md">
-                <div className="flex justify-evenly items-center max-w-md mx-auto">
+                <div className="flex items-center justify-between max-w-md mx-auto">
                     <NavItem to="/" icon={FiHome} label={t('home')} currentPath={location.pathname} onTap={tapFeedback} />
-                    <NavItem to="/search" icon={FiSearch} label={t('search')} currentPath={location.pathname} onTap={tapFeedback} />
+                    <div className="w-11" aria-hidden />
                     <Link
                         to="/scan"
                         onClick={tapFeedback}
@@ -153,14 +153,6 @@ const Navbar = () => {
                         <FiCamera size={26} strokeWidth={2.5} />
                     </Link>
                     <NavItem to="/ai-chat" icon={FiCpu} label={t('ai_chat_tab', 'AI')} currentPath={location.pathname} onTap={tapFeedback} />
-                    <NavItem
-                        to="/favorites"
-                        icon={FiHeart}
-                        label={t('favorites')}
-                        currentPath={location.pathname}
-                        state={{ from: location.pathname }}
-                        onTap={tapFeedback}
-                    />
                     <NavItem to="/profile" icon={FiUser} label={t('profile')} currentPath={location.pathname} onTap={tapFeedback} />
                 </div>
               </div>

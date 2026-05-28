@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { FiChevronRight, FiPackage, FiZap, FiBell, FiInfo, FiAlertTriangle, FiClock } from 'react-icons/fi';
+import { FiChevronRight, FiPackage, FiZap, FiBell, FiInfo, FiAlertTriangle, FiClock, FiSearch } from 'react-icons/fi';
 import useAnnouncementStore from '../stores/announcementStore';
 import useCategoriesStore from '../stores/categoriesStore';
 import useNavHistoryStore from '../stores/navHistoryStore';
@@ -25,6 +25,7 @@ const Home = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const navigationStack = useNavHistoryStore((state) => state.stack);
+    const [webSearch, setWebSearch] = useState('');
 
     const tapFeedback = () => {
         if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
@@ -180,6 +181,26 @@ const Home = () => {
                             <p className="text-gray-500 dark:text-gray-400 font-medium text-[13px] sm:text-sm md:text-lg mt-1">
                                 {t(greetingKey, 'Good morning')} — {t('home_ready_to_save', 'Ready to find the best deals today?')}
                             </p>
+                        </div>
+                    </div>
+
+                    {/* Web-only search (desktop) */}
+                    <div className="hidden md:block">
+                        <div className="relative max-w-2xl">
+                            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                            <input
+                                value={webSearch}
+                                onChange={(e) => setWebSearch(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        const q = webSearch.trim();
+                                        if (!q) return;
+                                        navigate(`/search?q=${encodeURIComponent(q)}`);
+                                    }
+                                }}
+                                placeholder={t('search_placeholder', 'Search products...')}
+                                className="w-full min-h-12 rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900 pl-12 pr-4 text-gray-900 dark:text-white font-semibold outline-none focus:ring-2 focus:ring-brand-500/30"
+                            />
                         </div>
                     </div>
 

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import useAuthStore from '../stores/authStore';
-import { FiMessageSquare, FiChevronRight, FiLogOut, FiUser, FiGlobe, FiShield } from 'react-icons/fi';
+import { FiMessageSquare, FiChevronRight, FiLogOut, FiUser, FiGlobe, FiShield, FiHeart } from 'react-icons/fi';
 import BackButton from '../components/BackButton';
 import { MobileHeader, MobilePage } from '../components/MobilePageLayout';
 
@@ -123,6 +123,22 @@ const Profile = () => {
                 <div className="space-y-6">
                     {/* Activity Group */}
                     <div className="bg-white dark:bg-gray-900 rounded-[2.5rem] p-2 shadow-soft border border-gray-100/50 dark:border-gray-800/50">
+                        <Link
+                            to="/favorites"
+                            state={{ from: '/profile' }}
+                            className="md:hidden flex items-center justify-between p-5 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-[2rem] transition-all group"
+                        >
+                            <div className="flex items-center gap-4">
+                                <div className="tap-target h-11 w-11 flex items-center justify-center rounded-2xl border border-red-200 bg-red-50 text-red-500 dark:border-red-500/40 dark:bg-red-500/15 dark:text-red-400">
+                                    <FiHeart size={20} className="fill-current" />
+                                </div>
+                                <span className="font-bold tracking-tight">{t('favorites', 'Favorites')}</span>
+                            </div>
+                            <FiChevronRight className="text-gray-300 group-hover:translate-x-1 transition-transform" />
+                        </Link>
+
+                        <div className="md:hidden h-px bg-gray-100/50 dark:bg-gray-800/50 mx-6" />
+
                         <Link
                             to="/settings"
                             className="flex items-center justify-between p-5 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-[2rem] transition-all group"
