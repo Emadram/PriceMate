@@ -132,7 +132,7 @@ const ProductCard = ({ product, prices = [] }) => {
                             </div>
                         ) : (
                             <div className="text-xs font-medium text-gray-400">
-                                {t('price')} scanning...
+                                {t('no_data_yet')}
                             </div>
                         )}
                         

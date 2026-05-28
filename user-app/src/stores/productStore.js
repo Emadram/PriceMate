@@ -16,50 +16,6 @@ const useProductStore = create((set, get) => ({
         search: {},
     },
 
-    addPrice: async (priceData) => {
-        set({ loading: true, error: null });
-        try {
-            const { productId, supermarketId, price, stockStatus, barcode } = priceData;
-
-            // 1. Create document in prices collection
-            await db.prices.create({
-                productId,
-                supermarketId,
-                price: parseFloat(price),
-                stockStatus,
-                updatedAt: new Date().toISOString()
-            });
-
-            // 2. Create document in price_history collection
-            try {
-                await db.priceHistory.create({
-                    productId,
-                    supermarketId,
-                    price: parseFloat(price),
-                    timestamp: new Date().toISOString()
-                });
-            } catch (historyErr) {
-                console.warn('Failed to Create Price History:', historyErr);
-            }
-
-            // Refresh product data
-            if (barcode) {
-                await get().fetchProductByBarcode(barcode);
-            } else if (productId) {
-                const currentProduct = get().product;
-                if (currentProduct && currentProduct.$id === productId) {
-                   await get().fetchProductByBarcode(currentProduct.barcode);
-                }
-            }
-
-            set({ loading: false });
-            return true;
-        } catch (error) {
-            set({ loading: false, error: error.message });
-            return false;
-        }
-    },
-
     fetchProductByBarcode: async (barcode) => {
         set({ loading: true, error: null, product: null, prices: [] });
         
