@@ -838,6 +838,17 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
     const formRef = useRef(null);
+    const quickPromptsRowRef = useRef(null);
+
+    useEffect(() => {
+        if (!quickPromptsRowRef.current) return;
+        // iOS can preserve horizontal scroll position; always start at the beginning.
+        try {
+            quickPromptsRowRef.current.scrollTo({ left: 0 });
+        } catch {
+            quickPromptsRowRef.current.scrollLeft = 0;
+        }
+    }, [activeConversationId, isLoading, input]);
 
     const mobileQuickPrompts = [
         {
@@ -2167,7 +2178,10 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                         className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] sm:p-5 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 shrink-0"
                     >
                         {user && activeConversationId && !input.trim() && !isLoading && (
-                            <div className="mb-3 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none]">
+                            <div
+                                ref={quickPromptsRowRef}
+                                className="mb-3 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none]"
+                            >
                                 {mobileQuickPrompts.map((item) => (
                                     <button
                                         key={item.key}
