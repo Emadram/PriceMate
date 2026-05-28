@@ -44,7 +44,7 @@ const AppShell = ({ children }) => {
   return (
     <>
       {!hideGlobalNav && <Navbar />}
-      <div className={mobileTopPadding}>{children}</div>
+      <div className={`overflow-x-hidden ${mobileTopPadding}`}>{children}</div>
       {!hideAiLauncher && <FloatingAIChatLauncher />}
     </>
   );

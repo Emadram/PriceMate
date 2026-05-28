@@ -415,7 +415,7 @@ describe('FloatingAIChatLauncher — Task 2: ai-open body class preservation', (
             Object.defineProperty(window, 'matchMedia', {
                 writable: true,
                 value: vi.fn().mockImplementation((query) => ({
-                    matches: query === '(min-width: 640px)',
+                    matches: query === '(min-width: 640px)' || query === '(min-width: 768px)',
                     media: query,
                     onchange: null,
                     addListener: vi.fn(),
@@ -512,15 +512,12 @@ describe('FloatingAIChatLauncher — Task 2: ai-open body class preservation', (
                 })),
             });
 
-            const { getByRole } = render(<FloatingAIChatLauncher />);
-
-            // Click the launcher button to open the chat (sets isOpen=true)
-            const launcherButton = getByRole('button', { name: /open ai assistant/i });
-            launcherButton.click();
+            // On mobile, launcher is disabled (AI tab replaces it).
+            render(<FloatingAIChatLauncher />);
 
             await new Promise((resolve) => setTimeout(resolve, 0));
 
-            // On mobile with isOpen=true: ai-open must NOT be on body (post-fix behavior)
+            // Launcher is not rendered → ai-open must NOT be on body.
             expect(document.body.classList.contains('ai-open')).toBe(false);
         }
     );

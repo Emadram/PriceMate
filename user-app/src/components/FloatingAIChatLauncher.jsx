@@ -5,6 +5,7 @@ const AIChatBox = lazy(() => import('./AIChatBox'));
 
 const FloatingAIChatLauncher = () => {
     const [isOpen, setIsOpen] = useState(false);
+    const [enabled, setEnabled] = useState(true);
 
     // No DOM duplicate detection — App renders a single launcher via AppShell.
 
@@ -48,6 +49,23 @@ const FloatingAIChatLauncher = () => {
         };
     }, []);
 
+    // Disable launcher on mobile now that AI is in the tab bar.
+    useEffect(() => {
+        if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+        const mq = window.matchMedia('(min-width: 768px)');
+
+        const update = () => setEnabled(!!mq.matches);
+        update();
+
+        try {
+            mq.addEventListener('change', update);
+            return () => mq.removeEventListener('change', update);
+        } catch {
+            mq.addListener(update);
+            return () => mq.removeListener(update);
+        }
+    }, []);
+
     useEffect(() => {
         try {
             const params = new URLSearchParams(window.location.search);
@@ -83,7 +101,7 @@ const FloatingAIChatLauncher = () => {
     return (
         <>
             <div id="pricemate-ai-launcher" className={wrapperClass}>
-                {!isOpen && !hideWhileSplash && (
+                {enabled && !isOpen && !hideWhileSplash && (
                     <button
                         type="button"
                         onClick={() => setIsOpen(true)}
@@ -96,7 +114,7 @@ const FloatingAIChatLauncher = () => {
                 )}
             </div>
             <Suspense fallback={null}>
-                {isOpen ? <AIChatBox isOpen={isOpen} onClose={() => setIsOpen(false)} /> : null}
+                {enabled && isOpen ? <AIChatBox isOpen={isOpen} onClose={() => setIsOpen(false)} /> : null}
             </Suspense>
         </>
     );

@@ -39,7 +39,7 @@ const Navbar = () => {
     return (
         <>
             {/* Top mobile header: show logo here (visible) and make background dark in dark mode */}
-            <div className="md:hidden fixed top-0 left-0 right-0 z-9999 pt-safe">
+            <div className="md:hidden fixed top-0 inset-x-0 z-9999 pt-safe px-safe">
                 <div className="mx-2 px-4 py-3 bg-transparent dark:bg-gray-900/95 rounded-b-[1.4rem] backdrop-blur-xl border-b border-gray-800/20">
                         <Link to="/" className="flex items-center justify-center gap-2 min-w-0">
                         <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-600 text-white font-black text-sm shadow-sm shadow-brand-500/25 shrink-0">
@@ -140,7 +140,8 @@ const Navbar = () => {
             </nav>
 
             {/* Mobile Bottom Navigation */}
-            <div className="md:hidden fixed bottom-0 left-0 right-0 z-9998 mx-2 mb-2 px-4 py-3 pb-safe-nav bg-transparent dark:bg-gray-900/95 rounded-t-[1.75rem] backdrop-blur-md">
+            <div className="md:hidden fixed bottom-0 inset-x-0 z-9998 px-safe">
+              <div className="mx-2 mb-2 px-4 py-3 pb-safe-nav bg-transparent dark:bg-gray-900/95 rounded-t-[1.75rem] backdrop-blur-md">
                 <div className="flex justify-evenly items-center max-w-md mx-auto">
                     <NavItem to="/" icon={FiHome} label={t('home')} currentPath={location.pathname} onTap={tapFeedback} />
                     <NavItem to="/search" icon={FiSearch} label={t('search')} currentPath={location.pathname} onTap={tapFeedback} />
@@ -162,6 +163,7 @@ const Navbar = () => {
                     />
                     <NavItem to="/profile" icon={FiUser} label={t('profile')} currentPath={location.pathname} onTap={tapFeedback} />
                 </div>
+              </div>
             </div>
         </>
     );
