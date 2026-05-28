@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { FiUser, FiLogOut, FiMoon, FiSun, FiGlobe, FiHome, FiSearch, FiCamera, FiHeart } from 'react-icons/fi';
+import { FiUser, FiLogOut, FiMoon, FiSun, FiGlobe, FiHome, FiSearch, FiCamera, FiHeart, FiCpu } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
 import useAuthStore from '../stores/authStore';
 import useCurrencyStore from '../stores/currencyStore';
@@ -151,6 +151,7 @@ const Navbar = () => {
                     >
                         <FiCamera size={26} strokeWidth={2.5} />
                     </Link>
+                    <NavItem to="/ai-chat" icon={FiCpu} label={t('ai_chat_tab', 'AI')} currentPath={location.pathname} onTap={tapFeedback} />
                     <NavItem
                         to="/favorites"
                         icon={FiHeart}

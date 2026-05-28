@@ -318,6 +318,29 @@ const useAuthStore = create((set, get) => ({
             return false;
         }
     },
+
+    updateUiPreferences: async (partial = {}) => {
+        try {
+            const currentUser = get().user;
+            const currentPrefs = currentUser?.prefs && typeof currentUser.prefs === 'object'
+                ? currentUser.prefs
+                : {};
+
+            const nextPrefs = {
+                ...currentPrefs,
+                ...partial,
+            };
+
+            const user = await account.updatePrefs(nextPrefs);
+            set({ user, error: null, errorCode: null });
+            return true;
+        } catch (error) {
+            const message = error.message || 'Could not update preferences';
+            set({ error: message, errorCode: null });
+            toast.error(message);
+            return false;
+        }
+    },
 }));
 
 export default useAuthStore;

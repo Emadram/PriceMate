@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { FiStar, FiShoppingBag, FiPackage, FiChevronRight, FiHeart, FiClock } from 'react-icons/fi';
+import { FiShoppingBag, FiPackage, FiChevronRight, FiHeart, FiClock } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
 import { db, Query } from '../lib/appwrite';
 import { fetchAllPrices, normalizeProduct } from '../utils/productUtils';
@@ -8,6 +8,7 @@ import ProductCard from '../components/ProductCard';
 import useFavoritesStore from '../stores/favoritesStore';
 import BackButton from '../components/BackButton';
 import { ProductCardSkeleton } from '../components/SkeletonLoaders';
+import { MobileHeader, MobilePage } from '../components/MobilePageLayout';
 
 const Favorites = () => {
     const { t } = useTranslation();
@@ -61,10 +62,13 @@ const Favorites = () => {
     }, [favoriteProducts, favoriteSupermarkets]);
 
     useEffect(() => {
-        const timeoutId = setTimeout(() => {
-            fetchFavorites();
-        }, 0);
-        return () => clearTimeout(timeoutId);
+        let cancelled = false;
+        Promise.resolve().then(() => {
+            if (!cancelled) fetchFavorites();
+        });
+        return () => {
+            cancelled = true;
+        };
     }, [fetchFavorites]);
 
     const productCount = favoriteProducts?.length ?? 0;
@@ -77,19 +81,17 @@ const Favorites = () => {
         : '/';
 
     return (
-        <div className="min-h-screen bg-[#F5F5F7] dark:bg-black transition-colors pb-safe">
-            <header className="pt-safe bg-white/80 dark:bg-black/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 dark:border-white/5 px-3 sm:px-4 py-3 sm:py-4">
-                <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
-                    <BackButton to={backTarget} />
-                    <h1 className="text-base sm:text-xl font-black text-gray-900 dark:text-white flex items-center gap-2 min-w-0">
-                        <FiStar className="text-yellow-500 shrink-0" />
-                        <span className="truncate">{t('favorites')}</span>
-                    </h1>
-                    <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-yellow-50 dark:bg-yellow-900/20 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-yellow-700 dark:text-yellow-400">
+        <MobilePage className="transition-colors">
+            <MobileHeader
+                title={t('favorites')}
+                icon={FiHeart}
+                left={<BackButton to={backTarget} />}
+                right={
+                    <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-red-50 dark:bg-red-900/20 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-red-700 dark:text-red-400">
                         <FiClock size={10} /> {totalCount}
                     </span>
-                </div>
-            </header>
+                }
+            />
 
             <main className="max-w-4xl mx-auto p-3 sm:p-6 space-y-5 sm:space-y-8">
                 {loading ? (
@@ -101,8 +103,8 @@ const Favorites = () => {
                 ) : !hasAny ? (
                     <div className="text-center py-16 sm:py-24 bg-white dark:bg-[#121214] rounded-[2rem] sm:rounded-[3rem] shadow-soft border border-gray-100/50 dark:border-white/5 px-5">
                         <div className="flex justify-center mb-5 sm:mb-6">
-                            <div className="p-5 sm:p-6 bg-yellow-50 dark:bg-yellow-900/20 rounded-[2rem] sm:rounded-[2.5rem]">
-                                <FiStar size={42} className="text-yellow-500" />
+                            <div className="p-5 sm:p-6 bg-red-50 dark:bg-red-900/20 rounded-[2rem] sm:rounded-[2.5rem]">
+                                <FiHeart size={42} className="text-red-500" />
                             </div>
                         </div>
                         <h3 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white mb-2">{t('no_favorites_yet', 'No Favorites Yet')}</h3>
@@ -249,7 +251,7 @@ const Favorites = () => {
                     </>
                 )}
             </main>
-        </div>
+        </MobilePage>
     );
 };
 

@@ -6,6 +6,7 @@ import useThemeStore from './stores/themeStore';
 import useFavoritesStore from './stores/favoritesStore';
 import useCurrencyStore from './stores/currencyStore';
 import { runDiagnostics } from './utils/diagnostics';
+import i18n from './lib/i18n';
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
 const Home = lazy(() => import('./pages/Home'));
@@ -17,9 +18,11 @@ const SearchResults = lazy(() => import('./pages/SearchResults'));
 const ProductDetails = lazy(() => import('./pages/ProductDetails'));
 const Profile = lazy(() => import('./pages/Profile'));
 const Favorites = lazy(() => import('./pages/Favorites'));
+const AIChat = lazy(() => import('./pages/AIChat'));
 const FeedbackPage = lazy(() => import('./pages/FeedbackPage'));
 const PriceComparison = lazy(() => import('./pages/PriceComparison'));
 const SupermarketProfile = lazy(() => import('./pages/SupermarketProfile'));
+const Settings = lazy(() => import('./pages/Settings'));
 import FloatingAIChatLauncher from './components/FloatingAIChatLauncher';
 import MobileSplashScreen from './components/MobileSplashScreen';
 import PageTransition from './components/PageTransition';
@@ -139,6 +142,26 @@ function App() {
     }
   }, [user, syncFavorites, clearFavorites]);
 
+  // Hydrate UI preferences from account prefs (mobile/desktop)
+  useEffect(() => {
+    if (!user?.prefs || typeof user.prefs !== 'object') return;
+    const prefs = user.prefs;
+
+    const prefTheme = prefs.uiTheme;
+    const prefCurrency = prefs.uiCurrency;
+    const prefLang = prefs.uiLanguage;
+
+    if (prefTheme === 'light' || prefTheme === 'dark') {
+      setTheme(prefTheme);
+    }
+    if (typeof prefCurrency === 'string' && prefCurrency.trim()) {
+      setCurrency(prefCurrency);
+    }
+    if (prefLang === 'en' || prefLang === 'tr') {
+      i18n.changeLanguage(prefLang);
+    }
+  }, [user?.$id, user?.prefs, setTheme, setCurrency]);
+
   return (
     <Router>
       <NavigationListener />
@@ -194,6 +217,22 @@ function App() {
           element={
             <ProtectedRoute>
               <Favorites />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <Settings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ai-chat"
+          element={
+            <ProtectedRoute>
+              <AIChat />
             </ProtectedRoute>
           }
         />

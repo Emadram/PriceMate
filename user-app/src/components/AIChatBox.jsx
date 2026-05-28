@@ -237,8 +237,15 @@ const parseIngredientCardData = (value) => {
     return data;
 };
 
+const hasFunctionalLocalStorage = () =>
+    typeof window !== 'undefined' &&
+    window.localStorage &&
+    typeof window.localStorage.getItem === 'function' &&
+    typeof window.localStorage.setItem === 'function';
+
 const readConfiguredTtl = () => {
     try {
+        if (!hasFunctionalLocalStorage()) return DEFAULT_INTENT_CACHE_TTL_MS;
         const raw = localStorage.getItem(INTENT_CACHE_TTL_SETTING_KEY);
         if (!raw) return DEFAULT_INTENT_CACHE_TTL_MS;
         const parsed = Number(raw);
@@ -251,6 +258,7 @@ const readConfiguredTtl = () => {
 
 const persistCacheToStorage = () => {
     try {
+        if (!hasFunctionalLocalStorage()) return;
         const obj = {};
         for (const [k, v] of intentCache.entries()) {
             obj[k] = v; // { value, expiresAt }
@@ -264,6 +272,7 @@ const persistCacheToStorage = () => {
 
 const hydrateCacheFromStorage = () => {
     try {
+        if (!hasFunctionalLocalStorage()) return;
         const raw = localStorage.getItem(INTENT_CACHE_STORAGE_KEY);
         if (!raw) return;
         const parsed = JSON.parse(raw);
@@ -280,7 +289,7 @@ const hydrateCacheFromStorage = () => {
 };
 
 // Initialize cache from storage on module load
-if (typeof window !== 'undefined' && window.localStorage) {
+if (hasFunctionalLocalStorage()) {
     hydrateCacheFromStorage();
 }
 
@@ -336,6 +345,7 @@ import { functions as appwriteFunctions } from '../lib/appwrite';
 import useCurrencyStore from '../stores/currencyStore';
 import useAuthStore from '../stores/authStore';
 import useChatStore, { CHAT_ERROR_MISSING_CONVERSATION_ID } from '../stores/chatStore';
+import { MobileHeader } from './MobilePageLayout';
 
 const AI_CHECK_FUNCTION_ID = import.meta.env.VITE_APPWRITE_FUNCTION_AI_CHECK || '';
 const AI_CHECK_MODE = import.meta.env.VITE_AI_CHECK_MODE || 'legacy';
@@ -801,7 +811,7 @@ const buildRankedProductContextLines = (products, userHint) => {
         .join('\n');
 };
 
-const AIChatBox = ({ isOpen, onClose }) => {
+const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
     const { t, i18n } = useTranslation();
     const { convert, getCurrencySymbol, currency } = useCurrencyStore();
     const user = useAuthStore(state => state.user);
@@ -1817,6 +1827,9 @@ const AIChatBox = ({ isOpen, onClose }) => {
 
     if (!isOpen) return null;
 
+    const effectiveOnClose = typeof onClose === 'function' ? onClose : () => {};
+    const isPage = variant === 'page';
+
     const renderConversationList = (afterPick) => {
         if (!user?.$id) return null;
         return (
@@ -1879,64 +1892,107 @@ const AIChatBox = ({ isOpen, onClose }) => {
 
     return (
         <>
+            {!isPage && (
+                <div
+                    className="fixed inset-0 z-[9998] bg-black/40 backdrop-blur-[2px] sm:hidden"
+                    onClick={effectiveOnClose}
+                    aria-hidden="true"
+                />
+            )}
             <div
-                className="fixed inset-0 z-[9998] bg-black/40 backdrop-blur-[2px] sm:hidden"
-                onClick={onClose}
-                aria-hidden="true"
-            />
-            <div className="fixed bottom-0 left-0 right-0 z-[9999] flex h-[85dvh] max-h-[85dvh] w-screen touch-pan-y flex-col overflow-hidden rounded-t-2xl border-0 bg-white shadow-2xl animate-in slide-in-from-bottom-4 duration-300 dark:border-gray-700 dark:bg-gray-800 sm:inset-auto sm:bottom-4 sm:right-4 sm:z-[2000] sm:h-[min(640px,90vh)] sm:max-h-none sm:w-[400px] sm:rounded-2xl sm:border sm:border-gray-200 sm:shadow-2xl sm:slide-in-from-bottom-5 sm:slide-in-from-right md:w-[448px]">
-            <div className="sm:hidden flex justify-center pt-2.5 pb-1 shrink-0" aria-hidden="true">
-                <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
-            </div>
-            <div className="border-b border-black/5 bg-gradient-to-r from-brand-700 via-brand-600 to-accent-600 px-3.5 pb-3 pt-2.5 sm:pt-[calc(0.65rem+env(safe-area-inset-top,0px))] text-white shadow-md shrink-0 sm:px-5 sm:py-4">
-                <div className="flex items-center gap-3 min-w-0">
-                    {user && (
-                        <button
-                            type="button"
-                            className="sm:hidden p-2.5 rounded-2xl bg-white/10 backdrop-blur-sm shrink-0 active:scale-95"
-                            onClick={() => setMobileListOpen(true)}
-                            aria-label={t('ai_chat_chats')}
-                        >
-                            <FiList size={20} />
-                        </button>
-                    )}
-                    <div className="hidden sm:flex w-8 h-8 bg-white/12 rounded-2xl items-center justify-center backdrop-blur-sm shrink-0">
-                        <FiCpu className="text-xl text-white/85" />
-                    </div>
-                    <div className="flex-1 min-w-0 flex flex-col justify-center">
-                        <div className="flex items-center gap-2 min-w-0 leading-none">
-                            <span className="font-black block text-sm sm:text-[15px] truncate">
-                                {t('ai_chat_title', 'PriceMate AI')}
-                            </span>
-                            <span className="hidden sm:inline-flex text-[9px] uppercase tracking-[0.22em] font-black bg-white/15 px-2 py-0.5 rounded-full">
-                                {t('ai_chat_powered_by', 'Powered by Gemini')}
-                            </span>
+                className={
+                    isPage
+                        ? 'w-full flex flex-col'
+                        : 'fixed bottom-0 left-0 right-0 z-[9999] flex h-[85dvh] max-h-[85dvh] w-screen touch-pan-y flex-col overflow-hidden rounded-t-2xl border-0 bg-white shadow-2xl animate-in slide-in-from-bottom-4 duration-300 dark:border-gray-700 dark:bg-gray-800 sm:inset-auto sm:bottom-4 sm:right-4 sm:z-[2000] sm:h-[min(640px,90vh)] sm:max-h-none sm:w-[400px] sm:rounded-2xl sm:border sm:border-gray-200 sm:shadow-2xl sm:slide-in-from-bottom-5 sm:slide-in-from-right md:w-[448px]'
+                }
+            >
+            {isPage ? (
+                <MobileHeader
+                    title={t('ai_chat_title', 'PriceMate AI')}
+                    icon={FiCpu}
+                    right={
+                        <div className="flex items-center gap-2">
+                            {user ? (
+                                <>
+                                    <button
+                                        type="button"
+                                        className="tap-target min-h-11 min-w-11 inline-flex items-center justify-center rounded-2xl hover:bg-gray-100/60 dark:hover:bg-white/5 transition sm:hidden"
+                                        onClick={() => setMobileListOpen(true)}
+                                        aria-label={t('ai_chat_chats')}
+                                    >
+                                        <FiList size={20} />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="tap-target min-h-11 min-w-11 inline-flex items-center justify-center rounded-2xl hover:bg-gray-100/60 dark:hover:bg-white/5 transition"
+                                        onClick={beginNewConversation}
+                                        aria-label={t('ai_chat_new')}
+                                    >
+                                        <FiPlus size={20} />
+                                    </button>
+                                </>
+                            ) : (
+                                <span className="w-11" aria-hidden />
+                            )}
                         </div>
-                        <p className="mt-1 text-[11px] text-white/80 leading-relaxed hidden sm:block">
-                            {t('ai_chat_subtitle', 'Ask for cheaper picks, compare products, or check ingredients instantly.')}
-                        </p>
+                    }
+                />
+            ) : (
+                <>
+                    <div className="sm:hidden flex justify-center pt-2.5 pb-1 shrink-0" aria-hidden="true">
+                        <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                        {user && (
-                            <button
-                                type="button"
-                                onClick={beginNewConversation}
-                                className="p-2.5 hover:bg-white/15 rounded-2xl transition-all active:scale-95 shrink-0"
-                                aria-label={t('ai_chat_new')}
-                            >
-                                <FiPlus size={20} />
-                            </button>
-                        )}
-                        <button
-                            onClick={onClose}
-                            className="p-2.5 hover:bg-white/15 rounded-2xl transition-all active:scale-95 shrink-0"
-                            aria-label={t('ai_chat_close')}
-                        >
-                            <FiX size={24} />
-                        </button>
+                    <div className="border-b border-black/5 bg-gradient-to-r from-brand-700 via-brand-600 to-accent-600 px-3.5 pb-3 pt-2.5 sm:pt-[calc(0.65rem+env(safe-area-inset-top,0px))] text-white shadow-md shrink-0 sm:px-5 sm:py-4">
+                        <div className="flex items-center gap-3 min-w-0">
+                            {user && (
+                                <button
+                                    type="button"
+                                    className="sm:hidden p-2.5 rounded-2xl bg-white/10 backdrop-blur-sm shrink-0 active:scale-95"
+                                    onClick={() => setMobileListOpen(true)}
+                                    aria-label={t('ai_chat_chats')}
+                                >
+                                    <FiList size={20} />
+                                </button>
+                            )}
+                            <div className="hidden sm:flex w-8 h-8 bg-white/12 rounded-2xl items-center justify-center backdrop-blur-sm shrink-0">
+                                <FiCpu className="text-xl text-white/85" />
+                            </div>
+                            <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                <div className="flex items-center gap-2 min-w-0 leading-none">
+                                    <span className="font-black block text-sm sm:text-[15px] truncate">
+                                        {t('ai_chat_title', 'PriceMate AI')}
+                                    </span>
+                                    <span className="hidden sm:inline-flex text-[9px] uppercase tracking-[0.22em] font-black bg-white/15 px-2 py-0.5 rounded-full">
+                                        {t('ai_chat_powered_by', 'Powered by Gemini')}
+                                    </span>
+                                </div>
+                                <p className="mt-1 text-[11px] text-white/80 leading-relaxed hidden sm:block">
+                                    {t('ai_chat_subtitle', 'Ask for cheaper picks, compare products, or check ingredients instantly.')}
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                                {user && (
+                                    <button
+                                        type="button"
+                                        onClick={beginNewConversation}
+                                        className="p-2.5 hover:bg-white/15 rounded-2xl transition-all active:scale-95 shrink-0"
+                                        aria-label={t('ai_chat_new')}
+                                    >
+                                        <FiPlus size={20} />
+                                    </button>
+                                )}
+                                <button
+                                    onClick={effectiveOnClose}
+                                    className="p-2.5 hover:bg-white/15 rounded-2xl transition-all active:scale-95 shrink-0"
+                                    aria-label={t('ai_chat_close')}
+                                >
+                                    <FiX size={24} />
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
+                </>
+            )}
 
             <div className="flex flex-1 min-h-0">
                 {user && (
