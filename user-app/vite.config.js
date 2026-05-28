@@ -14,6 +14,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: [
+        'LogoPriceMate.png',
         'favicon.png',
         'apple-touch-icon.png',
         'android-chrome-192.png',
@@ -31,13 +32,13 @@ export default defineConfig({
         start_url: '/',
         icons: [
           {
-            src: '/android-chrome-192.png',
+            src: '/LogoPriceMate.png',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'any',
           },
           {
-            src: '/android-chrome-512.png',
+            src: '/LogoPriceMate.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any maskable',
@@ -56,7 +57,7 @@ export default defineConfig({
           'vendor-i18n': ['i18next', 'react-i18next', 'i18next-browser-languagedetector'],
           'vendor-charts': ['recharts'],
           'vendor-map': ['ol'],
-          'vendor-scanner': ['@ericblade/quagga2', '@zxing/browser', '@zxing/library'],
+          'vendor-scanner': ['@zxing/browser', '@zxing/library'],
           'vendor-ai': ['openai', '@google/generative-ai'],
         },
       },
