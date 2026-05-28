@@ -183,21 +183,25 @@ const Home = () => {
                         </div>
                     </div>
 
-                        {/* Live Market Overview */}
-                    <div className="relative -mx-4 px-4 overflow-x-auto no-scrollbar flex items-stretch gap-3 sm:gap-4 animate-in slide-in-from-bottom-2 duration-1000 pb-2 snap-x">
+                    {/* Live Market Overview */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 animate-in slide-in-from-bottom-2 duration-1000">
                         {marketInsights.map((insight) => (
-                            <div 
-                                key={insight.id} 
-                                className="flex-shrink-0 bg-white dark:bg-gray-900 transition-all border border-gray-100 dark:border-gray-800 rounded-xl sm:rounded-2xl px-3 py-2.5 sm:px-5 sm:py-4 shadow-soft flex items-center gap-2.5 sm:gap-3 max-w-[min(100%,18.5rem)] sm:max-w-none sm:min-w-[220px] md:min-w-[260px] cursor-default hover:border-brand-100 dark:hover:border-brand-900/30 snap-center"
+                            <div
+                                key={insight.id}
+                                className="bg-white dark:bg-gray-900 transition-all border border-gray-100 dark:border-gray-800 rounded-xl sm:rounded-2xl px-3 py-2.5 sm:px-5 sm:py-4 shadow-soft flex items-center gap-2.5 sm:gap-3 min-w-0 cursor-default hover:border-brand-100 dark:hover:border-brand-900/30"
                             >
                                 <div className="text-sm sm:text-lg shrink-0">{insight.icon}</div>
-                                <span className="text-[11px] sm:text-sm font-semibold tracking-tight line-clamp-2">{insight.text}</span>
+                                <span className="text-[11px] sm:text-sm font-semibold tracking-tight line-clamp-2 min-w-0">
+                                    {insight.text}
+                                </span>
                             </div>
                         ))}
                         {marketInsights.length === 0 && (
-                            <div className="flex-shrink-0 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl sm:rounded-2xl px-3 py-2.5 sm:px-5 sm:py-4 shadow-soft flex items-center gap-2.5 sm:gap-3 max-w-[min(100%,18.5rem)] sm:min-w-[220px]">
+                            <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl sm:rounded-2xl px-3 py-2.5 sm:px-5 sm:py-4 shadow-soft flex items-center gap-2.5 sm:gap-3 min-w-0">
                                 <FiBell className="text-gray-400 shrink-0" />
-                                <span className="text-[11px] sm:text-sm font-medium text-gray-400 tracking-tight">Checking for updates...</span>
+                                <span className="text-[11px] sm:text-sm font-medium text-gray-400 tracking-tight min-w-0">
+                                    Checking for updates...
+                                </span>
                             </div>
                         )}
                     </div>

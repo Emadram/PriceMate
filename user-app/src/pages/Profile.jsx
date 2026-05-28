@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import useAuthStore from '../stores/authStore';
-import { FiMessageSquare, FiChevronRight, FiLogOut, FiUser, FiGlobe } from 'react-icons/fi';
+import { FiMessageSquare, FiChevronRight, FiLogOut, FiUser, FiGlobe, FiShield } from 'react-icons/fi';
 import BackButton from '../components/BackButton';
 import { MobileHeader, MobilePage } from '../components/MobilePageLayout';
 
