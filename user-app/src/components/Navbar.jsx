@@ -42,8 +42,14 @@ const Navbar = () => {
             <div className="md:hidden fixed top-0 inset-x-0 z-9999 pt-safe px-safe">
                 <div className="mx-2 px-4 py-3 bg-transparent dark:bg-gray-900/95 rounded-b-[1.4rem] backdrop-blur-xl border-b border-gray-800/20">
                         <Link to="/" className="flex items-center justify-center gap-2 min-w-0">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-600 text-white font-black text-sm shadow-sm shadow-brand-500/25 shrink-0">
-                            P
+                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/90 dark:bg-gray-900/60 shadow-sm shadow-brand-500/15 shrink-0 border border-gray-100/70 dark:border-gray-800/60 overflow-hidden">
+                            <img
+                                src="/LogoPriceMate.png"
+                                alt="PriceMate"
+                                className="h-full w-full object-contain p-1"
+                                loading="eager"
+                                decoding="async"
+                            />
                         </div>
                         <span className="text-sm font-black tracking-tight text-gray-900 dark:text-white truncate">PriceMate</span>
                     </Link>
@@ -56,8 +62,14 @@ const Navbar = () => {
                         {/* Logo */}
                         <div className="flex items-center">
                                 <Link to="/" className="flex-shrink-0 flex items-center gap-2 group">
-                                <div className="w-10 h-10 bg-brand-600 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-lg shadow-brand-500/30 group-hover:scale-105 transition-transform">
-                                    P
+                                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/90 dark:bg-gray-900/60 shadow-lg shadow-brand-500/20 group-hover:scale-105 transition-transform border border-gray-100/70 dark:border-gray-800/60 overflow-hidden">
+                                    <img
+                                        src="/LogoPriceMate.png"
+                                        alt="PriceMate"
+                                        className="h-full w-full object-contain p-1"
+                                        loading="eager"
+                                        decoding="async"
+                                    />
                                 </div>
                                 <span className="font-black text-2xl text-gray-900 dark:text-white hidden sm:block tracking-tighter">
                                     PriceMate

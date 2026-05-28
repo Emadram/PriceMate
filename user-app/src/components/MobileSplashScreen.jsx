@@ -124,7 +124,13 @@ const MobileSplashScreen = () => {
                     <div className={`absolute inset-[18px] rounded-[1.25rem] border border-white/18 bg-white/8 backdrop-blur-sm ${shouldFade ? 'animate-none' : 'animate-splash-glow'}`} />
                     <div className={`absolute right-5 top-8 h-3 w-3 rounded-full bg-white/85 ${shouldFade ? 'animate-none' : 'animate-pulse'}`} />
                     <div className={`absolute left-5 bottom-8 h-2 w-2 rounded-full bg-white/75 ${shouldFade ? 'animate-none' : 'animate-pulse'} delay-100`} />
-                    <span className="relative text-6xl font-black tracking-[-0.14em] text-white drop-shadow-[0_2px_10px_rgba(255,255,255,0.15)]">P</span>
+                    <img
+                        src="/LogoPriceMate.png"
+                        alt="PriceMate"
+                        className="relative h-20 w-20 object-contain drop-shadow-[0_2px_12px_rgba(255,255,255,0.12)]"
+                        loading="eager"
+                        decoding="async"
+                    />
                     <div className={`absolute inset-x-7 -bottom-3 h-3 rounded-full ${isDark ? 'bg-brand-400/35' : 'bg-brand-500/25 blur-[3px]'} ${shouldFade ? 'animate-none' : 'animate-splash-ripple'}`} />
                 </div>
 

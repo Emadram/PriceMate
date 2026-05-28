@@ -30,8 +30,14 @@ const Sidebar = () => {
     return (
         <aside className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 min-h-screen hidden lg:block sticky top-0 overflow-y-auto">
             <div className="p-6 flex items-center gap-3 border-b border-gray-100 dark:border-gray-700 mb-6">
-                <div className="bg-brand-600 p-2 rounded-lg text-white">
-                    <FiPackage size={20} />
+                <div className="h-10 w-10 rounded-xl flex items-center justify-center bg-white dark:bg-gray-900 shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+                    <img
+                        src="/LogoPriceMate.png"
+                        alt="PriceMate"
+                        className="h-full w-full object-contain p-1"
+                        loading="eager"
+                        decoding="async"
+                    />
                 </div>
                 <div className="flex-1 min-w-0">
                     <h1 className="text-xl font-bold text-gray-800 dark:text-white truncate">PriceMate</h1>

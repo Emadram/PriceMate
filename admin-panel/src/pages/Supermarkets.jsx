@@ -199,19 +199,19 @@ const Supermarkets = () => {
                     <div className="flex items-center gap-6 flex-1">
                         <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight uppercase">Supermarkets</h1>
                         <div className="relative group max-w-md w-full ml-4 hidden md:block">
-                            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand-600 dark:group-focus-within:text-brand-300 transition-colors" />
                             <input
                                 type="text"
                                 placeholder="Find store, brand or address..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="bg-gray-100 dark:bg-gray-900 border-gray-200 dark:border-gray-700 rounded-2xl py-2.5 pl-11 pr-4 w-full text-sm focus:ring-2 focus:ring-blue-500/20 focus:bg-white dark:focus:bg-gray-900 transition-all outline-none text-gray-800 dark:text-gray-100"
+                                className="bg-gray-100 dark:bg-gray-900 border-gray-200 dark:border-gray-700 rounded-2xl py-2.5 pl-11 pr-4 w-full text-sm focus:ring-2 focus:ring-brand-500/20 focus:bg-white dark:focus:bg-gray-900 transition-all outline-none text-gray-800 dark:text-gray-100"
                             />
                         </div>
                     </div>
                     <button
                         onClick={() => { setEditing(null); resetForm(); setShowModal(true); }}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl flex items-center gap-2 transition-all shadow-lg shadow-blue-500/20 active:scale-95 text-sm font-black uppercase tracking-widest"
+                        className="bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 rounded-2xl flex items-center gap-2 transition-all shadow-lg shadow-brand-600/20 active:scale-95 text-sm font-black uppercase tracking-widest"
                     >
                         <FiPlus size={20} className="stroke-[3]" /> Add Branch
                     </button>
@@ -220,7 +220,7 @@ const Supermarkets = () => {
                 <main className="max-w-7xl mx-auto px-6 py-8 w-full">
                     {loading ? (
                         <div className="flex h-64 items-center justify-center">
-                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-600"></div>
                         </div>
                     ) : (
                         <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
@@ -228,13 +228,13 @@ const Supermarkets = () => {
                                 <thead className="bg-gray-50/50 dark:bg-gray-900/50">
                                     <tr>
                                         <th
-                                            className="px-8 py-5 text-left text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] cursor-pointer hover:text-blue-600 transition-colors"
+                                            className="px-8 py-5 text-left text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] cursor-pointer hover:text-brand-700 dark:hover:text-brand-300 transition-colors"
                                             onClick={() => requestSort('name')}
                                         >
                                             Supermarket <SortIcon columnKey="name" currentKey={sortConfig.key} direction={sortConfig.direction} />
                                         </th>
                                         <th
-                                            className="px-8 py-5 text-left text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] cursor-pointer hover:text-blue-600 transition-colors"
+                                            className="px-8 py-5 text-left text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] cursor-pointer hover:text-brand-700 dark:hover:text-brand-300 transition-colors"
                                             onClick={() => requestSort('address')}
                                         >
                                             Contact <SortIcon columnKey="address" currentKey={sortConfig.key} direction={sortConfig.direction} />
@@ -244,7 +244,7 @@ const Supermarkets = () => {
                                 </thead>
                                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-50 dark:divide-gray-700/50">
                                     {sortedSupermarkets.map((item) => (
-                                        <tr key={item.$id} className="hover:bg-blue-50/20 dark:hover:bg-blue-900/10 transition-colors group">
+                                        <tr key={item.$id} className="hover:bg-brand-50/40 dark:hover:bg-brand-900/10 transition-colors group">
                                             <td className="px-8 py-6 whitespace-nowrap">
                                                 <div className="flex items-center">
                                                     <div className="h-14 w-14 flex-shrink-0 group-hover:scale-105 transition-transform duration-300">
@@ -260,19 +260,19 @@ const Supermarkets = () => {
                                                         <div className="text-base font-black text-gray-900 dark:text-white tracking-tight uppercase">
                                                             {item.brand ? `${item.brand}` : item.name}
                                                         </div>
-                                                        <div className="text-[10px] font-black text-blue-500 dark:text-blue-400 uppercase tracking-widest mt-0.5">
+                                                        <div className="text-[10px] font-black text-brand-600 dark:text-brand-300 uppercase tracking-widest mt-0.5">
                                                             {item.branchName || 'Primary Store'}
                                                         </div>
                                                     </div>
                                                 </div>
                                             </td>
                                             <td className="px-8 py-6 whitespace-nowrap">
-                                                <div className="text-sm text-gray-800 dark:text-gray-200 flex items-center gap-2 font-bold mb-1.5"><FiMapPin className="text-blue-500 text-xs" /> {item.address || 'Location Hidden'}</div>
+                                                <div className="text-sm text-gray-800 dark:text-gray-200 flex items-center gap-2 font-bold mb-1.5"><FiMapPin className="text-brand-600 dark:text-brand-300 text-xs" /> {item.address || 'Location Hidden'}</div>
                                                 <div className="text-[10px] text-gray-400 dark:text-gray-500 flex items-center gap-2 font-black uppercase tracking-widest"><FiPhone className="text-gray-300" /> {item.phoneNumber || 'No Contact'}</div>
                                             </td>
                                             <td className="px-8 py-6 whitespace-nowrap text-right text-sm font-medium">
                                                 <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button onClick={() => handleEdit(item)} className="p-3 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-2xl transition-all active:scale-95 border border-transparent hover:border-blue-100 dark:hover:border-blue-800/50">
+                                                    <button onClick={() => handleEdit(item)} className="p-3 text-brand-700 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-900/30 rounded-2xl transition-all active:scale-95 border border-transparent hover:border-brand-100 dark:hover:border-brand-800/50">
                                                         <FiEdit2 size={18} />
                                                     </button>
                                                     <button onClick={() => handleDelete(item.$id)} className="p-3 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-2xl transition-all active:scale-95 border border-transparent hover:border-red-100 dark:hover:border-red-800/50">
@@ -302,7 +302,7 @@ const Supermarkets = () => {
 
             {showModal && (
                 <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[1000]">
-                    <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] max-w-lg w-full p-10 shadow-2xl border border-gray-100 dark:border-gray-700 animate-in zoom-in-95 duration-200 max-h-[95vh] overflow-y-auto custom-scrollbar">
+                    <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] max-w-5xl w-full p-10 shadow-2xl border border-gray-100 dark:border-gray-700 animate-in zoom-in-95 duration-200 max-h-[92vh] overflow-y-auto custom-scrollbar">
                         <div className="flex justify-between items-center mb-8">
                             <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight uppercase">{editing ? 'Edit Store' : 'Add Store'}</h2>
                             <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-900 transition-colors bg-gray-50 dark:bg-gray-900 p-2 rounded-xl"><FiX size={20} /></button>
@@ -327,9 +327,9 @@ const Supermarkets = () => {
                                             accept="image/*"
                                             onChange={handleImageUpload}
                                             disabled={uploading}
-                                            className="block w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-900 dark:file:text-blue-300"
+                                            className="block w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100 dark:file:bg-brand-900/30 dark:file:text-brand-300"
                                         />
-                                        {uploading && <p className="text-xs text-blue-600 mt-1 animate-pulse">Uploading...</p>}
+                                        {uploading && <p className="text-xs text-brand-700 dark:text-brand-300 mt-1 animate-pulse">Uploading...</p>}
                                     </div>
                                     <div className="relative">
                                         <div className="absolute inset-0 flex items-center" aria-hidden="true">
