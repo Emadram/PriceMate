@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { FiUser, FiLogOut, FiMoon, FiSun, FiGlobe, FiHome, FiCamera, FiCpu, FiSearch } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
@@ -14,10 +14,31 @@ const Navbar = () => {
     const { theme, toggleTheme } = useThemeStore();
     const navigate = useNavigate();
     const location = useLocation();
+    const bottomNavRef = useRef(null);
 
     useEffect(() => {
         fetchRates();
     }, [fetchRates]);
+
+    useEffect(() => {
+        const el = bottomNavRef.current;
+        if (!el || typeof document === 'undefined') return undefined;
+
+        const root = document.documentElement;
+        const setVar = () => {
+            const h = Math.round(el.getBoundingClientRect().height || 0);
+            if (h > 0) root.style.setProperty('--bottom-nav-h', `${h}px`);
+        };
+
+        setVar();
+        window.addEventListener('resize', setVar, { passive: true });
+        window.addEventListener('orientationchange', setVar, { passive: true });
+
+        return () => {
+            window.removeEventListener('resize', setVar);
+            window.removeEventListener('orientationchange', setVar);
+        };
+    }, []);
 
     const toggleLanguage = () => {
         const currentLang = i18n.resolvedLanguage || i18n.language;
@@ -152,7 +173,7 @@ const Navbar = () => {
             </nav>
 
             {/* Mobile Bottom Navigation */}
-            <div className="md:hidden fixed bottom-0 inset-x-0 z-9998 px-safe">
+            <div ref={bottomNavRef} className="md:hidden fixed bottom-0 inset-x-0 z-9998 px-safe">
               <div className="mx-2 mb-2 px-4 py-3 pb-safe-nav bg-transparent dark:bg-gray-900/95 rounded-t-[1.75rem] backdrop-blur-md">
                 <div className="flex items-center justify-between max-w-md mx-auto">
                     <NavItem to="/" icon={FiHome} label={t('home')} currentPath={location.pathname} onTap={tapFeedback} />

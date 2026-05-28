@@ -9,6 +9,7 @@ export const MobileHeader = ({
     backTo,
     backLabel = 'Back',
     className = '',
+    dense = false,
 }) => {
     const leftNode =
         left ??
@@ -30,7 +31,7 @@ export const MobileHeader = ({
         <header
             className={`pt-safe px-safe sticky top-0 z-50 border-b border-gray-100 dark:border-white/5 bg-white/80 dark:bg-black/80 backdrop-blur-md ${className}`}
         >
-            <div className="max-w-4xl mx-auto px-4 py-3">
+            <div className={`max-w-4xl mx-auto px-4 ${dense ? 'py-2' : 'py-3'}`}>
                 <div className="grid grid-cols-3 items-center">
                     <div className="justify-self-start">{leftNode}</div>
                     <h1 className="justify-self-center text-base sm:text-xl font-black text-gray-900 dark:text-white flex items-center gap-2 min-w-0">

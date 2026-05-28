@@ -8,6 +8,7 @@ import {
 } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
 import { calculateDistance, hasValidLatLon, fetchSimilarProductsByCategory, fetchPricesForProducts, getRelationshipId, normalizeProduct, resolveCoordinates } from '../utils/productUtils';
+import { stripNutritionMeta } from '../utils/productUtils';
 import PriceHistoryChart from '../components/PriceHistoryChart';
 import AddPriceModal from '../components/AddPriceModal';
 import ReportModal from '../components/ReportModal';
@@ -554,14 +555,18 @@ const PriceComparison = () => {
                             />
                         )}
                         
-                        {product.description && (
-                                    <p className="text-xs sm:text-sm md:text-base text-gray-500 dark:text-gray-400 leading-relaxed max-w-xl font-medium italic">
-                                        "{product.description}"
-                                    </p>
-                                )}
+                        {(() => {
+                            const displayDescription = stripNutritionMeta(product.description || '');
+                            if (!displayDescription) return null;
+                            return (
+                                <p className="text-xs sm:text-sm md:text-base text-gray-500 dark:text-gray-400 leading-relaxed max-w-xl font-medium italic">
+                                    "{displayDescription}"
+                                </p>
+                            );
+                        })()}
 
                                 {/* Global Database Health & Nutrition Info */}
-                                {(product.nutriscore || product.allergens || product.is_global) && (
+                                {(product.nutriscore || product.is_global) && (
                                     <div className="pt-2 flex flex-wrap gap-3 items-center justify-center md:justify-start" aria-label="Product Nutrition and Information">
                                         {/* Nutriscore Badge */}
                                         {product.nutriscore && (
@@ -582,18 +587,6 @@ const PriceComparison = () => {
                                                 >
                                                     {product.nutriscore.toUpperCase()}
                                                 </span>
-                                            </div>
-                                        )}
-
-                                        {/* Allergens List */}
-                                        {product.allergens && product.allergens.length > 0 && (
-                                            <div className="flex flex-wrap gap-1 items-center" aria-label={`Contains allergens: ${Array.isArray(product.allergens) ? product.allergens.join(', ') : product.allergens}`}>
-                                                <FiAlertTriangle className="text-amber-500 mr-1" size={14} aria-hidden="true" />
-                                                {(Array.isArray(product.allergens) ? product.allergens : product.allergens.split(',')).map((allergen, i) => (
-                                                    <span key={i} className="bg-amber-50 dark:bg-amber-900/10 text-amber-700 dark:text-amber-400 text-[9px] font-black px-2 py-1 rounded-md uppercase tracking-wider border border-amber-200/50">
-                                                        {allergen.trim().replace('en:', '')}
-                                                    </span>
-                                                ))}
                                             </div>
                                         )}
 

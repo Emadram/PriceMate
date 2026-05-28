@@ -437,10 +437,11 @@ const SupermarketProfile = () => {
                                 {user && (
                                 <button
                                     onClick={handleReportClick}
-                                    className="tap-target h-11 w-11 p-3 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 rounded-2xl hover:bg-red-100 dark:hover:bg-red-500/20 active:scale-95 transition-all border border-red-100 dark:border-red-500/20"
+                                    className="tap-target inline-flex items-center gap-2 h-11 px-4 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 rounded-2xl hover:bg-red-100 dark:hover:bg-red-500/20 active:scale-95 transition-all border border-red-100 dark:border-red-500/20"
                                     title={t('report_issue', 'Report an issue')}
                                 >
                                     <AlertTriangle size={20} />
+                                    <span className="text-xs font-black uppercase tracking-widest">{t('report', 'Report')}</span>
                                 </button>
                                 )}
                             </div>

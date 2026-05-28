@@ -19,7 +19,7 @@ const OFF_PROXY_FUNCTION_ID = import.meta.env.VITE_APPWRITE_FUNCTION_OFF_PROXY |
 const OFF_RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
 const NUTRITION_META_MARKER = '\n\n[PriceMate Nutrition]\n';
 
-const stripNutritionMeta = (value) => {
+export const stripNutritionMeta = (value) => {
     const text = String(value || '');
     const markerIndex = text.indexOf(NUTRITION_META_MARKER);
     return markerIndex >= 0 ? text.slice(0, markerIndex).trimEnd() : text.trimEnd();

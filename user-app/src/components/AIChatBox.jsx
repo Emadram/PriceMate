@@ -2011,6 +2011,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 <MobileHeader
                     title={t('ai_chat_title', 'PriceMate AI')}
                     icon={FiCpu}
+                    dense
                     right={
                         <div className="flex items-center gap-2">
                             {user ? (
@@ -2132,7 +2133,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                         </div>
                     )}
 
-                    <div className="flex-1 overflow-y-auto overscroll-contain scroll-pb-32 p-4 sm:p-5 space-y-4 bg-gray-50 dark:bg-gray-900 min-h-0">
+                    <div className="flex-1 overflow-y-auto overscroll-contain scroll-pb-[calc(var(--bottom-nav-h,0px)+7.5rem)] px-4 pt-2.5 pb-[calc(0.875rem+var(--bottom-nav-h,0px))] sm:px-5 sm:pt-3 sm:pb-[calc(1rem+var(--bottom-nav-h,0px))] space-y-3.5 bg-gray-50 dark:bg-gray-900 min-h-0">
                         {!user && (
                             <div className="p-4 rounded-[1.5rem] bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/30 text-center">
                                 <p className="text-xs sm:text-sm text-amber-700 dark:text-amber-300 leading-relaxed">
@@ -2241,7 +2242,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                     <form
                         ref={formRef}
                         onSubmit={handleSend}
-                        className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] sm:p-5 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 shrink-0"
+                        className="px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px)+var(--bottom-nav-h,0px))] sm:px-5 sm:py-4 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 shrink-0"
                     >
                         {user && activeConversationId && !input.trim() && !isLoading && (
                             <div
@@ -2281,7 +2282,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                                           : t('ai_chat_input_placeholder')
                                 }
                                 disabled={isLoading || !user || !activeConversationId}
-                                className="flex-1 max-h-32 min-h-12 resize-none bg-gray-50 dark:bg-gray-900 border-none rounded-[1.25rem] py-3.5 px-4 text-[15px] leading-5 focus:ring-2 focus:ring-brand-500 transition-all dark:text-white disabled:opacity-50"
+                                className="flex-1 max-h-32 min-h-12 resize-none bg-gray-50 dark:bg-gray-900 border-none rounded-[1.25rem] py-3.5 px-4 text-[16px] sm:text-sm leading-6 sm:leading-5 focus:ring-2 focus:ring-brand-500 transition-all dark:text-white disabled:opacity-50"
                             />
                             <button
                                 type="submit"
