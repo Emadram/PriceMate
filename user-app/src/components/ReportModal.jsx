@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { FiX, FiAlertTriangle, FiCheckCircle, FiLoader } from 'react-icons/fi';
+import { createPortal } from 'react-dom';
+import { FiX, FiAlertTriangle, FiCheckCircle, FiLoader, FiSend } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
 import { db } from '../lib/appwrite';
 import useAuthStore from '../stores/authStore';
@@ -16,6 +17,7 @@ const ReportModal = ({ isOpen, onClose, targetName, targetType = 'supermarket' }
     const [panelMaxHeight, setPanelMaxHeight] = useState(null);
     const closeTimerRef = useRef(null);
     const panelRef = useRef(null);
+    const formId = 'report-modal-form';
 
     useDocumentScrollLock(isOpen);
 
@@ -40,12 +42,18 @@ const ReportModal = ({ isOpen, onClose, targetName, targetType = 'supermarket' }
 
         const updatePanelHeight = () => {
             const vv = window.visualViewport;
+            const navH = parseFloat(
+                getComputedStyle(document.documentElement).getPropertyValue('--bottom-nav-h') || '0'
+            ) || 0;
             if (!vv) {
                 setPanelMaxHeight(null);
                 return;
             }
             const topInset = Math.max(0, vv.offsetTop);
-            const available = Math.max(200, Math.floor(vv.height - topInset - 12));
+            const available = Math.max(
+                200,
+                Math.floor(vv.height - topInset - navH - 16)
+            );
             setPanelMaxHeight(available);
         };
 
@@ -98,6 +106,8 @@ const ReportModal = ({ isOpen, onClose, targetName, targetType = 'supermarket' }
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (!selectedReason || isSubmitting) return;
+
         setIsSubmitting(true);
         setError(null);
 
@@ -128,15 +138,25 @@ const ReportModal = ({ isOpen, onClose, targetName, targetType = 'supermarket' }
         ? { maxHeight: `${panelMaxHeight}px` }
         : undefined;
 
-    return (
-        <div className="fixed inset-0 z-[2000] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-300">
+    const canSubmit = Boolean(selectedReason) && !isSubmitting;
+
+    const modal = (
+        <div
+            className="fixed inset-0 z-[10050] flex items-end sm:items-center justify-center p-0 sm:p-4 pb-[var(--bottom-nav-h,0px)] sm:pb-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-300"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="report-modal-title"
+        >
             <div
                 ref={panelRef}
                 style={panelStyle}
-                className="bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-[2.5rem] shadow-2xl w-full sm:max-w-md flex flex-col max-h-[min(90dvh,calc(100dvh-env(safe-area-inset-bottom,0px)-0.75rem))] sm:max-h-[90dvh] overflow-hidden transform transition-all animate-in slide-in-from-bottom-4 sm:zoom-in duration-300"
+                className="bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-[2.5rem] shadow-2xl w-full sm:max-w-md flex flex-col max-h-[min(90dvh,calc(100dvh-var(--bottom-nav-h,0px)-env(safe-area-inset-top,0px)-0.5rem))] sm:max-h-[90dvh] overflow-hidden transform transition-all animate-in slide-in-from-bottom-4 sm:zoom-in duration-300 mb-0 sm:mb-0"
             >
                 <div className="flex justify-between items-center p-4 sm:p-6 border-b dark:border-gray-700 shrink-0">
-                    <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <h3
+                        id="report-modal-title"
+                        className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2"
+                    >
                         <FiAlertTriangle className="text-red-500 shrink-0" />
                         {t('report_issue', 'Report Issue')}
                     </h3>
@@ -150,9 +170,9 @@ const ReportModal = ({ isOpen, onClose, targetName, targetType = 'supermarket' }
                     </button>
                 </div>
 
-                <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-6">
+                <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-6 pb-2">
                     {step === 1 ? (
-                        <form onSubmit={handleSubmit} className="space-y-4">
+                        <form id={formId} onSubmit={handleSubmit} className="space-y-4">
                             <p className="text-sm text-gray-600 dark:text-gray-400">
                                 {t('report_help_text', { target: targetName, defaultValue: 'Help us improve {{target}} by reporting an issue.' })}
                             </p>
@@ -176,7 +196,7 @@ const ReportModal = ({ isOpen, onClose, targetName, targetType = 'supermarket' }
                                             disabled={isSubmitting}
                                             onClick={() => setSelectedReason(reason)}
                                             className={`text-left px-4 py-3 rounded-xl border transition-all ${selectedReason === reason
-                                                ? 'border-red-500 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300'
+                                                ? 'border-red-500 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 ring-2 ring-red-400/40'
                                                 : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
                                             }`}
                                         >
@@ -199,15 +219,6 @@ const ReportModal = ({ isOpen, onClose, targetName, targetType = 'supermarket' }
                                     placeholder={t('tell_us_more', 'Tell us more...')}
                                 />
                             </div>
-
-                            <button
-                                type="submit"
-                                disabled={!selectedReason || isSubmitting}
-                                className="w-full bg-red-600 text-white py-3 rounded-xl font-bold hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-red-500/30 flex items-center justify-center gap-2 min-h-12"
-                            >
-                                {isSubmitting ? <FiLoader className="animate-spin" /> : null}
-                                {isSubmitting ? t('sending_request', 'Sending Request...') : t('submit_report', 'Submit Report')}
-                            </button>
                         </form>
                     ) : (
                         <div className="text-center py-6 sm:py-8">
@@ -223,9 +234,51 @@ const ReportModal = ({ isOpen, onClose, targetName, targetType = 'supermarket' }
                         </div>
                     )}
                 </div>
+
+                {step === 1 && (
+                    <div
+                        data-testid="report-modal-footer"
+                        className="shrink-0 relative border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] sm:px-6 sm:pb-6"
+                    >
+                        <div
+                            className="pointer-events-none absolute inset-x-0 -top-8 h-8 bg-gradient-to-t from-white via-white/90 to-transparent dark:from-gray-900 dark:via-gray-900/90"
+                            aria-hidden
+                        />
+                        {!selectedReason && (
+                            <p className="text-center text-xs text-gray-500 dark:text-gray-400 mb-2 font-medium">
+                                {t('report_choose_reason_hint', 'Choose a reason above to continue')}
+                            </p>
+                        )}
+                        <button
+                            type="submit"
+                            form={formId}
+                            disabled={!canSubmit}
+                            className={`w-full min-h-14 rounded-2xl font-black text-base uppercase tracking-wide flex items-center justify-center gap-2.5 transition-all shadow-lg ${
+                                canSubmit
+                                    ? 'bg-gradient-to-r from-red-600 to-red-500 text-white shadow-red-500/40 hover:from-red-700 hover:to-red-600 ring-2 ring-red-400/60 scale-[1.01] active:scale-[0.99]'
+                                    : 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500 shadow-none cursor-not-allowed'
+                            }`}
+                        >
+                            {isSubmitting ? (
+                                <FiLoader className="animate-spin shrink-0" size={22} />
+                            ) : (
+                                <FiSend className="shrink-0" size={22} strokeWidth={2.5} />
+                            )}
+                            {isSubmitting
+                                ? t('sending_request', 'Sending Request...')
+                                : t('send_report', 'Send Report')}
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );
+
+    if (typeof document !== 'undefined') {
+        return createPortal(modal, document.body);
+    }
+
+    return modal;
 };
 
 export default ReportModal;

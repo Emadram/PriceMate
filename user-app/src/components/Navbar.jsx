@@ -31,10 +31,15 @@ const Navbar = ({ hideMobileTopLogo = false }) => {
         };
 
         setVar();
+        const ro = typeof ResizeObserver !== 'undefined'
+            ? new ResizeObserver(setVar)
+            : null;
+        ro?.observe(el);
         window.addEventListener('resize', setVar, { passive: true });
         window.addEventListener('orientationchange', setVar, { passive: true });
 
         return () => {
+            ro?.disconnect();
             window.removeEventListener('resize', setVar);
             window.removeEventListener('orientationchange', setVar);
         };
@@ -175,8 +180,8 @@ const Navbar = ({ hideMobileTopLogo = false }) => {
             </nav>
 
             {/* Mobile Bottom Navigation */}
-            <div ref={bottomNavRef} className="md:hidden fixed bottom-0 inset-x-0 z-9998 px-safe">
-              <div className="mx-2 mb-2 px-4 py-3 pb-safe-nav pricemate-mobile-chrome rounded-t-[1.75rem]">
+            <div ref={bottomNavRef} className="md:hidden fixed bottom-0 inset-x-0 z-9998">
+              <div className="pt-3 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] px-safe pricemate-mobile-chrome border-t border-gray-100/80 dark:border-gray-800/60 rounded-t-[1.25rem] shadow-[0_-4px_24px_rgba(15,23,42,0.06)]">
                 <div className="flex items-center justify-between max-w-md mx-auto">
                     <NavItem to="/" icon={FiHome} label={t('home')} currentPath={location.pathname} onTap={tapFeedback} />
                     <NavItem to="/search" icon={FiSearch} label={t('search', 'Search')} currentPath={location.pathname} onTap={tapFeedback} />

@@ -380,7 +380,7 @@ const ChatScreenHeader = ({
                     <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
                 </div>
             ) : null}
-            <header className="pricemate-mobile-chrome sticky top-0 z-10 shrink-0 border-b border-gray-100 dark:border-gray-700/50 px-3.5 pb-3 pt-[calc(0.5rem+env(safe-area-inset-top,0px))] sm:px-5 sm:py-4 sm:pt-[calc(0.65rem+env(safe-area-inset-top,0px))]">
+            <header className="pricemate-mobile-chrome z-10 shrink-0 border-b border-gray-100 dark:border-gray-700/50 px-3.5 pb-3 pt-[calc(0.5rem+env(safe-area-inset-top,0px))] sm:px-5 sm:py-4 sm:pt-[calc(0.65rem+env(safe-area-inset-top,0px))]">
                 <div className="flex items-center gap-2.5 min-w-0">
                     {user ? (
                         <button

@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, cleanup } from '@testing-library/react';
 import ReportModal from './ReportModal';
 
 vi.mock('../lib/appwrite', () => ({
@@ -21,14 +21,25 @@ vi.mock('../hooks/useDocumentScrollLock', () => ({
 }));
 
 describe('ReportModal mobile layout', () => {
-    it('renders bottom-sheet alignment and scrollable body when open', () => {
-        const { container } = render(
+    beforeEach(() => {
+        document.documentElement.style.setProperty('--bottom-nav-h', '72px');
+    });
+
+    afterEach(() => {
+        cleanup();
+        document.documentElement.style.removeProperty('--bottom-nav-h');
+    });
+
+    it('renders via portal above nav with scrollable body and sticky footer CTA', () => {
+        render(
             <ReportModal isOpen onClose={vi.fn()} targetName="Test Store" targetType="supermarket" />
         );
 
-        const overlay = container.firstChild;
+        const overlay = screen.getByRole('dialog');
         expect(overlay.className).toMatch(/items-end/);
         expect(overlay.className).toMatch(/sm:items-center/);
+        expect(overlay.className).toMatch(/bottom-nav-h/);
+        expect(overlay.className).toMatch(/z-\[10050\]/);
 
         const panel = overlay.querySelector('.rounded-t-3xl');
         expect(panel).toBeTruthy();
@@ -36,8 +47,12 @@ describe('ReportModal mobile layout', () => {
 
         const scrollBody = panel.querySelector('.overflow-y-auto');
         expect(scrollBody).toBeTruthy();
-        expect(scrollBody.className).toMatch(/overscroll-contain/);
+        expect(scrollBody.querySelector('button[type="submit"]')).toBeNull();
 
-        expect(screen.getByText('Report Issue')).toBeTruthy();
+        const footer = screen.getByTestId('report-modal-footer');
+        expect(footer).toBeTruthy();
+        expect(footer.querySelector('button[type="submit"]')).toBeTruthy();
+        expect(screen.getByText('Send Report')).toBeTruthy();
+        expect(screen.getByText('Choose a reason above to continue')).toBeTruthy();
     });
 });
