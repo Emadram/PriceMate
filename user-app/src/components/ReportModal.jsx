@@ -3,6 +3,7 @@ import { FiX, FiAlertTriangle, FiCheckCircle, FiLoader } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
 import { db } from '../lib/appwrite';
 import useAuthStore from '../stores/authStore';
+import useDocumentScrollLock from '../hooks/useDocumentScrollLock';
 
 const ReportModal = ({ isOpen, onClose, targetName, targetType = 'supermarket' }) => {
     const { t } = useTranslation();
@@ -12,7 +13,11 @@ const ReportModal = ({ isOpen, onClose, targetName, targetType = 'supermarket' }
     const [details, setDetails] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState(null);
+    const [panelMaxHeight, setPanelMaxHeight] = useState(null);
     const closeTimerRef = useRef(null);
+    const panelRef = useRef(null);
+
+    useDocumentScrollLock(isOpen);
 
     useEffect(() => {
         if (isOpen) {
@@ -30,6 +35,34 @@ const ReportModal = ({ isOpen, onClose, targetName, targetType = 'supermarket' }
         }
     }, []);
 
+    useEffect(() => {
+        if (!isOpen || typeof window === 'undefined') return undefined;
+
+        const updatePanelHeight = () => {
+            const vv = window.visualViewport;
+            if (!vv) {
+                setPanelMaxHeight(null);
+                return;
+            }
+            const topInset = Math.max(0, vv.offsetTop);
+            const available = Math.max(200, Math.floor(vv.height - topInset - 12));
+            setPanelMaxHeight(available);
+        };
+
+        updatePanelHeight();
+        const vv = window.visualViewport;
+        vv?.addEventListener('resize', updatePanelHeight);
+        vv?.addEventListener('scroll', updatePanelHeight);
+        window.addEventListener('resize', updatePanelHeight);
+
+        return () => {
+            vv?.removeEventListener('resize', updatePanelHeight);
+            vv?.removeEventListener('scroll', updatePanelHeight);
+            window.removeEventListener('resize', updatePanelHeight);
+            setPanelMaxHeight(null);
+        };
+    }, [isOpen]);
+
     if (!isOpen) return null;
 
     const marketReasons = [
@@ -37,7 +70,7 @@ const ReportModal = ({ isOpen, onClose, targetName, targetType = 'supermarket' }
         t('report_reason_out_of_stock', 'Out of Stock Products'),
         t('report_reason_wrong_location', 'Wrong Location'),
         t('report_reason_store_closed', 'Store Closed'),
-        t('report_reason_other', 'Other Issue')
+        t('report_reason_other', 'Other Issue'),
     ];
 
     const productReasons = [
@@ -45,7 +78,7 @@ const ReportModal = ({ isOpen, onClose, targetName, targetType = 'supermarket' }
         t('report_reason_missing_image', 'Missing Image'),
         t('report_reason_wrong_category', 'Wrong Category'),
         t('report_reason_incorrect_details', 'Incorrect Product Details'),
-        t('report_reason_inappropriate', 'Inappropriate Content')
+        t('report_reason_inappropriate', 'Inappropriate Content'),
     ];
 
     const reasons = targetType === 'product' ? productReasons : marketReasons;
@@ -72,20 +105,17 @@ const ReportModal = ({ isOpen, onClose, targetName, targetType = 'supermarket' }
         const message = [context, selectedReason, details.trim()].filter(Boolean).join(' - ');
 
         try {
-            await db.feedback.create(
-                {
-                    userId: user?.$id,
-                    message,
-                    status: 'pending',
-                    createdAt: new Date().toISOString()
-                }
-            );
+            await db.feedback.create({
+                userId: user?.$id,
+                message,
+                status: 'pending',
+                createdAt: new Date().toISOString(),
+            });
 
             setStep(2);
             closeTimerRef.current = window.setTimeout(() => {
                 closeModal();
             }, 3000);
-
         } catch (err) {
             console.error('Error submitting report:', err);
             setError(err.message || t('report_submit_failed', 'Failed to submit report. Please try again.'));
@@ -94,26 +124,33 @@ const ReportModal = ({ isOpen, onClose, targetName, targetType = 'supermarket' }
         }
     };
 
-    return (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-300">
-            <div className="bg-white dark:bg-gray-900 rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden transform transition-all scale-100 animate-in zoom-in duration-300">
+    const panelStyle = panelMaxHeight
+        ? { maxHeight: `${panelMaxHeight}px` }
+        : undefined;
 
-                {/* Header */}
-                <div className="flex justify-between items-center p-6 border-b dark:border-gray-700">
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                        <FiAlertTriangle className="text-red-500" />
+    return (
+        <div className="fixed inset-0 z-[2000] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-300">
+            <div
+                ref={panelRef}
+                style={panelStyle}
+                className="bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-[2.5rem] shadow-2xl w-full sm:max-w-md flex flex-col max-h-[min(90dvh,calc(100dvh-env(safe-area-inset-bottom,0px)-0.75rem))] sm:max-h-[90dvh] overflow-hidden transform transition-all animate-in slide-in-from-bottom-4 sm:zoom-in duration-300"
+            >
+                <div className="flex justify-between items-center p-4 sm:p-6 border-b dark:border-gray-700 shrink-0">
+                    <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                        <FiAlertTriangle className="text-red-500 shrink-0" />
                         {t('report_issue', 'Report Issue')}
                     </h3>
                     <button
+                        type="button"
                         onClick={closeModal}
                         className="tap-target h-11 w-11 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 transition"
+                        aria-label={t('close', 'Close')}
                     >
                         <FiX size={24} />
                     </button>
                 </div>
 
-                {/* Content */}
-                <div className="p-6">
+                <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-6">
                     {step === 1 ? (
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -139,9 +176,9 @@ const ReportModal = ({ isOpen, onClose, targetName, targetType = 'supermarket' }
                                             disabled={isSubmitting}
                                             onClick={() => setSelectedReason(reason)}
                                             className={`text-left px-4 py-3 rounded-xl border transition-all ${selectedReason === reason
-                                                    ? 'border-red-500 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300'
-                                                    : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
-                                                }`}
+                                                ? 'border-red-500 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300'
+                                                : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                                            }`}
                                         >
                                             {reason}
                                         </button>
@@ -157,8 +194,8 @@ const ReportModal = ({ isOpen, onClose, targetName, targetType = 'supermarket' }
                                     value={details}
                                     disabled={isSubmitting}
                                     onChange={(e) => setDetails(e.target.value)}
-                                    className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-red-500 focus:border-transparent transition"
-                                    rows="3"
+                                    className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-base text-gray-900 dark:text-white focus:ring-2 focus:ring-red-500 focus:border-transparent transition resize-none"
+                                    rows={3}
                                     placeholder={t('tell_us_more', 'Tell us more...')}
                                 />
                             </div>
@@ -166,14 +203,14 @@ const ReportModal = ({ isOpen, onClose, targetName, targetType = 'supermarket' }
                             <button
                                 type="submit"
                                 disabled={!selectedReason || isSubmitting}
-                                className="w-full bg-red-600 text-white py-3 rounded-xl font-bold hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-red-500/30 flex items-center justify-center gap-2"
+                                className="w-full bg-red-600 text-white py-3 rounded-xl font-bold hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-red-500/30 flex items-center justify-center gap-2 min-h-12"
                             >
                                 {isSubmitting ? <FiLoader className="animate-spin" /> : null}
                                 {isSubmitting ? t('sending_request', 'Sending Request...') : t('submit_report', 'Submit Report')}
                             </button>
                         </form>
                     ) : (
-                        <div className="text-center py-8">
+                        <div className="text-center py-6 sm:py-8">
                             <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4 text-green-600 dark:text-green-400">
                                 <FiCheckCircle size={32} />
                             </div>

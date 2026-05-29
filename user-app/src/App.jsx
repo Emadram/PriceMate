@@ -30,6 +30,7 @@ import Navbar from './components/Navbar';
 import NavigationListener from './components/NavigationListener';
 import { startOverflowDetector } from './utils/overflowDetector';
 import usePreventBrowserZoom from './hooks/usePreventBrowserZoom';
+import { unlockDocumentScroll } from './utils/documentScrollLock';
 
 const AUTH_ROUTE_PREFIXES = ['/login', '/register', '/verify-email', '/forgot-password', '/reset-password'];
 const IMMERSIVE_ROUTE_PREFIXES = ['/ai-chat'];
@@ -48,6 +49,12 @@ const AppShell = ({ children }) => {
   const immersiveShellClass = isImmersiveRoute
     ? 'pricemate-immersive-shell md:relative md:static md:h-auto md:overflow-visible md:flex-none'
     : '';
+
+  useEffect(() => {
+    if (!isImmersiveRoute) {
+      unlockDocumentScroll();
+    }
+  }, [isImmersiveRoute]);
 
   return (
     <>
