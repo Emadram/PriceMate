@@ -28,6 +28,9 @@
     overflow-x: hidden;
     overscroll-behavior-x: none;
     overscroll-behavior-y: none;
+    touch-action: manipulation;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 }
 
@@ -39,6 +42,77 @@
     overflow-x: hidden;
     overscroll-behavior-x: none;
     overscroll-behavior-y: none;
+    touch-action: manipulation;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body.pricemate-ai-chat-page {
+    overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: manipulation;
+  }
+
+  html:has(body.pricemate-ai-chat-page) {
+    overflow: hidden;
+  }
+
+  .pricemate-immersive-shell {
+    position: fixed;
+    top: var(--app-vv-top, 0px);
+    left: 0;
+    right: 0;
+    bottom: var(--bottom-nav-h, 0px);
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background-color: #ffffff;
+  }
+
+  .dark .pricemate-immersive-shell {
+    background-color: #111827;
+  }
+
+  @media (min-width: 768px) {
+    .pricemate-immersive-shell {
+      position: static;
+      top: auto;
+      left: auto;
+      right: auto;
+      bottom: auto;
+      z-index: auto;
+      background-color: transparent;
+    }
+
+    .dark .pricemate-immersive-shell {
+      background-color: transparent;
+    }
+  }
+
+  .pricemate-mobile-chrome {
+    background-color: rgb(255 255 255 / 0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .dark .pricemate-mobile-chrome {
+    background-color: rgb(17 24 39 / 0.95);
+  }
+
+  .leaflet-container,
+  .leaflet-pane,
+  #scanner-root,
+  #scanner-root video {
+    touch-action: auto;
+  }
+
+  @media (max-width: 767px) {
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='hidden']),
+    select,
+    textarea {
+      font-size: 16px;
+    }
   }
 
   html.pricemate-splash-active,

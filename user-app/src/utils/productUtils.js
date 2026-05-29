@@ -1072,6 +1072,153 @@ export const calculateDistance = (lat1, lon1, lat2, lon2) => {
     return (R * c).toFixed(1);
 };
 
+const SUPERMARKET_CONTEXT_CAP = 20;
+const SUPERMARKET_NO_COORDS_CAP = 5;
+
+/**
+ * Build ranked supermarket lines for AI system prompt (distance when user location known).
+ */
+export const buildSupermarketContextLines = (supermarkets = [], userLocation = null) => {
+    const list = Array.isArray(supermarkets) ? supermarkets : [];
+    const userOk = userLocation && hasValidLatLon(userLocation.latitude, userLocation.longitude);
+    const userLat = userOk ? Number(userLocation.latitude) : null;
+    const userLon = userOk ? Number(userLocation.longitude) : null;
+
+    const withCoords = [];
+    const withoutCoords = [];
+
+    for (const doc of list) {
+        if (!doc?.$id) continue;
+        const coords = resolveCoordinates(doc);
+        const name = String(doc.name || '').trim();
+        const branch = String(doc.branchName || '').trim();
+        const label = branch && branch !== name ? `${name} — ${branch}` : (name || 'Store');
+        const address = String(doc.address || '').trim().slice(0, 80);
+
+        if (!coords) {
+            withoutCoords.push({ doc, label, address });
+            continue;
+        }
+
+        let distanceKm = null;
+        if (userOk) {
+            const raw = calculateDistance(userLat, userLon, coords.latitude, coords.longitude);
+            distanceKm = raw !== null ? parseFloat(raw) : null;
+            if (!Number.isFinite(distanceKm)) distanceKm = null;
+        }
+
+        withCoords.push({
+            id: doc.$id,
+            label,
+            address,
+            coords,
+            distanceKm,
+        });
+    }
+
+    if (userOk) {
+        withCoords.sort((a, b) => {
+            if (a.distanceKm === null && b.distanceKm === null) {
+                return a.label.localeCompare(b.label, undefined, { sensitivity: 'base' });
+            }
+            if (a.distanceKm === null) return 1;
+            if (b.distanceKm === null) return -1;
+            return a.distanceKm - b.distanceKm;
+        });
+    } else {
+        withCoords.sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
+    }
+
+    const lines = [];
+    for (const row of withCoords.slice(0, SUPERMARKET_CONTEXT_CAP)) {
+        const parts = [`[STORE:${row.id}]`, row.label];
+        if (row.distanceKm !== null) parts.push(`${row.distanceKm} km`);
+        parts.push(`${row.coords.latitude},${row.coords.longitude}`);
+        if (row.address) parts.push(row.address);
+        lines.push(`- ${parts.join(' | ')}`);
+    }
+
+    for (const row of withoutCoords.slice(0, SUPERMARKET_NO_COORDS_CAP)) {
+        const tail = row.address ? ` | ${row.address}` : '';
+        lines.push(`- [STORE:${row.doc.$id}] ${row.label} | location not on map${tail}`);
+    }
+
+    if (lines.length === 0) {
+        return '(No supermarkets with map locations in the catalog yet.)';
+    }
+
+    return lines.join('\n');
+};
+
+export const isUserLocationAvailableForStores = (userLocation) =>
+    Boolean(userLocation && hasValidLatLon(userLocation.latitude, userLocation.longitude));
+
+const buildSupermarketDisplayLabel = (name, branchName) => {
+    const storeName = String(name || '').trim();
+    const branch = String(branchName || '').trim();
+    if (storeName && branch && branch !== storeName) return `${storeName} — ${branch}`;
+    return storeName || branch || '';
+};
+
+/**
+ * Resolve supermarket id/name/label for a price row (expanded relation or id lookup).
+ */
+export const resolvePriceSupermarketMeta = (price, supermarkets = []) => {
+    if (!price) {
+        return { supermarketId: null, name: null, branchName: null, label: '' };
+    }
+
+    const supermarketId = getRelationshipId(price.supermarkets) || price.supermarketId || null;
+    let name = getRelationshipAttribute(price.supermarkets, 'name') || price.supermarketName || null;
+    let branchName =
+        getRelationshipAttribute(price.supermarkets, 'branchName') ||
+        price.supermarketBranchName ||
+        null;
+
+    const relDoc = Array.isArray(price.supermarkets) ? price.supermarkets[0] : price.supermarkets;
+    if (relDoc && typeof relDoc === 'object') {
+        if (relDoc.name) name = relDoc.name;
+        if (relDoc.branchName) branchName = relDoc.branchName;
+    }
+
+    if (!name && supermarketId && Array.isArray(supermarkets)) {
+        const doc = supermarkets.find((s) => s.$id === supermarketId);
+        if (doc) {
+            name = doc.name || name;
+            branchName = doc.branchName || branchName;
+        }
+    }
+
+    const label = buildSupermarketDisplayLabel(name, branchName) || name || '';
+    return {
+        supermarketId,
+        name: name || null,
+        branchName: branchName || null,
+        label,
+    };
+};
+
+/**
+ * Attach normalized supermarket fields to each price on product list (AI chat / cards).
+ */
+export const enrichProductPricesWithSupermarkets = (products, supermarkets = []) => {
+    const list = Array.isArray(products) ? products : [];
+    return list.map((product) => {
+        const prices = Array.isArray(product.prices) ? product.prices : [];
+        const enrichedPrices = prices.map((pr) => {
+            const meta = resolvePriceSupermarketMeta(pr, supermarkets);
+            return {
+                ...pr,
+                supermarketId: meta.supermarketId || pr.supermarketId,
+                supermarketName: meta.name || pr.supermarketName,
+                supermarketBranchName: meta.branchName || pr.supermarketBranchName,
+                supermarketLabel: meta.label,
+            };
+        });
+        return { ...product, prices: enrichedPrices };
+    });
+};
+
 /**
  * Standardize product data format
  */

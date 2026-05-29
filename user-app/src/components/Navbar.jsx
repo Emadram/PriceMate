@@ -6,7 +6,7 @@ import useAuthStore from '../stores/authStore';
 import useCurrencyStore from '../stores/currencyStore';
 import useThemeStore from '../stores/themeStore';
 
-const Navbar = () => {
+const Navbar = ({ hideMobileTopLogo = false }) => {
     const { t, i18n } = useTranslation();
     const user = useAuthStore((state) => state.user);
     const logout = useAuthStore((state) => state.logout);
@@ -59,7 +59,8 @@ const Navbar = () => {
 
     return (
         <>
-            {/* Top mobile header: show logo here (visible) and make background dark in dark mode */}
+            {/* Top mobile header: hidden on immersive routes (e.g. /ai-chat) */}
+            {!hideMobileTopLogo && (
             <div className="md:hidden fixed top-0 inset-x-0 z-9999 pt-safe px-safe">
                 <div className="mx-2 px-4 py-3 bg-transparent dark:bg-gray-900/95 rounded-b-[1.4rem] backdrop-blur-xl border-b border-gray-800/20">
                         <Link to="/" className="flex items-center justify-center gap-2 min-w-0">
@@ -76,6 +77,7 @@ const Navbar = () => {
                     </Link>
                 </div>
             </div>
+            )}
 
                 <nav className="hidden md:block fixed top-0 left-0 right-0 pt-safe z-9999 bg-transparent dark:bg-gray-900/95 backdrop-blur-md transition-colors duration-200">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -174,7 +176,7 @@ const Navbar = () => {
 
             {/* Mobile Bottom Navigation */}
             <div ref={bottomNavRef} className="md:hidden fixed bottom-0 inset-x-0 z-9998 px-safe">
-              <div className="mx-2 mb-2 px-4 py-3 pb-safe-nav bg-transparent dark:bg-gray-900/95 rounded-t-[1.75rem] backdrop-blur-md">
+              <div className="mx-2 mb-2 px-4 py-3 pb-safe-nav pricemate-mobile-chrome rounded-t-[1.75rem]">
                 <div className="flex items-center justify-between max-w-md mx-auto">
                     <NavItem to="/" icon={FiHome} label={t('home')} currentPath={location.pathname} onTap={tapFeedback} />
                     <NavItem to="/search" icon={FiSearch} label={t('search', 'Search')} currentPath={location.pathname} onTap={tapFeedback} />

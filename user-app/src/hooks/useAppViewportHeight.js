@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
 
 /**
- * Keeps `--app-dvh` CSS var in sync with the visible viewport height.
- * Uses visualViewport on iOS to handle the on-screen keyboard correctly.
+ * Keeps viewport CSS vars in sync with the visible area (iOS keyboard-safe).
+ * --app-dvh: visual viewport height
+ * --app-vv-top: visual viewport offset from layout top
  */
 export default function useAppViewportHeight(enabled = true) {
     useEffect(() => {
@@ -10,15 +11,20 @@ export default function useAppViewportHeight(enabled = true) {
         if (typeof window === 'undefined' || typeof document === 'undefined') return undefined;
 
         const root = document.documentElement;
-        const vv = window.visualViewport;
 
         const setVar = () => {
+            const vv = window.visualViewport;
             const h = Math.round((vv?.height ?? window.innerHeight) || 0);
-            if (h > 0) root.style.setProperty('--app-dvh', `${h}px`);
+            const top = Math.round(vv?.offsetTop ?? 0);
+            if (h > 0) {
+                root.style.setProperty('--app-dvh', `${h}px`);
+            }
+            root.style.setProperty('--app-vv-top', `${top}px`);
         };
 
         setVar();
 
+        const vv = window.visualViewport;
         window.addEventListener('resize', setVar, { passive: true });
         window.addEventListener('orientationchange', setVar, { passive: true });
         vv?.addEventListener('resize', setVar, { passive: true });
@@ -32,4 +38,3 @@ export default function useAppViewportHeight(enabled = true) {
         };
     }, [enabled]);
 }
-

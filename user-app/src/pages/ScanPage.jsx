@@ -39,7 +39,7 @@ const ScanPage = () => {
 
                 {!scannedCode ? (
                     <div className="p-6">
-                        <div className="rounded-xl overflow-hidden shadow-inner bg-gray-100 dark:bg-gray-900">
+                        <div id="scanner-root" className="rounded-xl overflow-hidden shadow-inner bg-gray-100 dark:bg-gray-900">
                             <Scanner onDetected={handleDetected} paused={!!scannedCode} />
                         </div>
                         <p className="text-center text-gray-500 dark:text-gray-400 mt-6 text-sm flex items-center justify-center gap-2">

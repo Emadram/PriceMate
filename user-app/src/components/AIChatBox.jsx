@@ -338,7 +338,13 @@ import {
     normalizeOffCacheDoc,
     resolveOffCacheProductForIngredients,
     ingredientPayloadFromOffCache,
+    buildSupermarketContextLines,
+    enrichProductPricesWithSupermarkets,
+    isUserLocationAvailableForStores,
+    resolvePriceSupermarketMeta,
 } from '../utils/productUtils';
+import useUserLocation from '../hooks/useUserLocation';
+import useSupermarketsStore from '../stores/supermarketsStore';
 import {
     buildAiProfileCacheKey,
     buildAiCheckFingerprint,
@@ -351,7 +357,101 @@ import { functions as appwriteFunctions } from '../lib/appwrite';
 import useCurrencyStore from '../stores/currencyStore';
 import useAuthStore from '../stores/authStore';
 import useChatStore, { CHAT_ERROR_MISSING_CONVERSATION_ID } from '../stores/chatStore';
-import { MobileHeader } from './MobilePageLayout';
+
+const ChatScreenHeader = ({
+    variant,
+    title,
+    subtitle,
+    poweredByLabel,
+    user,
+    onOpenList,
+    onNewChat,
+    onClose,
+    showDragHandle,
+    t,
+}) => {
+    const isPage = variant === 'page';
+    const [logoFailed, setLogoFailed] = useState(false);
+
+    return (
+        <>
+            {showDragHandle ? (
+                <div className="sm:hidden flex justify-center pt-2.5 pb-1 shrink-0" aria-hidden="true">
+                    <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
+                </div>
+            ) : null}
+            <header className="pricemate-mobile-chrome sticky top-0 z-10 shrink-0 border-b border-gray-100 dark:border-gray-700/50 px-3.5 pb-3 pt-[calc(0.5rem+env(safe-area-inset-top,0px))] sm:px-5 sm:py-4 sm:pt-[calc(0.65rem+env(safe-area-inset-top,0px))]">
+                <div className="flex items-center gap-2.5 min-w-0">
+                    {user ? (
+                        <button
+                            type="button"
+                            className="tap-target inline-flex h-10 w-10 items-center justify-center rounded-2xl text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/25 shrink-0 active:scale-95 sm:hidden"
+                            onClick={onOpenList}
+                            aria-label={t('ai_chat_chats')}
+                        >
+                            <FiList size={20} />
+                        </button>
+                    ) : (
+                        <span className="w-10 shrink-0 sm:hidden" aria-hidden />
+                    )}
+                    <div className="w-9 h-9 rounded-2xl bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center shrink-0 border border-brand-100 dark:border-brand-800/40 overflow-hidden">
+                        {!logoFailed ? (
+                            <img
+                                src="/LogoPriceMate.png"
+                                alt=""
+                                className="h-6 w-6 object-contain"
+                                loading="eager"
+                                decoding="async"
+                                onError={() => setLogoFailed(true)}
+                            />
+                        ) : (
+                            <FiCpu className="text-lg text-brand-600 dark:text-brand-400" aria-hidden />
+                        )}
+                    </div>
+                    <div className="flex-1 min-w-0 flex flex-col justify-center">
+                        <div className="flex items-center gap-2 min-w-0 leading-none">
+                            <h1 className="font-black text-sm sm:text-[15px] truncate normal-case tracking-tight text-brand-700 dark:text-brand-400">
+                                {title}
+                            </h1>
+                            {poweredByLabel ? (
+                                <span className="hidden sm:inline-flex text-[9px] uppercase tracking-[0.22em] font-black bg-brand-50 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 px-2 py-0.5 rounded-full shrink-0">
+                                    {poweredByLabel}
+                                </span>
+                            ) : null}
+                        </div>
+                        {subtitle ? (
+                            <p className="mt-0.5 text-[10px] sm:text-[11px] text-brand-600/80 dark:text-brand-300/90 leading-snug truncate sm:line-clamp-2 sm:whitespace-normal">
+                                {subtitle}
+                            </p>
+                        ) : null}
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                        {user ? (
+                            <button
+                                type="button"
+                                onClick={onNewChat}
+                                className={`tap-target min-h-10 min-w-10 p-2.5 text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/25 rounded-2xl transition-all active:scale-95 ${isPage ? 'hidden sm:inline-flex' : 'inline-flex'} items-center justify-center`}
+                                aria-label={t('ai_chat_new')}
+                            >
+                                <FiPlus size={20} />
+                            </button>
+                        ) : null}
+                        {!isPage && onClose ? (
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="tap-target min-h-10 min-w-10 p-2.5 text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/25 rounded-2xl transition-all active:scale-95"
+                                aria-label={t('ai_chat_close')}
+                            >
+                                <FiX size={22} />
+                            </button>
+                        ) : null}
+                    </div>
+                </div>
+            </header>
+        </>
+    );
+};
 
 const AI_CHECK_FUNCTION_ID = import.meta.env.VITE_APPWRITE_FUNCTION_AI_CHECK || '';
 const AI_CHECK_MODE = import.meta.env.VITE_AI_CHECK_MODE || 'legacy';
@@ -402,11 +502,62 @@ const formatAiProfileForPrompt = (profile = {}) => {
     ].join('\n');
 };
 
-const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [], t }) => {
+const ChatProductThumb = ({ src, alt, className = 'w-full h-full' }) => {
+    const [failed, setFailed] = useState(false);
+    if (!src || failed) {
+        return <FiPackage className="text-gray-400 text-lg shrink-0" aria-hidden />;
+    }
+    return (
+        <img
+            src={src}
+            alt={alt || ''}
+            className={`${className} object-contain max-w-full max-h-full`}
+            loading="lazy"
+            decoding="async"
+            onError={() => setFailed(true)}
+        />
+    );
+};
+
+const tokenizeMessageContent = (text) => {
+    const combinedRegex = /\[(?:BARCODE|ID):([\w\d-]+)\]|\[STORE:([\w\d-]+)\]/gi;
+    const segments = [];
+    let lastIndex = 0;
+    let match = combinedRegex.exec(text);
+    while (match) {
+        if (match.index > lastIndex) {
+            segments.push({ type: 'text', value: text.slice(lastIndex, match.index) });
+        }
+        if (match[1]) segments.push({ type: 'barcode', value: match[1] });
+        if (match[2]) segments.push({ type: 'store', value: match[2] });
+        lastIndex = match.index + match[0].length;
+        match = combinedRegex.exec(text);
+    }
+    if (lastIndex < text.length) {
+        segments.push({ type: 'text', value: text.slice(lastIndex) });
+    }
+    return segments;
+};
+
+const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [], allSupermarkets = [], t }) => {
     const extractBarcodeFromText = (value) => {
         const match = String(value || '').match(/\[BARCODE:([\w\d-]+)\]/i);
         return match ? match[1] : '';
     };
+
+    const storeLabelFromPrice = (price) => {
+        if (!price) return t('store', 'Store');
+        if (price.supermarketLabel) return price.supermarketLabel;
+        const meta = resolvePriceSupermarketMeta(price, allSupermarkets);
+        return meta.label || t('store', 'Store');
+    };
+
+    const renderStoreBadge = (price) => (
+        <div className="flex items-center gap-1 text-[10px] font-bold text-gray-500 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-700 min-w-0">
+            <FiShoppingBag className="shrink-0" size={10} />
+            <span className="truncate max-w-[120px] sm:max-w-[140px]">{storeLabelFromPrice(price)}</span>
+        </div>
+    );
 
     const renderBarcodeProductCard = (barcode, key = 'barcode-card') => {
         const product = allProducts.find((p) => String(p.barcode || '') === String(barcode || ''));
@@ -434,19 +585,18 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [], t }) =
                 className="mt-2 block rounded-xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/10 overflow-hidden hover:shadow-md transition-all"
             >
                 <div className="flex items-center gap-3 p-2.5">
-                    <div className="w-12 h-12 bg-white dark:bg-gray-800 rounded-lg flex items-center justify-center overflow-hidden border border-gray-100 dark:border-gray-900/50 shrink-0">
-                        {product.imageUrl ? (
-                            <img src={product.imageUrl} alt={product.name} className="w-full h-full object-contain" />
-                        ) : (
-                            <FiPackage className="text-gray-400 text-lg" />
-                        )}
+                    <div className="w-12 h-12 max-w-[3rem] bg-white dark:bg-gray-800 rounded-lg flex items-center justify-center overflow-hidden border border-gray-100 dark:border-gray-900/50 shrink-0">
+                        <ChatProductThumb src={product.imageUrl} alt={product.name} />
                     </div>
                     <div className="flex-1 min-w-0">
                         <p className="text-sm font-bold text-gray-800 dark:text-white truncate">{product.name || product.productName}</p>
                         {best ? (
-                            <p className="text-xs text-green-700 dark:text-green-300 font-black">
-                                {t('best', 'Best')}: {convert(best.price, 'TRY')} {getCurrencySymbol()}
-                            </p>
+                            <div className="flex items-center justify-between gap-2 mt-0.5">
+                                <p className="text-xs text-green-700 dark:text-green-300 font-black shrink-0">
+                                    {t('best', 'Best')}: {convert(best.price, 'TRY')} {getCurrencySymbol()}
+                                </p>
+                                {renderStoreBadge(best)}
+                            </div>
                         ) : (
                             <p className="text-xs text-gray-500">{t('no_data_yet')}</p>
                         )}
@@ -680,21 +830,39 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [], t }) =
             return renderIngredientCard(ingredientCardData);
         }
 
-        // 2. PARSING TAGS
-        const barcodeRegex = /\[(?:BARCODE|ID):([\w\d-]+)\]/g;
-        const parts = text.split(barcodeRegex);
-        
+        const segments = tokenizeMessageContent(text);
         const isMostExpensiveRequest = text.toLowerCase().includes('most expensive') || text.toLowerCase().includes('pahalı');
         const isCheapestRequest = text.toLowerCase().includes('cheapest') || text.toLowerCase().includes('en ucuz');
 
-        return parts.map((part, i) => {
-            if (i % 2 === 0) {
-                return <span key={`msg-part-${i}`}>{renderInlineBoldText(part, `plain-${i}`)}</span>;
-            } else {
-                const barcode = part;
-                const product = allProducts.find(p => p.barcode === barcode);
+        return segments.map((segment, i) => {
+            if (segment.type === 'text') {
+                return <span key={`msg-part-${i}`}>{renderInlineBoldText(segment.value, `plain-${i}`)}</span>;
+            }
 
-                if (product) {
+            if (segment.type === 'store') {
+                const storeId = segment.value;
+                const store = allSupermarkets.find((s) => s.$id === storeId);
+                const storeLabel = store
+                    ? [store.name, store.branchName].filter(Boolean).join(' — ')
+                    : t('supermarket', 'Supermarket');
+
+                return (
+                    <Link
+                        key={`store-${i}-${storeId}`}
+                        to={`/supermarket/${storeId}`}
+                        className="inline-flex items-center gap-1.5 my-1.5 min-h-10 rounded-xl border border-brand-100 bg-brand-50 px-3 py-2 text-[12px] font-black text-brand-700 hover:bg-brand-100 dark:border-brand-800/50 dark:bg-brand-900/25 dark:text-brand-300 dark:hover:bg-brand-900/40"
+                    >
+                        <FiMapPin size={14} className="shrink-0" />
+                        <span className="truncate max-w-[200px]">{storeLabel}</span>
+                        <FiExternalLink size={12} className="shrink-0 opacity-70" />
+                    </Link>
+                );
+            }
+
+            const barcode = segment.value;
+            const product = allProducts.find(p => p.barcode === barcode);
+
+            if (product) {
                     const sortedPrices = [...(product.prices || [])].sort((a, b) => a.price - b.price);
                     const lowestPrice = sortedPrices.length > 0 ? sortedPrices[0] : null;
                     const highestPrice = sortedPrices.length > 0 ? sortedPrices[sortedPrices.length - 1] : null;
@@ -705,17 +873,13 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [], t }) =
 
                     return (
                         <Link 
-                            key={i}
+                            key={`barcode-${i}-${barcode}`}
                             to={`/price-comparison/${barcode}`}
                             className={`block my-2 ${isMostExpensiveRequest ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800' : 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800'} border rounded-xl overflow-hidden hover:shadow-md transition-all group`}
                         >
                             <div className="flex items-center gap-3 p-2.5">
-                                <div className="w-14 h-14 bg-white dark:bg-gray-800 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden border border-gray-100 dark:border-gray-900/50">
-                                    {product.imageUrl ? (
-                                        <img src={product.imageUrl} alt={product.name} className="w-full h-full object-contain" />
-                                    ) : (
-                                        <FiPackage className="text-gray-400 text-xl" />
-                                    )}
+                                <div className="w-14 h-14 max-w-[3.5rem] bg-white dark:bg-gray-800 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden border border-gray-100 dark:border-gray-900/50">
+                                    <ChatProductThumb src={product.imageUrl} alt={product.name} className="w-full h-full" />
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-1.5 mb-0.5">
@@ -727,19 +891,28 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [], t }) =
                                         )}
                                     </div>
                                     {priceToShow ? (
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-baseline gap-1">
-                                                <span className="text-xs text-gray-500 dark:text-gray-400">{isMostExpensiveRequest ? t('high', 'High') : t('best', 'Best')}:</span>
-                                                <span className={`text-base font-black ${isMostExpensiveRequest ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
-                                                    {convert(priceToShow.price, 'TRY')} {getCurrencySymbol()}
-                                                </span>
+                                        <div className="space-y-1.5">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div className="flex items-baseline gap-1">
+                                                    <span className="text-xs text-gray-500 dark:text-gray-400">{isMostExpensiveRequest ? t('high', 'High') : t('best', 'Best')}:</span>
+                                                    <span className={`text-base font-black ${isMostExpensiveRequest ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                                                        {convert(priceToShow.price, 'TRY')} {getCurrencySymbol()}
+                                                    </span>
+                                                </div>
+                                                {renderStoreBadge(priceToShow)}
                                             </div>
-                                            <div className="flex items-center gap-1 text-[10px] font-bold text-gray-500 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-700">
-                                                <FiShoppingBag className="shrink-0" size={10} />
-                                                <span className="truncate max-w-[70px]">
-                                                    {Array.isArray(priceToShow.supermarkets) ? priceToShow.supermarkets[0]?.name : (priceToShow.supermarketName || t('store', 'Store'))}
-                                                </span>
-                                            </div>
+                                            {text.toLowerCase().includes('compare') && sortedPrices.length > 1 ? (
+                                                <div className="space-y-1 border-t border-gray-100 dark:border-gray-700/60 pt-1.5">
+                                                    {sortedPrices.slice(0, 2).map((pr, idx) => (
+                                                        <div key={`${pr.supermarketId || idx}-${pr.price}`} className="flex items-center justify-between gap-2 text-[11px]">
+                                                            <span className="truncate text-gray-600 dark:text-gray-300 font-semibold">{storeLabelFromPrice(pr)}</span>
+                                                            <span className="shrink-0 font-black text-gray-800 dark:text-gray-100">
+                                                                {convert(pr.price, 'TRY')} {getCurrencySymbol()}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : null}
                                         </div>
                                     ) : (
                                         <span className="text-[10px] text-gray-500 italic">{t('no_data_yet')}</span>
@@ -750,28 +923,26 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [], t }) =
                     );
                 }
 
-                // Fallback to simpler link if product data isn't found
-                return (
+            return (
                     <Link 
-                        key={i}
+                        key={`barcode-fallback-${i}-${barcode}`}
                         to={`/price-comparison/${barcode}`}
                         className="inline-flex items-center gap-0.5 bg-white/20 hover:bg-white/30 px-1.5 py-0.5 rounded text-xs font-bold underline transition-colors"
                     >
                         {t('view_product', 'View Product')} <FiExternalLink size={10} />
                     </Link>
                 );
-            }
         });
     };
 
     return (
         <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[92%] sm:max-w-[85%] px-3.5 py-2.5 sm:p-3 rounded-[1.25rem] ${
+            <div className={`max-w-[92%] sm:max-w-[85%] min-w-0 overflow-hidden px-3.5 py-2.5 sm:p-3 rounded-[1.25rem] ${
                 msg.role === 'user' 
                     ? 'bg-brand-600 text-white rounded-tr-none shadow-md' 
                     : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 shadow-sm border border-gray-100 dark:border-gray-700 rounded-tl-none'
             }`}>
-                <div className="text-[15px] sm:text-sm leading-6 whitespace-pre-wrap">
+                <div className="text-[15px] sm:text-sm leading-6 whitespace-pre-wrap break-words overflow-hidden">
                     {renderContent(msg.content)}
                 </div>
             </div>
@@ -836,10 +1007,12 @@ const buildRankedProductContextLines = (products, userHint, aiProfile = {}) => {
                 : p.categoryId?.categoryName || 'General';
             const priceDetails = p.prices
                 .map((pr) => {
-                    const smName = Array.isArray(pr.supermarkets)
-                        ? pr.supermarkets[0]?.name
-                        : pr.supermarketName || pr.supermarkets?.name || 'Store';
-                    return `${smName}: ${pr.price} TRY`;
+                    const meta = resolvePriceSupermarketMeta(pr, []);
+                    const label = pr.supermarketLabel || meta.label || 'Store';
+                    const storeTag = (pr.supermarketId || meta.supermarketId)
+                        ? ` [STORE:${pr.supermarketId || meta.supermarketId}]`
+                        : '';
+                    return `${label}: ${pr.price} TRY${storeTag}`;
                 })
                 .join(', ');
             const barcodeTag = p.barcode || p.code || p.$id || '';
@@ -873,20 +1046,13 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [mobileListOpen, setMobileListOpen] = useState(false);
     const [fullProductList, setFullProductList] = useState([]);
+    const [supermarketList, setSupermarketList] = useState([]);
+    const { location: userLocation } = useUserLocation();
+    const fetchSupermarkets = useSupermarketsStore((state) => state.fetchSupermarkets);
     const messagesEndRef = useRef(null);
+    const messagesScrollRef = useRef(null);
     const inputRef = useRef(null);
     const formRef = useRef(null);
-    const quickPromptsRowRef = useRef(null);
-
-    useEffect(() => {
-        if (!quickPromptsRowRef.current) return;
-        // iOS can preserve horizontal scroll position; always start at the beginning.
-        try {
-            quickPromptsRowRef.current.scrollTo({ left: 0 });
-        } catch {
-            quickPromptsRowRef.current.scrollLeft = 0;
-        }
-    }, [activeConversationId, isLoading, input]);
 
     const mobileQuickPrompts = [
         {
@@ -998,23 +1164,43 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         el.style.height = `${Math.min(el.scrollHeight, 132)}px`;
     }, [input]);
 
-    // Auto-scroll to bottom
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const scrollMessagesToBottom = () => {
+        const pane = messagesScrollRef.current;
+        if (!pane) return;
+        pane.scrollTop = pane.scrollHeight;
+    };
+
+    const scrollMessagesToTop = () => {
+        const pane = messagesScrollRef.current;
+        if (!pane) return;
+        pane.scrollTop = 0;
     };
 
     useEffect(() => {
-        scrollToBottom();
-    }, [history, isLoading, activeConversationId, summariesLoading]);
+        const hasThread = Boolean(activeConversationId);
+        const hasMessages = history.length > 0;
+
+        if (hasThread && historyLoading) return;
+
+        if (hasThread && (hasMessages || isLoading)) {
+            requestAnimationFrame(() => {
+                scrollMessagesToBottom();
+                requestAnimationFrame(() => scrollMessagesToBottom());
+            });
+            return;
+        }
+        requestAnimationFrame(() => scrollMessagesToTop());
+    }, [history, isLoading, activeConversationId, historyLoading]);
 
     // Fetch context data (products and prices) to inform the AI
     useEffect(() => {
         const loadContext = async () => {
             try {
-                const [products, prices, offCache] = await Promise.all([
+                const [products, prices, offCache, supermarkets] = await Promise.all([
                     fetchProducts(50), 
                     fetchAllPrices(),
-                    fetchOffCacheSnapshot(20)
+                    fetchOffCacheSnapshot(20),
+                    fetchSupermarkets(),
                 ]);
                 
                 // Keep the structural product list for the component to use
@@ -1031,13 +1217,18 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                     .filter(Boolean)
                     .map((p) => ({ ...p, prices: [] }));
 
-                setFullProductList([...productsWithData, ...offCacheProducts]);
+                const enrichedProducts = enrichProductPricesWithSupermarkets(
+                    productsWithData,
+                    Array.isArray(supermarkets) ? supermarkets : []
+                );
+                setFullProductList([...enrichedProducts, ...offCacheProducts]);
+                setSupermarketList(Array.isArray(supermarkets) ? supermarkets : []);
             } catch (error) {
                 console.error("Error loading chat context:", error);
             }
         };
         loadContext();
-    }, []);
+    }, [fetchSupermarkets]);
 
     const extractBarcode = (message) => {
         const match = message.match(/\b\d{8,14}\b/);
@@ -1805,6 +1996,10 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
             });
 
             const promptContext = buildRankedProductContextLines(fullProductList, userMessage, userAiProfile);
+            const storeContext = buildSupermarketContextLines(supermarketList, userLocation);
+            const storeLocationStatus = isUserLocationAvailableForStores(userLocation)
+                ? 'available (distances in NEARBY STORES are precomputed; do not invent km values)'
+                : `unavailable (${t('ai_chat_location_needed_for_distance', 'Ask the user to enable browser location to sort stores by distance.')})`;
             const intentSummary = buildIntentSummary(userMessage);
             const aiProfileContext = formatAiProfileForPrompt(userAiProfile);
             const maxGenericReplyWords = userAiProfile.responseStyle === 'detailed'
@@ -1832,6 +2027,22 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 
                 WEBSITE PRODUCT DATA (sample; catalog has many more items):
                 ${promptContext}
+
+                NEARBY STORES (PriceMate supermarkets; sorted by distance when user location is available):
+                User location for distance sorting: ${storeLocationStatus}
+                ${storeContext}
+
+                STORE LOCATION RULES:
+                - When the user asks for the closest/nearest store, nearest branch, or "near me", use NEARBY STORES order.
+                - Name the top 1–3 matches with distance when listed; do not invent distances.
+                - If user location is unavailable, tell them to enable location in the browser; list stores without inventing km values.
+                - When mentioning a specific store, include [STORE:<id>] from NEARBY STORES (same pattern as [BARCODE:...]).
+                - Do not invent stores or coordinates not listed in NEARBY STORES.
+
+                PRODUCT + STORE RULES:
+                - When mentioning a product that has prices in WEBSITE PRODUCT DATA, always name the supermarket for the price you cite (e.g. "at Migros").
+                - For "cheapest" answers, use the lowest-price store from the data; do not invent store names.
+                - Prefer a short sentence plus [BARCODE:...]; include the store name in the sentence when stating a price.
 
                 PRODUCT LIMITS (STRICT):
                 - Mention at most three [BARCODE:...] products per reply.
@@ -1930,6 +2141,9 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
 
     const effectiveOnClose = typeof onClose === 'function' ? onClose : () => {};
     const isPage = variant === 'page';
+    const composerPadClass = isPage
+        ? 'px-4 py-3 sm:px-5 sm:py-4'
+        : 'px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px)+var(--bottom-nav-h,0px))] sm:px-5 sm:py-4';
 
     const renderConversationList = (afterPick) => {
         if (!user?.$id) return null;
@@ -2007,94 +2221,18 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                         : 'fixed bottom-0 left-0 right-0 z-[9999] flex h-[85dvh] max-h-[85dvh] w-full touch-pan-y flex-col overflow-hidden rounded-t-2xl border-0 bg-white shadow-2xl animate-in slide-in-from-bottom-4 duration-300 dark:border-gray-700 dark:bg-gray-800 sm:inset-auto sm:bottom-4 sm:right-4 sm:z-[2000] sm:h-[min(640px,90vh)] sm:max-h-none sm:w-[400px] sm:rounded-2xl sm:border sm:border-gray-200 sm:shadow-2xl sm:slide-in-from-bottom-5 sm:slide-in-from-right md:w-[448px]'
                 }
             >
-            {isPage ? (
-                <MobileHeader
-                    title={t('ai_chat_title', 'PriceMate AI')}
-                    icon={FiCpu}
-                    dense
-                    right={
-                        <div className="flex items-center gap-2">
-                            {user ? (
-                                <>
-                                    <button
-                                        type="button"
-                                        className="tap-target min-h-11 min-w-11 inline-flex items-center justify-center rounded-2xl hover:bg-gray-100/60 dark:hover:bg-white/5 transition sm:hidden"
-                                        onClick={() => setMobileListOpen(true)}
-                                        aria-label={t('ai_chat_chats')}
-                                    >
-                                        <FiList size={20} />
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="tap-target min-h-11 min-w-11 inline-flex items-center justify-center rounded-2xl hover:bg-gray-100/60 dark:hover:bg-white/5 transition"
-                                        onClick={beginNewConversation}
-                                        aria-label={t('ai_chat_new')}
-                                    >
-                                        <FiPlus size={20} />
-                                    </button>
-                                </>
-                            ) : (
-                                <span className="w-11" aria-hidden />
-                            )}
-                        </div>
-                    }
-                />
-            ) : (
-                <>
-                    <div className="sm:hidden flex justify-center pt-2.5 pb-1 shrink-0" aria-hidden="true">
-                        <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
-                    </div>
-                    <div className="border-b border-black/5 bg-gradient-to-r from-brand-700 via-brand-600 to-accent-600 px-3.5 pb-3 pt-2.5 sm:pt-[calc(0.65rem+env(safe-area-inset-top,0px))] text-white shadow-md shrink-0 sm:px-5 sm:py-4">
-                        <div className="flex items-center gap-3 min-w-0">
-                            {user && (
-                                <button
-                                    type="button"
-                                    className="sm:hidden p-2.5 rounded-2xl bg-white/10 backdrop-blur-sm shrink-0 active:scale-95"
-                                    onClick={() => setMobileListOpen(true)}
-                                    aria-label={t('ai_chat_chats')}
-                                >
-                                    <FiList size={20} />
-                                </button>
-                            )}
-                            <div className="hidden sm:flex w-8 h-8 bg-white/12 rounded-2xl items-center justify-center backdrop-blur-sm shrink-0">
-                                <FiCpu className="text-xl text-white/85" />
-                            </div>
-                            <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                <div className="flex items-center gap-2 min-w-0 leading-none">
-                                    <span className="font-black block text-sm sm:text-[15px] truncate">
-                                        {t('ai_chat_title', 'PriceMate AI')}
-                                    </span>
-                                    <span className="hidden sm:inline-flex text-[9px] uppercase tracking-[0.22em] font-black bg-white/15 px-2 py-0.5 rounded-full">
-                                        {t('ai_chat_powered_by', 'Powered by Gemini')}
-                                    </span>
-                                </div>
-                                <p className="mt-1 text-[11px] text-white/80 leading-relaxed hidden sm:block">
-                                    {t('ai_chat_subtitle', 'Ask for cheaper picks, compare products, or check ingredients instantly.')}
-                                </p>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                                {user && (
-                                    <button
-                                        type="button"
-                                        onClick={beginNewConversation}
-                                        className="p-2.5 hover:bg-white/15 rounded-2xl transition-all active:scale-95 shrink-0"
-                                        aria-label={t('ai_chat_new')}
-                                    >
-                                        <FiPlus size={20} />
-                                    </button>
-                                )}
-                                <button
-                                    onClick={effectiveOnClose}
-                                    className="p-2.5 hover:bg-white/15 rounded-2xl transition-all active:scale-95 shrink-0"
-                                    aria-label={t('ai_chat_close')}
-                                >
-                                    <FiX size={24} />
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </>
-            )}
+            <ChatScreenHeader
+                variant={isPage ? 'page' : 'drawer'}
+                title={t('ai_chat_title', 'PriceMate AI')}
+                subtitle={t('ai_chat_subtitle', 'Compare prices and ingredients.')}
+                poweredByLabel={t('ai_chat_powered_by', 'Powered by Gemini')}
+                user={user}
+                onOpenList={() => setMobileListOpen(true)}
+                onNewChat={beginNewConversation}
+                onClose={effectiveOnClose}
+                showDragHandle={!isPage}
+                t={t}
+            />
 
             <div className="flex flex-1 min-h-0">
                 {user && (
@@ -2133,7 +2271,14 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                         </div>
                     )}
 
-                    <div className="flex-1 overflow-y-auto overscroll-contain scroll-pb-[calc(var(--bottom-nav-h,0px)+7.5rem)] px-4 pt-2.5 pb-[calc(0.875rem+var(--bottom-nav-h,0px))] sm:px-5 sm:pt-3 sm:pb-[calc(1rem+var(--bottom-nav-h,0px))] space-y-3.5 bg-gray-50 dark:bg-gray-900 min-h-0">
+                    <div
+                        ref={messagesScrollRef}
+                        className={
+                            isPage
+                                ? 'flex-1 overflow-y-auto overscroll-contain px-4 pt-2.5 pb-3 space-y-3.5 bg-gray-50 dark:bg-gray-900 min-h-0'
+                                : 'flex-1 overflow-y-auto overscroll-contain scroll-pb-[calc(var(--bottom-nav-h,0px)+7.5rem)] px-4 pt-2.5 pb-[calc(0.875rem+var(--bottom-nav-h,0px))] sm:px-5 sm:pt-3 sm:pb-[calc(1rem+var(--bottom-nav-h,0px))] space-y-3.5 bg-gray-50 dark:bg-gray-900 min-h-0'
+                        }
+                    >
                         {!user && (
                             <div className="p-4 rounded-[1.5rem] bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/30 text-center">
                                 <p className="text-xs sm:text-sm text-amber-700 dark:text-amber-300 leading-relaxed">
@@ -2206,6 +2351,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                                         convert={convert}
                                         getCurrencySymbol={getCurrencySymbol}
                                         allProducts={fullProductList}
+                                        allSupermarkets={supermarketList}
                                         t={t}
                                     />
                                 ))}
@@ -2242,26 +2388,8 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                     <form
                         ref={formRef}
                         onSubmit={handleSend}
-                        className="px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px)+var(--bottom-nav-h,0px))] sm:px-5 sm:py-4 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 shrink-0"
+                        className={`${composerPadClass} bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 shrink-0`}
                     >
-                        {user && activeConversationId && !input.trim() && !isLoading && (
-                            <div
-                                ref={quickPromptsRowRef}
-                                className="mb-3 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none]"
-                            >
-                                {mobileQuickPrompts.map((item) => (
-                                    <button
-                                        key={item.key}
-                                        type="button"
-                                        onClick={() => applyQuickPrompt(item.prompt)}
-                                        className="shrink-0 min-h-11 rounded-full border border-brand-100 bg-brand-50 px-4 py-2.5 text-[11px] font-black text-brand-700 dark:border-brand-800/50 dark:bg-brand-900/20 dark:text-brand-300 flex items-center gap-2"
-                                    >
-                                        <item.Icon size={14} />
-                                        {item.label}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
                         <div className="relative flex items-end gap-2">
                             <textarea
                                 ref={inputRef}

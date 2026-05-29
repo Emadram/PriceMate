@@ -69,9 +69,30 @@ vi.mock('../stores/currencyStore', () => ({
     }),
 }));
 
+const authState = vi.hoisted(() => ({ user: null }));
+
 vi.mock('../stores/authStore', () => ({
     default: (selector) => {
-        const state = { user: null, isLoading: false };
+        const state = { user: authState.user, isLoading: false };
+        return selector ? selector(state) : state;
+    },
+}));
+
+vi.mock('../hooks/useUserLocation', () => ({
+    default: () => ({
+        location: null,
+        error: null,
+        loading: false,
+        retry: vi.fn(),
+    }),
+}));
+
+vi.mock('../stores/supermarketsStore', () => ({
+    default: (selector) => {
+        const state = {
+            supermarkets: [],
+            fetchSupermarkets: vi.fn().mockResolvedValue([]),
+        };
         return selector ? selector(state) : state;
     },
 }));
@@ -96,17 +117,26 @@ vi.mock('../stores/chatStore', () => ({
 }));
 
 vi.mock('../utils/productUtils', () => ({
-    fetchProducts: vi.fn(),
-    fetchAllPrices: vi.fn(),
+    fetchProducts: vi.fn().mockResolvedValue([]),
+    fetchAllPrices: vi.fn().mockResolvedValue([]),
     fetchIngredientsByBarcode: vi.fn(),
     searchIngredientsByName: vi.fn(),
     resolveCatalogProductForIngredients: vi.fn(),
     ingredientPayloadFromAppwriteProduct: vi.fn(),
     persistIngredientPayloadToCatalogProduct: vi.fn(),
-    fetchOffCacheSnapshot: vi.fn(),
+    fetchOffCacheSnapshot: vi.fn().mockResolvedValue([]),
     normalizeOffCacheDoc: vi.fn(),
     resolveOffCacheProductForIngredients: vi.fn(),
     ingredientPayloadFromOffCache: vi.fn(),
+    buildSupermarketContextLines: vi.fn(() => '- [STORE:test] Test Store'),
+    isUserLocationAvailableForStores: vi.fn(() => false),
+    resolvePriceSupermarketMeta: vi.fn(() => ({
+        supermarketId: 'sm-1',
+        name: 'Test Market',
+        branchName: null,
+        label: 'Test Market',
+    })),
+    enrichProductPricesWithSupermarkets: vi.fn((products) => products),
 }));
 
 vi.mock('../utils/aiCheckUtils', () => ({
@@ -521,4 +551,95 @@ describe('FloatingAIChatLauncher — Task 2: ai-open body class preservation', (
             expect(document.body.classList.contains('ai-open')).toBe(false);
         }
     );
+});
+
+describe('AIChatBox — page variant immersive header', () => {
+    it('renders unified chat header with AI title (not MobileHeader grid)', () => {
+        const { container, getByRole } = render(
+            <AIChatBox isOpen={true} onClose={() => {}} variant="page" />
+        );
+
+        expect(getByRole('heading', { name: /ai_chat_title/i })).toBeTruthy();
+        const header = container.querySelector('header');
+        expect(header).not.toBeNull();
+        expect(header.classList.contains('pricemate-mobile-chrome')).toBe(true);
+        expect(header.className).not.toContain('bg-gradient-to-r');
+        expect(getByRole('heading', { name: /ai_chat_title/i }).className).toContain('text-brand-700');
+        expect(container.querySelector('.grid.grid-cols-3')).toBeNull();
+    });
+
+    it('page variant does not render drawer drag handle', () => {
+        const { container } = render(
+            <AIChatBox isOpen={true} onClose={() => {}} variant="page" />
+        );
+
+        const handles = container.querySelectorAll('.rounded-full.bg-gray-300');
+        expect(handles.length).toBe(0);
+    });
+
+    it('page variant composer does not reserve bottom-nav height (immersive shell handles it)', () => {
+        const { container } = render(
+            <AIChatBox isOpen={true} onClose={() => {}} variant="page" />
+        );
+
+        const form = container.querySelector('form');
+        expect(form).not.toBeNull();
+        expect(form.className).not.toContain('bottom-nav-h');
+    });
+
+    it('drawer variant composer reserves bottom-nav height above tab bar', () => {
+        const { container } = render(
+            <AIChatBox isOpen={true} onClose={() => {}} />
+        );
+
+        const form = container.querySelector('form');
+        expect(form).not.toBeNull();
+        expect(form.className).toContain('bottom-nav-h');
+    });
+
+    it('page variant hides header new-chat button on mobile when logged in', () => {
+        authState.user = { $id: 'user-1', name: 'Test User' };
+        const { getByLabelText } = render(
+            <AIChatBox isOpen={true} onClose={() => {}} variant="page" />
+        );
+
+        const newChatBtn = getByLabelText('ai_chat_new');
+        expect(newChatBtn.className).toContain('hidden');
+        expect(newChatBtn.className).toContain('sm:inline-flex');
+        authState.user = null;
+    });
+
+    it('page variant centers list menu button icon in tap target', () => {
+        authState.user = { $id: 'user-1', name: 'Test User' };
+        const { getByLabelText } = render(
+            <AIChatBox isOpen={true} onClose={() => {}} variant="page" />
+        );
+
+        const menuBtn = getByLabelText('ai_chat_chats');
+        expect(menuBtn.className).toContain('items-center');
+        expect(menuBtn.className).toContain('justify-center');
+        authState.user = null;
+    });
+
+    it('drawer variant shows header new-chat button when logged in', () => {
+        authState.user = { $id: 'user-1', name: 'Test User' };
+        const { getByLabelText } = render(
+            <AIChatBox isOpen={true} onClose={() => {}} />
+        );
+
+        expect(getByLabelText('ai_chat_new')).toBeTruthy();
+        authState.user = null;
+    });
+
+    it('does not render composer quick-prompt suggestion pills in the form', () => {
+        authState.user = { $id: 'user-1', name: 'Test User' };
+        const { container } = render(
+            <AIChatBox isOpen={true} onClose={() => {}} variant="page" />
+        );
+
+        const form = container.querySelector('form');
+        expect(form).not.toBeNull();
+        expect(form.querySelectorAll('.rounded-full.border-brand-100').length).toBe(0);
+        authState.user = null;
+    });
 });
