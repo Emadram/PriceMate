@@ -70,6 +70,24 @@
     background-color: #ffffff;
   }
 
+  /* AI chat: stable shell height; keyboard overlays messages (not resize shell) */
+  @media (max-width: 767px) {
+    body.pricemate-ai-chat-page .pricemate-immersive-shell,
+    body.pricemate-ai-keyboard-overlay .pricemate-immersive-shell {
+      top: 0;
+    }
+  }
+
+  .pricemate-ai-composer-overlay {
+    background-color: rgb(255 255 255 / 0.88);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+
+  .dark .pricemate-ai-composer-overlay {
+    background-color: rgb(17 24 39 / 0.9);
+  }
+
   .dark .pricemate-immersive-shell {
     background-color: #111827;
   }

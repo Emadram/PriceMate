@@ -1,9 +1,11 @@
 import AIChatBox from '../components/AIChatBox';
 import useAppViewportHeight from '../hooks/useAppViewportHeight';
+import useAiChatViewportMeta from '../hooks/useAiChatViewportMeta';
 import useDocumentScrollLock from '../hooks/useDocumentScrollLock';
 
 const AIChat = () => {
-    useAppViewportHeight(true);
+    useAiChatViewportMeta(true);
+    useAppViewportHeight(true, { keyboardOverlayMode: true });
     useDocumentScrollLock(true);
 
     return (

@@ -1053,6 +1053,9 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
     const messagesScrollRef = useRef(null);
     const inputRef = useRef(null);
     const formRef = useRef(null);
+    const composerStackRef = useRef(null);
+    const composerFocusedRef = useRef(false);
+    const [composerStackHeight, setComposerStackHeight] = useState(72);
 
     const mobileQuickPrompts = [
         {
@@ -1163,6 +1166,39 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         el.style.height = 'auto';
         el.style.height = `${Math.min(el.scrollHeight, 132)}px`;
     }, [input]);
+
+    const isPage = variant === 'page';
+
+    useEffect(() => {
+        if (!isPage || !isOpen) return undefined;
+        const stack = composerStackRef.current;
+        if (!stack || typeof ResizeObserver === 'undefined') return undefined;
+
+        const measure = () => {
+            const h = Math.round(stack.getBoundingClientRect().height || 0);
+            if (h > 0) setComposerStackHeight(h);
+        };
+
+        measure();
+        const ro = new ResizeObserver(measure);
+        ro.observe(stack);
+        return () => ro.disconnect();
+    }, [isPage, isOpen, input, chatWriteError, mobileListOpen]);
+
+    useEffect(() => {
+        if (!isPage || !isOpen || typeof window === 'undefined') return undefined;
+
+        const onViewportChange = () => {
+            if (composerFocusedRef.current) {
+                const pane = messagesScrollRef.current;
+                if (pane) pane.scrollTop = pane.scrollHeight;
+            }
+        };
+
+        const vv = window.visualViewport;
+        vv?.addEventListener('resize', onViewportChange, { passive: true });
+        return () => vv?.removeEventListener('resize', onViewportChange);
+    }, [isPage, isOpen]);
 
     const scrollMessagesToBottom = () => {
         const pane = messagesScrollRef.current;
@@ -2140,10 +2176,32 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
     if (!isOpen) return null;
 
     const effectiveOnClose = typeof onClose === 'function' ? onClose : () => {};
-    const isPage = variant === 'page';
     const composerPadClass = isPage
         ? 'px-4 py-3 sm:px-5 sm:py-4'
         : 'px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px)+var(--bottom-nav-h,0px))] sm:px-5 sm:py-4';
+
+    const pageMessagesPadStyle = isPage
+        ? {
+              paddingBottom: `calc(${composerStackHeight}px + var(--keyboard-inset-bottom, 0px) + 0.75rem)`,
+          }
+        : undefined;
+
+    const composerStackClass = isPage
+        ? `shrink-0 max-md:fixed max-md:left-0 max-md:right-0 max-md:z-30 max-md:bottom-[calc(var(--keyboard-inset-bottom,0px)+var(--bottom-nav-h,0px))] ${mobileListOpen ? 'max-md:hidden' : ''}`
+        : 'shrink-0';
+
+    const composerFormClass = isPage
+        ? `${composerPadClass} pricemate-ai-composer-overlay border-t border-gray-100/80 dark:border-gray-700/50 sm:bg-white sm:dark:bg-gray-800 sm:border-gray-100 sm:dark:border-gray-700`
+        : `${composerPadClass} bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700`;
+
+    const handleComposerFocus = () => {
+        composerFocusedRef.current = true;
+        requestAnimationFrame(() => scrollMessagesToBottom());
+    };
+
+    const handleComposerBlur = () => {
+        composerFocusedRef.current = false;
+    };
 
     const renderConversationList = (afterPick) => {
         if (!user?.$id) return null;
@@ -2271,8 +2329,16 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                         </div>
                     )}
 
+                    <div className="relative flex-1 min-h-0 flex flex-col">
+                        {isPage && (
+                            <div
+                                className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] h-20 bg-gradient-to-t from-gray-50 via-gray-50/90 to-transparent dark:from-gray-900 dark:via-gray-900/90 max-md:block hidden sm:hidden"
+                                aria-hidden
+                            />
+                        )}
                     <div
                         ref={messagesScrollRef}
+                        style={pageMessagesPadStyle}
                         className={
                             isPage
                                 ? 'flex-1 overflow-y-auto overscroll-contain px-4 pt-2.5 pb-3 space-y-3.5 bg-gray-50 dark:bg-gray-900 min-h-0'
@@ -2366,63 +2432,73 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                         )}
                         <div ref={messagesEndRef} />
                     </div>
+                    </div>
 
-                    {user && chatWriteError && (
-                        <div className="shrink-0 px-4 py-2.5 bg-red-50 dark:bg-red-900/20 border-t border-red-100 dark:border-red-800/40 flex gap-2 items-start justify-between">
-                            <p className="text-xs text-red-800 dark:text-red-200 flex-1 leading-relaxed">
-                                {chatWriteError === CHAT_ERROR_MISSING_CONVERSATION_ID
-                                    ? t('chat_error_schema_conversation_id')
-                                    : chatWriteError}
-                            </p>
-                            <button
-                                type="button"
-                                onClick={() => clearChatWriteError()}
-                                className="text-xs font-bold text-red-700 dark:text-red-300 shrink-0 px-1"
-                                aria-label={t('chat_error_dismiss')}
-                            >
-                                ×
-                            </button>
-                        </div>
-                    )}
-
-                    <form
-                        ref={formRef}
-                        onSubmit={handleSend}
-                        className={`${composerPadClass} bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 shrink-0`}
+                    <div
+                        ref={composerStackRef}
+                        data-testid="ai-chat-composer-stack"
+                        className={composerStackClass}
                     >
-                        <div className="relative flex items-end gap-2">
-                            <textarea
-                                ref={inputRef}
-                                rows={1}
-                                value={input}
-                                onChange={(e) => setInput(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && !e.shiftKey) {
-                                        e.preventDefault();
-                                        formRef.current?.requestSubmit();
+                        {user && chatWriteError && (
+                            <div className="shrink-0 px-4 py-2.5 bg-red-50 dark:bg-red-900/20 border-t border-red-100 dark:border-red-800/40 flex gap-2 items-start justify-between max-md:pricemate-ai-composer-overlay">
+                                <p className="text-xs text-red-800 dark:text-red-200 flex-1 leading-relaxed">
+                                    {chatWriteError === CHAT_ERROR_MISSING_CONVERSATION_ID
+                                        ? t('chat_error_schema_conversation_id')
+                                        : chatWriteError}
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => clearChatWriteError()}
+                                    className="text-xs font-bold text-red-700 dark:text-red-300 shrink-0 px-1"
+                                    aria-label={t('chat_error_dismiss')}
+                                >
+                                    ×
+                                </button>
+                            </div>
+                        )}
+
+                        <form
+                            ref={formRef}
+                            onSubmit={handleSend}
+                            data-testid="ai-chat-composer-form"
+                            className={composerFormClass}
+                        >
+                            <div className="relative flex items-end gap-2">
+                                <textarea
+                                    ref={inputRef}
+                                    rows={1}
+                                    value={input}
+                                    onChange={(e) => setInput(e.target.value)}
+                                    onFocus={handleComposerFocus}
+                                    onBlur={handleComposerBlur}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                            e.preventDefault();
+                                            formRef.current?.requestSubmit();
+                                        }
+                                    }}
+                                    placeholder={
+                                        !user
+                                            ? t('ai_chat_login_placeholder')
+                                            : !activeConversationId
+                                              ? t('ai_chat_placeholder_no_thread')
+                                              : t('ai_chat_input_placeholder')
                                     }
-                                }}
-                                placeholder={
-                                    !user
-                                        ? t('ai_chat_login_placeholder')
-                                        : !activeConversationId
-                                          ? t('ai_chat_placeholder_no_thread')
-                                          : t('ai_chat_input_placeholder')
-                                }
-                                disabled={isLoading || !user || !activeConversationId}
-                                className="flex-1 max-h-32 min-h-12 resize-none bg-gray-50 dark:bg-gray-900 border-none rounded-[1.25rem] py-3.5 px-4 text-[16px] sm:text-sm leading-6 sm:leading-5 focus:ring-2 focus:ring-brand-500 transition-all dark:text-white disabled:opacity-50"
-                            />
-                            <button
-                                type="submit"
-                                disabled={
-                                    !input.trim() || isLoading || !user || !activeConversationId
-                                }
-                                className="min-h-12 min-w-12 bg-brand-600 hover:bg-brand-700 text-white px-4 rounded-[1.15rem] transition-all active:scale-90 disabled:opacity-50 disabled:active:scale-100 shadow-lg shadow-brand-200 dark:shadow-none flex items-center justify-center"
-                            >
-                                <FiSend />
-                            </button>
-                        </div>
-                    </form>
+                                    disabled={isLoading || !user || !activeConversationId}
+                                    className="flex-1 max-h-32 min-h-12 resize-none bg-gray-50 dark:bg-gray-900 border-none rounded-[1.25rem] py-3.5 px-4 text-[16px] sm:text-sm leading-6 sm:leading-5 focus:ring-2 focus:ring-brand-500 transition-all dark:text-white disabled:opacity-50"
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={
+                                        !input.trim() || isLoading || !user || !activeConversationId
+                                    }
+                                    className="min-h-12 min-w-12 bg-brand-600 hover:bg-brand-700 text-white px-4 rounded-[1.15rem] transition-all active:scale-90 disabled:opacity-50 disabled:active:scale-100 shadow-lg shadow-brand-200 dark:shadow-none flex items-center justify-center"
+                                >
+                                    <FiSend />
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
