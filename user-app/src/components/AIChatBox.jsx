@@ -343,6 +343,11 @@ import {
     isUserLocationAvailableForStores,
     resolvePriceSupermarketMeta,
 } from '../utils/productUtils';
+import {
+    findBestProductMatch,
+    scoreProductNameMatch,
+    FUZZY_MATCH_MIN_SCORE,
+} from '../utils/productNameMatch';
 import useUserLocation from '../hooks/useUserLocation';
 import useSupermarketsStore from '../stores/supermarketsStore';
 import {
@@ -984,10 +989,15 @@ const buildRankedProductContextLines = (products, userHint, aiProfile = {}) => {
             })
     );
     const scored = products.map((p) => {
-        const blob = norm(`${p.name || ''} ${p.productName || ''} ${p.categoryId?.categoryName || ''}`);
+        const displayName = p.name || p.productName || '';
+        const blob = norm(`${displayName} ${p.categoryId?.categoryName || ''}`);
         let score = 0;
         for (const w of words) {
             if (blob.includes(w)) score++;
+        }
+        const fuzzyScore = scoreProductNameMatch(userHint, displayName);
+        if (fuzzyScore >= FUZZY_MATCH_MIN_SCORE) {
+            score += Math.round(fuzzyScore * 6);
         }
         for (const w of dietaryBoostWords) {
             if (blob.includes(w)) score += 2;
@@ -1269,76 +1279,6 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
     const extractBarcode = (message) => {
         const match = message.match(/\b\d{8,14}\b/);
         return match ? match[0] : null;
-    };
-
-    const normalizeProductKey = (value) =>
-        String(value || '')
-            .toLowerCase()
-            .replace(/[^a-z0-9ğüşöçı]/gi, '');
-
-    const findProductMatch = (message, extraCandidates = []) => {
-        const lowered = message.toLowerCase();
-        let best = null;
-        let bestLength = 0;
-        const nMsg = normalizeProductKey(lowered);
-
-        const consider = (product, scoreLength) => {
-            if (scoreLength > bestLength) {
-                best = product;
-                bestLength = scoreLength;
-            }
-        };
-
-        const primaryList = fullProductList;
-        const secondaryList = Array.isArray(extraCandidates) ? extraCandidates : [];
-
-        primaryList.forEach((product) => {
-            const rawName = product.name || product.productName || '';
-            const name = rawName.toLowerCase();
-            if (!name) return;
-
-            if (lowered.includes(name)) {
-                consider(product, name.length);
-                return;
-            }
-
-            const nName = normalizeProductKey(rawName);
-            if (nName.length >= 4 && nMsg.includes(nName)) {
-                consider(product, nName.length);
-            }
-        });
-
-        if (!best && secondaryList.length > 0) {
-            secondaryList.forEach((product) => {
-                const rawName = product.name || product.productName || '';
-                const name = rawName.toLowerCase();
-                if (!name) return;
-
-                if (lowered.includes(name)) {
-                    consider(product, name.length);
-                    return;
-                }
-
-                const nName = normalizeProductKey(rawName);
-                if (nName.length >= 4 && nMsg.includes(nName)) {
-                    consider(product, nName.length);
-                }
-            });
-        }
-
-        if (!best && /\bcoke\b/i.test(lowered)) {
-            const cokeMatch =
-                primaryList.find((p) => {
-                    const n = normalizeProductKey(p.name || p.productName || '');
-                    return n.includes('coca') && n.includes('cola');
-                }) ||
-                primaryList.find((p) =>
-                    normalizeProductKey(p.name || p.productName || '').includes('coca')
-                );
-            if (cokeMatch) best = cokeMatch;
-        }
-
-        return best;
     };
 
     const extractQuotedProduct = (message) => {
@@ -1702,7 +1642,8 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         setInput('');
 
         const barcodeFromMessage = extractBarcode(userMessage);
-        const productMatch = findProductMatch(userMessage);
+        const localProductMatch = findBestProductMatch(userMessage, fullProductList);
+        const productMatch = localProductMatch?.product || null;
         const catalog = await resolveCatalogProductForIngredients(userMessage);
         const offCache = await resolveOffCacheProductForIngredients(userMessage);
         const mergedProductProfile = productMatch || catalog.product || offCache.product;
@@ -2079,6 +2020,9 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 - When mentioning a product that has prices in WEBSITE PRODUCT DATA, always name the supermarket for the price you cite (e.g. "at Migros").
                 - For "cheapest" answers, use the lowest-price store from the data; do not invent store names.
                 - Prefer a short sentence plus [BARCODE:...]; include the store name in the sentence when stating a price.
+                - Treat minor spelling, spacing, and brand shorthand as the same product when WEBSITE PRODUCT DATA or a resolved barcode indicates a match (e.g. "coco cola", "coca cola", "coke" → Coca-Cola).
+                - Do not ask the user to re-type the brand if a catalog product was already resolved in the message context.
+                - If no reasonable catalog match exists, ask for a barcode or a more specific product name—do not guess.
 
                 PRODUCT LIMITS (STRICT):
                 - Mention at most three [BARCODE:...] products per reply.
@@ -2121,9 +2065,19 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 15. Never restate the full user question; keep the answer short and direct.
             `;
 
-            const openRouterMessage = effectiveBarcode && !barcodeFromMessage
-                ? `Intent: ${intentSummary || userMessage}\nKnown barcode: [BARCODE:${effectiveBarcode}]`
-                : `Intent: ${intentSummary || userMessage}`;
+            const resolvedDisplayName =
+                catalogDisplayName ||
+                localProductMatch?.matchedName ||
+                mergedProductProfile?.name ||
+                mergedProductProfile?.productName ||
+                '';
+            let openRouterMessage = `Intent: ${intentSummary || userMessage}`;
+            if (effectiveBarcode) {
+                openRouterMessage += `\nKnown barcode: [BARCODE:${effectiveBarcode}]`;
+            }
+            if (resolvedDisplayName && effectiveBarcode) {
+                openRouterMessage += `\nResolved catalog product: ${resolvedDisplayName} [BARCODE:${effectiveBarcode}]`;
+            }
 
             const threadForApi = useChatStore
                 .getState()

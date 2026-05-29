@@ -1,4 +1,9 @@
 import { db, Query, COLLECTIONS, functions } from '../lib/appwrite';
+import {
+    buildCatalogSearchTerms,
+    findBestProductMatch,
+    FUZZY_MATCH_MIN_SCORE,
+} from './productNameMatch';
 
 const cacheStore = new Map();
 const inflightRequests = new Map();
@@ -779,21 +784,24 @@ export const resolveCatalogProductForIngredients = async (userMessage) => {
         }
     }
 
-    const lowered = trimmed.toLowerCase().replace(/\b\d{8,14}\b/g, ' ');
-    const terms = lowered
-        .split(/\s+/)
-        .filter((w) => w.length >= 2 && !CATALOG_RESOLVE_STOPWORDS.has(w))
-        .sort((a, b) => b.length - a.length);
+    const searchTerms = buildCatalogSearchTerms(trimmed).filter(
+        (term) => term.length >= 2 && !CATALOG_RESOLVE_STOPWORDS.has(term)
+    );
 
-    for (const term of terms) {
+    const pickFromDocuments = (documents, term) => {
+        if (!documents?.length) return null;
+        const fuzzy = findBestProductMatch(trimmed, documents, { minScore: FUZZY_MATCH_MIN_SCORE });
+        if (fuzzy?.product) return fuzzy.product;
+        const nameLower = (d) => (d.name || '').toLowerCase();
+        return documents.find((d) => nameLower(d).includes(term)) || documents[0];
+    };
+
+    for (const term of searchTerms) {
         if (term.length < 2) continue;
         try {
-            // No Query.select: Appwrite rejects the request if any selected attribute is missing from the schema.
             const res = await db.products.list([Query.search('name', term), Query.limit(8)]);
-            if (res.documents.length > 0) {
-                const nameLower = (d) => (d.name || '').toLowerCase();
-                const best =
-                    res.documents.find((d) => nameLower(d).includes(term)) || res.documents[0];
+            const best = pickFromDocuments(res.documents, term);
+            if (best) {
                 return {
                     product: best,
                     catalogBarcode: best.barcode || '',
@@ -807,11 +815,20 @@ export const resolveCatalogProductForIngredients = async (userMessage) => {
 
     try {
         const res = await db.products.list([Query.limit(500), Query.orderDesc('$createdAt')]);
+        const fuzzy = findBestProductMatch(trimmed, res.documents, { minScore: FUZZY_MATCH_MIN_SCORE });
+        if (fuzzy?.product) {
+            return {
+                product: fuzzy.product,
+                catalogBarcode: fuzzy.product.barcode || '',
+                catalogName: fuzzy.matchedName || fuzzy.product.name || '',
+            };
+        }
+
         let best = null;
         let bestScore = 0;
         for (const d of res.documents) {
             const n = (d.name || '').toLowerCase();
-            for (const term of terms) {
+            for (const term of searchTerms) {
                 if (term.length >= 3 && n.includes(term) && term.length >= bestScore) {
                     best = d;
                     bestScore = term.length;
