@@ -25,6 +25,20 @@ vi.mock('react-i18next', () => ({
 describe('Navbar mobile bottom chrome', () => {
     beforeEach(() => {
         document.documentElement.style.removeProperty('--bottom-nav-h');
+        document.documentElement.style.removeProperty('--mobile-top-logo-h');
+    });
+
+    it('pins top logo bar with fixed positioning on mobile', () => {
+        const { container } = render(
+            <MemoryRouter>
+                <Navbar />
+            </MemoryRouter>
+        );
+
+        const topLogo = container.querySelector('.fixed.top-0');
+        expect(topLogo).toBeTruthy();
+        expect(topLogo.className).toMatch(/md:hidden/);
+        expect(topLogo.className).toMatch(/pt-safe/);
     });
 
     it('pins bottom nav flush without mb-2 margin gap', () => {

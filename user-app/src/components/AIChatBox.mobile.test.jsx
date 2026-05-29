@@ -564,6 +564,8 @@ describe('AIChatBox — page variant immersive header', () => {
         expect(header).not.toBeNull();
         expect(header.classList.contains('pricemate-mobile-chrome')).toBe(true);
         expect(header.className).not.toContain('bg-gradient-to-r');
+        expect(header.className).not.toMatch(/\bsticky\b/);
+        expect(header.className).toMatch(/\bshrink-0\b/);
         expect(getByRole('heading', { name: /ai_chat_title/i }).className).toContain('text-brand-700');
         expect(container.querySelector('.grid.grid-cols-3')).toBeNull();
     });

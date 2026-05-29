@@ -120,7 +120,7 @@ const Favorites = () => {
                     </div>
                 ) : (
                     <>
-                        <div className="sticky top-[calc(env(safe-area-inset-top,0px)+4.6rem)] md:static z-40 -mx-1 px-1">
+                        <div className="sticky top-[calc(var(--mobile-top-logo-h,5rem)+var(--mobile-header-h,3.25rem))] md:static z-40 -mx-1 px-1">
                             <div className="flex p-1 rounded-2xl bg-gray-200/60 dark:bg-gray-800/80 border border-gray-100 dark:border-gray-700 backdrop-blur-md">
                             <button
                                 type="button"

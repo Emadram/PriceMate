@@ -15,10 +15,36 @@ const Navbar = ({ hideMobileTopLogo = false }) => {
     const navigate = useNavigate();
     const location = useLocation();
     const bottomNavRef = useRef(null);
+    const topLogoRef = useRef(null);
 
     useEffect(() => {
         fetchRates();
     }, [fetchRates]);
+
+    useEffect(() => {
+        const el = topLogoRef.current;
+        if (!el || typeof document === 'undefined') return undefined;
+
+        const root = document.documentElement;
+        const setVar = () => {
+            const h = Math.round(el.getBoundingClientRect().height || 0);
+            if (h > 0) root.style.setProperty('--mobile-top-logo-h', `${h}px`);
+        };
+
+        setVar();
+        const ro = typeof ResizeObserver !== 'undefined'
+            ? new ResizeObserver(setVar)
+            : null;
+        ro?.observe(el);
+        window.addEventListener('resize', setVar, { passive: true });
+        window.addEventListener('orientationchange', setVar, { passive: true });
+
+        return () => {
+            ro?.disconnect();
+            window.removeEventListener('resize', setVar);
+            window.removeEventListener('orientationchange', setVar);
+        };
+    }, [hideMobileTopLogo]);
 
     useEffect(() => {
         const el = bottomNavRef.current;
@@ -66,7 +92,7 @@ const Navbar = ({ hideMobileTopLogo = false }) => {
         <>
             {/* Top mobile header: hidden on immersive routes (e.g. /ai-chat) */}
             {!hideMobileTopLogo && (
-            <div className="md:hidden fixed top-0 inset-x-0 z-9999 pt-safe px-safe">
+            <div ref={topLogoRef} className="md:hidden fixed top-0 inset-x-0 z-9999 pt-safe px-safe">
                 <div className="mx-2 px-4 py-3 bg-transparent dark:bg-gray-900/95 rounded-b-[1.4rem] backdrop-blur-xl border-b border-gray-800/20">
                         <Link to="/" className="flex items-center justify-center gap-2 min-w-0">
                         <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/90 dark:bg-gray-900/60 shadow-sm shadow-brand-500/15 shrink-0 border border-gray-100/70 dark:border-gray-800/60 overflow-hidden">

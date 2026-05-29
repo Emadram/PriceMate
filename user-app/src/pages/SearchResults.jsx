@@ -30,6 +30,32 @@ const SearchResults = () => {
     const prevProductIds = useRef('');
     const prevPrices = useRef([]);
     const requestSeq = useRef(0);
+    const searchChromeRef = useRef(null);
+
+    useEffect(() => {
+        const el = searchChromeRef.current;
+        if (!el || typeof document === 'undefined') return undefined;
+
+        const root = document.documentElement;
+        const setVar = () => {
+            const h = Math.round(el.getBoundingClientRect().height || 0);
+            if (h > 0) root.style.setProperty('--mobile-search-chrome-h', `${h}px`);
+        };
+
+        setVar();
+        const ro = typeof ResizeObserver !== 'undefined'
+            ? new ResizeObserver(setVar)
+            : null;
+        ro?.observe(el);
+        window.addEventListener('resize', setVar, { passive: true });
+        window.addEventListener('orientationchange', setVar, { passive: true });
+
+        return () => {
+            ro?.disconnect();
+            window.removeEventListener('resize', setVar);
+            window.removeEventListener('orientationchange', setVar);
+        };
+    }, []);
 
     // Debounce search input changes to automatically update URL
     useEffect(() => {
@@ -174,8 +200,11 @@ const SearchResults = () => {
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-safe md:pb-8">
-            {/* Extended Header for Search Context */}
-            <div className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 md:sticky md:top-16 z-30">
+            {/* Extended Header for Search Context — fixed below global logo on mobile */}
+            <div
+                ref={searchChromeRef}
+                className="fixed inset-x-0 top-[var(--mobile-top-logo-h,5rem)] z-[9990] bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 md:static md:sticky md:top-16 md:z-30"
+            >
                 <div className="max-w-5xl mx-auto px-3 sm:px-4 py-3 md:py-6">
                     <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-6">
                         <div className="flex items-center justify-between md:justify-start gap-3 md:gap-4 flex-shrink-0">
@@ -229,6 +258,7 @@ const SearchResults = () => {
                     </div>
                 </div>
             </div>
+            <div className="md:hidden h-[var(--mobile-search-chrome-h,10rem)] shrink-0" aria-hidden="true" />
 
             <main className="max-w-5xl mx-auto px-4 py-6 md:py-8">
                 <div className="mb-4 md:mb-8 flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
