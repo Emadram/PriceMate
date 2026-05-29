@@ -113,6 +113,34 @@ const listAllThreadDocuments = async (userId, conversationId) => {
 /** Serialize session bootstrap so overlapping calls (Strict Mode, fast navigation) never double-run the empty-session branch. */
 let initSessionMutex = Promise.resolve();
 
+const lastConversationStorageKey = (userId) => `pricemate_last_conversation_${userId}`;
+
+const readLastConversationId = (userId) => {
+    if (!userId || typeof window === 'undefined' || !window.localStorage) return null;
+    try {
+        const value = window.localStorage.getItem(lastConversationStorageKey(userId));
+        return value && String(value).trim() ? String(value).trim() : null;
+    } catch {
+        return null;
+    }
+};
+
+const writeLastConversationId = (userId, conversationId) => {
+    if (!userId || !conversationId || typeof window === 'undefined' || !window.localStorage) return;
+    try {
+        window.localStorage.setItem(lastConversationStorageKey(userId), conversationId);
+    } catch {
+        // ignore quota / private mode
+    }
+};
+
+const resolveConversationToRestore = (summaries, storedId) => {
+    if (!summaries?.length) return null;
+    const ids = new Set(summaries.map((s) => s.id));
+    if (storedId && ids.has(storedId)) return storedId;
+    return summaries[0]?.id ?? null;
+};
+
 const useChatStore = create((set, get) => ({
     messages: [],
     conversationSummaries: [],
@@ -155,13 +183,15 @@ const useChatStore = create((set, get) => ({
         if (get().unsubscribe) {
             get().unsubscribe();
         }
+        const newId = ID.unique();
         set({
-            activeConversationId: ID.unique(),
+            activeConversationId: newId,
             messages: [],
             unsubscribe: null,
             loading: false,
             error: null,
         });
+        return newId;
     },
 
     clearChatWriteError: () => set({ error: null }),
@@ -216,6 +246,7 @@ const useChatStore = create((set, get) => ({
                 sortMessagesAsc
             );
             set({ messages: documents, loading: false });
+            writeLastConversationId(userId, conversationId);
 
             const unsubscribe = client.subscribe(
                 `databases.${DATABASE_ID}.collections.${COLLECTIONS.CHAT_HISTORY}.documents`,
@@ -243,14 +274,22 @@ const useChatStore = create((set, get) => ({
     },
 
     /**
-     * Refresh thread list and land with no conversation selected until the user clicks New.
+     * Refresh thread list and restore the last active conversation (or most recent thread).
      */
     initializeChatSession: async (userId) => {
         if (!userId) return;
 
         const job = initSessionMutex.then(async () => {
             await get().fetchConversationSummaries(userId);
-            get().clearConversationSelection();
+            const summaries = get().conversationSummaries;
+            const storedId = readLastConversationId(userId);
+            const targetId = resolveConversationToRestore(summaries, storedId);
+
+            if (targetId) {
+                await get().fetchMessagesForConversation(userId, targetId, { quiet: true });
+            } else {
+                get().clearConversationSelection();
+            }
         });
 
         initSessionMutex = job.catch((err) => {
@@ -289,6 +328,7 @@ const useChatStore = create((set, get) => ({
                 }));
             }
 
+            writeLastConversationId(userId, activeConversationId);
             await get().fetchConversationSummaries(userId);
             return doc;
         } catch (error) {

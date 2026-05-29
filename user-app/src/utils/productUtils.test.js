@@ -1,5 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import { buildDirectionsUrl, calculateDistance, extractGoogleMapsCoordinates, getRelationshipId, hasValidLatLon, normalizeProduct, resolveCoordinates } from './productUtils';
+import {
+    buildDirectionsUrl,
+    buildSupermarketContextLines,
+    calculateDistance,
+    enrichProductPricesWithSupermarkets,
+    extractGoogleMapsCoordinates,
+    getRelationshipId,
+    hasValidLatLon,
+    isUserLocationAvailableForStores,
+    normalizeProduct,
+    resolveCoordinates,
+    resolvePriceSupermarketMeta,
+} from './productUtils';
 
 describe('productUtils', () => {
     describe('hasValidLatLon', () => {
@@ -79,6 +91,90 @@ describe('productUtils', () => {
                 latitude: 41.0082,
                 longitude: 28.9784
             });
+        });
+    });
+
+    describe('buildSupermarketContextLines', () => {
+        const stores = [
+            {
+                $id: 'far',
+                name: 'Far Market',
+                latitude: 41.05,
+                longitude: 29.05,
+            },
+            {
+                $id: 'near',
+                name: 'Near Market',
+                latitude: 41.0082,
+                longitude: 28.9784,
+            },
+            {
+                $id: 'no-map',
+                name: 'No Map Store',
+                latitude: '',
+                longitude: '',
+            },
+        ];
+
+        it('sorts by distance when user location is available', () => {
+            const text = buildSupermarketContextLines(stores, {
+                latitude: 41.0082,
+                longitude: 28.9784,
+            });
+            expect(text.indexOf('[STORE:near]')).toBeLessThan(text.indexOf('[STORE:far]'));
+            expect(text).toContain('km');
+        });
+
+        it('sorts by name when user location is missing', () => {
+            const text = buildSupermarketContextLines(stores, null);
+            expect(text.indexOf('Far Market')).toBeLessThan(text.indexOf('Near Market'));
+            expect(text).not.toMatch(/\d+\.?\d* km/);
+        });
+
+        it('lists stores without coordinates as location not on map', () => {
+            const text = buildSupermarketContextLines(stores, null);
+            expect(text).toContain('location not on map');
+            expect(text).toContain('[STORE:no-map]');
+        });
+    });
+
+    describe('resolvePriceSupermarketMeta', () => {
+        it('resolves from expanded supermarkets relation', () => {
+            const meta = resolvePriceSupermarketMeta({
+                price: 60,
+                supermarkets: [{ $id: 'sm-1', name: 'Migros', branchName: 'Kadıköy' }],
+            });
+            expect(meta.supermarketId).toBe('sm-1');
+            expect(meta.label).toBe('Migros — Kadıköy');
+        });
+
+        it('resolves name via supermarketId lookup', () => {
+            const meta = resolvePriceSupermarketMeta(
+                { price: 45, supermarketId: 'sm-2' },
+                [{ $id: 'sm-2', name: 'BIM' }]
+            );
+            expect(meta.name).toBe('BIM');
+            expect(meta.label).toBe('BIM');
+        });
+    });
+
+    describe('enrichProductPricesWithSupermarkets', () => {
+        it('adds supermarketLabel on prices missing expanded relation', () => {
+            const [product] = enrichProductPricesWithSupermarkets(
+                [{ $id: 'p1', name: 'Twix', prices: [{ price: 50, supermarketId: 'sm-1' }] }],
+                [{ $id: 'sm-1', name: 'CarrefourSA', branchName: 'Levent' }]
+            );
+            expect(product.prices[0].supermarketName).toBe('CarrefourSA');
+            expect(product.prices[0].supermarketLabel).toBe('CarrefourSA — Levent');
+        });
+    });
+
+    describe('isUserLocationAvailableForStores', () => {
+        it('returns true for valid coordinates', () => {
+            expect(isUserLocationAvailableForStores({ latitude: 41, longitude: 29 })).toBe(true);
+        });
+        it('returns false for invalid coordinates', () => {
+            expect(isUserLocationAvailableForStores({ latitude: null, longitude: 29 })).toBe(false);
         });
     });
 

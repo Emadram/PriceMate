@@ -29,23 +29,34 @@ import PageTransition from './components/PageTransition';
 import Navbar from './components/Navbar';
 import NavigationListener from './components/NavigationListener';
 import { startOverflowDetector } from './utils/overflowDetector';
+import usePreventBrowserZoom from './hooks/usePreventBrowserZoom';
 
 const AUTH_ROUTE_PREFIXES = ['/login', '/register', '/verify-email', '/forgot-password', '/reset-password'];
+const IMMERSIVE_ROUTE_PREFIXES = ['/ai-chat'];
+
+const matchesRoutePrefix = (pathname, prefixes) =>
+  prefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
 const AppShell = ({ children }) => {
   const { pathname } = useLocation();
-  const hideAiLauncher = AUTH_ROUTE_PREFIXES.some(
-    (p) => pathname === p || pathname.startsWith(`${p}/`)
-  );
-  const hideGlobalNav = AUTH_ROUTE_PREFIXES.some(
-    (p) => pathname === p || pathname.startsWith(`${p}/`)
-  );
-  const mobileTopPadding = hideGlobalNav ? '' : 'pt-20';
+  const isAuthRoute = matchesRoutePrefix(pathname, AUTH_ROUTE_PREFIXES);
+  const isImmersiveRoute = matchesRoutePrefix(pathname, IMMERSIVE_ROUTE_PREFIXES);
+  const hideAiLauncher = isAuthRoute || isImmersiveRoute;
+  const hideGlobalNav = isAuthRoute;
+  const hideMobileTopLogo = isAuthRoute || isImmersiveRoute;
+  const mobileTopPadding = hideMobileTopLogo ? '' : 'pt-20';
+  const immersiveShellClass = isImmersiveRoute
+    ? 'pricemate-immersive-shell md:relative md:static md:h-auto md:overflow-visible md:flex-none'
+    : '';
 
   return (
     <>
-      {!hideGlobalNav && <Navbar />}
-      <div className={`overflow-x-hidden ${mobileTopPadding}`}>{children}</div>
+      {!hideGlobalNav && <Navbar hideMobileTopLogo={hideMobileTopLogo} />}
+      <div className={`overflow-x-hidden ${mobileTopPadding} ${immersiveShellClass}`}>
+        <div className={isImmersiveRoute ? 'h-full min-h-0 overflow-hidden flex flex-col md:h-auto md:overflow-visible' : undefined}>
+          {children}
+        </div>
+      </div>
       {!hideAiLauncher && <FloatingAIChatLauncher />}
     </>
   );
@@ -97,6 +108,7 @@ const ProtectedRoute = ({ children }) => {
 };
 
 function App() {
+  usePreventBrowserZoom(true);
   const checkSession = useAuthStore((state) => state.checkSession);
   const user = useAuthStore((state) => state.user);
   const { syncFavorites, clearFavorites } = useFavoritesStore();
