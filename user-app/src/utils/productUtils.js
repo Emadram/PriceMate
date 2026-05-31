@@ -41,24 +41,24 @@ const PRODUCT_LIST_SELECT = [
     'categories',
     'categoryId.*',
 ];
-const PRODUCT_PRICE_SELECT = ['$id', '$createdAt', '$updatedAt', 'price', 'currency', 'products.$id'];
-/** Expanded price fields for comparison / store pages (relationship attrs via dot notation only). */
-export const COMPARISON_PRICE_SELECT = [
+const PRODUCT_PRICE_SELECT = [
     '$id',
     '$createdAt',
     '$updatedAt',
     'price',
     'currency',
-    'stockStatus',
     'products.$id',
     'supermarkets.$id',
+];
+/** Optional expanded supermarket fields (only attrs present in Appwrite schema). */
+export const COMPARISON_PRICE_SELECT = [
+    ...PRODUCT_PRICE_SELECT,
     'supermarkets.name',
     'supermarkets.branchName',
     'supermarkets.address',
     'supermarkets.latitude',
     'supermarkets.longitude',
     'supermarkets.icon',
-    'supermarkets.logoUrl',
     'supermarkets.rating',
     'supermarkets.reviewsCount',
     'supermarkets.parentId',
@@ -73,9 +73,6 @@ const NUTRITION_META_MARKER = '\n\n[PriceMate Nutrition]\n';
 const pricesIndexCache = new WeakMap();
 const priceFieldSupport = {
     products: null,
-    productId: null,
-    productID: null,
-    product: null,
 };
 
 export const stripNutritionMeta = (value) => {
@@ -1311,9 +1308,47 @@ export const resolvePriceSupermarketMeta = (price, supermarkets = []) => {
     };
 };
 
-/**
- * Attach normalized supermarket fields to each price on product list (AI chat / cards).
- */
+/** Expand slim price rows with full supermarket documents (for comparison / maps). */
+export const enrichPricesWithSupermarketDocs = (prices, supermarkets = []) => {
+    if (!Array.isArray(prices) || prices.length === 0) return prices;
+    const catalog = Array.isArray(supermarkets) ? supermarkets : [];
+    if (catalog.length === 0) return prices;
+
+    const byId = new Map(catalog.map((store) => [store.$id, store]));
+
+    return prices.map((price) => {
+        const supermarketId = getRelationshipId(price.supermarkets) || price.supermarketId || null;
+        if (!supermarketId) return price;
+
+        const rel = price.supermarkets;
+        const hasExpanded =
+            rel &&
+            typeof rel === 'object' &&
+            !Array.isArray(rel) &&
+            (rel.name != null || rel.branchName != null || rel.latitude != null);
+        if (hasExpanded) return price;
+
+        const doc = byId.get(supermarketId);
+        if (!doc) return price;
+        return { ...price, supermarkets: doc };
+    });
+};
+
+export const fetchSupermarketsCatalog = async (limit = 100) => {
+    const cacheKey = `supermarkets:catalog:${limit}`;
+    const cached = getCachedValue(cacheKey);
+    if (cached) return cached;
+
+    try {
+        const response = await db.supermarkets.list([Query.limit(limit)]);
+        setCachedValue(cacheKey, response.documents, CACHE_TTL.categories);
+        return response.documents;
+    } catch (error) {
+        console.warn('Supermarket catalog fetch failed:', error?.message || error);
+        return [];
+    }
+};
+
 export const enrichProductPricesWithSupermarkets = (products, supermarkets = []) => {
     const list = Array.isArray(products) ? products : [];
     return list.map((product) => {
@@ -1427,31 +1462,24 @@ export const formatLastUpdate = (timestamp) => {
  * Fetch price history for a specific product
  */
 export const fetchPriceHistory = async (productId, branchId = null) => {
+    if (!productId) return [];
+
     try {
         const historyColl = COLLECTIONS.PRICE_HISTORY || 'price_history';
         const historyDocs = [];
         const historyIds = new Set();
 
-        const buildHistoryQueries = (productField, branchField) => {
-            const queries = [
-                Query.equal(productField, productId),
-                Query.orderAsc('timestamp'),
-                Query.limit(200)
-            ];
-
-            if (branchId) {
-                queries.push(Query.equal(branchField, branchId));
-            }
-
-            return queries;
-        };
-
         const fetchHistoryByField = async (productField, branchField) => {
             try {
-                const response = await db.priceHistory.list(
-                    buildHistoryQueries(productField, branchField)
-                );
-
+                const queries = [
+                    Query.equal(productField, productId),
+                    Query.orderAsc('timestamp'),
+                    Query.limit(50),
+                ];
+                if (branchId) {
+                    queries.push(Query.equal(branchField, branchId));
+                }
+                const response = await db.priceHistory.list(queries);
                 response.documents.forEach((doc) => {
                     if (!historyIds.has(doc.$id)) {
                         historyIds.add(doc.$id);
@@ -1460,44 +1488,25 @@ export const fetchPriceHistory = async (productId, branchId = null) => {
                 });
             } catch (innerError) {
                 if (innerError.code === 404) {
-                    console.warn(`Price history collection "${historyColl}" not found in Appwrite. Please ensure it is created.`);
-                } else {
-                    console.warn('Price history query failed:', innerError.message);
+                    console.warn(`Price history collection "${historyColl}" not found in Appwrite.`);
                 }
             }
         };
 
         await fetchHistoryByField('productId', 'supermarketId');
-        await fetchHistoryByField('products', 'supermarkets');
 
-        const priceDocs = [];
-        const priceQueries = (productField, branchField) => {
-            const queries = [
-                Query.equal(productField, productId),
-                Query.limit(200),
-                Query.select(['*', 'supermarkets.*'])
-            ];
-
+        let priceDocs = [];
+        try {
+            priceDocs = await fetchPricesForProducts([productId]);
             if (branchId) {
-                queries.push(Query.equal(branchField, branchId));
+                priceDocs = priceDocs.filter((price) => {
+                    const smId = getRelationshipId(price.supermarkets) || price.supermarketId;
+                    return smId === branchId;
+                });
             }
-
-            return queries;
-        };
-
-        const fetchPriceStack = async (productField, branchField) => {
-            try {
-                const response = await db.prices.list(
-                    priceQueries(productField, branchField)
-                );
-                priceDocs.push(...response.documents);
-            } catch (innerError) {
-                console.warn('Price stack query failed:', innerError.message);
-            }
-        };
-
-        await fetchPriceStack('products', 'supermarkets');
-        await fetchPriceStack('productId', 'supermarketId');
+        } catch (innerError) {
+            console.warn('Price stack query failed:', innerError?.message || innerError);
+        }
 
         const merged = [];
 
@@ -1682,29 +1691,8 @@ export const fetchPricesForProducts = async (productIds) => {
         try {
             for (let i = 0; i < normalizedIds.length; i += CHUNK_SIZE) {
                 const chunk = normalizedIds.slice(i, i + CHUNK_SIZE);
-                const primary = await fetchByField('products', chunk, PRODUCT_PRICE_SELECT);
-                addPrices(primary);
-
-                if (priceFieldSupport.products === false) {
-                    const fallback = await fetchByField('productId', chunk, ['*']);
-                    addPrices(fallback);
-
-                    const fallbackFound = new Set(fallback.map((price) => getPriceProductId(price)).filter(Boolean));
-                    const stillMissing = chunk.filter((id) => !fallbackFound.has(id));
-
-                    if (stillMissing.length > 0) {
-                        const fallbackCaps = await fetchByField('productID', stillMissing, ['*']);
-                        addPrices(fallbackCaps);
-
-                        const capsFound = new Set(fallbackCaps.map((price) => getPriceProductId(price)).filter(Boolean));
-                        const finalMissing = stillMissing.filter((id) => !capsFound.has(id));
-
-                        if (finalMissing.length > 0) {
-                            const fallbackAlt = await fetchByField('product', finalMissing, ['*']);
-                            addPrices(fallbackAlt);
-                        }
-                    }
-                }
+                const batch = await fetchByField('products', chunk, PRODUCT_PRICE_SELECT);
+                addPrices(batch);
             }
             setCachedValue(cacheKey, allPrices, CACHE_TTL.prices);
             return allPrices;

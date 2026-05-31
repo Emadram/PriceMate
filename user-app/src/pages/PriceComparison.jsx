@@ -32,6 +32,8 @@ const normalizeStockStatus = (status) => {
     return status;
 };
 
+const isSupermarketObject = (value) => value != null && typeof value === 'object' && !Array.isArray(value);
+
 const StockBranch = ({ name, status, price, distance, t, currencyLabel, supermarketId }) => {
     const normalizedStatus = normalizeStockStatus(status);
     const statusColors = {
@@ -130,7 +132,9 @@ const PriceComparison = () => {
     const getSupermarketFromPrice = (price) => {
         if (!price) return null;
         if (price.supermarkets) {
-            return Array.isArray(price.supermarkets) ? price.supermarkets[0] : price.supermarkets;
+            const rel = Array.isArray(price.supermarkets) ? price.supermarkets[0] : price.supermarkets;
+            if (isSupermarketObject(rel)) return rel;
+            if (typeof rel === 'string') return rel;
         }
         return price.supermarketId || null;
     };
@@ -177,8 +181,7 @@ const PriceComparison = () => {
             if (
                 userLocation &&
                 hasValidLatLon(userLocation.latitude, userLocation.longitude) &&
-                supermarket &&
-                typeof supermarket === 'object' &&
+                isSupermarketObject(supermarket) &&
                 resolveCoordinates(supermarket)
             ) {
                 const supermarketCoordinates = resolveCoordinates(supermarket);
@@ -199,7 +202,7 @@ const PriceComparison = () => {
 
         pricesWithDistance.forEach((price) => {
             const supermarket = getSupermarketFromPrice(price);
-            if (!supermarket) {
+            if (!isSupermarketObject(supermarket)) {
                 noStoreFallback.push(price);
                 return;
             }
@@ -316,8 +319,8 @@ const PriceComparison = () => {
         // If query param exists, put that supermarket's price first
         if (supermarketIdParam) {
             sorted.sort((a, b) => {
-                const aId = Array.isArray(a.supermarkets) ? a.supermarkets[0].$id : a.supermarkets.$id;
-                const bId = Array.isArray(b.supermarkets) ? b.supermarkets[0].$id : b.supermarkets.$id;
+                const aId = getRelationshipId(a.supermarkets) || a.supermarketId || null;
+                const bId = getRelationshipId(b.supermarkets) || b.supermarketId || null;
 
                 if (aId === supermarketIdParam) return -1;
                 if (bId === supermarketIdParam) return 1;
@@ -666,18 +669,22 @@ const PriceComparison = () => {
                                 {sortedPrices.map((priceEntry) => {
                                     const supermarket = getSupermarketFromPrice(priceEntry);
                                     const supermarketId = typeof supermarket === 'string' ? supermarket : supermarket?.$id;
-                                    const supermarketName = typeof supermarket === 'object' ? supermarket?.name : 'Store';
-                                    const supermarketAddress = typeof supermarket === 'object' ? supermarket?.address : null;
+                                    const supermarketName = isSupermarketObject(supermarket) ? (supermarket.name || 'Store') : 'Store';
+                                    const supermarketAddress = isSupermarketObject(supermarket) ? supermarket.address : null;
                                     const hasCoordinates =
-                                        typeof supermarket === 'object' &&
-                                        hasValidLatLon(supermarket?.latitude, supermarket?.longitude);
+                                        isSupermarketObject(supermarket) &&
+                                        hasValidLatLon(supermarket.latitude, supermarket.longitude);
                                     const isSelectedContext = supermarketIdParam && supermarketId === supermarketIdParam;
                                     const isLowest = getLowestPrice()?.$id === priceEntry.$id;
                                     // status text removed per UX decision; keep status normalization in branch details only
                                     const priceCurrency = getPriceCurrency(priceEntry);
                                     const convertedPrice = convert(priceEntry.price, priceCurrency);
-                                    const ratingValue = typeof supermarket === 'object' ? (supermarket.rating ?? supermarket.avgRating ?? supermarket.averageRating ?? null) : null;
-                                    const reviewsCount = typeof supermarket === 'object' ? (supermarket.reviewsCount ?? supermarket.reviews ?? null) : null;
+                                    const ratingValue = isSupermarketObject(supermarket)
+                                        ? (supermarket.rating ?? supermarket.avgRating ?? supermarket.averageRating ?? null)
+                                        : null;
+                                    const reviewsCount = isSupermarketObject(supermarket)
+                                        ? (supermarket.reviewsCount ?? supermarket.reviews ?? null)
+                                        : null;
                                     const isMapVisible = showMapForPriceId === priceEntry.$id;
                                     
                                     const updatedAtValue = getPriceTimestamp(priceEntry);
@@ -699,7 +706,7 @@ const PriceComparison = () => {
                                                         to={supermarketId ? `/supermarket/${supermarketId}` : '#'}
                                                         className="relative w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 bg-gray-50 dark:bg-gray-900 rounded-xl sm:rounded-2xl flex items-center justify-center flex-shrink-0 overflow-hidden"
                                                     >
-                                                        {typeof supermarket === 'object' && (supermarket.icon || supermarket.logoUrl) ? (
+                                                        {isSupermarketObject(supermarket) && (supermarket.icon || supermarket.logoUrl) ? (
                                                             <img src={supermarket.icon || supermarket.logoUrl} className="w-9 h-9 sm:w-11 sm:h-11 md:w-12 md:h-12 object-contain" alt="" />
                                                         ) : (
                                                             <FiShoppingBag className="text-gray-200 text-lg sm:text-xl" />
@@ -711,7 +718,7 @@ const PriceComparison = () => {
                                                         <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white truncate min-w-0 flex-1 basis-full sm:basis-auto">
                                                             {supermarketName}
                                                         </h4>
-                                                        {typeof supermarket === 'object' && supermarket?.branchName && (
+                                                        {isSupermarketObject(supermarket) && supermarket.branchName && (
                                                             <span className="text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-500 px-2 py-0.5 rounded-full font-bold shrink-0">
                                                                 {supermarket.branchName}
                                                             </span>
@@ -785,7 +792,7 @@ const PriceComparison = () => {
                                                 </summary>
                                                 <div className="mt-4 space-y-4">
                                                     {/* Local Map showing branches - only when toggled */}
-                                                        {isMapVisible && hasCoordinates && (
+                                                        {isMapVisible && hasCoordinates && isSupermarketObject(supermarket) && (
                                                         <div className="h-44 rounded-2xl overflow-hidden shadow-inner border border-gray-100 dark:border-gray-800/50 animate-in zoom-in-95 duration-300">
                                                             <StoreMap 
                                                                 supermarkets={[supermarket]} 
