@@ -14,11 +14,15 @@ export default function useAiChatViewportMeta(enabled = true) {
         if (!meta) return undefined;
 
         const original = meta.getAttribute('content') || '';
-        const next = original.includes(RESIZES_CONTENT)
-            ? original.replace(RESIZES_CONTENT, OVERLAYS_CONTENT)
-            : original.includes(OVERLAYS_CONTENT)
-              ? original
-              : `${original}, ${OVERLAYS_CONTENT}`;
+                if (!original.includes('interactive-widget')) {
+                        return undefined;
+                }
+
+                const next = original.includes(RESIZES_CONTENT)
+                        ? original.replace(RESIZES_CONTENT, OVERLAYS_CONTENT)
+                        : original.includes(OVERLAYS_CONTENT)
+                            ? original
+                            : original;
 
         meta.setAttribute('content', next);
 

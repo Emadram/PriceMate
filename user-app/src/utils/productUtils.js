@@ -41,7 +41,7 @@ const PRODUCT_LIST_SELECT = [
     'categories',
     'categoryId.*',
 ];
-const PRODUCT_PRICE_SELECT = ['$id', '$createdAt', '$updatedAt', 'price', 'products'];
+const PRODUCT_PRICE_SELECT = ['$id', '$createdAt', '$updatedAt', 'price', 'currency', 'products.$id'];
 const OFF_API_BASE = 'https://world.openfoodfacts.org';
 const OFF_DEBUG = import.meta.env.VITE_OFF_DEBUG === 'true';
 const OFF_PROXY_FUNCTION_ID = import.meta.env.VITE_APPWRITE_FUNCTION_OFF_PROXY || '';
@@ -1662,15 +1662,12 @@ export const fetchPricesForProducts = async (productIds) => {
                 const primary = await fetchByField('products', chunk, PRODUCT_PRICE_SELECT);
                 addPrices(primary);
 
-                const foundIds = new Set(primary.map((price) => getPriceProductId(price)).filter(Boolean));
-                const missingIds = chunk.filter((id) => !foundIds.has(id));
-
-                if (missingIds.length > 0) {
-                    const fallback = await fetchByField('productId', missingIds, ['*']);
+                if (priceFieldSupport.products === false) {
+                    const fallback = await fetchByField('productId', chunk, ['*']);
                     addPrices(fallback);
 
                     const fallbackFound = new Set(fallback.map((price) => getPriceProductId(price)).filter(Boolean));
-                    const stillMissing = missingIds.filter((id) => !fallbackFound.has(id));
+                    const stillMissing = chunk.filter((id) => !fallbackFound.has(id));
 
                     if (stillMissing.length > 0) {
                         const fallbackCaps = await fetchByField('productID', stillMissing, ['*']);
