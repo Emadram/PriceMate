@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import Scanner from '../components/Scanner';
-import { fetchGlobalProductWithRetries } from '../utils/productUtils';
+import BackButton from '../components/BackButton';
+import useProductStore from '../stores/productStore';
 
 const prefetchInflight = new Map();
-import BackButton from '../components/BackButton';
 
 const ScanPage = () => {
     const { t } = useTranslation();
@@ -20,10 +20,10 @@ const ScanPage = () => {
         if (prefetchInflight.has(code)) return;
         const p = (async () => {
             try {
-                    await fetchGlobalProductWithRetries(code);
-                } catch {
-                    // swallow; best-effort
-                } finally {
+                await useProductStore.getState().prefetchProductByBarcode(code);
+            } catch {
+                // swallow; best-effort
+            } finally {
                 prefetchInflight.delete(code);
             }
         })();
@@ -64,10 +64,10 @@ const ScanPage = () => {
                                 {t('scan_again', 'Scan Again')}
                             </button>
                             <button
-                                onClick={() => navigate(`/product/${scannedCode}`, { state: { fromScan: true } })}
+                                onClick={() => navigate(`/price-comparison/${scannedCode}?fromScan=1`, { state: { fromScan: true } })}
                                 className="tap-target min-h-11 bg-brand-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-brand-700 shadow-lg shadow-brand-500/30 transition"
                             >
-                                {t('view_product', 'View Product')}
+                                {t('view_prices', 'Compare Prices')}
                             </button>
                         </div>
                     </div>

@@ -18,11 +18,36 @@ const CACHE_TTL = {
 const OFF_CACHE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 const OFF_MEMORY_TTL_MS = 5 * 60 * 1000;
 const OFF_SEARCH_TTL_MS = 2 * 60 * 1000;
+const PRODUCT_LIST_SELECT = [
+    '$id',
+    '$createdAt',
+    '$updatedAt',
+    'name',
+    'product_name',
+    'barcode',
+    'code',
+    'brand',
+    'brands',
+    'imageUrl',
+    'image',
+    'image_url',
+    'image_front_url',
+    'description',
+    'unit',
+    'quantity',
+    'weight',
+    'nutriscore_grade',
+    'allergens_tags',
+    'categories',
+    'categoryId.*',
+];
+const PRODUCT_PRICE_SELECT = ['$id', '$createdAt', '$updatedAt', 'price', 'products'];
 const OFF_API_BASE = 'https://world.openfoodfacts.org';
 const OFF_DEBUG = import.meta.env.VITE_OFF_DEBUG === 'true';
 const OFF_PROXY_FUNCTION_ID = import.meta.env.VITE_APPWRITE_FUNCTION_OFF_PROXY || '';
 const OFF_RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
 const NUTRITION_META_MARKER = '\n\n[PriceMate Nutrition]\n';
+const pricesIndexCache = new WeakMap();
 
 export const stripNutritionMeta = (value) => {
     const text = String(value || '');
@@ -921,6 +946,27 @@ export const getRelationshipAttribute = (field, attribute) => {
     return null;
 };
 
+const getPricesIndex = (prices) => {
+    if (!Array.isArray(prices)) return null;
+    const cached = pricesIndexCache.get(prices);
+    if (cached) return cached;
+
+    const index = new Map();
+    for (const price of prices) {
+        const productId = getRelationshipId(price?.products);
+        if (!productId) continue;
+        const bucket = index.get(productId);
+        if (bucket) {
+            bucket.push(price);
+        } else {
+            index.set(productId, [price]);
+        }
+    }
+
+    pricesIndexCache.set(prices, index);
+    return index;
+};
+
 /** Expanded category document for icon/label (not a bare relation id string). */
 export const getExpandedCategoryDoc = (categoryId) => {
     if (!categoryId) return null;
@@ -943,7 +989,7 @@ export const fetchAllPrices = async (limit = 200) => {
         const response = await db.prices.list([
             Query.limit(limit),
             Query.orderDesc('$createdAt'),
-            Query.select(['*', 'products.*', 'supermarkets.*', 'products.categoryId.*'])
+            Query.select(['$id', '$createdAt', '$updatedAt', 'price', 'currency', 'products', 'supermarkets'])
         ]);
         setCachedValue(cacheKey, response.documents, CACHE_TTL.allPrices);
         return response.documents;
@@ -1015,7 +1061,7 @@ export const fetchProducts = async (limit = 50) => {
         const response = await db.products.list([
             Query.limit(limit),
             Query.orderDesc('$createdAt'),
-            Query.select(['*', 'categoryId.*'])
+            Query.select(PRODUCT_LIST_SELECT)
         ]);
         setCachedValue(cacheKey, response.documents, CACHE_TTL.products);
         return response.documents;
@@ -1040,7 +1086,7 @@ export const fetchSimilarProductsByCategory = async (categoryId, excludeId = nul
                 Query.equal('categoryId', categoryId),
                 Query.limit(limit + 1),
                 Query.orderDesc('$createdAt'),
-                Query.select(['*', 'categoryId.*'])
+                Query.select(PRODUCT_LIST_SELECT)
             ]);
 
             const filtered = response.documents
@@ -1243,9 +1289,7 @@ export const normalizeProduct = (product, prices = []) => {
     if (!product) return null;
 
     const productId = product.$id || product.code; // code is used by OFF
-    const productPrices = Array.isArray(prices) 
-        ? prices.filter(p => getRelationshipId(p.products) === productId)
-        : [];
+    const productPrices = getPricesForProduct(prices, productId);
 
     const cheapest = productPrices.length > 0 
         ? productPrices.reduce((min, p) => p.price < min.price ? p : min, productPrices[0])
@@ -1467,7 +1511,7 @@ export const searchProducts = async (query = '', categoryId = null, limit = 20, 
         try {
             const queries = [
                 Query.limit(limit),
-                Query.select(['*', 'categoryId.*'])
+                Query.select(PRODUCT_LIST_SELECT)
             ];
 
             if (categoryId) {
@@ -1553,7 +1597,7 @@ export const fetchPricesForProducts = async (productIds) => {
                 const response = await db.prices.list([
                     Query.equal('products', chunk),
                     Query.limit(100),
-                    Query.select(['*', 'supermarkets.*'])
+                    Query.select(PRODUCT_PRICE_SELECT)
                 ]);
                 allPrices.push(...response.documents);
             }
@@ -1574,7 +1618,7 @@ export const fetchProductByBarcode = async (barcode) => {
         const response = await db.products.list([
             Query.equal('barcode', barcode),
             Query.limit(1),
-            Query.select(['*', 'categoryId.*'])
+            Query.select(PRODUCT_LIST_SELECT)
         ]);
 
         if (response.documents.length > 0) {
@@ -1584,7 +1628,7 @@ export const fetchProductByBarcode = async (barcode) => {
         const fallback = await db.products.list([
             Query.equal('$id', barcode),
             Query.limit(1),
-            Query.select(['*', 'categoryId.*'])
+            Query.select(PRODUCT_LIST_SELECT)
         ]);
 
         return fallback.documents[0] || null;

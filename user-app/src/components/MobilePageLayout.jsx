@@ -78,7 +78,7 @@ export const MobileHeader = ({
 };
 
 export const MobilePage = ({ children, className = '' }) => (
-    <div className={`min-h-screen bg-[#F5F5F7] dark:bg-black text-gray-900 dark:text-gray-100 pb-safe ${className}`}>
+    <div className={`min-h-[100dvh] bg-[#F5F5F7] dark:bg-black text-gray-900 dark:text-gray-100 pb-safe ${className}`}>
         {children}
     </div>
 );

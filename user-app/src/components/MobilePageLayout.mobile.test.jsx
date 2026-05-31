@@ -34,4 +34,19 @@ describe('MobilePageLayout mobile static chrome', () => {
         expect(spacer).toBeTruthy();
         expect(spacer.className).toMatch(/h-\[var\(--mobile-header-h/);
     });
+
+    it('MobilePage uses a dynamic viewport minimum height for mobile browsers', () => {
+        const { container } = render(
+            <MemoryRouter>
+                <MobilePage>
+                    <div>Content</div>
+                </MobilePage>
+            </MemoryRouter>
+        );
+
+        const page = container.firstElementChild;
+        expect(page).toBeTruthy();
+        expect(page.className).toContain('min-h-[100dvh]');
+        expect(page.className).toContain('pb-safe');
+    });
 });

@@ -25,12 +25,13 @@ const ProductDetails = () => {
     };
 
     useEffect(() => {
-        if (barcode) {
-            fetchProductByBarcode(barcode);
-        }
-        
         if (location.state?.fromScan) {
             navigate(`/price-comparison/${barcode}?fromScan=1`, { replace: true, state: { fromScan: true } });
+            return;
+        }
+
+        if (barcode) {
+            fetchProductByBarcode(barcode);
         }
     }, [barcode, navigate, location.state, fetchProductByBarcode]);
 
