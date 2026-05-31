@@ -334,8 +334,6 @@ import {
     resolveCatalogProductForIngredients,
     ingredientPayloadFromAppwriteProduct,
     persistIngredientPayloadToCatalogProduct,
-    fetchOffCacheSnapshot,
-    normalizeOffCacheDoc,
     normalizeProduct,
     resolveOffCacheProductForIngredients,
     ingredientPayloadFromOffCache,
@@ -1245,24 +1243,18 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
             try {
                 const products = await fetchProducts(50);
                 const productIds = products.map((p) => p.$id).filter(Boolean);
-                const [prices, offCache, supermarkets] = await Promise.all([
+                const [prices, supermarkets] = await Promise.all([
                     fetchPricesForProducts(productIds),
-                    fetchOffCacheSnapshot(20),
                     fetchSupermarkets(),
                 ]);
 
                 const productsWithData = products.map((p) => normalizeProduct(p, prices));
 
-                const offCacheProducts = (offCache || [])
-                    .map((doc) => normalizeOffCacheDoc(doc))
-                    .filter(Boolean)
-                    .map((p) => ({ ...p, prices: [] }));
-
                 const enrichedProducts = enrichProductPricesWithSupermarkets(
                     productsWithData,
                     Array.isArray(supermarkets) ? supermarkets : []
                 );
-                setFullProductList([...enrichedProducts, ...offCacheProducts]);
+                setFullProductList(enrichedProducts);
                 setSupermarketList(Array.isArray(supermarkets) ? supermarkets : []);
             } catch (error) {
                 console.error("Error loading chat context:", error);

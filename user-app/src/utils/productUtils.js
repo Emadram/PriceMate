@@ -516,8 +516,58 @@ export const ingredientPayloadFromOffCache = (doc) => {
     };
 };
 
+const OFF_CACHE_UNAVAILABLE_KEY = 'pricemate:offCacheUnavailable';
+let offCacheCollectionAvailable = null;
+
+const readOffCacheUnavailableFlag = () => {
+    try {
+        return sessionStorage.getItem(OFF_CACHE_UNAVAILABLE_KEY) === '1';
+    } catch {
+        return false;
+    }
+};
+
+const markOffCacheUnavailable = () => {
+    offCacheCollectionAvailable = false;
+    try {
+        sessionStorage.setItem(OFF_CACHE_UNAVAILABLE_KEY, '1');
+    } catch {
+        // ignore storage failures
+    }
+};
+
+const isOffCacheUnavailableError = (error) => {
+    const code = error?.code;
+    const message = String(error?.message || '').toLowerCase();
+    return (
+        code === 404 ||
+        message.includes('not found') ||
+        message.includes('collection with the requested id could not be found')
+    );
+};
+
+const isOffCacheEnabled = () => {
+    const envFlag = import.meta.env.VITE_APPWRITE_OFF_CACHE_ENABLED;
+    if (envFlag === 'false' || envFlag === '0') return false;
+    if (offCacheCollectionAvailable === false) return false;
+    if (offCacheCollectionAvailable === null && readOffCacheUnavailableFlag()) {
+        offCacheCollectionAvailable = false;
+        return false;
+    }
+    return true;
+};
+
+const handleOffCacheError = (error, context) => {
+    if (isOffCacheUnavailableError(error)) {
+        markOffCacheUnavailable();
+        logOffDebug('collection-unavailable', { context });
+        return;
+    }
+    console.warn(`OFF cache ${context} failed:`, error?.message || error);
+};
+
 export const fetchOffCacheByBarcode = async (barcode) => {
-    if (!barcode) return null;
+    if (!barcode || !isOffCacheEnabled()) return null;
     try {
         const res = await db.offCache.list([
             Query.equal('barcode', String(barcode)),
@@ -533,14 +583,14 @@ export const fetchOffCacheByBarcode = async (barcode) => {
         }
         return null;
     } catch (error) {
-        console.warn('OFF cache lookup failed:', error?.message || error);
+        handleOffCacheError(error, 'lookup');
         return null;
     }
 };
 
 export const searchOffCacheByName = async (name, limit = 5) => {
     const term = String(name || '').trim();
-    if (!term) return [];
+    if (!term || !isOffCacheEnabled()) return [];
     try {
         const res = await db.offCache.list([
             Query.search('name', term),
@@ -553,12 +603,13 @@ export const searchOffCacheByName = async (name, limit = 5) => {
         }
         return fresh;
     } catch (error) {
-        console.warn('OFF cache name search failed:', error?.message || error);
+        handleOffCacheError(error, 'name search');
         return [];
     }
 };
 
 export const fetchOffCacheSnapshot = async (limit = 30) => {
+    if (!isOffCacheEnabled()) return [];
     try {
         const res = await db.offCache.list([
             Query.limit(limit),
@@ -567,13 +618,13 @@ export const fetchOffCacheSnapshot = async (limit = 30) => {
         const docs = res.documents || [];
         return docs.filter((doc) => isOffCacheFresh(doc));
     } catch (error) {
-        console.warn('OFF cache snapshot failed:', error?.message || error);
+        handleOffCacheError(error, 'snapshot');
         return [];
     }
 };
 
 const saveOffCacheRecord = async (record) => {
-    if (!record || !record.barcode) return null;
+    if (!record || !record.barcode || !isOffCacheEnabled()) return null;
     try {
         const existing = await db.offCache.list([
             Query.equal('barcode', record.barcode),
@@ -587,7 +638,7 @@ const saveOffCacheRecord = async (record) => {
         const created = await db.offCache.create(record);
         return created?.$id || null;
     } catch (error) {
-        console.warn('OFF cache save failed:', error?.message || error);
+        handleOffCacheError(error, 'save');
         return null;
     }
 };
