@@ -51,6 +51,7 @@ const pricesIndexCache = new WeakMap();
 const priceFieldSupport = {
     productId: null,
     productID: null,
+    product: null,
 };
 
 export const stripNutritionMeta = (value) => {
@@ -938,11 +939,23 @@ export const getRelationshipId = (field) => {
     return field.$id;
 };
 
+const normalizeProductKey = (value) => {
+    if (value === null || value === undefined) return null;
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number') return String(value);
+    const relId = getRelationshipId(value);
+    return relId ? String(relId) : null;
+};
+
 const getPriceProductId = (price) => {
     if (!price) return null;
     const relId = getRelationshipId(price.products);
-    if (relId) return relId;
-    return price.productId || price.productID || null;
+    if (relId) return String(relId);
+    return (
+        normalizeProductKey(price.productId) ||
+        normalizeProductKey(price.productID) ||
+        normalizeProductKey(price.product)
+    );
 };
 
 // Helper to safely get attribute from relationship (only if expanded)
@@ -1661,6 +1674,14 @@ export const fetchPricesForProducts = async (productIds) => {
                     if (stillMissing.length > 0) {
                         const fallbackCaps = await fetchByField('productID', stillMissing, ['*']);
                         addPrices(fallbackCaps);
+
+                        const capsFound = new Set(fallbackCaps.map((price) => getPriceProductId(price)).filter(Boolean));
+                        const finalMissing = stillMissing.filter((id) => !capsFound.has(id));
+
+                        if (finalMissing.length > 0) {
+                            const fallbackAlt = await fetchByField('product', finalMissing, ['*']);
+                            addPrices(fallbackAlt);
+                        }
                     }
                 }
             }
