@@ -200,10 +200,10 @@ const SearchResults = () => {
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-safe md:pb-8">
-            {/* Extended Header for Search Context — fixed below global logo on mobile */}
+            {/* Extended Header for Search Context — fixed at top safe area on mobile */}
             <div
                 ref={searchChromeRef}
-                className="fixed inset-x-0 top-[var(--mobile-top-logo-h,5rem)] z-[9990] bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 md:static md:sticky md:top-16 md:z-30"
+                className="fixed inset-x-0 top-0 pt-safe z-[9990] bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 md:static md:sticky md:top-16 md:z-30 md:pt-0"
             >
                 <div className="max-w-5xl mx-auto px-3 sm:px-4 py-3 md:py-6">
                     <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-6">

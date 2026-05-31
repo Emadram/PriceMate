@@ -1636,7 +1636,11 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
     const handleSend = async (e) => {
         e.preventDefault();
         if (!input.trim() || isLoading) return;
-        if (!user?.$id || !activeConversationId) return;
+        if (!user?.$id) return;
+
+        if (!activeConversationId) {
+            beginNewConversation();
+        }
 
         const userMessage = input.trim();
         setInput('');
@@ -2321,7 +2325,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                                             <div className="min-w-0">
                                                 <h2 className="text-lg font-black tracking-tight">{t('ai_chat_empty_title', 'What do you want to check?')}</h2>
                                                 <p className="text-white/80 text-xs sm:text-sm mt-0.5 leading-relaxed">
-                                                    {t('ai_chat_empty_description', 'Pick a shortcut or type your own shopping question.')}
+                                                    {t('ai_chat_empty_description')}
                                                 </p>
                                             </div>
                                         </div>
@@ -2431,21 +2435,19 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                                             formRef.current?.requestSubmit();
                                         }
                                     }}
-                                    placeholder={
-                                        !user
-                                            ? t('ai_chat_login_placeholder')
-                                            : !activeConversationId
-                                              ? t('ai_chat_placeholder_no_thread')
-                                              : t('ai_chat_input_placeholder')
-                                    }
-                                    disabled={isLoading || !user || !activeConversationId}
+                                placeholder={
+                                    !user
+                                        ? t('ai_chat_login_placeholder')
+                                        : t('ai_chat_input_placeholder')
+                                }
+                                disabled={isLoading || !user}
                                     className="flex-1 max-h-32 min-h-12 resize-none bg-gray-50 dark:bg-gray-900 border-none rounded-[1.25rem] py-3.5 px-4 text-[16px] sm:text-sm leading-6 sm:leading-5 focus:ring-2 focus:ring-brand-500 transition-all dark:text-white disabled:opacity-50"
                                 />
                                 <button
                                     type="submit"
-                                    disabled={
-                                        !input.trim() || isLoading || !user || !activeConversationId
-                                    }
+                                disabled={
+                                    !input.trim() || isLoading || !user
+                                }
                                     className="min-h-12 min-w-12 bg-brand-600 hover:bg-brand-700 text-white px-4 rounded-[1.15rem] transition-all active:scale-90 disabled:opacity-50 disabled:active:scale-100 shadow-lg shadow-brand-200 dark:shadow-none flex items-center justify-center"
                                 >
                                     <FiSend />

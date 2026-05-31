@@ -59,7 +59,7 @@ export const MobileHeader = ({
         <>
             <header
                 ref={headerRef}
-                className={`px-safe fixed inset-x-0 z-[9990] top-[var(--mobile-top-logo-h,5rem)] border-b border-gray-100 dark:border-white/5 bg-white/80 dark:bg-black/80 backdrop-blur-md md:static md:sticky md:top-0 md:z-50 ${className}`}
+                className={`px-safe fixed inset-x-0 z-[9990] top-0 pt-safe border-b border-gray-100 dark:border-white/5 bg-white/80 dark:bg-black/80 backdrop-blur-md md:static md:sticky md:top-0 md:z-50 md:pt-0 ${className}`}
             >
                 <div className={`max-w-4xl mx-auto px-4 ${dense ? 'py-2' : 'py-3'}`}>
                     <div className="grid grid-cols-3 items-center">

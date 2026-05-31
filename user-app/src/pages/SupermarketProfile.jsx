@@ -378,11 +378,13 @@ const SupermarketProfile = () => {
                         <div className="bg-gray-50 dark:bg-[#1C1C1E] p-3 sm:p-4 rounded-xl sm:rounded-2xl">
                             <p className="text-[9px] sm:text-[11px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest mb-1">{t('rating', 'Rating')}</p>
                             {ratingValue !== null && ratingValue !== undefined ? (
-                                <div className="flex items-center gap-2">
-                                    <StarRating value={ratingValue} size={14} />
-                                    <p className="text-base sm:text-xl font-bold dark:text-white">{ratingValue}</p>
+                                <div className="flex flex-col gap-0.5 min-w-0 sm:flex-row sm:items-center sm:gap-2">
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                        <StarRating value={ratingValue} size={14} />
+                                        <p className="text-base sm:text-xl font-bold dark:text-white shrink-0">{ratingValue}</p>
+                                    </div>
                                     {reviewsCount !== null && reviewsCount !== undefined && (
-                                        <span className="text-[10px] text-gray-400 font-medium ml-1">({reviewsCount})</span>
+                                        <span className="text-[10px] text-gray-400 font-medium truncate">({reviewsCount})</span>
                                     )}
                                 </div>
                             ) : (

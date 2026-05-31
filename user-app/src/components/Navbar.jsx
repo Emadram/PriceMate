@@ -6,7 +6,7 @@ import useAuthStore from '../stores/authStore';
 import useCurrencyStore from '../stores/currencyStore';
 import useThemeStore from '../stores/themeStore';
 
-const Navbar = ({ hideMobileTopLogo = false }) => {
+const Navbar = () => {
     const { t, i18n } = useTranslation();
     const user = useAuthStore((state) => state.user);
     const logout = useAuthStore((state) => state.logout);
@@ -15,36 +15,16 @@ const Navbar = ({ hideMobileTopLogo = false }) => {
     const navigate = useNavigate();
     const location = useLocation();
     const bottomNavRef = useRef(null);
-    const topLogoRef = useRef(null);
 
     useEffect(() => {
         fetchRates();
     }, [fetchRates]);
 
     useEffect(() => {
-        const el = topLogoRef.current;
-        if (!el || typeof document === 'undefined') return undefined;
-
-        const root = document.documentElement;
-        const setVar = () => {
-            const h = Math.round(el.getBoundingClientRect().height || 0);
-            if (h > 0) root.style.setProperty('--mobile-top-logo-h', `${h}px`);
-        };
-
-        setVar();
-        const ro = typeof ResizeObserver !== 'undefined'
-            ? new ResizeObserver(setVar)
-            : null;
-        ro?.observe(el);
-        window.addEventListener('resize', setVar, { passive: true });
-        window.addEventListener('orientationchange', setVar, { passive: true });
-
-        return () => {
-            ro?.disconnect();
-            window.removeEventListener('resize', setVar);
-            window.removeEventListener('orientationchange', setVar);
-        };
-    }, [hideMobileTopLogo]);
+        if (typeof document === 'undefined') return undefined;
+        document.documentElement.style.setProperty('--mobile-top-logo-h', '0px');
+        return undefined;
+    }, []);
 
     useEffect(() => {
         const el = bottomNavRef.current;
@@ -90,27 +70,7 @@ const Navbar = ({ hideMobileTopLogo = false }) => {
 
     return (
         <>
-            {/* Top mobile header: hidden on immersive routes (e.g. /ai-chat) */}
-            {!hideMobileTopLogo && (
-            <div ref={topLogoRef} className="md:hidden fixed top-0 inset-x-0 z-9999 pt-safe px-safe">
-                <div className="mx-2 px-4 py-3 bg-transparent dark:bg-gray-900/95 rounded-b-[1.4rem] backdrop-blur-xl border-b border-gray-800/20">
-                        <Link to="/" className="flex items-center justify-center gap-2 min-w-0">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/90 dark:bg-gray-900/60 shadow-sm shadow-brand-500/15 shrink-0 border border-gray-100/70 dark:border-gray-800/60 overflow-hidden">
-                            <img
-                                src="/LogoPriceMate.png"
-                                alt="PriceMate"
-                                className="h-full w-full object-contain p-1"
-                                loading="eager"
-                                decoding="async"
-                            />
-                        </div>
-                        <span className="text-sm font-black tracking-tight text-gray-900 dark:text-white truncate">PriceMate</span>
-                    </Link>
-                </div>
-            </div>
-            )}
-
-                <nav className="hidden md:block fixed top-0 left-0 right-0 pt-safe z-9999 bg-transparent dark:bg-gray-900/95 backdrop-blur-md transition-colors duration-200">
+            <nav className="hidden md:block fixed top-0 left-0 right-0 pt-safe z-9999 bg-transparent dark:bg-gray-900/95 backdrop-blur-md transition-colors duration-200">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between h-16">
                         {/* Logo */}

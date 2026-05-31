@@ -649,4 +649,19 @@ describe('AIChatBox — page variant immersive header', () => {
         expect(form.querySelectorAll('.rounded-full.border-brand-100').length).toBe(0);
         authState.user = null;
     });
+
+    it('enables composer for logged-in users without an active conversation', () => {
+        authState.user = { $id: 'user-1', name: 'Test User' };
+        const { container } = render(
+            <AIChatBox isOpen={true} onClose={() => {}} variant="page" />
+        );
+
+        const textarea = container.querySelector('textarea');
+        const submit = container.querySelector('button[type="submit"]');
+        expect(textarea).not.toBeNull();
+        expect(textarea.disabled).toBe(false);
+        expect(submit).not.toBeNull();
+        expect(submit.disabled).toBe(true);
+        authState.user = null;
+    });
 });

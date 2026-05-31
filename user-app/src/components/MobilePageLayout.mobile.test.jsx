@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { MobileHeader, MobilePage } from './MobilePageLayout';
 
 describe('MobilePageLayout mobile static chrome', () => {
-    it('MobileHeader uses fixed positioning below global logo on mobile, sticky on md+', () => {
+    it('MobileHeader uses fixed positioning at top safe area on mobile, sticky on md+', () => {
         const { container } = render(
             <MemoryRouter>
                 <MobilePage>
@@ -16,7 +16,8 @@ describe('MobilePageLayout mobile static chrome', () => {
         const header = container.querySelector('header');
         expect(header).toBeTruthy();
         expect(header.className).toMatch(/\bfixed\b/);
-        expect(header.className).toMatch(/top-\[var\(--mobile-top-logo-h/);
+        expect(header.className).toMatch(/\btop-0\b/);
+        expect(header.className).toMatch(/\bpt-safe\b/);
         expect(header.className).not.toMatch(/\bsticky top-0\b/);
         expect(header.className).toContain('md:sticky');
     });

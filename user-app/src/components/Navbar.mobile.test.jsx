@@ -28,17 +28,16 @@ describe('Navbar mobile bottom chrome', () => {
         document.documentElement.style.removeProperty('--mobile-top-logo-h');
     });
 
-    it('pins top logo bar with fixed positioning on mobile', () => {
+    it('does not render a mobile top PriceMate logo bar', () => {
         const { container } = render(
             <MemoryRouter>
                 <Navbar />
             </MemoryRouter>
         );
 
-        const topLogo = container.querySelector('.fixed.top-0');
-        expect(topLogo).toBeTruthy();
-        expect(topLogo.className).toMatch(/md:hidden/);
-        expect(topLogo.className).toMatch(/pt-safe/);
+        const topLogo = container.querySelector('.fixed.top-0.md\\:hidden');
+        expect(topLogo).toBeNull();
+        expect(document.documentElement.style.getPropertyValue('--mobile-top-logo-h')).toBe('0px');
     });
 
     it('pins bottom nav flush without mb-2 margin gap', () => {

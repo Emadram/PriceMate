@@ -705,25 +705,25 @@ const PriceComparison = () => {
                                                     </Link>
                                                 
                                                 <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-2 mb-1">
-                                                        <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white truncate">
+                                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-1 min-w-0">
+                                                        <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white truncate min-w-0 flex-1 basis-full sm:basis-auto">
                                                             {supermarketName}
                                                         </h4>
                                                         {typeof supermarket === 'object' && supermarket?.branchName && (
-                                                            <span className="text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-500 px-2 py-0.5 rounded-full font-bold">
+                                                            <span className="text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-500 px-2 py-0.5 rounded-full font-bold shrink-0">
                                                                 {supermarket.branchName}
                                                             </span>
                                                         )}
-                                                        {ratingValue !== null && ratingValue !== undefined && (
-                                                            <div className="mt-1 flex items-center gap-2">
-                                                                <StarRating value={ratingValue} size={14} />
-                                                                <span className="text-[11px] text-gray-500">{ratingValue}</span>
-                                                                {reviewsCount !== null && reviewsCount !== undefined && (
-                                                                    <span className="text-[10px] text-gray-400">· {reviewsCount}</span>
-                                                                )}
-                                                            </div>
-                                                        )}
                                                     </div>
+                                                    {ratingValue !== null && ratingValue !== undefined && (
+                                                        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 mb-1 min-w-0">
+                                                            <StarRating value={ratingValue} size={14} />
+                                                            <span className="text-[11px] text-gray-500 shrink-0">{ratingValue}</span>
+                                                            {reviewsCount !== null && reviewsCount !== undefined && (
+                                                                <span className="text-[10px] text-gray-400 shrink-0">({reviewsCount})</span>
+                                                            )}
+                                                        </div>
+                                                    )}
 
                                                     {supermarketAddress && (
                                                         <div className="flex items-center gap-1 text-[11px] text-gray-400 mb-2">
@@ -740,7 +740,7 @@ const PriceComparison = () => {
                                                     </div>
                                                 </div>
 
-                                                <div className="text-right flex flex-col items-end">
+                                                <div className="text-right flex flex-col items-end shrink-0">
                                                     <div className="flex items-baseline gap-1">
                                                         <span className={`text-lg sm:text-xl md:text-2xl font-bold ${isLowest ? 'text-green-600' : 'text-gray-900 dark:text-white'}`}>
                                                             {convertedPrice}

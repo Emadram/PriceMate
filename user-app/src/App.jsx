@@ -44,8 +44,6 @@ const AppShell = ({ children }) => {
   const isImmersiveRoute = matchesRoutePrefix(pathname, IMMERSIVE_ROUTE_PREFIXES);
   const hideAiLauncher = isAuthRoute || isImmersiveRoute;
   const hideGlobalNav = isAuthRoute;
-  const hideMobileTopLogo = isAuthRoute || isImmersiveRoute;
-  const mobileTopPadding = hideMobileTopLogo ? '' : 'pt-20';
   const immersiveShellClass = isImmersiveRoute
     ? 'pricemate-immersive-shell md:relative md:static md:h-auto md:overflow-visible md:flex-none'
     : '';
@@ -58,8 +56,8 @@ const AppShell = ({ children }) => {
 
   return (
     <>
-      {!hideGlobalNav && <Navbar hideMobileTopLogo={hideMobileTopLogo} />}
-      <div className={`overflow-x-hidden ${mobileTopPadding} ${immersiveShellClass}`}>
+      {!hideGlobalNav && <Navbar />}
+      <div className={`overflow-x-hidden pt-safe md:pt-0 ${immersiveShellClass}`}>
         <div className={isImmersiveRoute ? 'h-full min-h-0 overflow-hidden flex flex-col md:h-auto md:overflow-visible' : undefined}>
           {children}
         </div>
