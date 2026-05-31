@@ -1061,7 +1061,7 @@ export const fetchProducts = async (limit = 50) => {
         const response = await db.products.list([
             Query.limit(limit),
             Query.orderDesc('$createdAt'),
-            Query.select(PRODUCT_LIST_SELECT)
+            Query.select(['*', 'categoryId.*'])
         ]);
         setCachedValue(cacheKey, response.documents, CACHE_TTL.products);
         return response.documents;
@@ -1086,7 +1086,7 @@ export const fetchSimilarProductsByCategory = async (categoryId, excludeId = nul
                 Query.equal('categoryId', categoryId),
                 Query.limit(limit + 1),
                 Query.orderDesc('$createdAt'),
-                Query.select(PRODUCT_LIST_SELECT)
+                Query.select(['*', 'categoryId.*'])
             ]);
 
             const filtered = response.documents
@@ -1511,7 +1511,7 @@ export const searchProducts = async (query = '', categoryId = null, limit = 20, 
         try {
             const queries = [
                 Query.limit(limit),
-                Query.select(PRODUCT_LIST_SELECT)
+                Query.select(['*', 'categoryId.*'])
             ];
 
             if (categoryId) {

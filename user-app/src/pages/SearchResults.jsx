@@ -208,8 +208,11 @@ const SearchResults = () => {
                 <div className="max-w-5xl mx-auto px-3 sm:px-4 py-3 md:py-6">
                     <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-6">
                         <div className="flex items-center justify-between md:justify-start gap-3 md:gap-4 flex-shrink-0">
-                            <BackButton to="/" label={t('go_back_home')} />
-                            <h1 className="text-base sm:text-xl md:text-2xl font-black text-gray-900 dark:text-white tracking-tighter">
+                            <BackButton to="/" label={t('go_back_home')} className="hidden md:flex" />
+                            <h1 className="text-base sm:text-xl md:text-2xl font-black text-gray-900 dark:text-white tracking-tighter md:hidden">
+                                {t('search')}
+                            </h1>
+                            <h1 className="hidden md:block text-base sm:text-xl md:text-2xl font-black text-gray-900 dark:text-white tracking-tighter">
                                 {t('results')}
                             </h1>
                             <div className="md:hidden">
