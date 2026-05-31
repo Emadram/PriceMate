@@ -49,6 +49,7 @@ const OFF_RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
 const NUTRITION_META_MARKER = '\n\n[PriceMate Nutrition]\n';
 const pricesIndexCache = new WeakMap();
 const priceFieldSupport = {
+    products: null,
     productId: null,
     productID: null,
     product: null,
@@ -1636,17 +1637,17 @@ export const fetchPricesForProducts = async (productIds) => {
 
         const fetchByField = async (field, ids, select) => {
             if (!ids.length) return [];
-            if (field !== 'products' && priceFieldSupport[field] === false) return [];
+            if (priceFieldSupport[field] === false) return [];
             try {
                 const response = await db.prices.list([
                     Query.equal(field, ids),
                     Query.limit(100),
                     Query.select(select)
                 ]);
-                if (field !== 'products') priceFieldSupport[field] = true;
+                priceFieldSupport[field] = true;
                 return response.documents;
             } catch (error) {
-                if (field !== 'products' && isMissingAttributeError(error)) {
+                if (isMissingAttributeError(error)) {
                     priceFieldSupport[field] = false;
                     return [];
                 }
