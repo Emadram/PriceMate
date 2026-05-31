@@ -42,6 +42,29 @@ const PRODUCT_LIST_SELECT = [
     'categoryId.*',
 ];
 const PRODUCT_PRICE_SELECT = ['$id', '$createdAt', '$updatedAt', 'price', 'currency', 'products.$id'];
+/** Expanded price fields for comparison / store pages (relationship attrs via dot notation only). */
+export const COMPARISON_PRICE_SELECT = [
+    '$id',
+    '$createdAt',
+    '$updatedAt',
+    'price',
+    'currency',
+    'stockStatus',
+    'products.$id',
+    'supermarkets.$id',
+    'supermarkets.name',
+    'supermarkets.branchName',
+    'supermarkets.address',
+    'supermarkets.latitude',
+    'supermarkets.longitude',
+    'supermarkets.icon',
+    'supermarkets.logoUrl',
+    'supermarkets.rating',
+    'supermarkets.reviewsCount',
+    'supermarkets.parentId',
+    'supermarkets.isParent',
+];
+export { PRODUCT_PRICE_SELECT };
 const OFF_API_BASE = 'https://world.openfoodfacts.org';
 const OFF_DEBUG = import.meta.env.VITE_OFF_DEBUG === 'true';
 const OFF_PROXY_FUNCTION_ID = import.meta.env.VITE_APPWRITE_FUNCTION_OFF_PROXY || '';
@@ -1014,7 +1037,7 @@ export const fetchAllPrices = async (limit = 200) => {
         const response = await db.prices.list([
             Query.limit(limit),
             Query.orderDesc('$createdAt'),
-            Query.select(['$id', '$createdAt', '$updatedAt', 'price', 'currency', 'products', 'supermarkets'])
+            Query.select(PRODUCT_PRICE_SELECT)
         ]);
         setCachedValue(cacheKey, response.documents, CACHE_TTL.allPrices);
         return response.documents;

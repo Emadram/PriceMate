@@ -118,7 +118,7 @@ vi.mock('../stores/chatStore', () => ({
 
 vi.mock('../utils/productUtils', () => ({
     fetchProducts: vi.fn().mockResolvedValue([]),
-    fetchAllPrices: vi.fn().mockResolvedValue([]),
+    fetchPricesForProducts: vi.fn().mockResolvedValue([]),
     fetchIngredientsByBarcode: vi.fn(),
     searchIngredientsByName: vi.fn(),
     resolveCatalogProductForIngredients: vi.fn(),
@@ -126,6 +126,7 @@ vi.mock('../utils/productUtils', () => ({
     persistIngredientPayloadToCatalogProduct: vi.fn(),
     fetchOffCacheSnapshot: vi.fn().mockResolvedValue([]),
     normalizeOffCacheDoc: vi.fn(),
+    normalizeProduct: vi.fn((product, prices = []) => ({ ...product, prices })),
     resolveOffCacheProductForIngredients: vi.fn(),
     ingredientPayloadFromOffCache: vi.fn(),
     buildSupermarketContextLines: vi.fn(() => '- [STORE:test] Test Store'),

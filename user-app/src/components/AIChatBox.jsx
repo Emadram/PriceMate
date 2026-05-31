@@ -328,7 +328,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import {
     fetchProducts,
-    fetchAllPrices,
+    fetchPricesForProducts,
     fetchIngredientsByBarcode,
     searchIngredientsByName,
     resolveCatalogProductForIngredients,
@@ -336,6 +336,7 @@ import {
     persistIngredientPayloadToCatalogProduct,
     fetchOffCacheSnapshot,
     normalizeOffCacheDoc,
+    normalizeProduct,
     resolveOffCacheProductForIngredients,
     ingredientPayloadFromOffCache,
     buildSupermarketContextLines,
@@ -1242,21 +1243,15 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
     useEffect(() => {
         const loadContext = async () => {
             try {
-                const [products, prices, offCache, supermarkets] = await Promise.all([
-                    fetchProducts(50), 
-                    fetchAllPrices(),
+                const products = await fetchProducts(50);
+                const productIds = products.map((p) => p.$id).filter(Boolean);
+                const [prices, offCache, supermarkets] = await Promise.all([
+                    fetchPricesForProducts(productIds),
                     fetchOffCacheSnapshot(20),
                     fetchSupermarkets(),
                 ]);
-                
-                // Keep the structural product list for the component to use
-                const productsWithData = products.map(p => {
-                    const productPrices = prices.filter(pr => {
-                        const pid = Array.isArray(pr.products) ? pr.products[0]?.$id : (pr.productID || pr.products?.$id);
-                        return pid === p.$id;
-                    });
-                    return { ...p, prices: productPrices };
-                });
+
+                const productsWithData = products.map((p) => normalizeProduct(p, prices));
 
                 const offCacheProducts = (offCache || [])
                     .map((doc) => normalizeOffCacheDoc(doc))

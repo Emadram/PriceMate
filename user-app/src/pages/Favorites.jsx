@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { FiShoppingBag, FiPackage, FiChevronRight, FiHeart, FiClock } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
 import { db, Query } from '../lib/appwrite';
-import { fetchAllPrices, normalizeProduct } from '../utils/productUtils';
+import { fetchPricesForProducts, normalizeProduct } from '../utils/productUtils';
 import ProductCard from '../components/ProductCard';
 import useFavoritesStore from '../stores/favoritesStore';
 import BackButton from '../components/BackButton';
@@ -33,7 +33,7 @@ const Favorites = () => {
                         ])
                         .then((res) => res.documents)
                 );
-                promises.push(fetchAllPrices());
+                promises.push(fetchPricesForProducts(favoriteProducts));
             } else {
                 promises.push(Promise.resolve([]));
                 promises.push(Promise.resolve([]));

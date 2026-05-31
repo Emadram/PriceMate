@@ -538,30 +538,24 @@ const PriceComparison = () => {
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
 
-                        {user && (
-                            <ReportModal
-                                isOpen={isReportModalOpen} 
-                                onClose={() => setIsReportModalOpen(false)} 
-                                targetName={product.name}
-                                targetType="product"
-                                targetId={product.$id}
-                            />
-                        )}
-                        
+                        {/* Product description */}
                         {(() => {
                             const displayDescription = stripNutritionMeta(product.description || '');
                             if (!displayDescription) return null;
                             return (
-                                <p className="text-xs sm:text-sm md:text-base text-gray-500 dark:text-gray-400 leading-relaxed max-w-xl font-medium italic">
-                                    "{displayDescription}"
+                                <p className="text-xs sm:text-sm md:text-base text-gray-500 dark:text-gray-400 leading-relaxed max-w-xl font-medium italic px-3 sm:px-6 md:px-10 pb-4">
+                                    &ldquo;{displayDescription}&rdquo;
                                 </p>
                             );
                         })()}
 
-                                {/* Global Database Health & Nutrition Info */}
-                                {(product.nutriscore || product.is_global) && (
-                                    <div className="pt-2 flex flex-wrap gap-3 items-center justify-center md:justify-start" aria-label="Product Nutrition and Information">
+                            {/* Global Database Health & Nutrition Info */}
+                            {(product.nutriscore || product.is_global) && (
+                                <div className="pt-2 pb-4 px-3 sm:px-6 md:px-10 flex flex-wrap gap-3 items-center justify-center md:justify-start" aria-label="Product Nutrition and Information">
+
                                         {/* Nutriscore Badge */}
                                         {product.nutriscore && (
                                             <div 
@@ -593,11 +587,19 @@ const PriceComparison = () => {
                                         )}
                                     </div>
                                 )}
-
-                            </div>
-                        </div>
                     </div>
                 </div>
+
+                {/* ReportModal rendered outside card to avoid JSX nesting issues */}
+                {user && (
+                    <ReportModal
+                        isOpen={isReportModalOpen}
+                        onClose={() => setIsReportModalOpen(false)}
+                        targetName={product.name}
+                        targetType="product"
+                        targetId={product.$id}
+                    />
+                )}
 
                 {/* Price History Section */}
                 <div className="space-y-4 md:space-y-6">

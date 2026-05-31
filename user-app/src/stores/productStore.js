@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { db, Query } from '../lib/appwrite';
 import * as productUtils from '../utils/productUtils';
+import { COMPARISON_PRICE_SELECT, PRODUCT_PRICE_SELECT } from '../utils/productUtils';
 
 const CACHE_STALENESS_LIMIT = 5 * 60 * 1000; // 5 minutes
 const inflightProductRequests = new Map();
@@ -71,26 +72,33 @@ const loadProductPayload = async (barcode) => {
         }
     } else {
         product = response.documents[0];
-        const fetchPrices = async (attribute) => db.prices.list(
+        const fetchPrices = async (attribute, select) => db.prices.list(
             [
                 Query.equal(attribute, product.$id),
                 Query.orderAsc('price'),
-                Query.select(['*', 'supermarkets.*', 'products.*'])
+                Query.select(select)
             ]
         );
 
         try {
-            const pricesRes = await fetchPrices('products');
+            const pricesRes = await fetchPrices('products', COMPARISON_PRICE_SELECT);
             prices = pricesRes.documents;
         } catch (priceError) {
             const message = priceError?.message || '';
             const isNetworkError = message.includes('NetworkError') || message.includes('Failed to fetch');
             if (isNetworkError) {
                 console.warn('Prices temporarily unavailable due to network error.');
+                prices = [];
             } else {
-                console.error('Price lookup failed:', priceError);
+                console.warn('Full price select failed, trying minimal select:', priceError?.message);
+                try {
+                    const fallbackRes = await fetchPrices('products', PRODUCT_PRICE_SELECT);
+                    prices = fallbackRes.documents;
+                } catch (fallbackError) {
+                    console.error('Price lookup failed entirely:', fallbackError);
+                    prices = [];
+                }
             }
-            prices = [];
         }
     }
 
