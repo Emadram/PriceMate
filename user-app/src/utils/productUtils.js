@@ -48,6 +48,10 @@ const OFF_PROXY_FUNCTION_ID = import.meta.env.VITE_APPWRITE_FUNCTION_OFF_PROXY |
 const OFF_RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
 const NUTRITION_META_MARKER = '\n\n[PriceMate Nutrition]\n';
 const pricesIndexCache = new WeakMap();
+const priceFieldSupport = {
+    productId: null,
+    productID: null,
+};
 
 export const stripNutritionMeta = (value) => {
     const text = String(value || '');
@@ -934,6 +938,13 @@ export const getRelationshipId = (field) => {
     return field.$id;
 };
 
+const getPriceProductId = (price) => {
+    if (!price) return null;
+    const relId = getRelationshipId(price.products);
+    if (relId) return relId;
+    return price.productId || price.productID || null;
+};
+
 // Helper to safely get attribute from relationship (only if expanded)
 export const getRelationshipAttribute = (field, attribute) => {
     if (!field) return null;
@@ -953,7 +964,7 @@ const getPricesIndex = (prices) => {
 
     const index = new Map();
     for (const price of prices) {
-        const productId = getRelationshipId(price?.products);
+        const productId = getPriceProductId(price);
         if (!productId) continue;
         const bucket = index.get(productId);
         if (bucket) {
@@ -1004,10 +1015,12 @@ export const fetchAllPrices = async (limit = 200) => {
  */
 export const getPricesForProduct = (prices, productId) => {
     if (!prices || !productId) return [];
-    return prices.filter(price => {
-        const priceProductId = getRelationshipId(price.products);
-        return priceProductId === productId;
-    });
+    const index = getPricesIndex(prices);
+    if (index) {
+        const bucket = index.get(productId);
+        if (bucket) return bucket;
+    }
+    return prices.filter((price) => getPriceProductId(price) === productId);
 };
 
 /**
@@ -1586,20 +1599,70 @@ export const fetchPricesForProducts = async (productIds) => {
     const cached = getCachedValue(cacheKey);
     if (cached) return cached;
 
+    const isMissingAttributeError = (error) => {
+        const message = String(error?.message || '').toLowerCase();
+        if (error?.code === 400 && (message.includes('attribute') || message.includes('schema'))) {
+            return true;
+        }
+        return false;
+    };
+
     return withInflight(cacheKey, async () => {
         // Appwrite Query.equal supports arrays, but large arrays should be chunked
         const CHUNK_SIZE = 25;
         const allPrices = [];
+        const seenPriceIds = new Set();
+
+        const addPrices = (prices) => {
+            for (const price of prices) {
+                if (!price?.$id || seenPriceIds.has(price.$id)) continue;
+                seenPriceIds.add(price.$id);
+                allPrices.push(price);
+            }
+        };
+
+        const fetchByField = async (field, ids, select) => {
+            if (!ids.length) return [];
+            if (field !== 'products' && priceFieldSupport[field] === false) return [];
+            try {
+                const response = await db.prices.list([
+                    Query.equal(field, ids),
+                    Query.limit(100),
+                    Query.select(select)
+                ]);
+                if (field !== 'products') priceFieldSupport[field] = true;
+                return response.documents;
+            } catch (error) {
+                if (field !== 'products' && isMissingAttributeError(error)) {
+                    priceFieldSupport[field] = false;
+                    return [];
+                }
+                console.error('Error fetching prices for batch products:', error);
+                return [];
+            }
+        };
 
         try {
             for (let i = 0; i < normalizedIds.length; i += CHUNK_SIZE) {
                 const chunk = normalizedIds.slice(i, i + CHUNK_SIZE);
-                const response = await db.prices.list([
-                    Query.equal('products', chunk),
-                    Query.limit(100),
-                    Query.select(PRODUCT_PRICE_SELECT)
-                ]);
-                allPrices.push(...response.documents);
+                const primary = await fetchByField('products', chunk, PRODUCT_PRICE_SELECT);
+                addPrices(primary);
+
+                const foundIds = new Set(primary.map((price) => getPriceProductId(price)).filter(Boolean));
+                const missingIds = chunk.filter((id) => !foundIds.has(id));
+
+                if (missingIds.length > 0) {
+                    const fallback = await fetchByField('productId', missingIds, ['*']);
+                    addPrices(fallback);
+
+                    const fallbackFound = new Set(fallback.map((price) => getPriceProductId(price)).filter(Boolean));
+                    const stillMissing = missingIds.filter((id) => !fallbackFound.has(id));
+
+                    if (stillMissing.length > 0) {
+                        const fallbackCaps = await fetchByField('productID', stillMissing, ['*']);
+                        addPrices(fallbackCaps);
+                    }
+                }
             }
             setCachedValue(cacheKey, allPrices, CACHE_TTL.prices);
             return allPrices;
