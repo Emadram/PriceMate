@@ -349,6 +349,11 @@ import {
 } from '../utils/productNameMatch';
 import useUserLocation from '../hooks/useUserLocation';
 import useComposerKeyboardLift from '../hooks/useComposerKeyboardLift';
+import {
+    polishMessageSegments,
+    scrubPunctuationAfterProductTags,
+    tokenizeMessageContent,
+} from '../utils/chatMessageContent';
 import useSupermarketsStore from '../stores/supermarketsStore';
 import {
     buildAiProfileCacheKey,
@@ -522,26 +527,6 @@ const ChatProductThumb = ({ src, alt, className = 'w-full h-full' }) => {
             onError={() => setFailed(true)}
         />
     );
-};
-
-const tokenizeMessageContent = (text) => {
-    const combinedRegex = /\[(?:BARCODE|ID):([\w\d-]+)\]|\[STORE:([\w\d-]+)\]/gi;
-    const segments = [];
-    let lastIndex = 0;
-    let match = combinedRegex.exec(text);
-    while (match) {
-        if (match.index > lastIndex) {
-            segments.push({ type: 'text', value: text.slice(lastIndex, match.index) });
-        }
-        if (match[1]) segments.push({ type: 'barcode', value: match[1] });
-        if (match[2]) segments.push({ type: 'store', value: match[2] });
-        lastIndex = match.index + match[0].length;
-        match = combinedRegex.exec(text);
-    }
-    if (lastIndex < text.length) {
-        segments.push({ type: 'text', value: text.slice(lastIndex) });
-    }
-    return segments;
 };
 
 const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [], allSupermarkets = [], t }) => {
@@ -829,13 +814,14 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [], allSup
         
         // Remove empty lines created by removals
         text = text.replace(/\n\s*\n/g, '\n').trim();
+        text = scrubPunctuationAfterProductTags(text);
 
         const ingredientCardData = msg.role === 'assistant' ? parseIngredientCardData(text) : null;
         if (ingredientCardData) {
             return renderIngredientCard(ingredientCardData);
         }
 
-        const segments = tokenizeMessageContent(text);
+        const segments = polishMessageSegments(tokenizeMessageContent(text));
         const isMostExpensiveRequest = text.toLowerCase().includes('most expensive') || text.toLowerCase().includes('pahalı');
         const isCheapestRequest = text.toLowerCase().includes('cheapest') || text.toLowerCase().includes('en ucuz');
 
@@ -2119,13 +2105,14 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 6. For category-style questions, suggest at most three relevant items from the sample, then briefly ask the user to be more specific if the catalog is huge.
                 7. For every product you mention, you must include its barcode ID in square brackets like this: [BARCODE:123456].
                 8. Do not use [ID:123456], only use the word BARCODE in the brackets.
-                9. Minimize text. Do not describe features or give long intros. Just a short sentence and the barcode(s).
-                10. Do not repeat price lists (e.g., "- Store: X TRY"). The UI will show the card automatically.
-                11. Use the exact product names from the context.
-                12. If ingredient suitability data is provided, summarize it briefly and do not refuse to answer.
-                13. If you are unsure, ask the user for the barcode or exact product name instead of giving a generic refusal.
-                14. For ingredient safety answers, treat Open Food Facts as the source of truth and mention it in the source line.
-                15. Never restate the full user question; keep the answer short and direct.
+                9. Do not put punctuation (especially a period) immediately after [BARCODE:...] or [STORE:...]—the app shows a product card there.
+                10. Minimize text. Do not describe features or give long intros. Just a short sentence and the barcode(s).
+                11. Do not repeat price lists (e.g., "- Store: X TRY"). The UI will show the card automatically.
+                12. Use the exact product names from the context.
+                13. If ingredient suitability data is provided, summarize it briefly and do not refuse to answer.
+                14. If you are unsure, ask the user for the barcode or exact product name instead of giving a generic refusal.
+                15. For ingredient safety answers, treat Open Food Facts as the source of truth and mention it in the source line.
+                16. Never restate the full user question; keep the answer short and direct.
             `;
 
             const resolvedDisplayName =
