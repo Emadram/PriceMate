@@ -349,6 +349,7 @@ import {
 } from '../utils/productNameMatch';
 import useUserLocation from '../hooks/useUserLocation';
 import useComposerKeyboardLift from '../hooks/useComposerKeyboardLift';
+import { prefersKeyboardResizeViewport } from '../utils/platform';
 import {
     polishMessageSegments,
     scrubPunctuationAfterProductTags,
@@ -1021,7 +1022,10 @@ const buildRankedProductContextLines = (products, userHint, aiProfile = {}) => {
 const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
     const isPageVariant = variant === 'page';
     const [composerFocused, setComposerFocused] = useState(false);
-    useComposerKeyboardLift(isPageVariant && isOpen, { active: composerFocused });
+    const composerAnchoredToNav = prefersKeyboardResizeViewport();
+    useComposerKeyboardLift(isPageVariant && isOpen && !composerAnchoredToNav, {
+        active: composerFocused,
+    });
     const { t, i18n } = useTranslation();
     const { convert, getCurrencySymbol, currency } = useCurrencyStore();
     const user = useAuthStore(state => state.user);
@@ -2185,8 +2189,12 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         ? 'px-4 py-3 sm:px-5 sm:py-4'
         : 'px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px)+var(--bottom-nav-h,0px))] sm:px-5 sm:py-4';
 
+    const composerMobileBottom = composerAnchoredToNav
+        ? 'max-md:bottom-[calc(var(--bottom-nav-h,0px)+env(safe-area-inset-bottom,0px))] max-md:pricemate-ai-composer-nav-anchor'
+        : 'max-md:bottom-[calc(var(--bottom-nav-h,0px)+env(safe-area-inset-bottom,0px)+var(--composer-keyboard-lift,0px))]';
+
     const composerStackClass = isPage
-        ? `shrink-0 border-t border-gray-100/80 dark:border-gray-700/50 max-md:fixed max-md:inset-x-0 max-md:z-[9990] max-md:bottom-[calc(var(--bottom-nav-h,0px)+env(safe-area-inset-bottom,0px)+var(--composer-keyboard-lift,0px))] sm:relative sm:inset-auto sm:bottom-auto sm:z-auto ${mobileListOpen ? 'max-md:hidden' : ''}`
+        ? `shrink-0 border-t border-gray-100/80 dark:border-gray-700/50 max-md:fixed max-md:inset-x-0 max-md:z-[9999] ${composerMobileBottom} sm:relative sm:inset-auto sm:bottom-auto sm:z-auto ${mobileListOpen ? 'max-md:hidden' : ''}`
         : 'shrink-0';
 
     const composerFormClass = isPage

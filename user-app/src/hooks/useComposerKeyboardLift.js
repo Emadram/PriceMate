@@ -24,10 +24,16 @@ export default function useComposerKeyboardLift(enabled = true, options = {}) {
         const preferResizeLayout = prefersKeyboardResizeViewport();
 
         const setLift = () => {
+            // Android: composer is pinned above the tab bar; layout resize handles the keyboard.
+            if (preferResizeLayout) {
+                root.style.setProperty('--composer-keyboard-lift', '0px');
+                return;
+            }
+
             const baseline = active ? baselineInnerHeightRef.current : 0;
             const lift = computeKeyboardInsetBottom(window, {
                 baselineInnerHeight: baseline,
-                preferResizeLayout,
+                preferResizeLayout: false,
             });
             root.style.setProperty('--composer-keyboard-lift', `${lift}px`);
         };

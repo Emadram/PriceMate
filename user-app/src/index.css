@@ -68,6 +68,11 @@
     height: 100%;
   }
 
+  /* Android: pin message composer directly above the fixed tab bar (no keyboard lift). */
+  html.pricemate-ai-chat-keyboard-resize .pricemate-ai-composer-nav-anchor {
+    bottom: calc(var(--bottom-nav-h, 0px) + env(safe-area-inset-bottom, 0px));
+  }
+
   .pricemate-ai-composer-overlay {
     background-color: rgb(255 255 255 / 0.88);
     backdrop-filter: blur(16px);

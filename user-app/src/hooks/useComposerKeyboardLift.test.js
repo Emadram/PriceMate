@@ -6,6 +6,8 @@ vi.mock('../utils/platform', () => ({
     prefersKeyboardResizeViewport: vi.fn(() => false),
 }));
 
+import { prefersKeyboardResizeViewport } from '../utils/platform';
+
 describe('useComposerKeyboardLift', () => {
     beforeEach(() => {
         document.documentElement.style.removeProperty('--composer-keyboard-lift');
@@ -42,5 +44,25 @@ describe('useComposerKeyboardLift', () => {
     it('does nothing when disabled', () => {
         renderHook(() => useComposerKeyboardLift(false));
         expect(document.documentElement.style.getPropertyValue('--composer-keyboard-lift')).toBe('');
+    });
+
+    it('keeps lift at 0 on Android (composer anchored to tab bar)', () => {
+        vi.mocked(prefersKeyboardResizeViewport).mockReturnValue(true);
+        Object.defineProperty(window, 'visualViewport', {
+            configurable: true,
+            value: {
+                height: 400,
+                offsetTop: 0,
+                addEventListener: vi.fn(),
+                removeEventListener: vi.fn(),
+            },
+        });
+        Object.defineProperty(window, 'innerHeight', {
+            configurable: true,
+            value: 800,
+        });
+
+        renderHook(() => useComposerKeyboardLift(true, { active: true }));
+        expect(document.documentElement.style.getPropertyValue('--composer-keyboard-lift')).toBe('0px');
     });
 });
