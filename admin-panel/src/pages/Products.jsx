@@ -7,10 +7,10 @@ import useProductsStore from '../stores/productsStore';
 import useCategoriesStore from '../stores/categoriesStore';
 import useSupermarketsStore from '../stores/supermarketsStore';
 import Sidebar from '../components/Sidebar';
-import { client, DATABASE_ID, COLLECTIONS, functions } from '../lib/appwrite';
+import { client, DATABASE_ID, COLLECTIONS } from '../lib/appwrite';
+import { executeOffProxy, OFF_PROXY_FUNCTION_ID } from '../utils/executeOffProxy';
 
 const OFF_RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
-const OFF_PROXY_FUNCTION_ID = import.meta.env.VITE_APPWRITE_FUNCTION_OFF_PROXY || '';
 const NUTRITION_META_MARKER = '\n\n[PriceMate Nutrition]\n';
 
 const stripNutritionMeta = (value) => {
@@ -123,18 +123,11 @@ const Products = () => {
 
     const callOffProxy = useCallback(async (payload) => {
         if (!OFF_PROXY_FUNCTION_ID) return null;
-        try {
-            const execution = await functions.createExecution(
-                OFF_PROXY_FUNCTION_ID,
-                JSON.stringify(payload),
-                false
-            );
-            if (!execution?.response) return null;
-            return JSON.parse(execution.response);
-        } catch (error) {
-            console.error('OFF proxy error:', error);
-            return { ok: false, status: 0, error: 'Proxy error' };
+        const result = await executeOffProxy(payload);
+        if (!result?.ok && result?.error) {
+            console.error('OFF proxy error:', result.error);
         }
+        return result;
     }, []);
 
     const normalizeOffResult = (product) => {

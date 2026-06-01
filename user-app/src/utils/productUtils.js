@@ -1,4 +1,5 @@
 import { db, Query, COLLECTIONS, functions } from '../lib/appwrite';
+import { createFunctionExecutionJson } from './appwriteFunctionExecution';
 import {
     buildCatalogSearchTerms,
     findBestProductMatch,
@@ -101,13 +102,7 @@ const logOffDebug = (...args) => {
 const callOffProxy = async (payload) => {
     if (!OFF_PROXY_FUNCTION_ID) return null;
     try {
-        const execution = await functions.createExecution(
-            OFF_PROXY_FUNCTION_ID,
-            JSON.stringify(payload),
-            false
-        );
-        if (!execution?.response) return null;
-        return JSON.parse(execution.response);
+        return await createFunctionExecutionJson(functions, OFF_PROXY_FUNCTION_ID, payload);
     } catch (error) {
         logOffDebug('proxy-error', { message: error?.message || String(error) });
         return { ok: false, status: 0, error: 'Proxy error' };

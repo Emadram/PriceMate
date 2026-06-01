@@ -68,9 +68,15 @@
     height: var(--app-dvh, 100dvh);
   }
 
-  /* Drawer variant only: fixed composer above tab bar when using nav-anchor class. */
+  /* Android /ai-chat: in-flow composer above tab bar when using resize layout. */
   html.pricemate-ai-chat-keyboard-resize .pricemate-ai-composer-nav-anchor {
     bottom: calc(var(--bottom-nav-h, 0px) + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* iOS /ai-chat: fixed composer sits on keyboard inset (no white gap above keyboard). */
+  body.pricemate-ai-chat-page {
+    --mobile-ai-header-h: 4.5rem;
+    --mobile-ai-composer-h: 5.5rem;
   }
 
   .pricemate-ai-composer-overlay {

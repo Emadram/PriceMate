@@ -5,7 +5,7 @@ const RESIZES = 'interactive-widget=resizes-content';
 const OVERLAYS = 'interactive-widget=overlays-content';
 
 /**
- * On /ai-chat: mobile uses layout resize for keyboard; desktop keeps overlay meta default.
+ * On /ai-chat: Android uses layout resize; iOS uses overlay + visualViewport insets.
  */
 export default function useAiChatViewportMeta(enabled = true) {
     useEffect(() => {

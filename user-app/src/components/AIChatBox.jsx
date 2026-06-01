@@ -349,7 +349,7 @@ import {
 } from '../utils/productNameMatch';
 import useUserLocation from '../hooks/useUserLocation';
 import useComposerKeyboardLift from '../hooks/useComposerKeyboardLift';
-import { prefersKeyboardResizeViewport } from '../utils/platform';
+import { prefersKeyboardResizeViewport, usesAiChatFixedMobileChrome } from '../utils/platform';
 import {
     polishMessageSegments,
     scrubPunctuationAfterProductTags,
@@ -365,6 +365,7 @@ import {
     serializeAiCheckResponse,
 } from '../utils/aiCheckUtils';
 import { functions as appwriteFunctions } from '../lib/appwrite';
+import { createFunctionExecutionJson } from '../utils/appwriteFunctionExecution';
 import useCurrencyStore from '../stores/currencyStore';
 import useAuthStore from '../stores/authStore';
 import useChatStore, { CHAT_ERROR_MISSING_CONVERSATION_ID } from '../stores/chatStore';
@@ -379,9 +380,11 @@ const ChatScreenHeader = ({
     onNewChat,
     onClose,
     showDragHandle,
+    headerRef,
     t,
 }) => {
     const isPage = variant === 'page';
+    const iosFixedChrome = isPage && usesAiChatFixedMobileChrome();
     const [logoFailed, setLogoFailed] = useState(false);
 
     return (
@@ -392,8 +395,13 @@ const ChatScreenHeader = ({
                 </div>
             ) : null}
             <header
-                className={`pricemate-mobile-chrome z-10 shrink-0 border-b border-gray-100 dark:border-gray-700/50 px-3.5 pb-3 pt-[calc(0.5rem+env(safe-area-inset-top,0px))] sm:px-5 sm:py-4 sm:pt-[calc(0.65rem+env(safe-area-inset-top,0px))] ${
-                    isPage ? 'max-md:sticky max-md:top-0 max-md:z-20' : ''
+                ref={headerRef}
+                className={`pricemate-mobile-chrome shrink-0 border-b border-gray-100 dark:border-gray-700/50 px-3.5 pb-3 pt-[calc(0.5rem+env(safe-area-inset-top,0px))] sm:px-5 sm:py-4 sm:pt-[calc(0.65rem+env(safe-area-inset-top,0px))] ${
+                    iosFixedChrome
+                        ? 'max-md:fixed max-md:inset-x-0 max-md:top-[var(--app-vv-top,0px)] max-md:z-[10001] max-md:bg-white max-md:dark:bg-gray-900'
+                        : isPage
+                          ? 'z-10 max-md:sticky max-md:top-0 max-md:z-20'
+                          : 'z-10'
                 }`}
             >
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -409,12 +417,12 @@ const ChatScreenHeader = ({
                     ) : (
                         <span className="w-10 shrink-0 sm:hidden" aria-hidden />
                     )}
-                    <div className="w-9 h-9 rounded-2xl bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center shrink-0 border border-brand-100 dark:border-brand-800/40 overflow-hidden">
+                    <div className="w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 overflow-hidden">
                         {!logoFailed ? (
                             <img
-                                src="/LogoPriceMate.png"
+                                src="/favicon.svg"
                                 alt=""
-                                className="h-6 w-6 object-contain"
+                                className="h-9 w-9 object-contain rounded-2xl"
                                 loading="eager"
                                 decoding="async"
                                 onError={() => setLogoFailed(true)}
@@ -474,13 +482,11 @@ const AI_CHECK_MODE = import.meta.env.VITE_AI_CHECK_MODE || 'legacy';
 const runAiCheckFunction = async (payload) => {
     if (AI_CHECK_MODE !== 'hybrid' || !AI_CHECK_FUNCTION_ID) return null;
     try {
-        const execution = await appwriteFunctions.createExecution(
+        const parsed = await createFunctionExecutionJson(
+            appwriteFunctions,
             AI_CHECK_FUNCTION_ID,
-            JSON.stringify(payload),
-            false
+            payload
         );
-        if (!execution?.response) return null;
-        const parsed = JSON.parse(execution.response);
         return parsed && typeof parsed === 'object' ? parsed : null;
     } catch (error) {
         console.debug('AI check function unavailable, falling back locally:', error?.message || error);
@@ -1058,6 +1064,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
     const fetchSupermarkets = useSupermarketsStore((state) => state.fetchSupermarkets);
     const messagesEndRef = useRef(null);
     const messagesScrollRef = useRef(null);
+    const headerRef = useRef(null);
     const inputRef = useRef(null);
     const formRef = useRef(null);
     const composerStackRef = useRef(null);
@@ -1224,14 +1231,14 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
     }, [input]);
 
     const isPage = variant === 'page';
+    const iosFixedChrome = isPage && usesAiChatFixedMobileChrome();
 
     useEffect(() => {
         if (!isPage || !isOpen || typeof window === 'undefined') return undefined;
 
         const onViewportChange = () => {
             if (composerFocusedRef.current) {
-                const pane = messagesScrollRef.current;
-                if (pane) pane.scrollTop = pane.scrollHeight;
+                requestAnimationFrame(() => scrollMessagesToBottom());
             }
         };
 
@@ -1245,24 +1252,37 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
     }, [isPage, isOpen]);
 
     useEffect(() => {
-        const el = composerStackRef.current;
-        if (!isPage || !isOpen || !el || typeof document === 'undefined') return undefined;
+        if (!isPage || !isOpen || typeof document === 'undefined') return undefined;
 
         const root = document.documentElement;
-        const setVar = () => {
-            const h = Math.round(el.getBoundingClientRect().height || 0);
-            if (h > 0) root.style.setProperty('--mobile-ai-composer-h', `${h}px`);
+        const measure = () => {
+            const composerEl = composerStackRef.current;
+            const headerEl = headerRef.current;
+            if (composerEl) {
+                const h = Math.round(composerEl.getBoundingClientRect().height || 0);
+                if (h > 0) root.style.setProperty('--mobile-ai-composer-h', `${h}px`);
+            }
+            if (headerEl) {
+                const h = Math.round(headerEl.getBoundingClientRect().height || 0);
+                if (h > 0) root.style.setProperty('--mobile-ai-header-h', `${h}px`);
+            }
         };
 
-        setVar();
-        const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(setVar) : null;
-        ro?.observe(el);
-        window.addEventListener('resize', setVar, { passive: true });
+        measure();
+        const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+        if (composerStackRef.current) ro?.observe(composerStackRef.current);
+        if (headerRef.current) ro?.observe(headerRef.current);
+        window.addEventListener('resize', measure, { passive: true });
+
+        const vv = window.visualViewport;
+        vv?.addEventListener('resize', measure, { passive: true });
 
         return () => {
             ro?.disconnect();
-            window.removeEventListener('resize', setVar);
+            window.removeEventListener('resize', measure);
+            vv?.removeEventListener('resize', measure);
             root.style.removeProperty('--mobile-ai-composer-h');
+            root.style.removeProperty('--mobile-ai-header-h');
         };
     }, [isPage, isOpen, mobileListOpen, chatWriteError]);
 
@@ -2193,8 +2213,14 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         ? 'px-4 py-3 sm:px-5 sm:py-4'
         : 'px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px)+var(--bottom-nav-h,0px))] sm:px-5 sm:py-4';
 
+    const composerMobileBottom = iosFixedChrome
+        ? 'max-md:bottom-[calc(var(--bottom-nav-h,0px)+env(safe-area-inset-bottom,0px)+var(--keyboard-inset-bottom,0px))]'
+        : '';
+
     const composerStackClass = isPage
-        ? `shrink-0 border-t border-gray-100/80 dark:border-gray-700/50 ${mobileListOpen ? 'max-md:hidden' : ''}`
+        ? iosFixedChrome
+            ? `shrink-0 border-t border-gray-100/80 dark:border-gray-700/50 max-md:fixed max-md:inset-x-0 max-md:z-[10000] ${composerMobileBottom} max-md:bg-white max-md:dark:bg-gray-900 ${mobileListOpen ? 'max-md:hidden' : ''}`
+            : `shrink-0 border-t border-gray-100/80 dark:border-gray-700/50 ${mobileListOpen ? 'max-md:hidden' : ''}`
         : 'shrink-0';
 
     const composerFormClass = isPage
@@ -2298,6 +2324,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 onNewChat={beginNewConversation}
                 onClose={effectiveOnClose}
                 showDragHandle={!isPage}
+                headerRef={headerRef}
                 t={t}
             />
 
@@ -2343,7 +2370,9 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                         ref={messagesScrollRef}
                         className={
                             isPage
-                                ? 'flex-1 overflow-y-auto overscroll-contain scroll-pb-[var(--mobile-ai-composer-h,5.5rem)] px-4 pt-2.5 pb-3 max-md:pb-[var(--mobile-ai-composer-h,5.5rem)] space-y-3.5 bg-gray-50 dark:bg-gray-900 min-h-0'
+                                ? iosFixedChrome
+                                    ? 'flex-1 overflow-y-auto overscroll-contain px-4 pt-2.5 pb-3 space-y-3.5 bg-gray-50 dark:bg-gray-900 min-h-0 max-md:pt-[var(--mobile-ai-header-h,4.5rem)] max-md:pb-[calc(var(--mobile-ai-composer-h,5.5rem)+var(--keyboard-inset-bottom,0px))]'
+                                    : 'flex-1 overflow-y-auto overscroll-contain scroll-pb-[var(--mobile-ai-composer-h,5.5rem)] px-4 pt-2.5 pb-3 max-md:pb-[var(--mobile-ai-composer-h,5.5rem)] space-y-3.5 bg-gray-50 dark:bg-gray-900 min-h-0'
                                 : 'flex-1 overflow-y-auto overscroll-contain scroll-pb-[calc(var(--bottom-nav-h,0px)+7.5rem)] px-4 pt-2.5 pb-[calc(0.875rem+var(--bottom-nav-h,0px))] sm:px-5 sm:pt-3 sm:pb-[calc(1rem+var(--bottom-nav-h,0px))] space-y-3.5 bg-gray-50 dark:bg-gray-900 min-h-0'
                         }
                     >

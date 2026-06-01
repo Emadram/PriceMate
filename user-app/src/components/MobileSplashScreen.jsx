@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { getMobileSplashIconSrc } from '../utils/splashIcon';
 
 const MOBILE_SPLASH_KEY = 'pricemate-mobile-splash-seen';
 const SCROLL_KEY_PREFIX = 'pricemate-scroll:';
@@ -27,6 +28,7 @@ const MobileSplashScreen = () => {
         () => typeof document !== 'undefined' && document.readyState === 'complete'
     );
     const isDark = isDarkModeActive();
+    const splashIconSrc = useMemo(() => getMobileSplashIconSrc(), []);
 
     useEffect(() => {
         if (typeof window === 'undefined') return undefined;
@@ -114,20 +116,15 @@ const MobileSplashScreen = () => {
         >
             <div className={`absolute inset-0 ${isDark ? 'bg-[radial-gradient(circle_at_top,rgba(124,58,237,0.24),transparent_38%),linear-gradient(180deg,rgba(2,6,23,1),rgba(15,23,42,1))]' : 'bg-[radial-gradient(circle_at_top,rgba(124,58,237,0.2),transparent_38%),linear-gradient(180deg,#faf5ff,#ffffff)]'}`} />
             <div className="relative flex w-full max-w-sm flex-col items-center px-8 text-center touch-none">
-                <div className="relative mb-8 flex h-28 w-28 items-center justify-center">
-                    <div
-                        className={`absolute inset-0 rounded-[1.75rem] shadow-[0_20px_60px_rgba(109,40,217,0.35)] ${
-                            isDark ? 'bg-brand-600/30' : 'bg-brand-100'
-                        } ${shouldFade ? 'animate-none' : 'animate-splash-glow'}`}
-                    />
-                    <img
-                        src="/favicon.svg"
-                        alt="PriceMate"
-                        className="relative h-24 w-24 rounded-[1.25rem] object-contain shadow-lg"
-                        loading="eager"
-                        decoding="async"
-                    />
-                </div>
+                <img
+                    src={splashIconSrc}
+                    alt="PriceMate"
+                    width={128}
+                    height={128}
+                    className={`mb-8 h-32 w-32 object-contain shadow-[0_20px_60px_rgba(109,40,217,0.35)] ${shouldFade ? '' : 'animate-splash-glow'}`}
+                    loading="eager"
+                    decoding="async"
+                />
 
                 <div className="space-y-2">
                     <p className={`text-[10px] font-black uppercase tracking-[0.5em] ${promptTone}`}>PriceMate</p>

@@ -13,12 +13,29 @@ export const isAndroidWebBrowser = () => {
     return /Android/i.test(navigator.userAgent || '');
 };
 
+/** @returns {boolean} */
+export const isIOSWebBrowser = () => {
+    if (typeof navigator === 'undefined') return false;
+    if (/iPad|iPhone|iPod/i.test(navigator.userAgent || '')) return true;
+    return navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+};
+
 /**
- * Mobile browsers (including iOS) use layout viewport resize on /ai-chat so the
- * header stays visible and the composer pins above the bottom tab bar.
+ * Android: layout viewport shrinks with keyboard (interactive-widget=resizes-content).
+ * iOS: overlay keyboard; use visualViewport CSS vars + fixed header/composer instead.
  * @returns {boolean}
  */
 export const prefersKeyboardResizeViewport = () => {
     if (isDesktopViewport()) return false;
+    if (isIOSWebBrowser()) return false;
     return true;
+};
+
+/**
+ * iOS /ai-chat page uses fixed chrome pinned with --keyboard-inset-bottom.
+ * @returns {boolean}
+ */
+export const usesAiChatFixedMobileChrome = () => {
+    if (isDesktopViewport()) return false;
+    return isIOSWebBrowser();
 };

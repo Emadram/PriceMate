@@ -541,10 +541,10 @@ const PriceHistory = () => {
 
                         {!isOpeProxyConfigured() && (
                             <div className="mb-6 rounded-2xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-5 py-4 text-sm font-bold text-amber-800 dark:text-amber-200">
-                                Set <code className="text-xs">VITE_APPWRITE_FUNCTION_OFF_PROXY</code> in the admin
-                                panel <code className="text-xs">.env</code> and redeploy{' '}
+                                Set <code className="text-xs">VITE_APPWRITE_FUNCTION_OFF_PROXY</code>, redeploy{' '}
                                 <code className="text-xs">off-proxy</code> with{' '}
-                                <code className="text-xs">OPENPRICEENGINE_API_KEY</code> on the function.
+                                <code className="text-xs">OPENPRICEENGINE_API_KEY</code>, and grant{' '}
+                                <strong>Execute access → Users</strong> on that function (then redeploy).
                             </div>
                         )}
 

@@ -1,38 +1,13 @@
-import { functions } from '../lib/appwrite';
-
-const OFF_PROXY_FUNCTION_ID = import.meta.env.VITE_APPWRITE_FUNCTION_OFF_PROXY || '';
+import { executeOffProxy, OFF_PROXY_FUNCTION_ID } from './executeOffProxy';
 
 export const isOpeProxyConfigured = () => Boolean(OFF_PROXY_FUNCTION_ID);
 
 /**
  * Open Price Engine requests are routed through the shared off-proxy function.
  * @param {Record<string, unknown>} payload
- * @returns {Promise<{ ok: boolean, status?: number, data?: unknown, error?: string } | null>}
+ * @returns {Promise<{ ok: boolean, status?: number, data?: unknown, error?: string }>}
  */
-export const callOpeProxy = async (payload) => {
-    if (!OFF_PROXY_FUNCTION_ID) {
-        return {
-            ok: false,
-            status: 0,
-            error: 'VITE_APPWRITE_FUNCTION_OFF_PROXY is not configured.',
-        };
-    }
-
-    try {
-        const execution = await functions.createExecution(
-            OFF_PROXY_FUNCTION_ID,
-            JSON.stringify(payload),
-            false
-        );
-        if (!execution?.response) {
-            return { ok: false, status: 0, error: 'Empty proxy response.' };
-        }
-        return JSON.parse(execution.response);
-    } catch (err) {
-        console.error('OPE via off-proxy error:', err);
-        return { ok: false, status: 0, error: err?.message || 'Proxy error' };
-    }
-};
+export const callOpeProxy = (payload) => executeOffProxy(payload);
 
 /**
  * @returns {Promise<string[]>}

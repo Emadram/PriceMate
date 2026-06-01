@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { isAndroidWebBrowser, prefersKeyboardResizeViewport, isDesktopViewport } from './platform';
+import {
+    isAndroidWebBrowser,
+    isIOSWebBrowser,
+    prefersKeyboardResizeViewport,
+    usesAiChatFixedMobileChrome,
+    isDesktopViewport,
+} from './platform';
 
 describe('platform', () => {
     afterEach(() => {
@@ -29,14 +35,18 @@ describe('platform', () => {
         expect(prefersKeyboardResizeViewport()).toBe(true);
     });
 
-    it('does not treat iOS as Android', () => {
+    it('detects iOS and uses fixed chrome layout (not viewport resize)', () => {
         mockMobileViewport();
         vi.stubGlobal('navigator', {
             userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
             userAgentData: undefined,
+            platform: 'iPhone',
+            maxTouchPoints: 5,
         });
         expect(isAndroidWebBrowser()).toBe(false);
-        expect(prefersKeyboardResizeViewport()).toBe(true);
+        expect(isIOSWebBrowser()).toBe(true);
+        expect(prefersKeyboardResizeViewport()).toBe(false);
+        expect(usesAiChatFixedMobileChrome()).toBe(true);
     });
 
     it('does not prefer keyboard resize on desktop', () => {

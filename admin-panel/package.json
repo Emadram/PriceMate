@@ -10,7 +10,8 @@
     "test:coordinates": "node scripts/coordinateValidation.smoke.mjs",
     "test:price-history-backfill": "node scripts/priceHistoryBackfill.test.mjs",
     "test:ope": "node scripts/openPriceEngineNormalize.test.mjs && node scripts/openPriceEngineImport.test.mjs",
-    "test": "npm run test:price-history-backfill && npm run test:ope",
+    "test:appwrite-execution": "node scripts/appwriteFunctionExecution.test.mjs",
+    "test": "npm run test:price-history-backfill && npm run test:ope && npm run test:appwrite-execution",
     "preview": "vite preview"
   },
   "dependencies": {
