@@ -44,6 +44,8 @@ Uses `GET /api/v1/stores_tracked` (not `/stores`, which no longer exists).
 
 Uses `GET /api/v1/{store}/products/prices/query`.
 
-Admin UI: **Price History** → **Import from Open Price Engine** (fetch preview, then bulk import).
+Admin UI: **Price History** → **Import from Open Price Engine** → **Find OPE matches** (picks best store/name by data points), preview, import.
+
+Add optional string attributes on **products** for repeat imports: `opeStore`, `opeProductName`, `opeLastImportAt`.
 
 The standalone `appwrite-functions/ope-proxy/` folder is deprecated; OPE kinds live on `off-proxy` only.

@@ -1,8 +1,11 @@
 const OFF_API_BASE = 'https://world.openfoodfacts.org';
 const OPE_API_BASE = 'https://openpricengine.com/api/v1';
 /** Bump when redeploying; exposed via { "kind": "ping" } so you can confirm active deployment. */
-const OFF_PROXY_VERSION = '3';
+const OFF_PROXY_VERSION = '5';
 const OPE_STORE_PATHS = ['/stores_tracked', '/available_stores/plans', '/countries_tracked'];
+const MAX_PROBE_STORES = 12;
+const MAX_PRODUCT_NAMES_PER_STORE = 100;
+const MAX_PROBE_CANDIDATES = 10;
 
 // Simple TTL LRU cache
 class SimpleCache {
@@ -158,7 +161,7 @@ const parseOpeStoresList = (data) => {
     return [];
 };
 
-const buildOpeHistoricalUrl = (payload) => {
+const buildOpeHistoricalUrls = (payload) => {
     const store = String(payload.store || '').trim();
     const productname = String(payload.productname || payload.productName || '').trim();
     const startDate = String(payload.start_date || payload.startDate || '').trim();
@@ -168,17 +171,34 @@ const buildOpeHistoricalUrl = (payload) => {
         return { error: 'Missing store, productname, start_date, or end_date.' };
     }
 
-    const params = new URLSearchParams();
-    params.set('productname', productname);
-    params.set('start_date', startDate);
-    params.set('end_date', endDate);
-    const currency = String(payload.currency || '').trim();
-    if (currency && currency.toLowerCase() !== 'default') {
-        params.set('currency', currency);
+    if (startDate > endDate) {
+        return { error: 'start_date must be on or before end_date.' };
     }
 
-    const url = `${OPE_API_BASE}/${encodeURIComponent(store)}/products/prices/query?${params.toString()}`;
-    return { url };
+    const baseParams = new URLSearchParams();
+    baseParams.append('productname', productname);
+    baseParams.set('start_date', startDate);
+    baseParams.set('end_date', endDate);
+
+    const currency = String(payload.currency || '').trim();
+    const withCurrency = new URLSearchParams(baseParams);
+    let includeCurrency = false;
+    if (currency && currency.toLowerCase() !== 'default') {
+        withCurrency.set('currency', currency);
+        includeCurrency = true;
+    }
+
+    const path = `${OPE_API_BASE}/${encodeURIComponent(store)}/products/prices/query`;
+    return {
+        url: `${path}?${withCurrency.toString()}`,
+        urlWithoutCurrency: `${path}?${baseParams.toString()}`,
+        includeCurrency,
+    };
+};
+
+const isOpeDateNotFoundError = (err) => {
+    const detail = formatUpstreamError(err, '').toLowerCase();
+    return err?.status === 404 && detail.includes('date not found');
 };
 
 const runProxiedFetch = async ({ cacheKey, url, cacheTtl, fetchOpts, transform, log }) => {
@@ -271,6 +291,14 @@ const mapOpeUpstreamError = (status, data, fallback, url = '') => {
         return (detail || 'Invalid or missing Open Price Engine API key.') + urlHint;
     }
 
+    if (normalized.includes('date not found')) {
+        return (
+            'Open Price Engine has no price history for this store, product, and date range.' +
+            `${urlHint} Try currency "Default" or EUR (not USD) for European stores like Jumbo, ` +
+            'a simpler product name (e.g. "cola"), or a shorter date range.'
+        );
+    }
+
     if (status === 404) {
         const base =
             detail && detail.toLowerCase() !== 'not found'
@@ -334,6 +362,292 @@ const fetchOpeStoreList = async (apiKey, log) => {
     };
 };
 
+const normalizeProductLabel = (value) =>
+    String(value || '')
+        .normalize('NFD')
+        .replace(/\p{M}/gu, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+
+const scoreProductMatch = (query, name) => {
+    const q = normalizeProductLabel(query);
+    const n = normalizeProductLabel(name);
+    if (!q || !n) return 0;
+    if (n === q) return 100;
+    if (n.includes(q)) return 95;
+    const tokens = q.split(/\s+/).filter((t) => t.length >= 2);
+    if (!tokens.length) return 0;
+    const hits = tokens.filter((t) => n.includes(t)).length;
+    return hits === 0 ? 0 : Math.round((hits / tokens.length) * 85);
+};
+
+const parseOpeProductNamesList = (data) => {
+    if (!data) return [];
+    if (Array.isArray(data)) {
+        return data.map((x) => (typeof x === 'string' ? x : x?.name || x?.productname || '')).filter(Boolean);
+    }
+    if (Array.isArray(data.products)) return parseOpeProductNamesList(data.products);
+    if (Array.isArray(data.names)) return parseOpeProductNamesList(data.names);
+    if (typeof data === 'object') {
+        return Object.values(data).flatMap((v) => (Array.isArray(v) ? parseOpeProductNamesList(v) : []));
+    }
+    return [];
+};
+
+const parseStoresFromPayload = (payload) => {
+    const raw = payload.stores ?? payload.store ?? [];
+    const list = Array.isArray(raw) ? raw : [raw];
+    return [...new Set(list.map((s) => String(s || '').trim()).filter(Boolean))];
+};
+
+const fetchOpeJson = async (url, apiKey, log) => {
+    const headers = buildOpeHeaders(apiKey);
+    const response = await fetchWithRetry(url, { timeout: 15000, headers }, 2, log);
+    const contentType = response.headers.get('content-type') || '';
+    const data = contentType.includes('application/json') ? await response.json() : await response.text();
+    if (!response.ok) {
+        throw { status: response.status, data, url };
+    }
+    return data;
+};
+
+const fetchOpeProductNamesForStores = async (apiKey, stores, log) => {
+    const params = new URLSearchParams();
+    stores.slice(0, 20).forEach((store) => params.append('stores', store));
+    const url = `${OPE_API_BASE}/stores/products/names?${params.toString()}`;
+    const data = await fetchOpeJson(url, apiKey, log);
+    return parseOpeProductNamesList(data);
+};
+
+const countHistoryPoints = (data) => {
+    let count = 0;
+    const visit = (node) => {
+        if (!node) return;
+        if (Array.isArray(node)) {
+            node.forEach(visit);
+            return;
+        }
+        if (typeof node === 'object') {
+            const price = node.price ?? node.Price ?? node.product_price ?? node.amount;
+            const date = node.date ?? node.Date ?? node.timestamp ?? node.recorded_at ?? node.price_date;
+            if (price != null && price !== '' && date) {
+                count += 1;
+                return;
+            }
+            Object.values(node).forEach(visit);
+        }
+    };
+    visit(data);
+    return count;
+};
+
+const buildProductNameVariants = (productname) => {
+    const base = String(productname || '').trim();
+    if (!base) return [];
+    const variants = new Set([base]);
+    variants.add(base.replace(/-/g, ' ').replace(/\s+/g, ' ').trim());
+    variants.add(base.replace(/\s+/g, '-').trim());
+    return [...variants].filter(Boolean).slice(0, 4);
+};
+
+const splitMonthRanges = (startDate, endDate) => {
+    const ranges = [];
+    let cursor = new Date(`${startDate}T00:00:00Z`);
+    const end = new Date(`${endDate}T00:00:00Z`);
+    if (Number.isNaN(cursor.getTime()) || Number.isNaN(end.getTime())) {
+        return [{ start_date: startDate, end_date: endDate }];
+    }
+    while (cursor <= end) {
+        const monthStart = cursor.toISOString().slice(0, 10);
+        const next = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1));
+        const monthEndDate = new Date(next.getTime() - 86400000);
+        const monthEnd =
+            monthEndDate > end ? endDate : monthEndDate.toISOString().slice(0, 10);
+        ranges.push({ start_date: monthStart, end_date: monthEnd });
+        cursor = next;
+    }
+    return ranges.length ? ranges : [{ start_date: startDate, end_date: endDate }];
+};
+
+const mergeHistoricalData = (chunks) => {
+    if (!chunks.length) return null;
+    if (chunks.length === 1) return chunks[0];
+    if (Array.isArray(chunks[0])) return chunks.flat();
+    return chunks;
+};
+
+const fetchOpeHistoricalOnce = async (apiKey, payload, log) => {
+    const built = buildOpeHistoricalUrls(payload);
+    if (built.error) {
+        throw { status: 400, data: { detail: built.error } };
+    }
+    const fetchOpts = { timeout: 15000, headers: buildOpeHeaders(apiKey) };
+    try {
+        const result = await runProxiedFetch({
+            cacheKey: built.url,
+            url: built.url,
+            cacheTtl: 0,
+            fetchOpts,
+            transform: null,
+            log,
+        });
+        return { data: result.data, url: built.url, currencyOmitted: false };
+    } catch (historicalErr) {
+        if (built.includeCurrency && isOpeDateNotFoundError(historicalErr)) {
+            log('OPE historical: retry without currency');
+            const result = await runProxiedFetch({
+                cacheKey: built.urlWithoutCurrency,
+                url: built.urlWithoutCurrency,
+                cacheTtl: 0,
+                fetchOpts,
+                transform: null,
+                log,
+            });
+            return { data: result.data, url: built.urlWithoutCurrency, currencyOmitted: true };
+        }
+        throw historicalErr;
+    }
+};
+
+const fetchOpeHistoricalWithRetries = async (apiKey, payload, log) => {
+    const store = String(payload.store || '').trim();
+    const startDate = String(payload.start_date || payload.startDate || '').trim();
+    const endDate = String(payload.end_date || payload.endDate || '').trim();
+    const variants = [
+        ...new Set([
+            ...buildProductNameVariants(payload.productname || payload.productName),
+            ...(Array.isArray(payload.productnameVariants) ? payload.productnameVariants : []),
+        ]),
+    ].filter(Boolean);
+
+    let lastErr = null;
+    for (const productname of variants) {
+        try {
+            const attempt = await fetchOpeHistoricalOnce(
+                apiKey,
+                { ...payload, store, productname, start_date: startDate, end_date: endDate },
+                log
+            );
+            const points = countHistoryPoints(attempt.data);
+            if (points > 0) {
+                return { ...attempt, productname, pointCount: points };
+            }
+            lastErr = { status: 404, data: { detail: 'Empty history' }, url: attempt.url };
+        } catch (err) {
+            lastErr = err;
+            if (!isOpeDateNotFoundError(err) && err?.status !== 404) break;
+        }
+    }
+
+    const monthRanges = splitMonthRanges(startDate, endDate);
+    if (monthRanges.length > 1) {
+        const primaryName = variants[0] || String(payload.productname || '').trim();
+        const chunks = [];
+        for (const range of monthRanges) {
+            try {
+                const attempt = await fetchOpeHistoricalOnce(
+                    apiKey,
+                    {
+                        ...payload,
+                        store,
+                        productname: primaryName,
+                        start_date: range.start_date,
+                        end_date: range.end_date,
+                    },
+                    log
+                );
+                if (countHistoryPoints(attempt.data) > 0) chunks.push(attempt.data);
+            } catch {
+                // skip empty months
+            }
+        }
+        const merged = mergeHistoricalData(chunks);
+        if (merged && countHistoryPoints(merged) > 0) {
+            return {
+                data: merged,
+                url: `${OPE_API_BASE}/${encodeURIComponent(store)}/products/prices/query`,
+                productname: primaryName,
+                pointCount: countHistoryPoints(merged),
+                meta: { monthlyChunks: monthRanges.length },
+            };
+        }
+    }
+
+    if (lastErr) throw lastErr;
+    throw { status: 404, data: { detail: 'No historical prices found' } };
+};
+
+const probeOpeHistorical = async (apiKey, payload, log) => {
+    const productQuery = String(payload.productQuery || payload.query || payload.productname || '').trim();
+    const startDate = String(payload.start_date || payload.startDate || '').trim();
+    const endDate = String(payload.end_date || payload.endDate || '').trim();
+
+    if (!productQuery || !startDate || !endDate) {
+        return { error: 'Missing productQuery, start_date, or end_date.' };
+    }
+
+    let stores = parseStoresFromPayload(payload);
+    if (!stores.length) {
+        const storeList = await fetchOpeStoreList(apiKey, log);
+        stores = storeList.stores.slice(0, MAX_PROBE_STORES);
+    } else {
+        stores = stores.slice(0, MAX_PROBE_STORES);
+    }
+
+    const candidates = [];
+
+    for (const store of stores) {
+        let names = [];
+        try {
+            names = await fetchOpeProductNamesForStores(apiKey, [store], log);
+        } catch (err) {
+            log(`OPE product names failed for ${store}: ${formatUpstreamError(err, '')}`);
+            continue;
+        }
+
+        const ranked = names
+            .map((name) => ({ name, score: scoreProductMatch(productQuery, name) }))
+            .filter((row) => row.score >= 35)
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 8);
+
+        for (const { name, score } of ranked) {
+            try {
+                const result = await fetchOpeHistoricalWithRetries(
+                    apiKey,
+                    {
+                        store,
+                        productname: name,
+                        start_date: startDate,
+                        end_date: endDate,
+                        currency: payload.currency,
+                    },
+                    log
+                );
+                const pointCount = result.pointCount ?? countHistoryPoints(result.data);
+                if (pointCount <= 0) continue;
+
+                candidates.push({
+                    store,
+                    productname: result.productname || name,
+                    matchScore: score,
+                    pointCount,
+                    sampleUrl: result.url,
+                    currencyOmitted: Boolean(result.meta?.currencyOmitted),
+                });
+            } catch {
+                // try next name
+            }
+            if (candidates.length >= MAX_PROBE_CANDIDATES) break;
+        }
+        if (candidates.length >= MAX_PROBE_CANDIDATES) break;
+    }
+
+    candidates.sort((a, b) => b.pointCount - a.pointCount || b.matchScore - a.matchScore);
+    return { candidates: candidates.slice(0, MAX_PROBE_CANDIDATES), storesScanned: stores.length };
+};
+
 const handler = async ({ req, res, log, error }) => {
     try {
         const payload = parsePayload(req);
@@ -348,7 +662,9 @@ const handler = async ({ req, res, log, error }) => {
                     version: OFF_PROXY_VERSION,
                     opeRoutes: {
                         stores: OPE_STORE_PATHS,
+                        productNames: '/stores/products/names',
                         historical: '/{store}/products/prices/query',
+                        probe: 'ope_probe_historical',
                     },
                 },
             });
@@ -389,6 +705,42 @@ const handler = async ({ req, res, log, error }) => {
             }
             const storeList = await fetchOpeStoreList(apiKey, log);
             return sendJson(res, { ok: true, status: 200, data: storeList });
+        } else if (kind === 'ope_product_names') {
+            const apiKey = getOpeApiKey();
+            if (!apiKey) {
+                return sendJson(res, {
+                    ok: false,
+                    status: 500,
+                    error: 'OPENPRICEENGINE_API_KEY is not configured on off-proxy.',
+                });
+            }
+            const stores = parseStoresFromPayload(payload);
+            if (!stores.length) {
+                return sendJson(res, { ok: false, status: 400, error: 'Missing stores (array or store).' });
+            }
+            const names = await fetchOpeProductNamesForStores(apiKey, stores, log);
+            return sendJson(res, {
+                ok: true,
+                status: 200,
+                data: {
+                    stores,
+                    names: [...new Set(names)].sort().slice(0, MAX_PRODUCT_NAMES_PER_STORE),
+                },
+            });
+        } else if (kind === 'ope_probe_historical') {
+            const apiKey = getOpeApiKey();
+            if (!apiKey) {
+                return sendJson(res, {
+                    ok: false,
+                    status: 500,
+                    error: 'OPENPRICEENGINE_API_KEY is not configured on off-proxy.',
+                });
+            }
+            const probe = await probeOpeHistorical(apiKey, payload, log);
+            if (probe.error) {
+                return sendJson(res, { ok: false, status: 400, error: probe.error });
+            }
+            return sendJson(res, { ok: true, status: 200, data: probe });
         } else if (kind === 'ope_historical') {
             const apiKey = getOpeApiKey();
             if (!apiKey) {
@@ -398,21 +750,25 @@ const handler = async ({ req, res, log, error }) => {
                     error: 'OPENPRICEENGINE_API_KEY is not configured on off-proxy.',
                 });
             }
-            const built = buildOpeHistoricalUrl(payload);
-            if (built.error) {
-                return sendJson(res, { ok: false, status: 400, error: built.error });
-            }
-            url = built.url;
-            cacheTtl = 1000 * 60 * 15;
-            fetchOpts = {
-                timeout: 15000,
-                headers: buildOpeHeaders(apiKey),
-            };
+            const result = await fetchOpeHistoricalWithRetries(apiKey, payload, log);
+            return sendJson(res, {
+                ok: true,
+                status: 200,
+                data: result.data,
+                meta: {
+                    productname: result.productname,
+                    pointCount: result.pointCount,
+                    currencyOmitted: result.currencyOmitted,
+                    ...(result.meta || {}),
+                },
+                upstreamUrl: result.url,
+            });
         } else {
             return sendJson(res, {
                 ok: false,
                 status: 400,
-                error: 'Unsupported kind. Use barcode, search, ope_stores, or ope_historical.',
+                error:
+                    'Unsupported kind. Use barcode, search, ope_stores, ope_product_names, ope_probe_historical, or ope_historical.',
             });
         }
 
@@ -429,7 +785,12 @@ const handler = async ({ req, res, log, error }) => {
         return sendJson(res, { ok: true, status: result.status || 200, data: result.data });
     } catch (err) {
         const kind = String(parsePayload(req).kind || '').toLowerCase();
-        const opeKinds = ['ope_stores', 'ope_historical'];
+        const opeKinds = [
+            'ope_stores',
+            'ope_historical',
+            'ope_product_names',
+            'ope_probe_historical',
+        ];
         log(`off-proxy error (${kind || 'unknown'}): ${String(err?.message || err)}`);
         if (error) {
             error(String(err?.message || err));

@@ -1515,23 +1515,36 @@ export const fetchPriceHistory = async (productId, branchId = null) => {
         const historyDocs = [];
         const historyIds = new Set();
 
+        const HISTORY_PAGE_SIZE = 100;
+        const HISTORY_MAX_DOCS = 1000;
+
         const fetchHistoryByField = async (productField, branchField) => {
             try {
-                const queries = [
-                    Query.equal(productField, productId),
-                    Query.orderAsc('timestamp'),
-                    Query.limit(50),
-                ];
-                if (branchId) {
-                    queries.push(Query.equal(branchField, branchId));
-                }
-                const response = await db.priceHistory.list(queries);
-                response.documents.forEach((doc) => {
-                    if (!historyIds.has(doc.$id)) {
-                        historyIds.add(doc.$id);
-                        historyDocs.push(doc);
+                let cursor = null;
+                while (historyDocs.length < HISTORY_MAX_DOCS) {
+                    const queries = [
+                        Query.equal(productField, productId),
+                        Query.orderAsc('timestamp'),
+                        Query.limit(HISTORY_PAGE_SIZE),
+                    ];
+                    if (branchId) {
+                        queries.push(Query.equal(branchField, branchId));
                     }
-                });
+                    if (cursor) {
+                        queries.push(Query.cursorAfter(cursor));
+                    }
+                    const response = await db.priceHistory.list(queries);
+                    const docs = response.documents || [];
+                    docs.forEach((doc) => {
+                        if (!historyIds.has(doc.$id)) {
+                            historyIds.add(doc.$id);
+                            historyDocs.push(doc);
+                        }
+                    });
+                    if (docs.length < HISTORY_PAGE_SIZE) break;
+                    cursor = docs[docs.length - 1]?.$id;
+                    if (!cursor) break;
+                }
             } catch (innerError) {
                 if (innerError.code === 404) {
                     console.warn(`Price history collection "${historyColl}" not found in Appwrite.`);

@@ -168,6 +168,30 @@ const useProductsStore = create((set, get) => ({
         }
     },
 
+    updateProductOpeMapping: async (id, mapping) => {
+        set({ loading: true, error: null });
+        try {
+            const payload = {};
+            if (mapping?.opeStore != null) payload.opeStore = String(mapping.opeStore).trim();
+            if (mapping?.opeProductName != null) {
+                payload.opeProductName = String(mapping.opeProductName).trim();
+            }
+            if (mapping?.opeLastImportAt != null) payload.opeLastImportAt = mapping.opeLastImportAt;
+            if (!Object.keys(payload).length) {
+                set({ loading: false });
+                return true;
+            }
+            await db.products.update(id, payload);
+            await useProductsStore.getState().fetchProducts();
+            set({ loading: false });
+            return true;
+        } catch (error) {
+            console.warn('OPE mapping update failed (add opeStore, opeProductName, opeLastImportAt to products schema):', error);
+            set({ loading: false });
+            return false;
+        }
+    },
+
     updateProduct: async (id, data) => {
         set({ loading: true, error: null });
         console.log('Updating product:', id, data);
@@ -195,6 +219,16 @@ const useProductsStore = create((set, get) => ({
 
             if (data.supermarkets) {
                 payload.supermarkets = data.supermarkets;
+            }
+
+            if (data.opeStore !== undefined) {
+                payload.opeStore = String(data.opeStore).trim();
+            }
+            if (data.opeProductName !== undefined) {
+                payload.opeProductName = String(data.opeProductName).trim();
+            }
+            if (data.opeLastImportAt !== undefined) {
+                payload.opeLastImportAt = data.opeLastImportAt;
             }
 
             attachOptionalNutrition(payload, data, { allowNullClear: true });

@@ -6,8 +6,14 @@ import usePriceHistoryStore from '../stores/priceHistoryStore';
 import useProductsStore from '../stores/productsStore';
 import useSupermarketsStore from '../stores/supermarketsStore';
 import { client, DATABASE_ID, COLLECTIONS } from '../lib/appwrite';
-import { isOpeProxyConfigured, fetchOpeStores, fetchOpeHistoricalPrices } from '../utils/openPriceEngineClient';
+import {
+    isOpeProxyConfigured,
+    fetchOpeStores,
+    fetchOpeHistoricalPrices,
+    probeOpeHistoricalMatches,
+} from '../utils/openPriceEngineClient';
 import { normalizeOpeHistoricalResponse } from '../utils/openPriceEngineNormalize';
+import { buildProductNameVariants } from '../utils/openPriceEngineMatch';
 
 const OPE_DEFAULT_SUPERMARKET_ID = import.meta.env.VITE_OPE_IMPORT_SUPERMARKET_ID || '';
 
@@ -21,7 +27,7 @@ const buildDefaultOpeForm = (supermarketId = '') => {
         store: '',
         start_date: start.toISOString().slice(0, 10),
         end_date: end.toISOString().slice(0, 10),
-        currency: 'USD',
+        currency: 'Default',
         supermarketId,
         priceChangeReason: 'Open Price Engine import',
     };
@@ -29,7 +35,7 @@ const buildDefaultOpeForm = (supermarketId = '') => {
 
 const PriceHistory = () => {
     const { history, loading, fetchHistory, addHistory, updateHistory, deleteHistory, backfillFromPrices, importHistoryBatch } = usePriceHistoryStore();
-    const { products, fetchProducts } = useProductsStore();
+    const { products, fetchProducts, updateProductOpeMapping } = useProductsStore();
     const { supermarkets, fetchSupermarkets } = useSupermarketsStore();
 
     const [showModal, setShowModal] = useState(false);
@@ -60,6 +66,9 @@ const PriceHistory = () => {
     const [opeFetching, setOpeFetching] = useState(false);
     const [opeImporting, setOpeImporting] = useState(false);
     const [opeImportProgress, setOpeImportProgress] = useState(null);
+    const [opeProbeResults, setOpeProbeResults] = useState([]);
+    const [opeProbing, setOpeProbing] = useState(false);
+    const [opeProbeError, setOpeProbeError] = useState('');
 
     const refreshData = useCallback(async () => {
         await Promise.all([
@@ -113,8 +122,50 @@ const PriceHistory = () => {
         setOpeForm((prev) => ({
             ...prev,
             productId,
-            productname: product?.name || prev.productname,
+            productname: product?.opeProductName || product?.name || prev.productname,
+            store: product?.opeStore || prev.store,
         }));
+    };
+
+    const handleOpeProbe = async () => {
+        const query = String(opeForm.productname || '').trim();
+        if (!query) {
+            setOpeProbeError('Enter a product name to search OPE catalogs (e.g. coca cola).');
+            return;
+        }
+        setOpeProbing(true);
+        setOpeProbeError('');
+        setOpeProbeResults([]);
+        try {
+            const { candidates } = await probeOpeHistoricalMatches({
+                productQuery: query,
+                start_date: opeForm.start_date,
+                end_date: opeForm.end_date,
+                currency: opeForm.currency,
+                stores: opeStores.length ? opeStores : undefined,
+            });
+            setOpeProbeResults(candidates);
+            if (candidates.length === 0) {
+                setOpeProbeError(
+                    'No OPE store had historical prices for this query. Try a shorter name (e.g. "cola") or different dates.'
+                );
+            }
+        } catch (err) {
+            setOpeProbeError(err?.message || 'OPE probe failed.');
+        } finally {
+            setOpeProbing(false);
+        }
+    };
+
+    const applyOpeCandidate = (candidate) => {
+        setOpeForm((prev) => ({
+            ...prev,
+            store: candidate.store,
+            productname: candidate.productname,
+            currency: 'Default',
+        }));
+        setOpeProbeError('');
+        setOpeFetchError('');
     };
 
     const openOpeModal = () => {
@@ -124,6 +175,8 @@ const PriceHistory = () => {
         setOpePreview([]);
         setOpeFetchError('');
         setOpeStoresError('');
+        setOpeProbeResults([]);
+        setOpeProbeError('');
         setShowOpeModal(true);
     };
 
@@ -143,6 +196,7 @@ const PriceHistory = () => {
                 start_date: opeForm.start_date,
                 end_date: opeForm.end_date,
                 currency: opeForm.currency,
+                productnameVariants: buildProductNameVariants(opeForm.productname),
             });
             const normalized = normalizeOpeHistoricalResponse(data);
             if (normalized.length === 0) {
@@ -190,6 +244,18 @@ const PriceHistory = () => {
         if (!result?.success) {
             alert(`Import failed: ${result?.errors?.[0] || 'Check console for details.'}`);
             return;
+        }
+
+        if (opeForm.productId && opeForm.store && opeForm.productname) {
+            try {
+                await updateProductOpeMapping(opeForm.productId, {
+                    opeStore: opeForm.store,
+                    opeProductName: opeForm.productname,
+                    opeLastImportAt: new Date().toISOString(),
+                });
+            } catch (err) {
+                console.warn('Could not save OPE mapping on product:', err?.message || err);
+            }
         }
 
         alert(
@@ -548,9 +614,9 @@ const PriceHistory = () => {
                             </div>
                         )}
 
-                        {(opeStoresError || opeFetchError) && (
+                        {(opeStoresError || opeFetchError || opeProbeError) && (
                             <div className="mb-6 rounded-2xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-5 py-4 text-sm font-bold text-red-700 dark:text-red-300">
-                                {opeFetchError || opeStoresError}
+                                {opeFetchError || opeProbeError || opeStoresError}
                             </div>
                         )}
 
@@ -583,10 +649,64 @@ const PriceHistory = () => {
                                     value={opeForm.productname}
                                     onChange={(e) => setOpeForm({ ...opeForm, productname: e.target.value })}
                                     className="w-full bg-gray-50 dark:bg-gray-900 border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-500/20 outline-none text-gray-900 dark:text-white font-bold"
-                                    placeholder="e.g. milk"
+                                    placeholder="e.g. coca cola"
                                     required
                                 />
+                                <div className="flex flex-wrap items-center gap-3 pt-1">
+                                    <button
+                                        type="button"
+                                        onClick={handleOpeProbe}
+                                        disabled={opeProbing || !isOpeProxyConfigured()}
+                                        className="rounded-2xl bg-brand-600 px-4 py-2.5 text-xs font-black uppercase tracking-wider text-white hover:bg-brand-700 disabled:opacity-50"
+                                    >
+                                        {opeProbing ? 'Searching OPE…' : 'Find OPE matches'}
+                                    </button>
+                                    <span className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">
+                                        Scans stores for the best historical match (any store with data).
+                                    </span>
+                                </div>
                             </div>
+
+                            {opeProbeResults.length > 0 && (
+                                <div className="rounded-2xl border border-brand-200 dark:border-brand-800 bg-brand-50/50 dark:bg-brand-900/20 overflow-hidden">
+                                    <p className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-brand-700 dark:text-brand-300 border-b border-brand-100 dark:border-brand-800">
+                                        OPE matches (by data points)
+                                    </p>
+                                    <div className="max-h-48 overflow-y-auto">
+                                        <table className="w-full text-left text-sm">
+                                            <thead className="text-[10px] uppercase text-gray-500">
+                                                <tr>
+                                                    <th className="px-4 py-2">Store</th>
+                                                    <th className="px-4 py-2">Product</th>
+                                                    <th className="px-4 py-2">Points</th>
+                                                    <th className="px-4 py-2" />
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {opeProbeResults.map((row) => (
+                                                    <tr
+                                                        key={`${row.store}-${row.productname}`}
+                                                        className="border-t border-brand-100/80 dark:border-brand-800/80"
+                                                    >
+                                                        <td className="px-4 py-2 font-bold">{row.store}</td>
+                                                        <td className="px-4 py-2">{row.productname}</td>
+                                                        <td className="px-4 py-2 font-mono">{row.pointCount}</td>
+                                                        <td className="px-4 py-2 text-right">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => applyOpeCandidate(row)}
+                                                                className="text-xs font-black text-brand-600 dark:text-brand-400 hover:underline"
+                                                            >
+                                                                Use
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
 
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
@@ -647,7 +767,7 @@ const PriceHistory = () => {
                                         value={opeForm.currency}
                                         onChange={(e) => setOpeForm({ ...opeForm, currency: e.target.value })}
                                         className="w-full bg-gray-50 dark:bg-gray-900 rounded-2xl px-5 py-4 font-bold text-gray-900 dark:text-white"
-                                        placeholder="USD"
+                                        placeholder="Default (recommended for Jumbo/EU)"
                                     />
                                 </div>
                                 <div className="space-y-2">
