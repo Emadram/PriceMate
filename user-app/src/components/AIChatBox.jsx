@@ -391,7 +391,11 @@ const ChatScreenHeader = ({
                     <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
                 </div>
             ) : null}
-            <header className="pricemate-mobile-chrome z-10 shrink-0 border-b border-gray-100 dark:border-gray-700/50 px-3.5 pb-3 pt-[calc(0.5rem+env(safe-area-inset-top,0px))] sm:px-5 sm:py-4 sm:pt-[calc(0.65rem+env(safe-area-inset-top,0px))]">
+            <header
+                className={`pricemate-mobile-chrome z-10 shrink-0 border-b border-gray-100 dark:border-gray-700/50 px-3.5 pb-3 pt-[calc(0.5rem+env(safe-area-inset-top,0px))] sm:px-5 sm:py-4 sm:pt-[calc(0.65rem+env(safe-area-inset-top,0px))] ${
+                    isPage ? 'max-md:sticky max-md:top-0 max-md:z-20' : ''
+                }`}
+            >
                 <div className="flex items-center gap-2.5 min-w-0">
                     {user ? (
                         <button
@@ -2189,12 +2193,8 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         ? 'px-4 py-3 sm:px-5 sm:py-4'
         : 'px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px)+var(--bottom-nav-h,0px))] sm:px-5 sm:py-4';
 
-    const composerMobileBottom = composerAnchoredToNav
-        ? 'max-md:bottom-[calc(var(--bottom-nav-h,0px)+env(safe-area-inset-bottom,0px))] max-md:pricemate-ai-composer-nav-anchor'
-        : 'max-md:bottom-[calc(var(--bottom-nav-h,0px)+env(safe-area-inset-bottom,0px)+var(--composer-keyboard-lift,0px))]';
-
     const composerStackClass = isPage
-        ? `shrink-0 border-t border-gray-100/80 dark:border-gray-700/50 max-md:fixed max-md:inset-x-0 max-md:z-[9999] ${composerMobileBottom} sm:relative sm:inset-auto sm:bottom-auto sm:z-auto ${mobileListOpen ? 'max-md:hidden' : ''}`
+        ? `shrink-0 border-t border-gray-100/80 dark:border-gray-700/50 ${mobileListOpen ? 'max-md:hidden' : ''}`
         : 'shrink-0';
 
     const composerFormClass = isPage
@@ -2343,7 +2343,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                         ref={messagesScrollRef}
                         className={
                             isPage
-                                ? 'flex-1 overflow-y-auto overscroll-contain scroll-pb-[calc(var(--bottom-nav-h,0px)+var(--mobile-ai-composer-h,5.5rem))] px-4 pt-2.5 pb-3 max-md:pb-[calc(var(--bottom-nav-h,0px)+var(--mobile-ai-composer-h,5.5rem))] space-y-3.5 bg-gray-50 dark:bg-gray-900 min-h-0'
+                                ? 'flex-1 overflow-y-auto overscroll-contain scroll-pb-[var(--mobile-ai-composer-h,5.5rem)] px-4 pt-2.5 pb-3 max-md:pb-[var(--mobile-ai-composer-h,5.5rem)] space-y-3.5 bg-gray-50 dark:bg-gray-900 min-h-0'
                                 : 'flex-1 overflow-y-auto overscroll-contain scroll-pb-[calc(var(--bottom-nav-h,0px)+7.5rem)] px-4 pt-2.5 pb-[calc(0.875rem+var(--bottom-nav-h,0px))] sm:px-5 sm:pt-3 sm:pb-[calc(1rem+var(--bottom-nav-h,0px))] space-y-3.5 bg-gray-50 dark:bg-gray-900 min-h-0'
                         }
                     >

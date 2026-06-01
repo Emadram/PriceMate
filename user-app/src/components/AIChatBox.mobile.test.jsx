@@ -585,8 +585,8 @@ describe('AIChatBox — page variant immersive header', () => {
         expect(header).not.toBeNull();
         expect(header.classList.contains('pricemate-mobile-chrome')).toBe(true);
         expect(header.className).not.toContain('bg-gradient-to-r');
-        expect(header.className).not.toMatch(/\bsticky\b/);
         expect(header.className).toMatch(/\bshrink-0\b/);
+        expect(header.className).toMatch(/max-md:sticky/);
         expect(getByRole('heading', { name: /ai_chat_title/i }).className).toContain('text-brand-700');
         expect(container.querySelector('.grid.grid-cols-3')).toBeNull();
     });
@@ -600,16 +600,20 @@ describe('AIChatBox — page variant immersive header', () => {
         expect(handles.length).toBe(0);
     });
 
-    it('page variant composer is fixed above bottom nav on mobile (nav anchor, no keyboard lift)', () => {
-        const { getByTestId } = render(
+    it('page variant composer is in-flow at bottom on mobile (not viewport-fixed)', () => {
+        const { getByTestId, container } = render(
             <AIChatBox isOpen={true} onClose={() => {}} variant="page" />
         );
 
         const stack = getByTestId('ai-chat-composer-stack');
-        expect(stack.className).toMatch(/max-md:fixed/);
-        expect(stack.className).toMatch(/bottom-nav-h/);
-        expect(stack.className).toMatch(/pricemate-ai-composer-nav-anchor/);
+        expect(stack.className).toMatch(/shrink-0/);
+        expect(stack.className).not.toMatch(/max-md:fixed/);
+        expect(stack.className).not.toMatch(/pricemate-ai-composer-nav-anchor/);
         expect(stack.className).not.toMatch(/composer-keyboard-lift/);
+
+        const header = container.querySelector('header');
+        expect(header).not.toBeNull();
+        expect(header.className).toMatch(/max-md:sticky/);
 
         const form = getByTestId('ai-chat-composer-form');
         expect(form.className).toMatch(/max-md:bg-white/);

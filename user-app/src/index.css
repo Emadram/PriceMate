@@ -64,11 +64,11 @@
 
   html.pricemate-ai-chat-keyboard-resize .pricemate-ai-chat-page-root {
     min-height: 0;
-    max-height: none;
-    height: 100%;
+    max-height: var(--app-dvh, 100dvh);
+    height: var(--app-dvh, 100dvh);
   }
 
-  /* Android: pin message composer directly above the fixed tab bar (no keyboard lift). */
+  /* Drawer variant only: fixed composer above tab bar when using nav-anchor class. */
   html.pricemate-ai-chat-keyboard-resize .pricemate-ai-composer-nav-anchor {
     bottom: calc(var(--bottom-nav-h, 0px) + env(safe-area-inset-bottom, 0px));
   }
