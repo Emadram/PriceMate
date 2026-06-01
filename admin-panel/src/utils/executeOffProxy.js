@@ -1,5 +1,4 @@
-import { Client, Functions } from 'appwrite';
-import { account, getAppwriteConfig } from '../lib/appwrite';
+import { account, functions } from '../lib/appwrite';
 import {
     executionFailureMessage,
     getFunctionExecutionBody,
@@ -31,11 +30,16 @@ const mapExecuteError = (err) => {
         return `Logged-in users cannot execute this function. ${EXECUTE_PERMISSION_HINT}`;
     }
 
+    if (lower.includes('jwt') && lower.includes('cookie')) {
+        return 'Authentication conflict. Refresh the page and try again while logged in as admin.';
+    }
+
     return message || 'Proxy error';
 };
 
 /**
- * Run off-proxy with the admin's JWT so Appwrite applies Users/team execute rules.
+ * Run off-proxy with the admin session cookie (same client as login).
+ * Do not combine setJWT with an active browser session — Appwrite rejects mixed auth.
  * @param {Record<string, unknown>} payload
  * @returns {Promise<{ ok: boolean, status?: number, data?: unknown, error?: string }>}
  */
@@ -48,28 +52,17 @@ export const executeOffProxy = async (payload) => {
         };
     }
 
-    const { endpoint, projectId } = getAppwriteConfig();
-    if (!endpoint || !projectId) {
+    try {
+        await account.get();
+    } catch {
         return {
             ok: false,
-            status: 0,
-            error: 'Appwrite endpoint or project ID is missing in admin .env.',
+            status: 401,
+            error: 'Admin session expired. Log in again, then retry.',
         };
     }
 
     try {
-        const { jwt } = await account.createJWT();
-        if (!jwt) {
-            return {
-                ok: false,
-                status: 401,
-                error: 'Admin session expired. Log in again, then retry.',
-            };
-        }
-
-        const client = new Client().setEndpoint(endpoint).setProject(projectId).setJWT(jwt);
-        const functions = new Functions(client);
-
         let execution = await functions.createExecution({
             functionId: OFF_PROXY_FUNCTION_ID,
             body: JSON.stringify(payload),
