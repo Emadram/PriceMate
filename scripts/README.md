@@ -36,9 +36,13 @@ Historical grocery prices use the **same** Appwrite function as Open Food Facts 
 {"kind":"ope_stores"}
 ```
 
+Uses `GET /api/v1/stores_tracked` (not `/stores`, which no longer exists).
+
 ```json
 {"kind":"ope_historical","store":"woolworths","productname":"milk","start_date":"2024-01-01","end_date":"2024-12-31","currency":"USD"}
 ```
+
+Uses `GET /api/v1/{store}/products/prices/query`.
 
 Admin UI: **Price History** → **Import from Open Price Engine** (fetch preview, then bulk import).
 

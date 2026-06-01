@@ -1,5 +1,8 @@
 const OFF_API_BASE = 'https://world.openfoodfacts.org';
 const OPE_API_BASE = 'https://openpricengine.com/api/v1';
+/** Bump when redeploying; exposed via { "kind": "ping" } so you can confirm active deployment. */
+const OFF_PROXY_VERSION = '3';
+const OPE_STORE_PATHS = ['/stores_tracked', '/available_stores/plans', '/countries_tracked'];
 
 // Simple TTL LRU cache
 class SimpleCache {
@@ -174,7 +177,7 @@ const buildOpeHistoricalUrl = (payload) => {
         params.set('currency', currency);
     }
 
-    const url = `${OPE_API_BASE}/${encodeURIComponent(store)}/products/query?${params.toString()}`;
+    const url = `${OPE_API_BASE}/${encodeURIComponent(store)}/products/prices/query?${params.toString()}`;
     return { url };
 };
 
@@ -203,7 +206,7 @@ const runProxiedFetch = async ({ cacheKey, url, cacheTtl, fetchOpts, transform, 
                 : await response.text();
 
             if (!response.ok) {
-                throw { status: response.status, data };
+                throw { status: response.status, data, url };
             }
 
             if (transform) {
@@ -245,27 +248,90 @@ const formatUpstreamError = (err, fallback) => {
 const getOpeApiKey = () =>
     String(process.env.OPENPRICEENGINE_API_KEY || process.env.OPE_API_KEY || '').trim();
 
-/** OPE often returns 404 "Not Found" when the API key is missing or invalid. */
-const mapOpeUpstreamError = (status, data, fallback) => {
+const buildOpeHeaders = (rawKey) => {
+    let key = String(rawKey || '').trim();
+    if (
+        (key.startsWith('"') && key.endsWith('"')) ||
+        (key.startsWith("'") && key.endsWith("'"))
+    ) {
+        key = key.slice(1, -1).trim();
+    }
+    return {
+        accept: 'application/json',
+        Authorization: key,
+    };
+};
+
+const mapOpeUpstreamError = (status, data, fallback, url = '') => {
     const detail = formatUpstreamError({ data }, '');
     const normalized = detail.toLowerCase();
+    const urlHint = url ? ` URL: ${url}` : '';
 
-    if (
-        status === 404 &&
-        (!detail || normalized === 'not found' || normalized.includes('not found'))
-    ) {
+    if (status === 403 || normalized.includes('api key')) {
+        return (detail || 'Invalid or missing Open Price Engine API key.') + urlHint;
+    }
+
+    if (status === 404) {
+        const base =
+            detail && detail.toLowerCase() !== 'not found'
+                ? `Open Price Engine 404: ${detail}`
+                : 'Open Price Engine 404 (wrong route, store slug, or plan).';
         return (
-            'Open Price Engine rejected the request (404). Set a valid OPENPRICEENGINE_API_KEY ' +
-            'on off-proxy (Appwrite Console → Settings → Variables), redeploy, then retry. ' +
-            'Create a key at https://openpricengine.com/documentation/'
+            `${base}${urlHint} Deploy off-proxy v${OFF_PROXY_VERSION} (ping to verify). ` +
+            'Routes: /stores_tracked and /{store}/products/prices/query.'
         );
     }
 
-    if (status === 403 || normalized.includes('api key')) {
-        return detail || 'Invalid or missing Open Price Engine API key.';
+    return (detail || fallback) + urlHint;
+};
+
+const fetchOpeStoreList = async (apiKey, log) => {
+    const headers = buildOpeHeaders(apiKey);
+    const attempts = [];
+
+    for (const path of OPE_STORE_PATHS) {
+        const url = `${OPE_API_BASE}${path}`;
+        try {
+            const response = await fetchWithRetry(url, { timeout: 15000, headers }, 2, log);
+            const contentType = response.headers.get('content-type') || '';
+            const data = contentType.includes('application/json')
+                ? await response.json()
+                : await response.text();
+
+            if (!response.ok) {
+                attempts.push({
+                    path,
+                    status: response.status,
+                    detail: formatUpstreamError({ data }, response.statusText),
+                });
+                continue;
+            }
+
+            let stores = parseOpeStoresList(data);
+            if (!stores.length && data && typeof data === 'object') {
+                stores = parseOpeStoresList(data.stores ?? data.data ?? data.results);
+            }
+
+            if (stores.length > 0) {
+                log(`OPE stores: ${stores.length} from ${path}`);
+                return { stores, source: path };
+            }
+
+            attempts.push({ path, status: response.status, detail: 'Empty store list in response' });
+        } catch (err) {
+            attempts.push({
+                path,
+                status: err?.status || 0,
+                detail: formatUpstreamError(err, String(err?.message || err)),
+            });
+        }
     }
 
-    return detail || fallback;
+    throw {
+        status: 404,
+        data: { detail: 'No OPE store list endpoint returned stores', attempts },
+        url: `${OPE_API_BASE}${OPE_STORE_PATHS[0]}`,
+    };
 };
 
 const handler = async ({ req, res, log, error }) => {
@@ -274,7 +340,18 @@ const handler = async ({ req, res, log, error }) => {
         const kind = String(payload.kind || payload.type || '').toLowerCase();
 
         if (kind === 'ping') {
-            return sendJson(res, { ok: true, status: 200, data: { pong: true } });
+            return sendJson(res, {
+                ok: true,
+                status: 200,
+                data: {
+                    pong: true,
+                    version: OFF_PROXY_VERSION,
+                    opeRoutes: {
+                        stores: OPE_STORE_PATHS,
+                        historical: '/{store}/products/prices/query',
+                    },
+                },
+            });
         }
 
         if (!kind) {
@@ -310,16 +387,8 @@ const handler = async ({ req, res, log, error }) => {
                     error: 'OPENPRICEENGINE_API_KEY is not configured on off-proxy.',
                 });
             }
-            url = `${OPE_API_BASE}/stores`;
-            cacheTtl = 1000 * 60 * 60 * 6;
-            fetchOpts = {
-                timeout: 15000,
-                headers: {
-                    accept: 'application/json',
-                    Authorization: apiKey,
-                },
-            };
-            transform = (data) => ({ stores: parseOpeStoresList(data) });
+            const storeList = await fetchOpeStoreList(apiKey, log);
+            return sendJson(res, { ok: true, status: 200, data: storeList });
         } else if (kind === 'ope_historical') {
             const apiKey = getOpeApiKey();
             if (!apiKey) {
@@ -337,10 +406,7 @@ const handler = async ({ req, res, log, error }) => {
             cacheTtl = 1000 * 60 * 15;
             fetchOpts = {
                 timeout: 15000,
-                headers: {
-                    accept: 'application/json',
-                    Authorization: apiKey,
-                },
+                headers: buildOpeHeaders(apiKey),
             };
         } else {
             return sendJson(res, {
@@ -373,12 +439,13 @@ const handler = async ({ req, res, log, error }) => {
                 ? 'Open Price Engine request failed.'
                 : 'Open Food Facts request failed.';
             const message = opeKinds.includes(kind)
-                ? mapOpeUpstreamError(err.status, err.data, fallback)
+                ? mapOpeUpstreamError(err.status, err.data, fallback, err.url || url)
                 : formatUpstreamError(err, fallback);
             return sendJson(res, {
                 ok: false,
                 status: err.status,
                 error: message,
+                upstreamUrl: err.url || url || undefined,
                 data: err.data,
             });
         }

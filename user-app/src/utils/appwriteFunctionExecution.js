@@ -97,6 +97,7 @@ export const parseFunctionExecutionJson = (execution) => {
             ok: false,
             status: parsed.status || execution.responseStatusCode || 500,
             error: parsed.error || 'Proxy request failed.',
+            upstreamUrl: parsed.upstreamUrl,
             data: parsed.data,
         };
     }

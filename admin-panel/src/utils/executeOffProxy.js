@@ -79,6 +79,8 @@ export const executeOffProxy = async (payload) => {
                 status: execution.status,
                 responseStatusCode: execution.responseStatusCode,
                 error: result.error,
+                upstreamUrl: result.upstreamUrl,
+                data: result.data,
             });
         }
         return result;
