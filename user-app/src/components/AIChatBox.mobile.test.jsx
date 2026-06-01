@@ -590,7 +590,8 @@ describe('AIChatBox — page variant immersive header', () => {
         expect(stack.className).toMatch(/shrink-0/);
 
         const form = getByTestId('ai-chat-composer-form');
-        expect(form.className).toMatch(/pricemate-ai-composer-overlay/);
+        expect(form.className).toMatch(/max-md:bg-white/);
+        expect(form.className).not.toMatch(/pricemate-ai-composer-overlay/);
         expect(form.className).not.toContain('bottom-nav-h');
     });
 
@@ -635,6 +636,16 @@ describe('AIChatBox — page variant immersive header', () => {
         );
 
         expect(getByLabelText('ai_chat_new')).toBeTruthy();
+        authState.user = null;
+    });
+
+    it('shows quick prompt shortcuts on a new empty conversation thread', () => {
+        authState.user = { $id: 'user-1', name: 'Test User' };
+        const { getByText } = render(
+            <AIChatBox isOpen={true} onClose={() => {}} variant="page" />
+        );
+        expect(getByText('ai_chat_quick_cheapest')).toBeTruthy();
+        expect(getByText('ai_chat_quick_compare')).toBeTruthy();
         authState.user = null;
     });
 

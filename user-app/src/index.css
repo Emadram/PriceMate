@@ -62,6 +62,11 @@
     overflow: hidden;
   }
 
+  body.pricemate-ai-chat-page .pricemate-immersive-shell {
+    height: var(--ai-chat-shell-h, var(--app-dvh, 100dvh));
+    max-height: var(--ai-chat-shell-h, var(--app-dvh, 100dvh));
+  }
+
   .pricemate-immersive-shell {
     position: fixed;
     top: var(--app-vv-top, 0px);

@@ -55,4 +55,15 @@ describe('Navbar mobile bottom chrome', () => {
         expect(chrome.className).not.toMatch(/\bmb-2\b/);
         expect(chrome.className).toMatch(/pb-\[max\(0\.5rem/);
     });
+
+    it('hides mobile bottom nav on /ai-chat', () => {
+        const { container } = render(
+            <MemoryRouter initialEntries={['/ai-chat']}>
+                <Navbar />
+            </MemoryRouter>
+        );
+
+        expect(container.querySelector('.fixed.bottom-0')).toBeNull();
+        expect(document.documentElement.style.getPropertyValue('--bottom-nav-h')).toBe('0px');
+    });
 });

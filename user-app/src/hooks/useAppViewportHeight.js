@@ -41,11 +41,16 @@ export default function useAppViewportHeight(enabled = true, options = {}) {
             root.style.setProperty('--app-vv-top', `${top}px`);
             root.style.setProperty('--keyboard-inset-bottom', `${keyboardInset}px`);
 
-            const bottomNavPx = Number.parseInt(
-                getComputedStyle(root).getPropertyValue('--bottom-nav-h') || '0',
-                10
-            ) || 0;
-            const shellH = keyboardInset > 0 ? h : Math.max(0, h - bottomNavPx);
+            const onAiChatPage = body.classList.contains('pricemate-ai-chat-page');
+            const bottomNavPx = onAiChatPage
+                ? 0
+                : Number.parseInt(
+                    getComputedStyle(root).getPropertyValue('--bottom-nav-h') || '0',
+                    10
+                ) || 0;
+            const shellH = onAiChatPage || keyboardInset > 0
+                ? h
+                : Math.max(0, h - bottomNavPx);
             if (shellH > 0) {
                 root.style.setProperty('--ai-chat-shell-h', `${shellH}px`);
             }

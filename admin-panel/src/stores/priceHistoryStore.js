@@ -1,6 +1,12 @@
 import { create } from 'zustand';
 import { db } from '../lib/appwrite';
 import { Query } from 'appwrite';
+import {
+    PRICE_BACKFILL_SELECT,
+    listAllDocuments,
+    buildBackfillPayloads,
+    createHistoryInBatches,
+} from '../utils/priceHistoryBackfill';
 
 const usePriceHistoryStore = create((set) => ({
     history: [],
@@ -10,11 +16,11 @@ const usePriceHistoryStore = create((set) => ({
     fetchHistory: async () => {
         set({ loading: true, error: null });
         try {
-            const response = await db.priceHistory.list([
-                Query.orderDesc('timestamp'),
-                Query.limit(200)
-            ]);
-            set({ history: response.documents, loading: false });
+            const documents = await listAllDocuments(
+                (queries) => db.priceHistory.list(queries),
+                [Query.orderDesc('timestamp')]
+            );
+            set({ history: documents, loading: false });
         } catch (error) {
             console.error('Fetch price history error:', error);
             set({ error: error.message, loading: false });
@@ -79,64 +85,102 @@ const usePriceHistoryStore = create((set) => ({
         }
     },
 
-    syncFromPrices: async (limit = 200) => {
-        set({ loading: true, error: null });
-        try {
-            const historyResponse = await db.priceHistory.list([
-                Query.limit(limit),
-                Query.select(['$id', 'priceId'])
-            ]);
+    /** @deprecated Use backfillFromPrices */
+    syncFromPrices: async () => {
+        return usePriceHistoryStore.getState().backfillFromPrices();
+    },
 
-            const existingPriceIds = new Set(
-                historyResponse.documents
-                    .map((doc) => doc.priceId)
-                    .filter((value) => value)
+  /**
+   * One-time backfill: paginate all prices, skip rows that already have history (by priceId), parallel create.
+   * @param {(progress: object) => void} [onProgress]
+   */
+    backfillFromPrices: async (onProgress) => {
+        set({ loading: true, error: null });
+
+        const report = (patch) => {
+            onProgress?.(patch);
+        };
+
+        try {
+            report({ phase: 'loading_existing', processed: 0, total: 0, created: 0, skipped: 0, failed: 0 });
+
+            const historyDocs = await listAllDocuments(
+                (queries) => db.priceHistory.list(queries),
+                [Query.select(['$id', 'priceId'])]
             );
 
-            const pricesResponse = await db.prices.list([
-                Query.limit(limit),
-                Query.orderDesc('$updatedAt'),
-                Query.select(['*', 'products.$id', 'supermarkets.$id'])
-            ]);
+            const existingPriceIds = new Set(
+                historyDocs.map((doc) => doc.priceId).filter(Boolean)
+            );
 
-            let createdCount = 0;
+            report({ phase: 'loading_prices', processed: 0, total: 0, created: 0, skipped: 0, failed: 0 });
 
-            for (const price of pricesResponse.documents) {
-                if (price.$id && existingPriceIds.has(price.$id)) {
-                    continue;
+            const prices = await listAllDocuments(
+                (queries) => db.prices.list(queries),
+                [Query.orderDesc('$updatedAt'), Query.select(PRICE_BACKFILL_SELECT)]
+            );
+
+            const { payloads, skippedExisting, skippedInvalid } = buildBackfillPayloads(
+                prices,
+                existingPriceIds
+            );
+
+            const skipped = skippedExisting + skippedInvalid;
+
+            report({
+                phase: 'creating',
+                processed: 0,
+                total: payloads.length,
+                created: 0,
+                skipped,
+                failed: 0,
+            });
+
+            const { created, failed, errors } = await createHistoryInBatches(
+                payloads,
+                (payload) => db.priceHistory.create(payload),
+                {
+                    onProgress: (stats) => {
+                        report({
+                            phase: 'creating',
+                            processed: stats.processed,
+                            total: payloads.length,
+                            created: stats.created,
+                            skipped,
+                            failed: stats.failed,
+                        });
+                    },
                 }
-
-                const productId = typeof price.products === 'object' ? price.products.$id : price.products || price.productId;
-                const supermarketId = typeof price.supermarkets === 'object' ? price.supermarkets.$id : price.supermarkets || price.supermarketId;
-
-                if (!productId || !supermarketId) {
-                    continue;
-                }
-
-                const timestamp = price.$updatedAt || price.updatedAt || price.$createdAt || new Date().toISOString();
-
-                await db.priceHistory.create({
-                    priceId: price.$id || null,
-                    price: parseFloat(price.price),
-                    productId,
-                    supermarketId,
-                    timestamp,
-                    isPromotional: false,
-                    priceChangeReason: null
-                });
-
-                createdCount += 1;
-            }
+            );
 
             await usePriceHistoryStore.getState().fetchHistory();
             set({ loading: false });
-            return { success: true, createdCount };
+
+            return {
+                success: true,
+                createdCount: created,
+                skipped,
+                skippedExisting,
+                skippedInvalid,
+                failed,
+                totalPrices: prices.length,
+                errors,
+            };
         } catch (error) {
-            console.error('Sync price history from prices error:', error);
+            console.error('Backfill price history from prices error:', error);
             set({ error: error.message, loading: false });
-            return { success: false, createdCount: 0 };
+            return {
+                success: false,
+                createdCount: 0,
+                skipped: 0,
+                skippedExisting: 0,
+                skippedInvalid: 0,
+                failed: 0,
+                totalPrices: 0,
+                errors: [error.message],
+            };
         }
-    }
+    },
 }));
 
 export default usePriceHistoryStore;

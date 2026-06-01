@@ -8,14 +8,15 @@ import useSupermarketsStore from '../stores/supermarketsStore';
 import { client, DATABASE_ID, COLLECTIONS } from '../lib/appwrite';
 
 const PriceHistory = () => {
-    const { history, loading, fetchHistory, addHistory, updateHistory, deleteHistory, syncFromPrices } = usePriceHistoryStore();
+    const { history, loading, fetchHistory, addHistory, updateHistory, deleteHistory, backfillFromPrices } = usePriceHistoryStore();
     const { products, fetchProducts } = useProductsStore();
     const { supermarkets, fetchSupermarkets } = useSupermarketsStore();
 
     const [showModal, setShowModal] = useState(false);
     const [editing, setEditing] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
-    const [syncing, setSyncing] = useState(false);
+    const [backfilling, setBackfilling] = useState(false);
+    const [backfillProgress, setBackfillProgress] = useState(null);
     const [lastUpdated, setLastUpdated] = useState(null);
     const isFresh = useFreshIndicator(lastUpdated);
 
@@ -130,18 +131,56 @@ const PriceHistory = () => {
         }
     };
 
-    const handleSync = async () => {
-        setSyncing(true);
-        const result = await syncFromPrices(200);
-        setSyncing(false);
+    const handleBackfill = async () => {
+        setBackfilling(true);
+        setBackfillProgress({
+            phase: 'starting',
+            processed: 0,
+            total: 0,
+            created: 0,
+            skipped: 0,
+            failed: 0,
+        });
+
+        const result = await backfillFromPrices((progress) => {
+            setBackfillProgress(progress);
+        });
+
+        setBackfilling(false);
+        setBackfillProgress(null);
 
         if (!result?.success) {
-            alert('Failed to sync prices into history. Check console for details.');
+            const detail = result?.errors?.[0] || 'Check console for details.';
+            alert(`Backfill failed: ${detail}`);
             return;
         }
 
-        alert(`Synced ${result.createdCount} prices into history.`);
+        const lines = [
+            `Created: ${result.createdCount}`,
+            `Skipped: ${result.skipped} (${result.skippedExisting} already in history, ${result.skippedInvalid} invalid/missing relations)`,
+            `Failed: ${result.failed}`,
+            `Prices scanned: ${result.totalPrices}`,
+        ];
+        if (result.errors?.length) {
+            lines.push(`Errors: ${result.errors.join('; ')}`);
+        }
+        alert(lines.join('\n'));
     };
+
+    const backfillPercent =
+        backfillProgress?.total > 0
+            ? Math.min(100, Math.round((backfillProgress.processed / backfillProgress.total) * 100))
+            : backfillProgress?.phase === 'loading_existing' || backfillProgress?.phase === 'loading_prices'
+              ? null
+              : 0;
+
+    const backfillPhaseLabel = (() => {
+        if (!backfillProgress) return '';
+        if (backfillProgress.phase === 'loading_existing') return 'Loading existing history…';
+        if (backfillProgress.phase === 'loading_prices') return 'Loading all prices…';
+        if (backfillProgress.phase === 'creating') return 'Writing history…';
+        return 'Starting…';
+    })();
 
     return (
         <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex">
@@ -170,12 +209,12 @@ const PriceHistory = () => {
                         </div>
                     </div>
                     <button
-                        onClick={handleSync}
-                        disabled={syncing || loading}
+                        onClick={handleBackfill}
+                        disabled={backfilling || loading}
                         className="bg-gray-900 hover:bg-black text-white px-5 py-3 rounded-2xl flex items-center gap-2 transition-all shadow-lg shadow-gray-900/20 active:scale-95 text-[11px] font-black uppercase tracking-widest disabled:opacity-60 disabled:cursor-not-allowed"
                     >
-                        <FiRefreshCw size={18} className={`stroke-[2.5] ${syncing ? 'animate-spin' : ''}`} />
-                        {syncing ? 'Syncing...' : 'Sync Prices'}
+                        <FiRefreshCw size={18} className={`stroke-[2.5] ${backfilling ? 'animate-spin' : ''}`} />
+                        {backfilling ? 'Backfilling…' : 'Backfill from prices'}
                     </button>
                     <button
                         onClick={() => {
@@ -196,6 +235,32 @@ const PriceHistory = () => {
                         <FiPlus size={20} className="stroke-[3]" /> Add Entry
                     </button>
                 </header>
+
+                {backfilling && backfillProgress && (
+                    <div className="px-6 pb-4 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
+                        <div className="max-w-7xl mx-auto space-y-2">
+                            <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-bold text-gray-600 dark:text-gray-300">
+                                <span>{backfillPhaseLabel}</span>
+                                <span>
+                                    {backfillProgress.phase === 'creating'
+                                        ? `${backfillProgress.processed} / ${backfillProgress.total} · created ${backfillProgress.created} · skipped ${backfillProgress.skipped} · failed ${backfillProgress.failed}`
+                                        : backfillProgress.skipped > 0
+                                          ? `skipped ${backfillProgress.skipped} (prep)`
+                                          : ''}
+                                </span>
+                            </div>
+                            <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-900 overflow-hidden">
+                                <div
+                                    className="h-full bg-brand-600 transition-all duration-300 ease-out"
+                                    style={{
+                                        width: backfillPercent != null ? `${backfillPercent}%` : '30%',
+                                        opacity: backfillPercent != null ? 1 : 0.5,
+                                    }}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 <main className="max-w-7xl mx-auto px-6 py-8 w-full">
                     {loading ? (

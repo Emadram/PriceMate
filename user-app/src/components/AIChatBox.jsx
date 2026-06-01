@@ -1103,7 +1103,9 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         },
     ];
 
-    const mobileEmptyActions = mobileQuickPrompts.slice(0, 4);
+    const featuredQuickPrompts = mobileQuickPrompts.filter((item) =>
+        ['cheapest', 'ingredients', 'compare', 'suitable'].includes(item.key)
+    );
 
     const beginNewConversation = () => {
         startNewConversation();
@@ -1115,6 +1117,54 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         setInput(prompt);
         requestAnimationFrame(() => inputRef.current?.focus());
     };
+
+    const showQuickPrompts =
+        Boolean(user) &&
+        !summariesLoading &&
+        !historyLoading &&
+        !isLoading &&
+        history.length === 0;
+
+    const renderQuickPromptSuggestions = (showHero = true) => (
+        <div className={showHero ? 'mx-auto w-full max-w-md space-y-4 pt-2' : 'mx-auto w-full max-w-md space-y-3 pt-1'}>
+            {showHero && (
+                <div className="rounded-[1.75rem] bg-gradient-to-br from-brand-600 via-brand-600 to-brand-700 p-5 text-white shadow-xl shadow-brand-600/20">
+                    <div className="flex items-center gap-3">
+                        <div className="h-11 w-11 rounded-2xl bg-white/10 flex items-center justify-center backdrop-blur-sm shrink-0">
+                            <FiCpu size={22} className="text-white/85" />
+                        </div>
+                        <div className="min-w-0">
+                            <h2 className="text-lg font-black tracking-tight">{t('ai_chat_empty_title', 'What do you want to check?')}</h2>
+                            <p className="text-white/80 text-xs sm:text-sm mt-0.5 leading-relaxed">
+                                {t('ai_chat_empty_description')}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+            <div className="grid grid-cols-2 gap-2">
+                {featuredQuickPrompts.map((item) => {
+                    const Icon = item.Icon;
+                    return (
+                        <button
+                            key={item.key}
+                            type="button"
+                            onClick={() => applyQuickPrompt(item.prompt)}
+                            className="min-h-24 rounded-3xl border border-gray-200 bg-white px-4 py-3.5 text-left text-gray-800 shadow-sm transition active:scale-[0.98] dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                        >
+                            <span className="mb-2 flex h-9 w-9 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 dark:bg-brand-900/30 dark:text-brand-300">
+                                <Icon size={17} />
+                            </span>
+                            <span className="block text-[12px] font-black leading-tight">{item.label}</span>
+                            <span className="mt-1 block text-[10px] font-semibold leading-4 text-gray-500 dark:text-gray-400">
+                                {item.description}
+                            </span>
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
 
     const maxChatIndex = conversationSummaries.reduce(
         (m, s) => Math.max(m, s.chatIndex ?? 0),
@@ -1990,6 +2040,16 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 - When mentioning a specific store, include [STORE:<id>] from NEARBY STORES (same pattern as [BARCODE:...]).
                 - Do not invent stores or coordinates not listed in NEARBY STORES.
 
+                CLOSEST + CHEAPEST:
+                - When the user wants the nearest store, closest option, or cheapest price, name the product first (ask if missing).
+                - Combine NEARBY STORES (distance) with WEBSITE PRODUCT DATA (price): prefer a store that is reasonably close and has a low price.
+                - Give one clear recommendation in 1–2 sentences, then at most two alternatives with store name, price, and distance when known.
+
+                COMPARE / RANK BY PRICE:
+                - When the user wants to compare or rank supermarkets for one product, use only prices from WEBSITE PRODUCT DATA.
+                - List supermarkets for that product from cheapest to most expensive (up to 5 lines), e.g. "1. Store — 12.50 TRY [STORE:id]".
+                - If the product is unclear, ask which product before ranking.
+
                 PRODUCT + STORE RULES:
                 - When mentioning a product that has prices in WEBSITE PRODUCT DATA, always name the supermarket for the price you cite (e.g. "at Migros").
                 - For "cheapest" answers, use the lowest-price store from the data; do not invent store names.
@@ -2025,7 +2085,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 1. Answer questions about products, prices, shopping, and ingredient suitability within the PriceMate app.
                 2. If the user asks about something unrelated, politely say you only assist with product-related queries.
                 3. Recommend specific products using the data provided—respect the PRODUCT LIMITS above.
-                4. If the user asks for "cheapest" or "best deal", highlight at most a few; do not list everything.
+                4. If the user asks for "cheapest" or "best deal", highlight at most a few; for "compare" or "rank", use a numbered cheapest-first list (see COMPARE / RANK BY PRICE).
                 5. If the user asks for "most expensive" or "premium", highlight at most a few; do not list everything.
                 6. For category-style questions, suggest at most three relevant items from the sample, then briefly ask the user to be more specific if the catalog is huge.
                 7. For every product you mention, you must include its barcode ID in square brackets like this: [BARCODE:123456].
@@ -2105,7 +2165,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
 
     const effectiveOnClose = typeof onClose === 'function' ? onClose : () => {};
     const composerPadClass = isPage
-        ? 'px-4 py-3 sm:px-5 sm:py-4'
+        ? 'px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] sm:px-5 sm:py-4 sm:pb-4'
         : 'px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px)+var(--bottom-nav-h,0px))] sm:px-5 sm:py-4';
 
     const composerStackClass = isPage
@@ -2113,7 +2173,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         : 'shrink-0';
 
     const composerFormClass = isPage
-        ? `${composerPadClass} max-md:pricemate-ai-composer-overlay border-t border-gray-100/80 dark:border-gray-700/50 sm:bg-white sm:dark:bg-gray-800 sm:border-gray-100 sm:dark:border-gray-700`
+        ? `${composerPadClass} max-md:bg-white max-md:dark:bg-gray-900 border-t border-gray-100/80 dark:border-gray-700/50 sm:bg-white sm:dark:bg-gray-800 sm:border-gray-100 sm:dark:border-gray-700`
         : `${composerPadClass} bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700`;
 
     const handleComposerFocus = () => {
@@ -2252,17 +2312,11 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                     )}
 
                     <div className="relative flex-1 min-h-0 flex flex-col">
-                        {isPage && (
-                            <div
-                                className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] h-20 bg-gradient-to-t from-gray-50 via-gray-50/90 to-transparent dark:from-gray-900 dark:via-gray-900/90 max-md:block hidden sm:hidden"
-                                aria-hidden
-                            />
-                        )}
                     <div
                         ref={messagesScrollRef}
                         className={
                             isPage
-                                ? 'flex-1 overflow-y-auto overscroll-contain px-4 pt-2.5 pb-3 space-y-3.5 bg-gray-50 dark:bg-gray-900 min-h-0'
+                                ? 'flex-1 overflow-y-auto overscroll-contain scroll-pb-20 px-4 pt-2.5 pb-3 space-y-3.5 bg-gray-50 dark:bg-gray-900 min-h-0'
                                 : 'flex-1 overflow-y-auto overscroll-contain scroll-pb-[calc(var(--bottom-nav-h,0px)+7.5rem)] px-4 pt-2.5 pb-[calc(0.875rem+var(--bottom-nav-h,0px))] sm:px-5 sm:pt-3 sm:pb-[calc(1rem+var(--bottom-nav-h,0px))] space-y-3.5 bg-gray-50 dark:bg-gray-900 min-h-0'
                         }
                     >
@@ -2273,64 +2327,19 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                                 </p>
                             </div>
                         )}
-                        {user && !activeConversationId && (
-                            summariesLoading ? (
-                                <div className="flex justify-center py-12">
-                                    <FiLoader className="animate-spin text-brand-600" />
-                                </div>
-                            ) : (
-                                <div className="mx-auto w-full max-w-md space-y-4 pt-2">
-                                    <div className="rounded-[1.75rem] bg-gradient-to-br from-brand-600 via-brand-600 to-brand-700 p-5 text-white shadow-xl shadow-brand-600/20">
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-11 w-11 rounded-2xl bg-white/10 flex items-center justify-center backdrop-blur-sm shrink-0">
-                                                <FiCpu size={22} className="text-white/85" />
-                                            </div>
-                                            <div className="min-w-0">
-                                                <h2 className="text-lg font-black tracking-tight">{t('ai_chat_empty_title', 'What do you want to check?')}</h2>
-                                                <p className="text-white/80 text-xs sm:text-sm mt-0.5 leading-relaxed">
-                                                    {t('ai_chat_empty_description')}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        {/* Removed large 'NEW' button per request; use plus icons in the list to start new chats. */}
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {mobileEmptyActions.map((item) => {
-                                            const Icon = item.Icon;
-                                            return (
-                                            <button
-                                                key={item.key}
-                                                type="button"
-                                                onClick={() => applyQuickPrompt(item.prompt)}
-                                                className="min-h-24 rounded-3xl border border-gray-200 bg-white px-4 py-3.5 text-left text-gray-800 shadow-sm transition active:scale-[0.98] dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-                                            >
-                                                <span className="mb-2 flex h-9 w-9 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 dark:bg-brand-900/30 dark:text-brand-300">
-                                                    <Icon size={17} />
-                                                </span>
-                                                <span className="block text-[12px] font-black leading-tight">{item.label}</span>
-                                                <span className="mt-1 block text-[10px] font-semibold leading-4 text-gray-500 dark:text-gray-400">{item.description}</span>
-                                            </button>
-                                            );
-                                        })}
-                                    </div>
-
-                                    {/* Guide text removed per request. */}
-                                </div>
-                            )
+                        {user && !activeConversationId && summariesLoading && (
+                            <div className="flex justify-center py-12">
+                                <FiLoader className="animate-spin text-brand-600" />
+                            </div>
                         )}
+                        {showQuickPrompts && renderQuickPromptSuggestions(!activeConversationId)}
                         {user && activeConversationId && historyLoading && (
                             <div className="flex justify-center py-12">
                                 <FiLoader className="animate-spin text-brand-600" />
                             </div>
                         )}
-                        {user && activeConversationId && !historyLoading && (
+                        {user && activeConversationId && !historyLoading && !showQuickPrompts && (
                             <>
-                                {history.length === 0 && !isLoading && (
-                                    <p className="text-center text-xs text-gray-500 dark:text-gray-400 py-2">
-                                        {t('ai_chat_thread_empty')}
-                                    </p>
-                                )}
                                 {history.map((msg, idx) => (
                                     <ChatMessage
                                         key={msg.$id || idx}
@@ -2351,6 +2360,12 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                                 )}
                             </>
                         )}
+                        {!isPage && (
+                            <div
+                                className="sticky bottom-0 z-[1] -mt-20 h-20 pointer-events-none bg-gradient-to-t from-gray-50 via-gray-50/90 to-transparent dark:from-gray-900 dark:via-gray-900/90"
+                                aria-hidden
+                            />
+                        )}
                         <div ref={messagesEndRef} />
                     </div>
 
@@ -2360,7 +2375,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                         className={composerStackClass}
                     >
                         {user && chatWriteError && (
-                            <div className="shrink-0 px-4 py-2.5 bg-red-50 dark:bg-red-900/20 border-t border-red-100 dark:border-red-800/40 flex gap-2 items-start justify-between max-md:pricemate-ai-composer-overlay">
+                            <div className={`shrink-0 px-4 py-2.5 bg-red-50 dark:bg-red-900/20 border-t border-red-100 dark:border-red-800/40 flex gap-2 items-start justify-between ${isPage ? 'max-md:bg-red-50 max-md:dark:bg-red-900/20' : 'max-md:pricemate-ai-composer-overlay'}`}>
                                 <p className="text-xs text-red-800 dark:text-red-200 flex-1 leading-relaxed">
                                     {chatWriteError === CHAT_ERROR_MISSING_CONVERSATION_ID
                                         ? t('chat_error_schema_conversation_id')

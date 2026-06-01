@@ -8,6 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "test:coordinates": "node scripts/coordinateValidation.smoke.mjs",
+    "test:price-history-backfill": "node scripts/priceHistoryBackfill.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -15,6 +15,7 @@ const Navbar = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const bottomNavRef = useRef(null);
+    const isAiChatPage = location.pathname.startsWith('/ai-chat');
 
     useEffect(() => {
         fetchRates();
@@ -27,10 +28,17 @@ const Navbar = () => {
     }, []);
 
     useEffect(() => {
-        const el = bottomNavRef.current;
-        if (!el || typeof document === 'undefined') return undefined;
-
+        if (typeof document === 'undefined') return undefined;
         const root = document.documentElement;
+
+        if (isAiChatPage) {
+            root.style.setProperty('--bottom-nav-h', '0px');
+            return undefined;
+        }
+
+        const el = bottomNavRef.current;
+        if (!el) return undefined;
+
         const setVar = () => {
             const h = Math.round(el.getBoundingClientRect().height || 0);
             if (h > 0) root.style.setProperty('--bottom-nav-h', `${h}px`);
@@ -49,7 +57,7 @@ const Navbar = () => {
             window.removeEventListener('resize', setVar);
             window.removeEventListener('orientationchange', setVar);
         };
-    }, []);
+    }, [isAiChatPage]);
 
     const toggleLanguage = () => {
         const currentLang = i18n.resolvedLanguage || i18n.language;
@@ -165,7 +173,8 @@ const Navbar = () => {
                 </div>
             </nav>
 
-            {/* Mobile Bottom Navigation */}
+            {/* Mobile Bottom Navigation — hidden on /ai-chat (dedicated full-screen chat) */}
+            {!isAiChatPage && (
             <div ref={bottomNavRef} className="md:hidden fixed bottom-0 inset-x-0 z-9998">
               <div className="pt-3 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] px-safe pricemate-mobile-chrome border-t border-gray-100/80 dark:border-gray-800/60 rounded-t-[1.25rem] shadow-[0_-4px_24px_rgba(15,23,42,0.06)]">
                 <div className="flex items-center justify-between max-w-md mx-auto px-3">
@@ -183,6 +192,7 @@ const Navbar = () => {
                 </div>
               </div>
             </div>
+            )}
         </>
     );
 };
