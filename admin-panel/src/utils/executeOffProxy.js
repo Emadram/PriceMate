@@ -73,8 +73,8 @@ export const executeOffProxy = async (payload) => {
         }
 
         const result = parseFunctionExecutionJson(execution);
-        if (!result?.ok) {
-            console.error('off-proxy execution failed:', {
+        if (result?.ok === false) {
+            console.error('off-proxy request failed:', {
                 executionId: execution.$id,
                 status: execution.status,
                 responseStatusCode: execution.responseStatusCode,

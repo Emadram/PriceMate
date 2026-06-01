@@ -12,10 +12,21 @@ export const callOpeProxy = (payload) => executeOffProxy(payload);
 /**
  * @returns {Promise<string[]>}
  */
+const enhanceOpeError = (message) => {
+    const text = String(message || '');
+    if (text.toLowerCase() === 'not found') {
+        return (
+            'Open Price Engine returned "Not Found" (usually an invalid or missing API key). ' +
+            'Set OPENPRICEENGINE_API_KEY on the off-proxy function in Appwrite and redeploy.'
+        );
+    }
+    return text || 'Open Price Engine request failed.';
+};
+
 export const fetchOpeStores = async () => {
     const result = await callOpeProxy({ kind: 'ope_stores' });
     if (!result?.ok) {
-        throw new Error(result?.error || 'Failed to load Open Price Engine stores.');
+        throw new Error(enhanceOpeError(result?.error));
     }
     const stores = result.data?.stores;
     return Array.isArray(stores) ? stores : [];
@@ -39,7 +50,7 @@ export const fetchOpeHistoricalPrices = async (params) => {
             typeof result?.data === 'string'
                 ? result.data
                 : result?.data?.detail || result?.error || 'Historical price fetch failed.';
-        throw new Error(String(detail));
+        throw new Error(enhanceOpeError(detail));
     }
     return result.data;
 };

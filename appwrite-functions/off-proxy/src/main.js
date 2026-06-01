@@ -242,6 +242,32 @@ const formatUpstreamError = (err, fallback) => {
     }
 };
 
+const getOpeApiKey = () =>
+    String(process.env.OPENPRICEENGINE_API_KEY || process.env.OPE_API_KEY || '').trim();
+
+/** OPE often returns 404 "Not Found" when the API key is missing or invalid. */
+const mapOpeUpstreamError = (status, data, fallback) => {
+    const detail = formatUpstreamError({ data }, '');
+    const normalized = detail.toLowerCase();
+
+    if (
+        status === 404 &&
+        (!detail || normalized === 'not found' || normalized.includes('not found'))
+    ) {
+        return (
+            'Open Price Engine rejected the request (404). Set a valid OPENPRICEENGINE_API_KEY ' +
+            'on off-proxy (Appwrite Console → Settings → Variables), redeploy, then retry. ' +
+            'Create a key at https://openpricengine.com/documentation/'
+        );
+    }
+
+    if (status === 403 || normalized.includes('api key')) {
+        return detail || 'Invalid or missing Open Price Engine API key.';
+    }
+
+    return detail || fallback;
+};
+
 const handler = async ({ req, res, log, error }) => {
     try {
         const payload = parsePayload(req);
@@ -276,7 +302,7 @@ const handler = async ({ req, res, log, error }) => {
             url = `${OFF_API_BASE}/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=${pageSize}`;
             cacheTtl = 1000 * 60 * 10; // 10 minutes for searches
         } else if (kind === 'ope_stores') {
-            const apiKey = process.env.OPENPRICEENGINE_API_KEY || '';
+            const apiKey = getOpeApiKey();
             if (!apiKey) {
                 return sendJson(res, {
                     ok: false,
@@ -295,7 +321,7 @@ const handler = async ({ req, res, log, error }) => {
             };
             transform = (data) => ({ stores: parseOpeStoresList(data) });
         } else if (kind === 'ope_historical') {
-            const apiKey = process.env.OPENPRICEENGINE_API_KEY || '';
+            const apiKey = getOpeApiKey();
             if (!apiKey) {
                 return sendJson(res, {
                     ok: false,
@@ -346,10 +372,13 @@ const handler = async ({ req, res, log, error }) => {
             const fallback = opeKinds.includes(kind)
                 ? 'Open Price Engine request failed.'
                 : 'Open Food Facts request failed.';
+            const message = opeKinds.includes(kind)
+                ? mapOpeUpstreamError(err.status, err.data, fallback)
+                : formatUpstreamError(err, fallback);
             return sendJson(res, {
                 ok: false,
                 status: err.status,
-                error: formatUpstreamError(err, fallback),
+                error: message,
                 data: err.data,
             });
         }
