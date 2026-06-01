@@ -1,7 +1,7 @@
 import { account, functions } from '../lib/appwrite';
 import {
-    executionFailureMessage,
     getFunctionExecutionBody,
+    parseFunctionExecutionJson,
     waitForFunctionExecution,
 } from './appwriteFunctionExecution';
 
@@ -39,7 +39,6 @@ const mapExecuteError = (err) => {
 
 /**
  * Run off-proxy with the admin session cookie (same client as login).
- * Do not combine setJWT with an active browser session — Appwrite rejects mixed auth.
  * @param {Record<string, unknown>} payload
  * @returns {Promise<{ ok: boolean, status?: number, data?: unknown, error?: string }>}
  */
@@ -73,24 +72,16 @@ export const executeOffProxy = async (payload) => {
             execution = await waitForFunctionExecution(functions, OFF_PROXY_FUNCTION_ID, execution);
         }
 
-        if (execution.status === 'failed') {
-            return {
-                ok: false,
-                status: execution.responseStatusCode || 500,
-                error: executionFailureMessage(execution),
-            };
+        const result = parseFunctionExecutionJson(execution);
+        if (!result?.ok) {
+            console.error('off-proxy execution failed:', {
+                executionId: execution.$id,
+                status: execution.status,
+                responseStatusCode: execution.responseStatusCode,
+                error: result.error,
+            });
         }
-
-        const responseBody = getFunctionExecutionBody(execution);
-        if (!responseBody) {
-            return {
-                ok: false,
-                status: execution.responseStatusCode || 0,
-                error: `Empty proxy response (execution status: ${execution.status || 'unknown'}).`,
-            };
-        }
-
-        return JSON.parse(responseBody);
+        return result;
     } catch (err) {
         console.error('off-proxy execution error:', err);
         return {

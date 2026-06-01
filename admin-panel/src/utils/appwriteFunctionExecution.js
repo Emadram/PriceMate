@@ -1,5 +1,8 @@
 const TERMINAL_STATUSES = new Set(['completed', 'failed']);
 
+const CONSOLE_LOG_HINT =
+    'Open Appwrite Console → Functions → off-proxy → Executions for runtime logs.';
+
 /**
  * Appwrite SDK v21+ uses responseBody; older SDKs used response.
  * @param {import('appwrite').Models.Execution | null | undefined} execution
@@ -37,16 +40,80 @@ export const executionFailureMessage = (execution) => {
     const errors = String(execution?.errors || '').trim();
     const logs = String(execution?.logs || '').trim();
     const body = getFunctionExecutionBody(execution);
+    const code = execution?.responseStatusCode;
 
     if (errors) return errors;
     if (body) {
         try {
             const parsed = JSON.parse(body);
             if (parsed?.error) return String(parsed.error);
+            if (parsed?.message) return String(parsed.message);
         } catch {
             return body.slice(0, 500);
         }
     }
     if (logs) return logs.slice(0, 500);
-    return `Function execution ${execution?.status || 'failed'}.`;
+
+    const codeSuffix = code ? ` (HTTP ${code})` : '';
+    return `Function runtime failed${codeSuffix}. ${CONSOLE_LOG_HINT}`;
+};
+
+/**
+ * @param {import('appwrite').Models.Execution} execution
+ * @returns {{ ok: boolean, status?: number, data?: unknown, error?: string, executionId?: string }}
+ */
+export const parseFunctionExecutionJson = (execution) => {
+    const status = execution?.status;
+
+    if (!TERMINAL_STATUSES.has(status)) {
+        return {
+            ok: false,
+            status: 0,
+            error: 'Function execution timed out before finishing. Retry, or raise the off-proxy timeout in Appwrite Console.',
+            executionId: execution?.$id,
+        };
+    }
+
+    if (status === 'failed') {
+        return {
+            ok: false,
+            status: execution.responseStatusCode || 500,
+            error: executionFailureMessage(execution),
+            executionId: execution?.$id,
+        };
+    }
+
+    const body = getFunctionExecutionBody(execution);
+    if (!body) {
+        return {
+            ok: false,
+            status: execution.responseStatusCode || 0,
+            error: `Empty function response (status: ${status}). ${CONSOLE_LOG_HINT}`,
+            executionId: execution?.$id,
+        };
+    }
+
+    let parsed;
+    try {
+        parsed = JSON.parse(body);
+    } catch {
+        return {
+            ok: false,
+            status: execution.responseStatusCode || 0,
+            error: body.slice(0, 500),
+            executionId: execution?.$id,
+        };
+    }
+
+    if (parsed?.ok === false) {
+        return {
+            ok: false,
+            status: parsed.status || execution.responseStatusCode || 500,
+            error: parsed.error || 'Proxy request failed.',
+            data: parsed.data,
+            executionId: execution?.$id,
+        };
+    }
+
+    return parsed;
 };

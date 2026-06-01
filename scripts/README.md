@@ -21,7 +21,7 @@ Admin backfill: **Price History** → **Backfill from prices** (paginates all `p
 
 Historical grocery prices use the **same** Appwrite function as Open Food Facts (`appwrite-functions/off-proxy/`). No extra function slot is required.
 
-1. Redeploy `off-proxy` from `PriceMate/appwrite-functions/off-proxy/` (Node 18).
+1. Redeploy `off-proxy` from `PriceMate/appwrite-functions/off-proxy/` (Node 18). The handler always returns HTTP 200 with `{ ok, status, error? }` in the body so Appwrite does not mark executions failed on 4xx/5xx payloads.
 2. **Execute access (required for admin panel):** In Appwrite Console → **off-proxy** → **Settings** → **Execute access**, add **Users** (or your admins team). Save, then **redeploy** the function so the permission takes effect.
 3. On that function, set environment variable:
    - `OPENPRICEENGINE_API_KEY` — [Open Price Engine](https://openpricengine.com/documentation/) API key (server-only; never `VITE_*`).

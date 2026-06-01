@@ -74,14 +74,16 @@ async function fetchWithRetry(url, opts = {}, maxRetries = 4, log) {
     let lastErr = null;
     while (attempt <= maxRetries) {
         try {
+            const requestOpts = { ...opts };
             const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-            const timeout = opts.timeout || 10000;
+            const timeout = requestOpts.timeout || 10000;
             if (controller) {
                 setTimeout(() => controller.abort(), timeout);
-                opts.signal = controller.signal;
+                requestOpts.signal = controller.signal;
             }
+            delete requestOpts.timeout;
 
-            const res = await fetch(url, opts);
+            const res = await fetch(url, requestOpts);
             if (res.ok) return res;
 
             // handle 429 Retry-After
@@ -219,13 +221,29 @@ const runProxiedFetch = async ({ cacheKey, url, cacheTtl, fetchOpts, transform, 
     return fetchPromise;
 };
 
-module.exports = async ({ req, res, log, error }) => {
+/** Always HTTP 200 from the executor; real status lives in the JSON body (avoids Appwrite non-2xx failures). */
+const sendJson = (res, payload) => res.json(payload, 200);
+
+const formatUpstreamError = (err, fallback) => {
+    if (!err?.data) return fallback;
+    if (typeof err.data === 'string') return err.data.slice(0, 500);
+    if (typeof err.data?.detail === 'string') return err.data.detail;
+    if (typeof err.data?.error === 'string') return err.data.error;
+    if (typeof err.data?.message === 'string') return err.data.message;
+    try {
+        return JSON.stringify(err.data).slice(0, 500);
+    } catch {
+        return fallback;
+    }
+};
+
+const handler = async ({ req, res, log, error }) => {
     try {
         const payload = parsePayload(req);
         const kind = String(payload.kind || payload.type || '').toLowerCase();
 
         if (!kind) {
-            return res.json({ ok: false, status: 400, error: 'Missing kind.' }, 400);
+            return sendJson(res, { ok: false, status: 400, error: 'Missing kind.' });
         }
 
         let url = '';
@@ -236,14 +254,14 @@ module.exports = async ({ req, res, log, error }) => {
         if (kind === 'barcode') {
             const barcode = String(payload.barcode || '').trim();
             if (!barcode) {
-                return res.json({ ok: false, status: 400, error: 'Missing barcode.' }, 400);
+                return sendJson(res, { ok: false, status: 400, error: 'Missing barcode.' });
             }
             url = `${OFF_API_BASE}/api/v0/product/${encodeURIComponent(barcode)}.json`;
             cacheTtl = 1000 * 60 * 60 * 24; // 24h for product lookups
         } else if (kind === 'search') {
             const query = String(payload.query || payload.q || '').trim();
             if (!query) {
-                return res.json({ ok: false, status: 400, error: 'Missing search query.' }, 400);
+                return sendJson(res, { ok: false, status: 400, error: 'Missing search query.' });
             }
             const pageSize = Math.min(Math.max(Number(payload.pageSize || 5), 1), 20);
             url = `${OFF_API_BASE}/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=${pageSize}`;
@@ -251,14 +269,11 @@ module.exports = async ({ req, res, log, error }) => {
         } else if (kind === 'ope_stores') {
             const apiKey = process.env.OPENPRICEENGINE_API_KEY || '';
             if (!apiKey) {
-                return res.json(
-                    {
-                        ok: false,
-                        status: 500,
-                        error: 'OPENPRICEENGINE_API_KEY is not configured on off-proxy.',
-                    },
-                    500
-                );
+                return sendJson(res, {
+                    ok: false,
+                    status: 500,
+                    error: 'OPENPRICEENGINE_API_KEY is not configured on off-proxy.',
+                });
             }
             url = `${OPE_API_BASE}/stores`;
             cacheTtl = 1000 * 60 * 60 * 6;
@@ -273,18 +288,15 @@ module.exports = async ({ req, res, log, error }) => {
         } else if (kind === 'ope_historical') {
             const apiKey = process.env.OPENPRICEENGINE_API_KEY || '';
             if (!apiKey) {
-                return res.json(
-                    {
-                        ok: false,
-                        status: 500,
-                        error: 'OPENPRICEENGINE_API_KEY is not configured on off-proxy.',
-                    },
-                    500
-                );
+                return sendJson(res, {
+                    ok: false,
+                    status: 500,
+                    error: 'OPENPRICEENGINE_API_KEY is not configured on off-proxy.',
+                });
             }
             const built = buildOpeHistoricalUrl(payload);
             if (built.error) {
-                return res.json({ ok: false, status: 400, error: built.error }, 400);
+                return sendJson(res, { ok: false, status: 400, error: built.error });
             }
             url = built.url;
             cacheTtl = 1000 * 60 * 15;
@@ -296,14 +308,11 @@ module.exports = async ({ req, res, log, error }) => {
                 },
             };
         } else {
-            return res.json(
-                {
-                    ok: false,
-                    status: 400,
-                    error: 'Unsupported kind. Use barcode, search, ope_stores, or ope_historical.',
-                },
-                400
-            );
+            return sendJson(res, {
+                ok: false,
+                status: 400,
+                error: 'Unsupported kind. Use barcode, search, ope_stores, or ope_historical.',
+            });
         }
 
         const cacheKey = url;
@@ -316,17 +325,32 @@ module.exports = async ({ req, res, log, error }) => {
             log,
         });
 
-        return res.json({ ok: true, status: result.status || 200, data: result.data }, result.status || 200);
+        return sendJson(res, { ok: true, status: result.status || 200, data: result.data });
     } catch (err) {
-        error(err);
-        if (err && err.status) {
-            const opeKinds = ['ope_stores', 'ope_historical'];
-            const kind = String(parsePayload(req).kind || '').toLowerCase();
-            const message = opeKinds.includes(kind)
-                ? 'Open Price Engine request failed.'
-                : 'OFF request failed.';
-            return res.json({ ok: false, status: err.status, error: message, data: err.data }, err.status);
+        const kind = String(parsePayload(req).kind || '').toLowerCase();
+        const opeKinds = ['ope_stores', 'ope_historical'];
+        log(`off-proxy error (${kind || 'unknown'}): ${String(err?.message || err)}`);
+        if (error) {
+            error(String(err?.message || err));
         }
-        return res.json({ ok: false, status: 500, error: 'Proxy error.' }, 500);
+        if (err && err.status) {
+            const fallback = opeKinds.includes(kind)
+                ? 'Open Price Engine request failed.'
+                : 'Open Food Facts request failed.';
+            return sendJson(res, {
+                ok: false,
+                status: err.status,
+                error: formatUpstreamError(err, fallback),
+                data: err.data,
+            });
+        }
+        return sendJson(res, {
+            ok: false,
+            status: 500,
+            error: String(err?.message || err || 'Proxy error.'),
+        });
     }
 };
+
+module.exports = handler;
+module.exports.default = handler;

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
     getFunctionExecutionBody,
     executionFailureMessage,
+    parseFunctionExecutionJson,
 } from '../src/utils/appwriteFunctionExecution.js';
 
 assert.equal(getFunctionExecutionBody({ responseBody: '{"ok":true}' }), '{"ok":true}');
@@ -14,5 +15,16 @@ const failed = executionFailureMessage({
     responseBody: '{"error":"upstream"}',
 });
 assert.match(failed, /timeout|upstream/);
+
+const proxyError = parseFunctionExecutionJson({
+    status: 'completed',
+    responseBody: JSON.stringify({ ok: false, status: 401, error: 'Invalid API key' }),
+});
+assert.equal(proxyError.ok, false);
+assert.equal(proxyError.error, 'Invalid API key');
+
+const runtimeFailed = parseFunctionExecutionJson({ status: 'failed', responseStatusCode: 500 });
+assert.equal(runtimeFailed.ok, false);
+assert.match(runtimeFailed.error, /runtime failed|Executions/i);
 
 console.log('appwriteFunctionExecution.test.mjs: OK');
