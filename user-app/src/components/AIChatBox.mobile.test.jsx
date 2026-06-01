@@ -548,10 +548,30 @@ describe('FloatingAIChatLauncher — Task 2: ai-open body class preservation', (
 
             await new Promise((resolve) => setTimeout(resolve, 0));
 
-            // Launcher is not rendered → ai-open must NOT be on body.
+            // Launcher is not mounted on mobile → ai-open must NOT be on body.
             expect(document.body.classList.contains('ai-open')).toBe(false);
+            expect(document.getElementById('pricemate-ai-launcher')).toBeNull();
         }
     );
+
+    it('does not mount launcher DOM on mobile viewport', () => {
+        Object.defineProperty(window, 'matchMedia', {
+            writable: true,
+            value: vi.fn().mockImplementation((query) => ({
+                matches: query === '(min-width: 768px)' ? false : false,
+                media: query,
+                onchange: null,
+                addListener: vi.fn(),
+                removeListener: vi.fn(),
+                addEventListener: vi.fn(),
+                removeEventListener: vi.fn(),
+                dispatchEvent: vi.fn(),
+            })),
+        });
+
+        const { container } = render(<FloatingAIChatLauncher />);
+        expect(container.firstChild).toBeNull();
+    });
 });
 
 describe('AIChatBox — page variant immersive header', () => {

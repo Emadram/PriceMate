@@ -5,7 +5,7 @@ const AIChat = () => {
     useAiChatViewportMeta(true);
 
     return (
-        <div className="flex flex-col w-full max-w-4xl mx-auto min-h-[100dvh] max-h-[100dvh] md:min-h-screen md:max-h-none overflow-hidden bg-white dark:bg-gray-900 pb-safe-nav md:pb-8">
+        <div className="pricemate-ai-chat-page-root flex flex-col w-full max-w-4xl mx-auto flex-1 min-h-[100dvh] max-h-[100dvh] md:min-h-screen md:max-h-none overflow-hidden bg-white dark:bg-gray-900 pb-safe-nav md:pb-8">
             <AIChatBox isOpen variant="page" />
         </div>
     );

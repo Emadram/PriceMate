@@ -2,12 +2,37 @@ import { useEffect } from 'react';
 
 /**
  * @param {Window} win
+ * @param {{ baselineInnerHeight?: number, preferResizeLayout?: boolean }} [options]
  * @returns {number}
  */
-export const computeKeyboardInsetBottom = (win = typeof window !== 'undefined' ? window : null) => {
+export const computeKeyboardInsetBottom = (
+    win = typeof window !== 'undefined' ? window : null,
+    options = {}
+) => {
     if (!win?.visualViewport) return 0;
+
+    const { baselineInnerHeight = 0, preferResizeLayout = false } = options;
     const vv = win.visualViewport;
-    return Math.max(0, Math.round(win.innerHeight - vv.offsetTop - vv.height));
+    let inset = Math.max(0, Math.round(win.innerHeight - vv.offsetTop - vv.height));
+
+    if (
+        preferResizeLayout &&
+        inset > 0 &&
+        typeof document !== 'undefined' &&
+        baselineInnerHeight > 0 &&
+        document.documentElement.clientHeight < baselineInnerHeight - 50
+    ) {
+        return 0;
+    }
+
+    if (inset === 0 && baselineInnerHeight > 0) {
+        const fallback = Math.round(baselineInnerHeight - vv.offsetTop - vv.height);
+        if (fallback > 50) {
+            inset = fallback;
+        }
+    }
+
+    return inset;
 };
 
 /**

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import useAuthStore from './stores/authStore';
 import useThemeStore from './stores/themeStore';
@@ -30,6 +30,8 @@ import Navbar from './components/Navbar';
 import NavigationListener from './components/NavigationListener';
 import { startOverflowDetector } from './utils/overflowDetector';
 import usePreventBrowserZoom from './hooks/usePreventBrowserZoom';
+import { isDesktopViewport } from './utils/platform';
+
 const AUTH_ROUTE_PREFIXES = ['/login', '/register', '/verify-email', '/forgot-password', '/reset-password'];
 const AI_CHAT_ROUTE_PREFIXES = ['/ai-chat'];
 
@@ -38,10 +40,28 @@ const matchesRoutePrefix = (pathname, prefixes) =>
 
 const AppShell = ({ children }) => {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const isAuthRoute = matchesRoutePrefix(pathname, AUTH_ROUTE_PREFIXES);
   const isAiChatRoute = matchesRoutePrefix(pathname, AI_CHAT_ROUTE_PREFIXES);
   const hideAiLauncher = isAuthRoute || isAiChatRoute;
   const hideGlobalNav = isAuthRoute;
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || isAuthRoute || isAiChatRoute) return undefined;
+    if (isDesktopViewport()) return undefined;
+
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('openAI') !== '1') return undefined;
+
+      params.delete('openAI');
+      const qs = params.toString();
+      navigate(`/ai-chat${qs ? `?${qs}` : ''}`, { replace: true });
+    } catch {
+      // ignore
+    }
+    return undefined;
+  }, [pathname, isAuthRoute, isAiChatRoute, navigate]);
 
   return (
     <>

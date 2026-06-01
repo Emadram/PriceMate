@@ -37,4 +37,12 @@ describe('computeKeyboardInsetBottom', () => {
         };
         expect(computeKeyboardInsetBottom(win)).toBe(0);
     });
+
+    it('uses baseline inner height when layout height already shrank but inset reads zero', () => {
+        const win = {
+            innerHeight: 500,
+            visualViewport: { height: 500, offsetTop: 0 },
+        };
+        expect(computeKeyboardInsetBottom(win, { baselineInnerHeight: 800 })).toBe(300);
+    });
 });

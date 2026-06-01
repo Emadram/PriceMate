@@ -1,7 +1,11 @@
 import { useEffect } from 'react';
+import { prefersKeyboardResizeViewport } from '../utils/platform';
+
+const RESIZES = 'interactive-widget=resizes-content';
+const OVERLAYS = 'interactive-widget=overlays-content';
 
 /**
- * On /ai-chat: keyboard overlays content (same model as Search) — do not resize the layout viewport.
+ * On /ai-chat: Android uses layout resize for keyboard; iOS uses overlay (stable tab bar).
  */
 export default function useAiChatViewportMeta(enabled = true) {
     useEffect(() => {
@@ -11,16 +15,24 @@ export default function useAiChatViewportMeta(enabled = true) {
         if (!meta) return undefined;
 
         const original = meta.getAttribute('content') || '';
-        const resizesContent = 'interactive-widget=resizes-content';
-        const overlaysContent = 'interactive-widget=overlays-content';
+        const useResize = prefersKeyboardResizeViewport();
+        const targetWidget = useResize ? RESIZES : OVERLAYS;
+        const otherWidget = useResize ? OVERLAYS : RESIZES;
 
         let next = original;
-        if (original.includes(resizesContent)) {
-            next = original.replace(resizesContent, overlaysContent);
-        } else if (!original.includes(overlaysContent)) {
-            next = original.trim().endsWith(',')
-                ? `${original} ${overlaysContent}`
-                : `${original}, ${overlaysContent}`;
+        if (next.includes(otherWidget)) {
+            next = next.replace(otherWidget, targetWidget);
+        } else if (!next.includes(targetWidget)) {
+            next = next.trim().endsWith(',')
+                ? `${next} ${targetWidget}`
+                : `${next}, ${targetWidget}`;
+        }
+
+        const root = document.documentElement;
+        if (useResize) {
+            root.classList.add('pricemate-ai-chat-keyboard-resize');
+        } else {
+            root.classList.remove('pricemate-ai-chat-keyboard-resize');
         }
 
         if (next !== original) {
@@ -29,6 +41,7 @@ export default function useAiChatViewportMeta(enabled = true) {
 
         return () => {
             meta.setAttribute('content', original);
+            root.classList.remove('pricemate-ai-chat-keyboard-resize');
         };
     }, [enabled]);
 }

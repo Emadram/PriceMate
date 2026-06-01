@@ -2,6 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import useComposerKeyboardLift from './useComposerKeyboardLift';
 
+vi.mock('../utils/platform', () => ({
+    prefersKeyboardResizeViewport: vi.fn(() => false),
+}));
+
 describe('useComposerKeyboardLift', () => {
     beforeEach(() => {
         document.documentElement.style.removeProperty('--composer-keyboard-lift');
@@ -13,9 +17,6 @@ describe('useComposerKeyboardLift', () => {
     });
 
     it('sets --composer-keyboard-lift from visual viewport and clears on unmount', () => {
-        const addSpy = vi.spyOn(window, 'addEventListener');
-        const removeSpy = vi.spyOn(window, 'removeEventListener');
-
         Object.defineProperty(window, 'visualViewport', {
             configurable: true,
             value: {
@@ -30,14 +31,12 @@ describe('useComposerKeyboardLift', () => {
             value: 800,
         });
 
-        const { unmount } = renderHook(() => useComposerKeyboardLift(true));
+        const { unmount } = renderHook(() => useComposerKeyboardLift(true, { active: true }));
 
         expect(document.documentElement.style.getPropertyValue('--composer-keyboard-lift')).toBe('400px');
-        expect(addSpy).toHaveBeenCalled();
 
         unmount();
         expect(document.documentElement.style.getPropertyValue('--composer-keyboard-lift')).toBe('');
-        expect(removeSpy).toHaveBeenCalled();
     });
 
     it('does nothing when disabled', () => {

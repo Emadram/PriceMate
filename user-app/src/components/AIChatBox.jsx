@@ -1020,7 +1020,8 @@ const buildRankedProductContextLines = (products, userHint, aiProfile = {}) => {
 
 const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
     const isPageVariant = variant === 'page';
-    useComposerKeyboardLift(isPageVariant && isOpen);
+    const [composerFocused, setComposerFocused] = useState(false);
+    useComposerKeyboardLift(isPageVariant && isOpen, { active: composerFocused });
     const { t, i18n } = useTranslation();
     const { convert, getCurrencySymbol, currency } = useCurrencyStore();
     const user = useAuthStore(state => state.user);
@@ -2194,11 +2195,13 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
 
     const handleComposerFocus = () => {
         composerFocusedRef.current = true;
+        setComposerFocused(true);
         requestAnimationFrame(() => scrollMessagesToBottom());
     };
 
     const handleComposerBlur = () => {
         composerFocusedRef.current = false;
+        setComposerFocused(false);
     };
 
     const renderConversationList = (afterPick) => {
@@ -2417,6 +2420,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                             <div className="relative flex items-end gap-2">
                                 <textarea
                                     ref={inputRef}
+                                    data-ai-composer-input
                                     rows={1}
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}

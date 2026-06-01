@@ -146,8 +146,6 @@ const MobileSplashScreen = () => {
                     )}
                 </div>
 
-                {/* The launcher button is rendered by FloatingAIChatLauncher and will position itself over the splash when attached. */}
-
                 <div className="mt-8 flex items-center gap-3">
                     <div className={`h-2.5 w-2.5 rounded-full bg-brand-500 ${shouldFade ? 'animate-none' : 'animate-pulse'}`} />
                     <div className={`h-2.5 w-2.5 rounded-full bg-brand-400 ${shouldFade ? 'animate-none' : 'animate-pulse'} delay-100`} />
