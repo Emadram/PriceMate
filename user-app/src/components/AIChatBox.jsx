@@ -1064,7 +1064,6 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
     const formRef = useRef(null);
     const composerStackRef = useRef(null);
     const composerFocusedRef = useRef(false);
-    const [composerStackHeight, setComposerStackHeight] = useState(72);
 
     const mobileQuickPrompts = [
         {
@@ -1177,22 +1176,6 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
     }, [input]);
 
     const isPage = variant === 'page';
-
-    useEffect(() => {
-        if (!isPage || !isOpen) return undefined;
-        const stack = composerStackRef.current;
-        if (!stack || typeof ResizeObserver === 'undefined') return undefined;
-
-        const measure = () => {
-            const h = Math.round(stack.getBoundingClientRect().height || 0);
-            if (h > 0) setComposerStackHeight(h);
-        };
-
-        measure();
-        const ro = new ResizeObserver(measure);
-        ro.observe(stack);
-        return () => ro.disconnect();
-    }, [isPage, isOpen, input, chatWriteError, mobileListOpen]);
 
     useEffect(() => {
         if (!isPage || !isOpen || typeof window === 'undefined') return undefined;
@@ -2125,18 +2108,12 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         ? 'px-4 py-3 sm:px-5 sm:py-4'
         : 'px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px)+var(--bottom-nav-h,0px))] sm:px-5 sm:py-4';
 
-    const pageMessagesPadStyle = isPage
-        ? {
-              paddingBottom: `calc(${composerStackHeight}px + var(--keyboard-inset-bottom, 0px) + 0.75rem)`,
-          }
-        : undefined;
-
     const composerStackClass = isPage
-        ? `shrink-0 max-md:fixed max-md:left-0 max-md:right-0 max-md:z-30 max-md:bottom-[calc(var(--keyboard-inset-bottom,0px)+var(--bottom-nav-h,0px))] ${mobileListOpen ? 'max-md:hidden' : ''}`
+        ? `shrink-0 border-t border-gray-100/80 dark:border-gray-700/50 ${mobileListOpen ? 'max-md:hidden' : ''}`
         : 'shrink-0';
 
     const composerFormClass = isPage
-        ? `${composerPadClass} pricemate-ai-composer-overlay border-t border-gray-100/80 dark:border-gray-700/50 sm:bg-white sm:dark:bg-gray-800 sm:border-gray-100 sm:dark:border-gray-700`
+        ? `${composerPadClass} max-md:pricemate-ai-composer-overlay border-t border-gray-100/80 dark:border-gray-700/50 sm:bg-white sm:dark:bg-gray-800 sm:border-gray-100 sm:dark:border-gray-700`
         : `${composerPadClass} bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700`;
 
     const handleComposerFocus = () => {
@@ -2283,7 +2260,6 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                         )}
                     <div
                         ref={messagesScrollRef}
-                        style={pageMessagesPadStyle}
                         className={
                             isPage
                                 ? 'flex-1 overflow-y-auto overscroll-contain px-4 pt-2.5 pb-3 space-y-3.5 bg-gray-50 dark:bg-gray-900 min-h-0'
@@ -2377,7 +2353,6 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                         )}
                         <div ref={messagesEndRef} />
                     </div>
-                    </div>
 
                     <div
                         ref={composerStackRef}
@@ -2441,6 +2416,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                                 </button>
                             </div>
                         </form>
+                    </div>
                     </div>
                 </div>
             </div>

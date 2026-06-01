@@ -1,10 +1,7 @@
 import { useEffect } from 'react';
 
-const RESIZES_CONTENT = 'interactive-widget=resizes-content';
-const OVERLAYS_CONTENT = 'interactive-widget=overlays-content';
-
 /**
- * On /ai-chat only: keyboard overlays content instead of resizing layout (ChatGPT-style).
+ * On /ai-chat: prefer layout resize when the keyboard opens (ChatGPT / Gemini style).
  */
 export default function useAiChatViewportMeta(enabled = true) {
     useEffect(() => {
@@ -14,17 +11,21 @@ export default function useAiChatViewportMeta(enabled = true) {
         if (!meta) return undefined;
 
         const original = meta.getAttribute('content') || '';
-                if (!original.includes('interactive-widget')) {
-                        return undefined;
-                }
+        const resizesContent = 'interactive-widget=resizes-content';
+        const overlaysContent = 'interactive-widget=overlays-content';
 
-                const next = original.includes(RESIZES_CONTENT)
-                        ? original.replace(RESIZES_CONTENT, OVERLAYS_CONTENT)
-                        : original.includes(OVERLAYS_CONTENT)
-                            ? original
-                            : original;
+        let next = original;
+        if (original.includes(overlaysContent)) {
+            next = original.replace(overlaysContent, resizesContent);
+        } else if (!original.includes(resizesContent)) {
+            next = original.trim().endsWith(',')
+                ? `${original} ${resizesContent}`
+                : `${original}, ${resizesContent}`;
+        }
 
-        meta.setAttribute('content', next);
+        if (next !== original) {
+            meta.setAttribute('content', next);
+        }
 
         return () => {
             meta.setAttribute('content', original);

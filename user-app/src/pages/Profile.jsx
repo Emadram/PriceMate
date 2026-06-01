@@ -3,7 +3,6 @@ import { Link, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import useAuthStore from '../stores/authStore';
 import { FiMessageSquare, FiChevronRight, FiLogOut, FiUser, FiGlobe, FiShield, FiHeart } from 'react-icons/fi';
-import BackButton from '../components/BackButton';
 import { MobileHeader, MobilePage } from '../components/MobilePageLayout';
 
 const ALLERGY_OPTIONS = [
@@ -102,7 +101,6 @@ const Profile = () => {
             <MobileHeader
                 title={t('profile')}
                 icon={FiUser}
-                left={<BackButton to="/" />}
             />
 
             <div className="max-w-md mx-auto px-5 sm:px-6 pt-5 sm:pt-6">

@@ -41,6 +41,15 @@ export default function useAppViewportHeight(enabled = true, options = {}) {
             root.style.setProperty('--app-vv-top', `${top}px`);
             root.style.setProperty('--keyboard-inset-bottom', `${keyboardInset}px`);
 
+            const bottomNavPx = Number.parseInt(
+                getComputedStyle(root).getPropertyValue('--bottom-nav-h') || '0',
+                10
+            ) || 0;
+            const shellH = keyboardInset > 0 ? h : Math.max(0, h - bottomNavPx);
+            if (shellH > 0) {
+                root.style.setProperty('--ai-chat-shell-h', `${shellH}px`);
+            }
+
             if (keyboardOverlayMode) {
                 if (keyboardInset > 0) {
                     body.classList.add('pricemate-ai-keyboard-overlay');
@@ -67,6 +76,7 @@ export default function useAppViewportHeight(enabled = true, options = {}) {
                 body.classList.remove('pricemate-ai-keyboard-overlay');
             }
             root.style.removeProperty('--keyboard-inset-bottom');
+            root.style.removeProperty('--ai-chat-shell-h');
         };
     }, [enabled, keyboardOverlayMode]);
 }
