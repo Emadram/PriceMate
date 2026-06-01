@@ -7,6 +7,7 @@ import {
     buildBackfillPayloads,
     createHistoryInBatches,
 } from '../utils/priceHistoryBackfill';
+import { buildOpeImportPayloads } from '../utils/openPriceEngineImport';
 
 const usePriceHistoryStore = create((set) => ({
     history: [],
@@ -177,6 +178,83 @@ const usePriceHistoryStore = create((set) => ({
                 skippedInvalid: 0,
                 failed: 0,
                 totalPrices: 0,
+                errors: [error.message],
+            };
+        }
+    },
+
+    /**
+     * Bulk-create price_history rows from normalized Open Price Engine data.
+     * @param {{ price: number, timestamp: string }[]} rows
+     * @param {{ productId: string, supermarketId: string, priceChangeReason?: string, opeStore?: string }} options
+     * @param {(progress: object) => void} [onProgress]
+     */
+    importHistoryBatch: async (rows, options, onProgress) => {
+        set({ loading: true, error: null });
+
+        const report = (patch) => onProgress?.(patch);
+
+        try {
+            const { payloads, skipped: skippedDupes } = buildOpeImportPayloads(rows, options);
+
+            if (payloads.length === 0) {
+                set({ loading: false });
+                return {
+                    success: true,
+                    createdCount: 0,
+                    skipped: skippedDupes,
+                    failed: 0,
+                    total: 0,
+                    errors: [],
+                };
+            }
+
+            report({
+                phase: 'creating',
+                processed: 0,
+                total: payloads.length,
+                created: 0,
+                skipped: skippedDupes,
+                failed: 0,
+            });
+
+            const { created, failed, errors } = await createHistoryInBatches(
+                payloads,
+                (payload) => db.priceHistory.create(payload),
+                {
+                    onProgress: (stats) => {
+                        report({
+                            phase: 'creating',
+                            processed: stats.processed,
+                            total: payloads.length,
+                            created: stats.created,
+                            skipped: skippedDupes,
+                            failed: stats.failed,
+                        });
+                    },
+                }
+            );
+
+            await usePriceHistoryStore.getState().fetchHistory();
+            set({ loading: false });
+
+            return {
+                success: true,
+                createdCount: created,
+                skipped: skippedDupes,
+                failed,
+                total: payloads.length,
+                errors,
+            };
+        } catch (error) {
+            console.error('OPE import batch error:', error);
+            set({ error: error.message, loading: false });
+            return {
+                success: false,
+                createdCount: 0,
+                skipped: 0,
+                failed: 0,
+                total: 0,
                 errors: [error.message],
             };
         }

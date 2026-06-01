@@ -14,8 +14,11 @@ export const isAndroidWebBrowser = () => {
 };
 
 /**
- * Android browsers often need layout viewport resize for keyboard avoidance;
- * iOS Safari keeps overlay mode so the bottom tab bar does not jump.
+ * Mobile browsers (including iOS) use layout viewport resize on /ai-chat so the
+ * header stays visible and the composer pins above the bottom tab bar.
  * @returns {boolean}
  */
-export const prefersKeyboardResizeViewport = () => isAndroidWebBrowser();
+export const prefersKeyboardResizeViewport = () => {
+    if (isDesktopViewport()) return false;
+    return true;
+};

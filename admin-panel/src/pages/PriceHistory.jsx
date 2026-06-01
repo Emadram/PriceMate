@@ -1,14 +1,34 @@
 import { useCallback, useEffect, useState } from 'react';
 import useFreshIndicator from '../hooks/useFreshIndicator';
-import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiX, FiClock, FiRefreshCw } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiX, FiClock, FiRefreshCw, FiDownload } from 'react-icons/fi';
 import Sidebar from '../components/Sidebar';
 import usePriceHistoryStore from '../stores/priceHistoryStore';
 import useProductsStore from '../stores/productsStore';
 import useSupermarketsStore from '../stores/supermarketsStore';
 import { client, DATABASE_ID, COLLECTIONS } from '../lib/appwrite';
+import { isOpeProxyConfigured, fetchOpeStores, fetchOpeHistoricalPrices } from '../utils/openPriceEngineClient';
+import { normalizeOpeHistoricalResponse } from '../utils/openPriceEngineNormalize';
+
+const OPE_DEFAULT_SUPERMARKET_ID = import.meta.env.VITE_OPE_IMPORT_SUPERMARKET_ID || '';
+
+const buildDefaultOpeForm = (supermarketId = '') => {
+    const end = new Date();
+    const start = new Date();
+    start.setFullYear(start.getFullYear() - 1);
+    return {
+        productId: '',
+        productname: '',
+        store: '',
+        start_date: start.toISOString().slice(0, 10),
+        end_date: end.toISOString().slice(0, 10),
+        currency: 'USD',
+        supermarketId,
+        priceChangeReason: 'Open Price Engine import',
+    };
+};
 
 const PriceHistory = () => {
-    const { history, loading, fetchHistory, addHistory, updateHistory, deleteHistory, backfillFromPrices } = usePriceHistoryStore();
+    const { history, loading, fetchHistory, addHistory, updateHistory, deleteHistory, backfillFromPrices, importHistoryBatch } = usePriceHistoryStore();
     const { products, fetchProducts } = useProductsStore();
     const { supermarkets, fetchSupermarkets } = useSupermarketsStore();
 
@@ -30,6 +50,17 @@ const PriceHistory = () => {
         priceChangeReason: ''
     });
 
+    const [showOpeModal, setShowOpeModal] = useState(false);
+    const [opeForm, setOpeForm] = useState(() => buildDefaultOpeForm(OPE_DEFAULT_SUPERMARKET_ID));
+    const [opeStores, setOpeStores] = useState([]);
+    const [opeStoresLoading, setOpeStoresLoading] = useState(false);
+    const [opeStoresError, setOpeStoresError] = useState('');
+    const [opePreview, setOpePreview] = useState([]);
+    const [opeFetchError, setOpeFetchError] = useState('');
+    const [opeFetching, setOpeFetching] = useState(false);
+    const [opeImporting, setOpeImporting] = useState(false);
+    const [opeImportProgress, setOpeImportProgress] = useState(null);
+
     const refreshData = useCallback(async () => {
         await Promise.all([
             fetchHistory(),
@@ -43,6 +74,138 @@ const PriceHistory = () => {
         const t = setTimeout(() => refreshData(), 0);
         return () => clearTimeout(t);
     }, [refreshData]);
+
+    useEffect(() => {
+        if (!showOpeModal || !isOpeProxyConfigured()) return undefined;
+
+        let cancelled = false;
+        const loadStores = async () => {
+            setOpeStoresLoading(true);
+            setOpeStoresError('');
+            try {
+                const stores = await fetchOpeStores();
+                if (!cancelled) {
+                    setOpeStores(stores);
+                    if (stores.length > 0) {
+                        setOpeForm((prev) => ({
+                            ...prev,
+                            store: prev.store || stores[0],
+                        }));
+                    }
+                }
+            } catch (err) {
+                if (!cancelled) {
+                    setOpeStoresError(err?.message || 'Failed to load OPE stores.');
+                }
+            } finally {
+                if (!cancelled) setOpeStoresLoading(false);
+            }
+        };
+
+        loadStores();
+        return () => {
+            cancelled = true;
+        };
+    }, [showOpeModal]);
+
+    const handleOpeProductChange = (productId) => {
+        const product = products.find((p) => p.$id === productId);
+        setOpeForm((prev) => ({
+            ...prev,
+            productId,
+            productname: product?.name || prev.productname,
+        }));
+    };
+
+    const openOpeModal = () => {
+        const defaultStore =
+            OPE_DEFAULT_SUPERMARKET_ID || supermarkets[0]?.$id || '';
+        setOpeForm(buildDefaultOpeForm(defaultStore));
+        setOpePreview([]);
+        setOpeFetchError('');
+        setOpeStoresError('');
+        setShowOpeModal(true);
+    };
+
+    const handleOpeFetch = async (e) => {
+        e.preventDefault();
+        setOpeFetchError('');
+        setOpeFetching(true);
+        setOpePreview([]);
+
+        try {
+            if (!isOpeProxyConfigured()) {
+                throw new Error('VITE_APPWRITE_FUNCTION_OFF_PROXY is not configured.');
+            }
+            const data = await fetchOpeHistoricalPrices({
+                store: opeForm.store,
+                productname: opeForm.productname,
+                start_date: opeForm.start_date,
+                end_date: opeForm.end_date,
+                currency: opeForm.currency,
+            });
+            const normalized = normalizeOpeHistoricalResponse(data);
+            if (normalized.length === 0) {
+                setOpeFetchError('No price points returned for this query. Try another store, product name, or date range.');
+            }
+            setOpePreview(normalized);
+        } catch (err) {
+            setOpeFetchError(err?.message || 'Failed to fetch prices.');
+        } finally {
+            setOpeFetching(false);
+        }
+    };
+
+    const handleOpeImport = async () => {
+        if (opePreview.length === 0) return;
+        if (!opeForm.productId || !opeForm.supermarketId) {
+            alert('Select a PriceMate product and storage supermarket before importing.');
+            return;
+        }
+
+        setOpeImporting(true);
+        setOpeImportProgress({
+            phase: 'creating',
+            processed: 0,
+            total: opePreview.length,
+            created: 0,
+            skipped: 0,
+            failed: 0,
+        });
+
+        const result = await importHistoryBatch(
+            opePreview,
+            {
+                productId: opeForm.productId,
+                supermarketId: opeForm.supermarketId,
+                priceChangeReason: opeForm.priceChangeReason,
+                opeStore: opeForm.store,
+            },
+            (progress) => setOpeImportProgress(progress)
+        );
+
+        setOpeImporting(false);
+        setOpeImportProgress(null);
+
+        if (!result?.success) {
+            alert(`Import failed: ${result?.errors?.[0] || 'Check console for details.'}`);
+            return;
+        }
+
+        alert(
+            [
+                `Created: ${result.createdCount}`,
+                `Skipped (duplicates/invalid): ${result.skipped}`,
+                `Failed: ${result.failed}`,
+            ].join('\n')
+        );
+        setShowOpeModal(false);
+    };
+
+    const opeImportPercent =
+        opeImportProgress?.total > 0
+            ? Math.min(100, Math.round((opeImportProgress.processed / opeImportProgress.total) * 100))
+            : 0;
 
     // `isFresh` indicator handled by useFreshIndicator to avoid rapid flicker
 
@@ -217,6 +380,14 @@ const PriceHistory = () => {
                         {backfilling ? 'Backfilling…' : 'Backfill from prices'}
                     </button>
                     <button
+                        type="button"
+                        onClick={openOpeModal}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl flex items-center gap-2 transition-all shadow-lg shadow-indigo-600/20 active:scale-95 text-[11px] font-black uppercase tracking-widest"
+                    >
+                        <FiDownload size={18} className="stroke-[2.5]" />
+                        Import from OPE
+                    </button>
+                    <button
                         onClick={() => {
                             setEditing(null);
                             setFormData({
@@ -347,6 +518,255 @@ const PriceHistory = () => {
                     )}
                 </main>
             </div>
+
+            {showOpeModal && (
+                <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[1000] overflow-y-auto">
+                    <div
+                        className={`bg-white dark:bg-gray-800 rounded-[2.5rem] w-full p-10 shadow-2xl border border-gray-100 dark:border-gray-700 animate-in zoom-in-95 duration-200 my-8 ${
+                            opePreview.length > 0 ? 'max-w-3xl' : 'max-w-lg'
+                        }`}
+                    >
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight uppercase">
+                                Import from Open Price Engine
+                            </h2>
+                            <button
+                                type="button"
+                                onClick={() => setShowOpeModal(false)}
+                                className="text-gray-400 hover:text-gray-900 transition-colors bg-gray-50 dark:bg-gray-900 p-2 rounded-xl"
+                            >
+                                <FiX size={20} />
+                            </button>
+                        </div>
+
+                        {!isOpeProxyConfigured() && (
+                            <div className="mb-6 rounded-2xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-5 py-4 text-sm font-bold text-amber-800 dark:text-amber-200">
+                                Set <code className="text-xs">VITE_APPWRITE_FUNCTION_OFF_PROXY</code> in the admin
+                                panel <code className="text-xs">.env</code> and redeploy{' '}
+                                <code className="text-xs">off-proxy</code> with{' '}
+                                <code className="text-xs">OPENPRICEENGINE_API_KEY</code> on the function.
+                            </div>
+                        )}
+
+                        {(opeStoresError || opeFetchError) && (
+                            <div className="mb-6 rounded-2xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-5 py-4 text-sm font-bold text-red-700 dark:text-red-300">
+                                {opeFetchError || opeStoresError}
+                            </div>
+                        )}
+
+                        <form onSubmit={handleOpeFetch} className="space-y-5">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
+                                    PriceMate product
+                                </label>
+                                <select
+                                    value={opeForm.productId}
+                                    onChange={(e) => handleOpeProductChange(e.target.value)}
+                                    className="w-full bg-gray-50 dark:bg-gray-900 border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-500/20 outline-none text-sm font-bold text-gray-900 dark:text-white appearance-none cursor-pointer"
+                                    required
+                                >
+                                    <option value="">Select product</option>
+                                    {products.map((product) => (
+                                        <option key={product.$id} value={product.$id}>
+                                            {product.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
+                                    Product name for OPE
+                                </label>
+                                <input
+                                    type="text"
+                                    value={opeForm.productname}
+                                    onChange={(e) => setOpeForm({ ...opeForm, productname: e.target.value })}
+                                    className="w-full bg-gray-50 dark:bg-gray-900 border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-500/20 outline-none text-gray-900 dark:text-white font-bold"
+                                    placeholder="e.g. milk"
+                                    required
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
+                                    OPE store
+                                </label>
+                                <select
+                                    value={opeForm.store}
+                                    onChange={(e) => setOpeForm({ ...opeForm, store: e.target.value })}
+                                    className="w-full bg-gray-50 dark:bg-gray-900 border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-500/20 outline-none text-sm font-bold text-gray-900 dark:text-white appearance-none cursor-pointer"
+                                    required
+                                    disabled={opeStoresLoading}
+                                >
+                                    <option value="">
+                                        {opeStoresLoading ? 'Loading stores…' : 'Select OPE store'}
+                                    </option>
+                                    {opeStores.map((store) => (
+                                        <option key={store} value={store}>
+                                            {store}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
+                                        Start date
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={opeForm.start_date}
+                                        onChange={(e) => setOpeForm({ ...opeForm, start_date: e.target.value })}
+                                        className="w-full bg-gray-50 dark:bg-gray-900 rounded-2xl px-5 py-4 font-bold text-gray-900 dark:text-white"
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
+                                        End date
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={opeForm.end_date}
+                                        onChange={(e) => setOpeForm({ ...opeForm, end_date: e.target.value })}
+                                        className="w-full bg-gray-50 dark:bg-gray-900 rounded-2xl px-5 py-4 font-bold text-gray-900 dark:text-white"
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
+                                        Currency (optional)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={opeForm.currency}
+                                        onChange={(e) => setOpeForm({ ...opeForm, currency: e.target.value })}
+                                        className="w-full bg-gray-50 dark:bg-gray-900 rounded-2xl px-5 py-4 font-bold text-gray-900 dark:text-white"
+                                        placeholder="USD"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
+                                        Storage store (internal only)
+                                    </label>
+                                    <select
+                                        value={opeForm.supermarketId}
+                                        onChange={(e) => setOpeForm({ ...opeForm, supermarketId: e.target.value })}
+                                        className="w-full bg-gray-50 dark:bg-gray-900 border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-500/20 outline-none text-sm font-bold text-gray-900 dark:text-white appearance-none cursor-pointer"
+                                        required
+                                    >
+                                        <option value="">Select supermarket</option>
+                                        {supermarkets.map((market) => (
+                                            <option key={market.$id} value={market.$id}>
+                                                {market.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
+                                    Price change reason
+                                </label>
+                                <input
+                                    type="text"
+                                    value={opeForm.priceChangeReason}
+                                    onChange={(e) => setOpeForm({ ...opeForm, priceChangeReason: e.target.value })}
+                                    className="w-full bg-gray-50 dark:bg-gray-900 rounded-2xl px-5 py-4 font-bold text-gray-900 dark:text-white"
+                                />
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={opeFetching || opeImporting || !isOpeProxyConfigured()}
+                                className="w-full bg-brand-600 text-white px-6 py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-brand-700 transition-all disabled:opacity-60"
+                            >
+                                {opeFetching ? 'Fetching…' : 'Fetch prices'}
+                            </button>
+                        </form>
+
+                        {opePreview.length > 0 && (
+                            <div className="mt-8 space-y-4">
+                                <p className="text-[11px] font-black uppercase tracking-widest text-gray-500">
+                                    Preview ({opePreview.length} points)
+                                </p>
+                                <div className="max-h-64 overflow-y-auto rounded-2xl border border-gray-100 dark:border-gray-700">
+                                    <table className="min-w-full text-sm">
+                                        <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0">
+                                            <tr>
+                                                <th className="px-4 py-3 text-left text-[10px] font-black uppercase text-gray-400">
+                                                    Date
+                                                </th>
+                                                <th className="px-4 py-3 text-left text-[10px] font-black uppercase text-gray-400">
+                                                    Price
+                                                </th>
+                                                <th className="px-4 py-3 text-left text-[10px] font-black uppercase text-gray-400">
+                                                    OPE store label
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
+                                            {opePreview.map((row) => (
+                                                <tr key={`${row.timestamp}-${row.price}`}>
+                                                    <td className="px-4 py-2 font-bold text-gray-700 dark:text-gray-200">
+                                                        {new Date(row.timestamp).toLocaleDateString()}
+                                                    </td>
+                                                    <td className="px-4 py-2 font-bold">{row.price}</td>
+                                                    <td className="px-4 py-2 text-gray-500">{row.rawStore || '—'}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                {opeImporting && opeImportProgress && (
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between text-[11px] font-bold text-gray-600 dark:text-gray-300">
+                                            <span>Importing…</span>
+                                            <span>
+                                                {opeImportProgress.processed} / {opeImportProgress.total} · created{' '}
+                                                {opeImportProgress.created} · failed {opeImportProgress.failed}
+                                            </span>
+                                        </div>
+                                        <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-900 overflow-hidden">
+                                            <div
+                                                className="h-full bg-indigo-600 transition-all duration-300"
+                                                style={{ width: `${opeImportPercent}%` }}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="flex gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowOpeModal(false)}
+                                        className="flex-1 bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-200 px-6 py-4 rounded-2xl font-black uppercase tracking-widest text-xs"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleOpeImport}
+                                        disabled={opeImporting || opeFetching}
+                                        className="flex-1 bg-indigo-600 text-white px-6 py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-indigo-700 disabled:opacity-60"
+                                    >
+                                        {opeImporting
+                                            ? 'Importing…'
+                                            : `Import ${opePreview.length} entries`}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {showModal && (
                 <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[1000]">

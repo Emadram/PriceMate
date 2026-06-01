@@ -1,4 +1,5 @@
 const OFF_API_BASE = 'https://world.openfoodfacts.org';
+const OPE_API_BASE = 'https://openpricengine.com/api/v1';
 
 // Simple TTL LRU cache
 class SimpleCache {
@@ -107,7 +108,7 @@ async function fetchWithRetry(url, opts = {}, maxRetries = 4, log) {
             // network / aborted
             const base = 300 * Math.pow(2, attempt);
             const jitter = Math.random() * base * 0.5;
-            if (log) log(`OFF proxy fetch attempt ${attempt} failed: ${String(err)}; retrying after ${Math.round(base + jitter)}ms`);
+            if (log) log(`Proxy fetch attempt ${attempt} failed: ${String(err)}; retrying after ${Math.round(base + jitter)}ms`);
             await sleep(base + jitter);
             attempt++;
             continue;
@@ -115,6 +116,108 @@ async function fetchWithRetry(url, opts = {}, maxRetries = 4, log) {
     }
     throw lastErr || new Error('Fetch failed after retries');
 }
+
+const parseOpeStoresList = (data) => {
+    const pickName = (item) => {
+        if (!item) return '';
+        if (typeof item === 'string') return item.trim();
+        return String(
+            item.store ||
+                item.name ||
+                item.store_name ||
+                item.slug ||
+                item.id ||
+                ''
+        ).trim();
+    };
+
+    if (!data) return [];
+    if (Array.isArray(data)) {
+        return [...new Set(data.map(pickName).filter(Boolean))].sort();
+    }
+    if (Array.isArray(data.stores)) {
+        return [...new Set(data.stores.map(pickName).filter(Boolean))].sort();
+    }
+    if (typeof data === 'object') {
+        const values = Object.values(data).flatMap((v) => {
+            if (Array.isArray(v)) return v.map(pickName);
+            return [pickName(v)];
+        });
+        return [...new Set(values.filter(Boolean))].sort();
+    }
+    return [];
+};
+
+const buildOpeHistoricalUrl = (payload) => {
+    const store = String(payload.store || '').trim();
+    const productname = String(payload.productname || payload.productName || '').trim();
+    const startDate = String(payload.start_date || payload.startDate || '').trim();
+    const endDate = String(payload.end_date || payload.endDate || '').trim();
+
+    if (!store || !productname || !startDate || !endDate) {
+        return { error: 'Missing store, productname, start_date, or end_date.' };
+    }
+
+    const params = new URLSearchParams();
+    params.set('productname', productname);
+    params.set('start_date', startDate);
+    params.set('end_date', endDate);
+    const currency = String(payload.currency || '').trim();
+    if (currency && currency.toLowerCase() !== 'default') {
+        params.set('currency', currency);
+    }
+
+    const url = `${OPE_API_BASE}/${encodeURIComponent(store)}/products/query?${params.toString()}`;
+    return { url };
+};
+
+const runProxiedFetch = async ({ cacheKey, url, cacheTtl, fetchOpts, transform, log }) => {
+    const cached = cache.get(cacheKey);
+    if (cached) {
+        log(`Proxy cache hit: ${cacheKey}`);
+        return { status: 200, data: cached };
+    }
+
+    if (inflight.has(cacheKey)) {
+        log(`Proxy dedupe wait: ${cacheKey}`);
+        try {
+            return await inflight.get(cacheKey);
+        } catch {
+            inflight.delete(cacheKey);
+        }
+    }
+
+    const fetchPromise = (async () => {
+        try {
+            const response = await fetchWithRetry(url, fetchOpts, 4, log);
+            const contentType = response.headers.get('content-type') || '';
+            let data = contentType.includes('application/json')
+                ? await response.json()
+                : await response.text();
+
+            if (!response.ok) {
+                throw { status: response.status, data };
+            }
+
+            if (transform) {
+                data = transform(data);
+            }
+
+            try {
+                cache.set(cacheKey, data, cacheTtl);
+            } catch {
+                // ignore cache set errors
+            }
+
+            return { status: response.status, data };
+        } finally {
+            inflight.delete(cacheKey);
+        }
+    })();
+
+    inflight.set(cacheKey, fetchPromise);
+    return fetchPromise;
+};
 
 module.exports = async ({ req, res, log, error }) => {
     try {
@@ -127,6 +230,9 @@ module.exports = async ({ req, res, log, error }) => {
 
         let url = '';
         let cacheTtl = 0;
+        let fetchOpts = { timeout: 10000 };
+        let transform = null;
+
         if (kind === 'barcode') {
             const barcode = String(payload.barcode || '').trim();
             if (!barcode) {
@@ -142,66 +248,84 @@ module.exports = async ({ req, res, log, error }) => {
             const pageSize = Math.min(Math.max(Number(payload.pageSize || 5), 1), 20);
             url = `${OFF_API_BASE}/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=${pageSize}`;
             cacheTtl = 1000 * 60 * 10; // 10 minutes for searches
+        } else if (kind === 'ope_stores') {
+            const apiKey = process.env.OPENPRICEENGINE_API_KEY || '';
+            if (!apiKey) {
+                return res.json(
+                    {
+                        ok: false,
+                        status: 500,
+                        error: 'OPENPRICEENGINE_API_KEY is not configured on off-proxy.',
+                    },
+                    500
+                );
+            }
+            url = `${OPE_API_BASE}/stores`;
+            cacheTtl = 1000 * 60 * 60 * 6;
+            fetchOpts = {
+                timeout: 15000,
+                headers: {
+                    accept: 'application/json',
+                    Authorization: apiKey,
+                },
+            };
+            transform = (data) => ({ stores: parseOpeStoresList(data) });
+        } else if (kind === 'ope_historical') {
+            const apiKey = process.env.OPENPRICEENGINE_API_KEY || '';
+            if (!apiKey) {
+                return res.json(
+                    {
+                        ok: false,
+                        status: 500,
+                        error: 'OPENPRICEENGINE_API_KEY is not configured on off-proxy.',
+                    },
+                    500
+                );
+            }
+            const built = buildOpeHistoricalUrl(payload);
+            if (built.error) {
+                return res.json({ ok: false, status: 400, error: built.error }, 400);
+            }
+            url = built.url;
+            cacheTtl = 1000 * 60 * 15;
+            fetchOpts = {
+                timeout: 15000,
+                headers: {
+                    accept: 'application/json',
+                    Authorization: apiKey,
+                },
+            };
         } else {
-            return res.json({ ok: false, status: 400, error: 'Unsupported kind.' }, 400);
+            return res.json(
+                {
+                    ok: false,
+                    status: 400,
+                    error: 'Unsupported kind. Use barcode, search, ope_stores, or ope_historical.',
+                },
+                400
+            );
         }
 
         const cacheKey = url;
+        const result = await runProxiedFetch({
+            cacheKey,
+            url,
+            cacheTtl,
+            fetchOpts,
+            transform,
+            log,
+        });
 
-        // Return cached value if present
-        const cached = cache.get(cacheKey);
-        if (cached) {
-            log(`OFF proxy cache hit: ${cacheKey}`);
-            return res.json({ ok: true, status: 200, data: cached }, 200);
-        }
-
-        // Inflight dedupe
-        if (inflight.has(cacheKey)) {
-            log(`OFF proxy dedupe wait: ${cacheKey}`);
-            try {
-                const result = await inflight.get(cacheKey);
-                return res.json({ ok: true, status: result.status || 200, data: result.data }, result.status || 200);
-            } catch (err) {
-                // previous inflight failed, continue to fetch
-                inflight.delete(cacheKey);
-            }
-        }
-
-        const fetchPromise = (async () => {
-            try {
-                const response = await fetchWithRetry(url, { timeout: 10000 }, 4, log);
-                const contentType = response.headers.get('content-type') || '';
-                const data = contentType.includes('application/json')
-                    ? await response.json()
-                    : await response.text();
-
-                if (!response.ok) {
-                    throw { status: response.status, data };
-                }
-
-                // store in cache
-                try {
-                    cache.set(cacheKey, data, cacheTtl);
-                } catch (e) {
-                    // ignore cache set errors
-                }
-
-                return { status: response.status, data };
-            } catch (err) {
-                throw err;
-            } finally {
-                inflight.delete(cacheKey);
-            }
-        })();
-
-        inflight.set(cacheKey, fetchPromise);
-
-        const result = await fetchPromise;
         return res.json({ ok: true, status: result.status || 200, data: result.data }, result.status || 200);
     } catch (err) {
         error(err);
         if (err && err.status) {
-            return res.json({ ok: false, status: err.status, error: 'OFF request failed.', data: err.data }, err.status);
+            const opeKinds = ['ope_stores', 'ope_historical'];
+            const kind = String(parsePayload(req).kind || '').toLowerCase();
+            const message = opeKinds.includes(kind)
+                ? 'Open Price Engine request failed.'
+                : 'OFF request failed.';
+            return res.json({ ok: false, status: err.status, error: message, data: err.data }, err.status);
         }
         return res.json({ ok: false, status: 500, error: 'Proxy error.' }, 500);
     }

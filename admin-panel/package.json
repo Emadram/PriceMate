@@ -9,6 +9,8 @@
     "lint": "eslint .",
     "test:coordinates": "node scripts/coordinateValidation.smoke.mjs",
     "test:price-history-backfill": "node scripts/priceHistoryBackfill.test.mjs",
+    "test:ope": "node scripts/openPriceEngineNormalize.test.mjs && node scripts/openPriceEngineImport.test.mjs",
+    "test": "npm run test:price-history-backfill && npm run test:ope",
     "preview": "vite preview"
   },
   "dependencies": {

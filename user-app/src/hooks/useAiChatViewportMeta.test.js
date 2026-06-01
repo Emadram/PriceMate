@@ -28,7 +28,8 @@ describe('useAiChatViewportMeta', () => {
         document.documentElement.classList.remove('pricemate-ai-chat-keyboard-resize');
     });
 
-    it('adds interactive-widget=overlays-content on iOS-style platforms', () => {
+    it('adds interactive-widget=overlays-content when resize is not preferred (desktop)', () => {
+        vi.mocked(prefersKeyboardResizeViewport).mockReturnValue(false);
         const { unmount } = renderHook(() => useAiChatViewportMeta(true));
         expect(meta.getAttribute('content')).toContain('interactive-widget=overlays-content');
         expect(meta.getAttribute('content')).not.toContain('interactive-widget=resizes-content');
