@@ -54,6 +54,14 @@ export const executionFailureMessage = (execution) => {
     }
     if (logs) return logs.slice(0, 500);
 
+    if (code === 503) {
+        return (
+            'Function runtime unavailable (HTTP 503). Redeploy off-proxy with entrypoint ' +
+            'src/main.js, Node 18+, an active Ready deployment, and timeout ≥ 30s. ' +
+            CONSOLE_LOG_HINT
+        );
+    }
+
     const codeSuffix = code ? ` (HTTP ${code})` : '';
     return `Function runtime failed${codeSuffix}. ${CONSOLE_LOG_HINT}`;
 };

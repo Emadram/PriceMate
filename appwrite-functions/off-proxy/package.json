@@ -2,8 +2,9 @@
   "name": "off-proxy",
   "version": "1.0.0",
   "private": true,
-  "main": "src/index.js",
+  "type": "module",
+  "main": "src/main.js",
   "engines": {
-    "node": "18.x"
+    "node": ">=18"
   }
 }

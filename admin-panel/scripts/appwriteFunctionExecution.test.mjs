@@ -27,4 +27,7 @@ const runtimeFailed = parseFunctionExecutionJson({ status: 'failed', responseSta
 assert.equal(runtimeFailed.ok, false);
 assert.match(runtimeFailed.error, /runtime failed|Executions/i);
 
+const unavailable = parseFunctionExecutionJson({ status: 'failed', responseStatusCode: 503 });
+assert.match(unavailable.error, /503|src\/main\.js/i);
+
 console.log('appwriteFunctionExecution.test.mjs: OK');
