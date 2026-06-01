@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getMobileSplashIconSrc } from '../utils/splashIcon';
+import AppLogo from './AppLogo';
 
 const MOBILE_SPLASH_KEY = 'pricemate-mobile-splash-seen';
 const SCROLL_KEY_PREFIX = 'pricemate-scroll:';
@@ -28,7 +28,6 @@ const MobileSplashScreen = () => {
         () => typeof document !== 'undefined' && document.readyState === 'complete'
     );
     const isDark = isDarkModeActive();
-    const splashIconSrc = useMemo(() => getMobileSplashIconSrc(), []);
 
     useEffect(() => {
         if (typeof window === 'undefined') return undefined;
@@ -116,14 +115,11 @@ const MobileSplashScreen = () => {
         >
             <div className={`absolute inset-0 ${isDark ? 'bg-[radial-gradient(circle_at_top,rgba(124,58,237,0.24),transparent_38%),linear-gradient(180deg,rgba(2,6,23,1),rgba(15,23,42,1))]' : 'bg-[radial-gradient(circle_at_top,rgba(124,58,237,0.2),transparent_38%),linear-gradient(180deg,#faf5ff,#ffffff)]'}`} />
             <div className="relative flex w-full max-w-sm flex-col items-center px-8 text-center touch-none">
-                <img
-                    src={splashIconSrc}
-                    alt="PriceMate"
+                <AppLogo
+                    size="lg"
                     width={128}
                     height={128}
-                    className={`mb-8 h-32 w-32 object-contain shadow-[0_20px_60px_rgba(109,40,217,0.35)] ${shouldFade ? '' : 'animate-splash-glow'}`}
-                    loading="eager"
-                    decoding="async"
+                    className={`mb-8 shadow-[0_20px_60px_rgba(109,40,217,0.35)] ${shouldFade ? '' : 'animate-splash-glow'}`}
                 />
 
                 <div className="space-y-2">

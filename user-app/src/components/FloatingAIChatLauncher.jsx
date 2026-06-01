@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { FiCpu } from 'react-icons/fi';
+import AppLogo from './AppLogo';
 import { isDesktopViewport } from '../utils/platform';
 
 const AIChatBox = lazy(() => import('./AIChatBox'));
@@ -106,7 +106,12 @@ const FloatingAIChatLauncher = () => {
                         title="AI Assistant"
                         aria-label="Open AI Assistant"
                     >
-                        <FiCpu className="h-8 w-8" aria-hidden />
+                        <AppLogo
+                            variant="ai"
+                            size="fab"
+                            alt=""
+                            shellClassName="!border-0 !shadow-none bg-white"
+                        />
                     </button>
                 )}
             </div>

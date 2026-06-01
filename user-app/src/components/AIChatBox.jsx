@@ -369,6 +369,7 @@ import { createFunctionExecutionJson } from '../utils/appwriteFunctionExecution'
 import useCurrencyStore from '../stores/currencyStore';
 import useAuthStore from '../stores/authStore';
 import useChatStore, { CHAT_ERROR_MISSING_CONVERSATION_ID } from '../stores/chatStore';
+import AppLogo from './AppLogo';
 
 const ChatScreenHeader = ({
     variant,
@@ -385,7 +386,6 @@ const ChatScreenHeader = ({
 }) => {
     const isPage = variant === 'page';
     const iosFixedChrome = isPage && usesAiChatFixedMobileChrome();
-    const [logoFailed, setLogoFailed] = useState(false);
 
     return (
         <>
@@ -417,20 +417,7 @@ const ChatScreenHeader = ({
                     ) : (
                         <span className="w-10 shrink-0 sm:hidden" aria-hidden />
                     )}
-                    <div className="w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 overflow-hidden">
-                        {!logoFailed ? (
-                            <img
-                                src="/favicon.svg"
-                                alt=""
-                                className="h-9 w-9 object-contain rounded-2xl"
-                                loading="eager"
-                                decoding="async"
-                                onError={() => setLogoFailed(true)}
-                            />
-                        ) : (
-                            <FiCpu className="text-lg text-brand-600 dark:text-brand-400" aria-hidden />
-                        )}
-                    </div>
+                    <AppLogo variant="ai" size="xs" alt="" shellClassName="shadow-none" />
                     <div className="flex-1 min-w-0 flex flex-col justify-center">
                         <div className="flex items-center gap-2 min-w-0 leading-none">
                             <h1 className="font-black text-sm sm:text-[15px] truncate normal-case tracking-tight text-brand-700 dark:text-brand-400">

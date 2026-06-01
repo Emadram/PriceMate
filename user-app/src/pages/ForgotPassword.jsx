@@ -4,6 +4,7 @@ import { Mail, ArrowRight, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import useAuthStore from '../stores/authStore';
 import BackButton from '../components/BackButton';
+import AppLogo from '../components/AppLogo';
 
 const ForgotPassword = () => {
     const { t } = useTranslation();
@@ -57,15 +58,7 @@ const ForgotPassword = () => {
 
             <div className="sm:mx-auto sm:w-full sm:max-w-md relative">
                 <div className="flex justify-center mb-8">
-                    <div className="w-16 h-16 bg-white/90 dark:bg-gray-900/60 rounded-[2rem] flex items-center justify-center shadow-xl shadow-brand-500/20 active:scale-95 transition-transform cursor-pointer border border-gray-100/70 dark:border-gray-800/60 overflow-hidden">
-                        <img
-                            src="/LogoPriceMate.png"
-                            alt="PriceMate"
-                            className="h-full w-full object-contain p-2"
-                            loading="eager"
-                            decoding="async"
-                        />
-                    </div>
+                    <AppLogo size="md" shellClassName="shadow-xl shadow-brand-500/20 dark:shadow-brand-900/40 active:scale-95 transition-transform cursor-pointer" />
                 </div>
 
                 <h2 className="text-center text-4xl font-black tracking-tight text-gray-900 dark:text-white">

@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import useAuthStore from '../stores/authStore';
 import useCurrencyStore from '../stores/currencyStore';
 import useThemeStore from '../stores/themeStore';
+import AppLogo from './AppLogo';
 
 const Navbar = () => {
     const { t, i18n } = useTranslation();
@@ -76,15 +77,7 @@ const Navbar = () => {
                         {/* Logo */}
                         <div className="flex items-center">
                                 <Link to="/" className="flex-shrink-0 flex items-center gap-2 group">
-                                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/90 dark:bg-gray-900/60 shadow-lg shadow-brand-500/20 group-hover:scale-105 transition-transform border border-gray-100/70 dark:border-gray-800/60 overflow-hidden">
-                                    <img
-                                        src="/LogoPriceMate.png"
-                                        alt="PriceMate"
-                                        className="h-full w-full object-contain p-1"
-                                        loading="eager"
-                                        decoding="async"
-                                    />
-                                </div>
+                                <AppLogo size="sm" shellClassName="group-hover:scale-105 transition-transform" />
                                 <span className="font-black text-2xl text-gray-900 dark:text-white hidden sm:block tracking-tighter">
                                     PriceMate
                                 </span>
