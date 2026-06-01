@@ -62,26 +62,6 @@
     overflow: hidden;
   }
 
-  body.pricemate-ai-chat-page .pricemate-immersive-shell {
-    height: var(--ai-chat-shell-h, var(--app-dvh, 100dvh));
-    max-height: var(--ai-chat-shell-h, var(--app-dvh, 100dvh));
-  }
-
-  .pricemate-immersive-shell {
-    position: fixed;
-    top: var(--app-vv-top, 0px);
-    left: 0;
-    right: 0;
-    bottom: auto;
-    height: var(--ai-chat-shell-h, calc(var(--app-dvh, 100dvh) - var(--bottom-nav-h, 0px)));
-    max-height: var(--ai-chat-shell-h, calc(var(--app-dvh, 100dvh) - var(--bottom-nav-h, 0px)));
-    z-index: 40;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    background-color: #ffffff;
-  }
-
   .pricemate-ai-composer-overlay {
     background-color: rgb(255 255 255 / 0.88);
     backdrop-filter: blur(16px);
@@ -90,26 +70,6 @@
 
   .dark .pricemate-ai-composer-overlay {
     background-color: rgb(17 24 39 / 0.9);
-  }
-
-  .dark .pricemate-immersive-shell {
-    background-color: #111827;
-  }
-
-  @media (min-width: 768px) {
-    .pricemate-immersive-shell {
-      position: static;
-      top: auto;
-      left: auto;
-      right: auto;
-      bottom: auto;
-      z-index: auto;
-      background-color: transparent;
-    }
-
-    .dark .pricemate-immersive-shell {
-      background-color: transparent;
-    }
   }
 
   .pricemate-mobile-chrome {

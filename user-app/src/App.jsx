@@ -30,10 +30,8 @@ import Navbar from './components/Navbar';
 import NavigationListener from './components/NavigationListener';
 import { startOverflowDetector } from './utils/overflowDetector';
 import usePreventBrowserZoom from './hooks/usePreventBrowserZoom';
-import { unlockDocumentScroll } from './utils/documentScrollLock';
-
 const AUTH_ROUTE_PREFIXES = ['/login', '/register', '/verify-email', '/forgot-password', '/reset-password'];
-const IMMERSIVE_ROUTE_PREFIXES = ['/ai-chat'];
+const AI_CHAT_ROUTE_PREFIXES = ['/ai-chat'];
 
 const matchesRoutePrefix = (pathname, prefixes) =>
   prefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`));
@@ -41,26 +39,15 @@ const matchesRoutePrefix = (pathname, prefixes) =>
 const AppShell = ({ children }) => {
   const { pathname } = useLocation();
   const isAuthRoute = matchesRoutePrefix(pathname, AUTH_ROUTE_PREFIXES);
-  const isImmersiveRoute = matchesRoutePrefix(pathname, IMMERSIVE_ROUTE_PREFIXES);
-  const hideAiLauncher = isAuthRoute || isImmersiveRoute;
+  const isAiChatRoute = matchesRoutePrefix(pathname, AI_CHAT_ROUTE_PREFIXES);
+  const hideAiLauncher = isAuthRoute || isAiChatRoute;
   const hideGlobalNav = isAuthRoute;
-  const immersiveShellClass = isImmersiveRoute
-    ? 'pricemate-immersive-shell md:relative md:static md:h-auto md:overflow-visible md:flex-none'
-    : '';
-
-  useEffect(() => {
-    if (!isImmersiveRoute) {
-      unlockDocumentScroll();
-    }
-  }, [isImmersiveRoute]);
 
   return (
     <>
       {!hideGlobalNav && <Navbar />}
-      <div className={`overflow-x-hidden pt-safe md:pt-0 ${immersiveShellClass}`}>
-        <div className={isImmersiveRoute ? 'h-full min-h-0 overflow-hidden flex flex-col md:h-auto md:overflow-visible' : undefined}>
+      <div className="overflow-x-hidden pt-safe md:pt-0">
           {children}
-        </div>
       </div>
       {!hideAiLauncher && <FloatingAIChatLauncher />}
     </>

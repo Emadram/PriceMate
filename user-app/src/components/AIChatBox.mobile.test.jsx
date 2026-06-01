@@ -580,19 +580,19 @@ describe('AIChatBox — page variant immersive header', () => {
         expect(handles.length).toBe(0);
     });
 
-    it('page variant composer sits in flex column on mobile (keyboard resizes shell)', () => {
+    it('page variant composer is fixed above bottom nav on mobile (keyboard overlay)', () => {
         const { getByTestId } = render(
             <AIChatBox isOpen={true} onClose={() => {}} variant="page" />
         );
 
         const stack = getByTestId('ai-chat-composer-stack');
-        expect(stack.className).not.toMatch(/max-md:fixed/);
-        expect(stack.className).toMatch(/shrink-0/);
+        expect(stack.className).toMatch(/max-md:fixed/);
+        expect(stack.className).toMatch(/bottom-nav-h/);
+        expect(stack.className).toMatch(/composer-keyboard-lift/);
 
         const form = getByTestId('ai-chat-composer-form');
         expect(form.className).toMatch(/max-md:bg-white/);
         expect(form.className).not.toMatch(/pricemate-ai-composer-overlay/);
-        expect(form.className).not.toContain('bottom-nav-h');
     });
 
     it('drawer variant composer reserves bottom-nav height above tab bar', () => {

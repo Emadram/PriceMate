@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 
 /**
- * On /ai-chat: prefer layout resize when the keyboard opens (ChatGPT / Gemini style).
+ * On /ai-chat: keyboard overlays content (same model as Search) — do not resize the layout viewport.
  */
 export default function useAiChatViewportMeta(enabled = true) {
     useEffect(() => {
@@ -15,12 +15,12 @@ export default function useAiChatViewportMeta(enabled = true) {
         const overlaysContent = 'interactive-widget=overlays-content';
 
         let next = original;
-        if (original.includes(overlaysContent)) {
-            next = original.replace(overlaysContent, resizesContent);
-        } else if (!original.includes(resizesContent)) {
+        if (original.includes(resizesContent)) {
+            next = original.replace(resizesContent, overlaysContent);
+        } else if (!original.includes(overlaysContent)) {
             next = original.trim().endsWith(',')
-                ? `${original} ${resizesContent}`
-                : `${original}, ${resizesContent}`;
+                ? `${original} ${overlaysContent}`
+                : `${original}, ${overlaysContent}`;
         }
 
         if (next !== original) {

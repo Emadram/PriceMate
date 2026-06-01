@@ -348,6 +348,7 @@ import {
     FUZZY_MATCH_MIN_SCORE,
 } from '../utils/productNameMatch';
 import useUserLocation from '../hooks/useUserLocation';
+import useComposerKeyboardLift from '../hooks/useComposerKeyboardLift';
 import useSupermarketsStore from '../stores/supermarketsStore';
 import {
     buildAiProfileCacheKey,
@@ -1032,6 +1033,8 @@ const buildRankedProductContextLines = (products, userHint, aiProfile = {}) => {
 };
 
 const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
+    const isPageVariant = variant === 'page';
+    useComposerKeyboardLift(isPageVariant && isOpen);
     const { t, i18n } = useTranslation();
     const { convert, getCurrencySymbol, currency } = useCurrencyStore();
     const user = useAuthStore(state => state.user);
@@ -1239,8 +1242,34 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
 
         const vv = window.visualViewport;
         vv?.addEventListener('resize', onViewportChange, { passive: true });
-        return () => vv?.removeEventListener('resize', onViewportChange);
+        vv?.addEventListener('scroll', onViewportChange, { passive: true });
+        return () => {
+            vv?.removeEventListener('resize', onViewportChange);
+            vv?.removeEventListener('scroll', onViewportChange);
+        };
     }, [isPage, isOpen]);
+
+    useEffect(() => {
+        const el = composerStackRef.current;
+        if (!isPage || !isOpen || !el || typeof document === 'undefined') return undefined;
+
+        const root = document.documentElement;
+        const setVar = () => {
+            const h = Math.round(el.getBoundingClientRect().height || 0);
+            if (h > 0) root.style.setProperty('--mobile-ai-composer-h', `${h}px`);
+        };
+
+        setVar();
+        const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(setVar) : null;
+        ro?.observe(el);
+        window.addEventListener('resize', setVar, { passive: true });
+
+        return () => {
+            ro?.disconnect();
+            window.removeEventListener('resize', setVar);
+            root.style.removeProperty('--mobile-ai-composer-h');
+        };
+    }, [isPage, isOpen, mobileListOpen, chatWriteError]);
 
     const scrollMessagesToBottom = () => {
         const pane = messagesScrollRef.current;
@@ -2165,11 +2194,11 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
 
     const effectiveOnClose = typeof onClose === 'function' ? onClose : () => {};
     const composerPadClass = isPage
-        ? 'px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] sm:px-5 sm:py-4 sm:pb-4'
+        ? 'px-4 py-3 sm:px-5 sm:py-4'
         : 'px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px)+var(--bottom-nav-h,0px))] sm:px-5 sm:py-4';
 
     const composerStackClass = isPage
-        ? `shrink-0 border-t border-gray-100/80 dark:border-gray-700/50 ${mobileListOpen ? 'max-md:hidden' : ''}`
+        ? `shrink-0 border-t border-gray-100/80 dark:border-gray-700/50 max-md:fixed max-md:inset-x-0 max-md:z-[9990] max-md:bottom-[calc(var(--bottom-nav-h,0px)+env(safe-area-inset-bottom,0px)+var(--composer-keyboard-lift,0px))] sm:relative sm:inset-auto sm:bottom-auto sm:z-auto ${mobileListOpen ? 'max-md:hidden' : ''}`
         : 'shrink-0';
 
     const composerFormClass = isPage
@@ -2257,7 +2286,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
             <div
                 className={
                     isPage
-                        ? 'w-full flex flex-col h-full min-h-0 overflow-hidden'
+                        ? 'w-full flex flex-col flex-1 h-full min-h-0 overflow-hidden'
                         : 'fixed bottom-0 left-0 right-0 z-[9999] flex h-[85dvh] max-h-[85dvh] w-full touch-pan-y flex-col overflow-hidden rounded-t-2xl border-0 bg-white shadow-2xl animate-in slide-in-from-bottom-4 duration-300 dark:border-gray-700 dark:bg-gray-800 sm:inset-auto sm:bottom-4 sm:right-4 sm:z-[2000] sm:h-[min(640px,90vh)] sm:max-h-none sm:w-[400px] sm:rounded-2xl sm:border sm:border-gray-200 sm:shadow-2xl sm:slide-in-from-bottom-5 sm:slide-in-from-right md:w-[448px]'
                 }
             >
@@ -2316,7 +2345,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                         ref={messagesScrollRef}
                         className={
                             isPage
-                                ? 'flex-1 overflow-y-auto overscroll-contain scroll-pb-20 px-4 pt-2.5 pb-3 space-y-3.5 bg-gray-50 dark:bg-gray-900 min-h-0'
+                                ? 'flex-1 overflow-y-auto overscroll-contain scroll-pb-[calc(var(--bottom-nav-h,0px)+var(--mobile-ai-composer-h,5.5rem))] px-4 pt-2.5 pb-3 max-md:pb-[calc(var(--bottom-nav-h,0px)+var(--mobile-ai-composer-h,5.5rem))] space-y-3.5 bg-gray-50 dark:bg-gray-900 min-h-0'
                                 : 'flex-1 overflow-y-auto overscroll-contain scroll-pb-[calc(var(--bottom-nav-h,0px)+7.5rem)] px-4 pt-2.5 pb-[calc(0.875rem+var(--bottom-nav-h,0px))] sm:px-5 sm:pt-3 sm:pb-[calc(1rem+var(--bottom-nav-h,0px))] space-y-3.5 bg-gray-50 dark:bg-gray-900 min-h-0'
                         }
                     >

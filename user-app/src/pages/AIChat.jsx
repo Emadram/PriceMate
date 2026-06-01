@@ -1,15 +1,11 @@
 import AIChatBox from '../components/AIChatBox';
-import useAppViewportHeight from '../hooks/useAppViewportHeight';
 import useAiChatViewportMeta from '../hooks/useAiChatViewportMeta';
-import useDocumentScrollLock from '../hooks/useDocumentScrollLock';
 
 const AIChat = () => {
     useAiChatViewportMeta(true);
-    useAppViewportHeight(true);
-    useDocumentScrollLock(true);
 
     return (
-        <div className="flex flex-col w-full max-w-4xl mx-auto h-full min-h-0 flex-1 overflow-hidden bg-white dark:bg-gray-900">
+        <div className="flex flex-col w-full max-w-4xl mx-auto min-h-[100dvh] max-h-[100dvh] md:min-h-screen md:max-h-none overflow-hidden bg-white dark:bg-gray-900 pb-safe-nav md:pb-8">
             <AIChatBox isOpen variant="page" />
         </div>
     );
