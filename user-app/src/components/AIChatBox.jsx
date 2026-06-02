@@ -556,6 +556,48 @@ const buildThreadForApi = (messages = [], { maxMessages = 18, maxCharsPerMessage
     return normalized.slice(normalized.length - maxMessages);
 };
 
+const extractCategoryKey = (product) => {
+    const raw = product?.categoryId;
+    if (!raw) return '';
+    if (typeof raw === 'string') return raw;
+    if (Array.isArray(raw) && raw.length > 0) {
+        const first = raw[0];
+        return first?.$id || first?.categoryId || first?.id || first?.categoryName || first?.name || '';
+    }
+    if (typeof raw === 'object') {
+        return raw.$id || raw.categoryId || raw.id || raw.categoryName || raw.name || '';
+    }
+    return '';
+};
+
+const buildCategoryAlternativesReply = (product, products, t) => {
+    const categoryKey = extractCategoryKey(product);
+    if (!categoryKey) return '';
+
+    const candidates = (Array.isArray(products) ? products : [])
+        .filter((p) => p && extractCategoryKey(p) === categoryKey)
+        .filter((p) => String(p.barcode || p.code || '').trim().length > 0)
+        .filter((p) => String(p.name || p.productName || '').trim().length > 0)
+        .filter((p) => Array.isArray(p.prices) && p.prices.length > 0);
+
+    const picked = candidates.slice(0, 3);
+    if (picked.length === 0) return '';
+
+    const lines = picked.map((p) => {
+        const barcode = String(p.barcode || p.code || '').trim();
+        const name = String(p.name || p.productName || '').trim();
+        return `- ${name} [BARCODE:${barcode}]`;
+    });
+
+    return [
+        t?.('ai_catalog_only_refusal_help', "That product isn’t available in PriceMate yet. Here are some alternatives in the same category:") ||
+            "That product isn’t available in PriceMate yet. Here are some alternatives in the same category:",
+        ...lines,
+        t?.('ai_catalog_only_refusal_hint', "If you share a barcode, I can check the exact item.") ||
+            "If you share a barcode, I can check the exact item.",
+    ].join('\n');
+};
+
 const profileHasPersonalization = (profile = {}) =>
     [
         profile.dietaryPreferences,
@@ -1119,6 +1161,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
 
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const lastResolvedProductRef = useRef({ barcode: '', name: '' });
     const [mobileListOpen, setMobileListOpen] = useState(false);
     const [fullProductList, setFullProductList] = useState([]);
     const [supermarketList, setSupermarketList] = useState([]);
@@ -1786,11 +1829,42 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         const userMessage = input.trim();
         setInput('');
 
+        const looksLikeIngredientFollowUp = (message) => {
+            const lowered = String(message || '').toLowerCase();
+            return (
+                lowered.includes('ingredient') ||
+                lowered.includes('ingredients') ||
+                lowered.includes('allergen') ||
+                lowered.includes('allergens') ||
+                lowered.includes('içerik') ||
+                lowered.includes('icerik') ||
+                lowered.includes('içindekiler') ||
+                lowered.includes('icindekiler')
+            );
+        };
+
+        const hasExplicitProductHint = (message) => {
+            const lowered = String(message || '').toLowerCase();
+            if (/\b\d{8,14}\b/.test(lowered)) return true; // barcode
+            const match = findBestProductMatch(message, fullProductList);
+            if (match?.product && match.score >= FUZZY_MATCH_MIN_SCORE) return true;
+            // If the user explicitly names something short like "milk", fuzzy match will usually catch it.
+            return false;
+        };
+
+        const contextFallback =
+            looksLikeIngredientFollowUp(userMessage) && !hasExplicitProductHint(userMessage)
+                ? lastResolvedProductRef.current
+                : { barcode: '', name: '' };
+
         const barcodeFromMessage = extractBarcode(userMessage);
         const localProductMatch = findBestProductMatch(userMessage, fullProductList);
         const productMatch = localProductMatch?.product || null;
-        const catalog = await resolveCatalogProductForIngredients(userMessage);
-        const offCache = await resolveOffCacheProductForIngredients(userMessage);
+        const resolveMessageForCatalog = contextFallback?.barcode
+            ? `${userMessage}\n[BARCODE:${contextFallback.barcode}]`
+            : userMessage;
+        const catalog = await resolveCatalogProductForIngredients(resolveMessageForCatalog);
+        const offCache = await resolveOffCacheProductForIngredients(resolveMessageForCatalog);
         const mergedProductProfile = productMatch || catalog.product || offCache.product;
         const effectiveBarcode =
             barcodeFromMessage ||
@@ -1798,9 +1872,19 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
             offCache.barcode ||
             productMatch?.barcode ||
             productMatch?.code ||
+            contextFallback?.barcode ||
             '';
         const catalogDisplayName =
             catalog.catalogName || offCache.name || productMatch?.name || productMatch?.productName || '';
+        const effectiveDisplayName =
+            catalogDisplayName || contextFallback?.name || mergedProductProfile?.name || mergedProductProfile?.productName || '';
+
+        if (effectiveBarcode || effectiveDisplayName) {
+            lastResolvedProductRef.current = {
+                barcode: effectiveBarcode || lastResolvedProductRef.current.barcode,
+                name: effectiveDisplayName || lastResolvedProductRef.current.name,
+            };
+        }
 
         // Use store to add user message
         if (user?.$id) {
@@ -2087,10 +2171,14 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
 
         if (isProductSpecific) {
             try {
-                const catalogOnly = await resolveCatalogProductForIngredients(userMessage);
+                const catalogOnly = await resolveCatalogProductForIngredients(resolveMessageForCatalog);
                 if (!catalogOnly?.product) {
                     if (user?.$id) {
-                        await addMessage(user.$id, 'assistant', t('ai_catalog_only_refusal'), user);
+                        const bestGuess = localProductMatch?.product || mergedProductProfile || null;
+                        const reply =
+                            buildCategoryAlternativesReply(bestGuess, fullProductList, t) ||
+                            t('ai_catalog_only_refusal');
+                        await addMessage(user.$id, 'assistant', reply, user);
                     }
                     setIsLoading(false);
                     return;
@@ -2223,6 +2311,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
 
             const resolvedDisplayName =
                 catalogDisplayName ||
+                contextFallback?.name ||
                 localProductMatch?.matchedName ||
                 mergedProductProfile?.name ||
                 mergedProductProfile?.productName ||
@@ -2234,21 +2323,25 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
             if (resolvedDisplayName && effectiveBarcode) {
                 openRouterMessage += `\nResolved catalog product: ${resolvedDisplayName} [BARCODE:${effectiveBarcode}]`;
             }
+            if (!barcodeFromMessage && contextFallback?.barcode) {
+                openRouterMessage += `\nFollow-up context: user did not name a new product; reuse last product [BARCODE:${contextFallback.barcode}]`;
+            }
 
-            const threadForApi = useChatStore
+            const threadForApiRaw = useChatStore
                 .getState()
-                .messages;
+                .messages
+                .map((m) => ({ role: m.role, content: m.content }));
             if (
-                threadForApi.length > 0 &&
-                threadForApi[threadForApi.length - 1].role === 'user'
+                threadForApiRaw.length > 0 &&
+                threadForApiRaw[threadForApiRaw.length - 1].role === 'user'
             ) {
-                threadForApi[threadForApi.length - 1] = {
+                threadForApiRaw[threadForApiRaw.length - 1] = {
                     role: 'user',
                     content: openRouterMessage,
                 };
             }
 
-            const boundedThread = buildThreadForApi(threadForApi, {
+            const boundedThread = buildThreadForApi(threadForApiRaw, {
                 maxMessages: 18,
                 maxCharsPerMessage: 1200,
             });
