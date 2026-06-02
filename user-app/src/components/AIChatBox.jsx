@@ -482,6 +482,54 @@ const runAiCheckFunction = async (payload) => {
     }
 };
 
+const AI_DEBUG = import.meta.env.VITE_AI_DEBUG === 'true';
+
+const extractOpenRouterError = (error) => {
+    const status =
+        error?.status ||
+        error?.response?.status ||
+        error?.cause?.status ||
+        null;
+
+    const message =
+        error?.error?.message ||
+        error?.response?.data?.error?.message ||
+        error?.response?.data?.message ||
+        error?.message ||
+        String(error || '');
+
+    const code =
+        error?.error?.code ||
+        error?.response?.data?.error?.code ||
+        error?.code ||
+        null;
+
+    const provider =
+        error?.error?.metadata?.provider_name ||
+        error?.response?.data?.error?.metadata?.provider_name ||
+        null;
+
+    return { status, code, provider, message };
+};
+
+const clampText = (value, maxChars) => {
+    const text = String(value || '');
+    if (text.length <= maxChars) return text;
+    return `${text.slice(0, maxChars)}…`;
+};
+
+const buildThreadForApi = (messages = [], { maxMessages = 18, maxCharsPerMessage = 1200 } = {}) => {
+    const normalized = (Array.isArray(messages) ? messages : [])
+        .filter(Boolean)
+        .map((m) => ({
+            role: m.role === 'assistant' ? 'assistant' : 'user',
+            content: clampText(m.content, maxCharsPerMessage),
+        }));
+
+    if (normalized.length <= maxMessages) return normalized;
+    return normalized.slice(normalized.length - maxMessages);
+};
+
 const profileHasPersonalization = (profile = {}) =>
     [
         profile.dietaryPreferences,
@@ -2163,7 +2211,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
 
             const threadForApi = useChatStore
                 .getState()
-                .messages.map((m) => ({ role: m.role, content: m.content }));
+                .messages;
             if (
                 threadForApi.length > 0 &&
                 threadForApi[threadForApi.length - 1].role === 'user'
@@ -2174,9 +2222,14 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 };
             }
 
+            const boundedThread = buildThreadForApi(threadForApi, {
+                maxMessages: 18,
+                maxCharsPerMessage: 1200,
+            });
+
             const completion = await openai.chat.completions.create({
                 model: "google/gemini-2.0-flash-001",
-                messages: [{ role: "system", content: prompt }, ...threadForApi],
+                messages: [{ role: "system", content: clampText(prompt, 12000) }, ...boundedThread],
             });
 
             const text = completion.choices[0]?.message?.content || "No response received.";
@@ -2191,14 +2244,32 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 }
             }
         } catch (error) {
-            console.error("AI Error details:", error);
+            const detail = extractOpenRouterError(error);
+            console.error("AI Error details:", error, detail);
             let errorMessage = "Sorry, I can't connect to the AI right now. ";
-            if (error.message?.includes("API Key")) {
+            if (detail.message?.includes("API Key") || detail.message?.includes("api key")) {
                 errorMessage += "There's an issue with the API Key configuration.";
-            } else if (error.status === 429) {
+            } else if (detail.status === 401 || detail.status === 403) {
+                errorMessage += "Authentication failed (API key / referer).";
+            } else if (detail.status === 400) {
+                errorMessage += "Request rejected (bad request / model / prompt too large).";
+            } else if (detail.status === 413) {
+                errorMessage += "Request too large. Please try a shorter message.";
+            } else if (detail.status === 429) {
                 errorMessage += "Rate limit exceeded. Please wait a moment.";
+            } else if (!detail.status && /failed to fetch|networkerror|load failed/i.test(detail.message || '')) {
+                errorMessage += "Network/CORS blocked the request from the browser.";
             } else {
                 errorMessage += "Please try again in a few moments.";
+            }
+
+            if (AI_DEBUG) {
+                const bits = [
+                    detail.status ? `status=${detail.status}` : null,
+                    detail.code ? `code=${detail.code}` : null,
+                    detail.provider ? `provider=${detail.provider}` : null,
+                ].filter(Boolean);
+                errorMessage += `\n(Debug) ${bits.join(' ')}\n(Debug) ${clampText(detail.message, 220)}`;
             }
             
             if (user?.$id) {

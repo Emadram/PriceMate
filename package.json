@@ -10,6 +10,7 @@
     "seed:products-by-category": "npm --prefix scripts run seed:products-by-category --",
     "seed:price-history": "npm --prefix scripts run seed:price-history --",
     "fix:missing-product-images": "npm --prefix scripts run fix:missing-product-images --",
+    "cleanup:invalid-image-products": "npm --prefix scripts run cleanup:invalid-image-products -- --",
     "test:scripts": "npm run test --prefix scripts"
   },
   "dependencies": {
