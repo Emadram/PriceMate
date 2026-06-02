@@ -314,7 +314,7 @@ const SupermarketProfile = () => {
                                                         className="fixed inset-0 z-40" 
                                                         onClick={() => setIsBranchDropdownOpen(false)}
                                                     ></div>
-                                                    <div className="absolute left-0 mt-3 w-72 bg-white dark:bg-[#1C1C1E] rounded-[1.5rem] shadow-2xl border border-gray-100 dark:border-white/5 py-3 z-50 animate-in fade-in slide-in-from-top-2">
+                                                    <div className="absolute right-0 mt-3 w-[min(18rem,calc(100vw-2rem))] bg-white dark:bg-[#1C1C1E] rounded-[1.5rem] shadow-2xl border border-gray-100 dark:border-white/5 py-3 z-50 animate-in fade-in slide-in-from-top-2 max-h-[min(60vh,24rem)] overflow-y-auto overscroll-contain">
                                                         <div className="px-4 py-2 mb-2">
                                                             <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">{t('branches', 'Branches')}</p>
                                                         </div>
@@ -325,7 +325,7 @@ const SupermarketProfile = () => {
                                                             <MapPin size={16} className="mt-0.5 text-brand-600 dark:text-brand-500" />
                                                             <div className="flex-1 min-w-0">
                                                                 <p className="text-[10px] font-bold text-brand-600 dark:text-brand-500 uppercase tracking-wider mb-0.5">{t('current', 'Current')}</p>
-                                                                <p className="text-[13px] sm:text-[14px] font-semibold text-gray-900 dark:text-white line-clamp-1">
+                                                                <p className="text-[13px] sm:text-[14px] font-semibold text-gray-900 dark:text-white line-clamp-2 break-words">
                                                                     {supermarket.branchName ? `${supermarket.name} — ${supermarket.branchName}` : supermarket.address || t('this_branch', 'This branch')}
                                                                 </p>
                                                                 {distanceLabel && (
@@ -344,8 +344,8 @@ const SupermarketProfile = () => {
                                                                 className="w-full px-4 py-3 flex items-start gap-3 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors text-left group"
                                                             >
                                                                 <MapPin size={16} className="mt-0.5 text-gray-400 group-hover:text-black dark:group-hover:text-white" />
-                                                                <div>
-                                                                    <p className="text-[13px] sm:text-[14px] font-semibold text-gray-900 dark:text-white line-clamp-1">
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-[13px] sm:text-[14px] font-semibold text-gray-900 dark:text-white line-clamp-2 break-words">
                                                                         {branch.branchName ? `${branch.name || supermarket.name} — ${branch.branchName}` : branch.address || t('branch', 'Branch')}
                                                                     </p>
                                                                     {resolveDistanceKm(branch) !== null && (
