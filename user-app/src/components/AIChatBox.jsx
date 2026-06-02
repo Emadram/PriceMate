@@ -2160,7 +2160,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
             loweredMessage.includes('yakinimdaki');
 
         const hasExplicitBarcode = /\b\d{8,14}\b/.test(loweredMessage);
-        const hasExplicitProductHint = Boolean(effectiveBarcode || mergedProductProfile || productMatch);
+        const hasExplicitProductHintNow = Boolean(effectiveBarcode || mergedProductProfile || productMatch);
 
         // Catalog-only gating should ONLY apply when the user is asking about a specific product.
         const isProductSpecific =
@@ -2172,20 +2172,20 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 loweredMessage.includes('içerik') ||
                 loweredMessage.includes('icerik') ||
                 loweredMessage.includes('içindekiler')) &&
-                hasExplicitProductHint) ||
+                hasExplicitProductHintNow) ||
             ((loweredMessage.includes('compare') ||
                 loweredMessage.includes('price') ||
                 loweredMessage.includes('cheapest') ||
                 loweredMessage.includes('en ucuz') ||
                 loweredMessage.includes('fiyat')) &&
-                hasExplicitProductHint) ||
+                hasExplicitProductHintNow) ||
             (loweredMessage.includes('barcode') || loweredMessage.includes('barkod')) ||
             ((loweredMessage.includes('suitable') ||
                 loweredMessage.includes('safe') ||
                 loweredMessage.includes('uygun')) &&
-                hasExplicitProductHint);
+                hasExplicitProductHintNow);
 
-        const shouldBypassCatalogGate = mentionsNearestStore && !hasExplicitProductHint;
+        const shouldBypassCatalogGate = mentionsNearestStore && !hasExplicitProductHintNow;
 
         if (isProductSpecific) {
             try {
