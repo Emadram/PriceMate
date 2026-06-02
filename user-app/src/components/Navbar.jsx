@@ -159,7 +159,7 @@ const Navbar = () => {
             </nav>
 
             {/* Mobile Bottom Navigation */}
-            <div ref={bottomNavRef} className="md:hidden fixed bottom-0 inset-x-0 z-9998">
+            <div ref={bottomNavRef} className="pricemate-mobile-bottom-nav md:hidden fixed bottom-0 inset-x-0 z-9998">
               <div className="pt-3 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] px-safe pricemate-mobile-chrome border-t border-gray-100/80 dark:border-gray-800/60 rounded-t-[1.25rem] shadow-[0_-4px_24px_rgba(15,23,42,0.06)]">
                 <div className="flex items-center justify-between max-w-md mx-auto px-3">
                     <NavItem to="/" icon={FiHome} label={t('home')} currentPath={location.pathname} onTap={tapFeedback} />

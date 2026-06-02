@@ -79,6 +79,15 @@
     --mobile-ai-composer-h: 5.5rem;
   }
 
+  /* When the /ai-chat thread list is open on mobile, hide global bottom tabs
+     so the chat header/title never visually overlaps the center scan (+) button. */
+  body.pricemate-ai-chat-list-open .pricemate-mobile-bottom-nav {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(12px);
+    transition: opacity 180ms ease-out, transform 180ms ease-out;
+  }
+
   .pricemate-ai-composer-overlay {
     background-color: rgb(255 255 255 / 0.88);
     backdrop-filter: blur(16px);

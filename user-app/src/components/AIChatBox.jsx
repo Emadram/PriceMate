@@ -370,6 +370,7 @@ import useCurrencyStore from '../stores/currencyStore';
 import useAuthStore from '../stores/authStore';
 import useChatStore, { CHAT_ERROR_MISSING_CONVERSATION_ID } from '../stores/chatStore';
 import AppLogo from './AppLogo';
+import { lockDocumentScroll, releaseDocumentScrollLock } from '../utils/documentScrollLock';
 
 const ChatScreenHeader = ({
     variant,
@@ -1209,6 +1210,21 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
     useEffect(() => {
         if (!isOpen) setMobileListOpen(false);
     }, [isOpen]);
+
+    // When the chat list overlay is open on mobile, hide global bottom tabs to
+    // avoid visual overlap with the header/title on iPhone.
+    useEffect(() => {
+        if (typeof document === 'undefined') return undefined;
+        if (!isPageVariant) return undefined;
+
+        const { body } = document;
+        if (isOpen && mobileListOpen) {
+            body.classList.add('pricemate-ai-chat-list-open');
+        } else {
+            body.classList.remove('pricemate-ai-chat-list-open');
+        }
+        return () => body.classList.remove('pricemate-ai-chat-list-open');
+    }, [isPageVariant, isOpen, mobileListOpen]);
 
     useEffect(() => {
         const el = inputRef.current;

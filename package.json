@@ -5,7 +5,9 @@
     "install:user-app": "npm ci --prefix user-app",
     "build:user-app": "npm run build --prefix user-app",
     "install:admin-panel": "npm ci --prefix admin-panel",
-    "build:admin-panel": "npm run build --prefix admin-panel"
+    "build:admin-panel": "npm run build --prefix admin-panel",
+    "seed:price-history": "npm run seed:price-history --prefix scripts",
+    "test:scripts": "npm run test --prefix scripts"
   },
   "dependencies": {
     "dotenv": "^17.3.1",

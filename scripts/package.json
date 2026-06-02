@@ -1,0 +1,9 @@
+{
+  "name": "pricemate-scripts",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "seed:price-history": "node seed_price_history.js",
+    "test": "node --test test/*.test.js"
+  }
+}
