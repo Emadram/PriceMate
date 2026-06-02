@@ -78,6 +78,7 @@ const useProductsStore = create((set, get) => ({
     limit: 10,
 
     setPage: (page) => set({ page }),
+    setLimit: (limit) => set({ limit: Math.max(1, Number(limit) || 10), page: 1 }),
 
     fetchProducts: async (page = 1) => {
         set({ loading: true, error: null });

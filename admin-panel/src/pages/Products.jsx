@@ -40,6 +40,7 @@ const Products = () => {
         page, 
         limit, 
         fetchProducts, 
+        setLimit,
         deleteProduct, 
         uploadProductImage 
     } = useProductsStore();
@@ -396,6 +397,13 @@ const Products = () => {
         handlePageChange(Math.max(1, Math.min(totalPages, Math.floor(next))));
     };
 
+    const handleLimitChange = (event) => {
+        const next = Number(event.target.value);
+        setLimit(next);
+        fetchProducts(1);
+        setLastUpdated(new Date().toISOString());
+    };
+
     const handleImageUpload = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -593,6 +601,21 @@ const Products = () => {
                                         <option key={c.$id} value={c.$id}>{c.categoryName}</option>
                                     ))}
                                 </select>
+                            </div>
+                            <div className="flex items-center gap-3 text-sm font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.15em] whitespace-nowrap">
+                                <span>Show:</span>
+                                <select
+                                    value={limit}
+                                    onChange={handleLimitChange}
+                                    className="bg-gray-50 dark:bg-gray-900 border-none px-4 py-2 rounded-xl focus:ring-0 cursor-pointer text-brand-700 dark:text-brand-300 font-black text-xs tracking-widest uppercase transition-all hover:bg-brand-50 dark:hover:bg-brand-900/30"
+                                >
+                                    {[10, 25, 50, 100].map((n) => (
+                                        <option key={n} value={n}>
+                                            {n}
+                                        </option>
+                                    ))}
+                                </select>
+                                <span>products</span>
                             </div>
                         </div>
                         <div className="flex items-center gap-4">
