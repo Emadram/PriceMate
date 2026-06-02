@@ -663,9 +663,6 @@ const SupermarketProfile = () => {
                                 </div>
                                 <h3 className="text-xl font-semibold dark:text-white mb-2">{t('no_products_available')}</h3>
                                 <p className="text-gray-500 dark:text-gray-400 mb-8 max-w-sm mx-auto">{t('no_products_available_subtitle')}</p>
-                                <button className="tap-target bg-black dark:bg-white text-white dark:text-black px-6 py-3 rounded-2xl font-semibold active:scale-95 transition-all">
-                                    Contribute Data
-                                </button>
                             </div>
                         )}
                     </section>
