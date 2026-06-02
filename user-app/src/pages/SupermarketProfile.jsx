@@ -661,8 +661,8 @@ const SupermarketProfile = () => {
                                 <div className="w-16 h-16 bg-gray-50 dark:bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
                                     <Info className="text-gray-300" />
                                 </div>
-                                <h3 className="text-xl font-semibold dark:text-white mb-2">{t('no_data_yet')}</h3>
-                                <p className="text-gray-500 dark:text-gray-400 mb-8 max-w-sm mx-auto">{t('no_data_yet_subtitle')}</p>
+                                <h3 className="text-xl font-semibold dark:text-white mb-2">{t('no_products_available')}</h3>
+                                <p className="text-gray-500 dark:text-gray-400 mb-8 max-w-sm mx-auto">{t('no_products_available_subtitle')}</p>
                                 <button className="tap-target bg-black dark:bg-white text-white dark:text-black px-6 py-3 rounded-2xl font-semibold active:scale-95 transition-all">
                                     Contribute Data
                                 </button>
