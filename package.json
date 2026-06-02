@@ -6,6 +6,7 @@
     "build:user-app": "npm run build --prefix user-app",
     "install:admin-panel": "npm ci --prefix admin-panel",
     "build:admin-panel": "npm run build --prefix admin-panel",
+    "seed:prices-all": "npm run seed:prices-all --prefix scripts",
     "seed:price-history": "npm run seed:price-history --prefix scripts",
     "test:scripts": "npm run test --prefix scripts"
   },

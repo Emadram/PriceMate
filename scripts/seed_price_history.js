@@ -38,10 +38,12 @@ const parseArgs = (argv) => {
         dryRun: false,
         force: false,
         clearSynthetic: false,
-        minPoints: 50,
+        perProductPoints: 50,
+        minPoints: null,
         start: '2023-01-01',
         end: null,
         productId: null,
+        maxProducts: null,
         concurrency: 8,
     };
 
@@ -49,10 +51,12 @@ const parseArgs = (argv) => {
         if (arg === '--dry-run') flags.dryRun = true;
         else if (arg === '--force') flags.force = true;
         else if (arg === '--clear-synthetic') flags.clearSynthetic = true;
-        else if (arg.startsWith('--min-points=')) flags.minPoints = Number(arg.split('=')[1]) || 50;
+        else if (arg.startsWith('--per-product-points=')) flags.perProductPoints = Number(arg.split('=')[1]) || 50;
+        else if (arg.startsWith('--min-points=')) flags.minPoints = Number(arg.split('=')[1]) || null; // legacy alias
         else if (arg.startsWith('--start=')) flags.start = arg.split('=')[1];
         else if (arg.startsWith('--end=')) flags.end = arg.split('=')[1];
         else if (arg.startsWith('--product-id=')) flags.productId = arg.split('=')[1];
+        else if (arg.startsWith('--max-products=')) flags.maxProducts = Number(arg.split('=')[1]) || null;
         else if (arg.startsWith('--concurrency=')) flags.concurrency = Number(arg.split('=')[1]) || 8;
     }
 
@@ -151,10 +155,12 @@ const run = async () => {
 
     console.log('Seed price history');
     console.log(`  Range: ${flags.start} → ${flags.end}`);
-    console.log(`  Min points per product: ${flags.minPoints}`);
+    const perProductPoints = flags.minPoints ?? flags.perProductPoints;
+    console.log(`  Points per product (distributed across supermarkets): ${perProductPoints}`);
     console.log(`  Dry run: ${flags.dryRun}`);
     console.log(`  Force: ${flags.force}`);
     console.log(`  Clear synthetic: ${flags.clearSynthetic}`);
+    console.log('  Recommended Appwrite indexes on price_history: productId (key), timestamp (key), priceId (key optional)');
 
     const priceDocs = await loadPrices();
     const byProduct = groupPricesByProduct(priceDocs);
@@ -166,6 +172,9 @@ const run = async () => {
             console.error(`Product ${flags.productId} has no prices in ${COLLECTIONS.PRICES}.`);
             process.exit(1);
         }
+    }
+    if (flags.maxProducts && productIds.length > flags.maxProducts) {
+        productIds = productIds.slice(0, flags.maxProducts);
     }
 
     const productMetaMap = await loadProductsMap(new Set(productIds));
@@ -197,7 +206,7 @@ const run = async () => {
                 COLLECTIONS.PRICE_HISTORY,
                 productId
             );
-            if (existingCount >= flags.minPoints) {
+            if (existingCount >= perProductPoints) {
                 skipped += 1;
                 continue;
             }
@@ -210,10 +219,10 @@ const run = async () => {
             productMeta,
             startDate,
             endDate,
-            minPoints: flags.minPoints,
+            totalPoints: perProductPoints,
         });
 
-        if (payloads.length < flags.minPoints) {
+        if (payloads.length < perProductPoints) {
             console.warn(
                 `  Product ${productId} (${productMeta.name || 'unknown'}): only ${payloads.length} points`
             );
@@ -254,6 +263,7 @@ const run = async () => {
             }
         );
 
+    const startedAt = Date.now();
     const { created, failed, errors } = await createDocumentsInBatches(
         allPayloads,
         createFn,
@@ -261,7 +271,11 @@ const run = async () => {
             concurrency: flags.concurrency,
             onProgress: (s) => {
                 if (s.processed % 200 === 0 || s.processed === s.total) {
-                    console.log(`  Progress: ${s.processed}/${s.total} (created ${s.created}, failed ${s.failed})`);
+                    const elapsed = Math.max(1, (Date.now() - startedAt) / 1000);
+                    const rate = (s.created / elapsed).toFixed(1);
+                    console.log(
+                        `  Progress: ${s.processed}/${s.total} (created ${s.created}, failed ${s.failed}, ${rate}/s)`
+                    );
                 }
             },
         }

@@ -143,3 +143,19 @@ export const deleteSyntheticHistory = async (
     }
     return deleted;
 };
+
+/**
+ * Fast count of documents in a collection (uses Appwrite `total`).
+ * @param {import('node-appwrite').Databases} databases
+ * @param {string} databaseId
+ * @param {string} collectionId
+ * @param {unknown[]} [queries]
+ * @returns {Promise<number>}
+ */
+export const countDocuments = async (databases, databaseId, collectionId, queries = []) => {
+    const response = await databases.listDocuments(databaseId, collectionId, [
+        ...queries,
+        Query.limit(1),
+    ]);
+    return response.total ?? 0;
+};

@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "seed:prices-all": "node seed_prices_for_all_supermarkets.js",
     "seed:price-history": "node seed_price_history.js",
     "test": "node --test test/*.test.js"
   }

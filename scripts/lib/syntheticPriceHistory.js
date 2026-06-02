@@ -78,6 +78,30 @@ export const inflationMultiplierAt = (date, endDate) => {
 };
 
 /**
+ * Evenly-spaced timeline with a fixed number of points.
+ * @param {Date} start
+ * @param {Date} end
+ * @param {number} totalPoints
+ * @returns {Date[]}
+ */
+export const buildTimelineFixedCount = (start, end, totalPoints = 50) => {
+    const n = Math.max(2, Math.floor(totalPoints));
+    const startMs = start.getTime();
+    const endMs = end.getTime();
+    const span = Math.max(1, endMs - startMs);
+    const step = span / (n - 1);
+    const out = [];
+    for (let i = 0; i < n; i++) {
+        out.push(new Date(Math.round(startMs + step * i)));
+    }
+    // Ensure exact end date for last point
+    out[out.length - 1] = new Date(endMs);
+    return out;
+};
+
+/**
+ * Weekly-ish timeline (legacy) with at least minPoints.
+ * Kept for compatibility with earlier seeding modes.
  * @param {Date} start
  * @param {Date} end
  * @param {number} minPoints
@@ -137,7 +161,8 @@ const roundPrice = (value) => Math.round(value * 100) / 100;
  * @param {{ name?: string, unit?: string, brand?: string }} [options.productMeta]
  * @param {Date} options.startDate
  * @param {Date} options.endDate
- * @param {number} [options.minPoints]
+ * @param {number} [options.totalPoints]
+ * @param {number} [options.minPoints] legacy alias
  * @param {number} [options.storeBias]
  * @returns {object[]}
  */
@@ -148,6 +173,7 @@ export const generateSyntheticHistory = (options) => {
         productMeta = {},
         startDate,
         endDate,
+        totalPoints,
         minPoints = 50,
         storeBias = 0.03,
     } = options;
@@ -155,7 +181,9 @@ export const generateSyntheticHistory = (options) => {
     if (!stores?.length) return [];
 
     const rng = createRng(hashSeed(productId));
-    const timeline = buildTimeline(startDate, endDate, minPoints);
+    const timeline = Number.isFinite(Number(totalPoints))
+        ? buildTimelineFixedCount(startDate, endDate, Number(totalPoints))
+        : buildTimeline(startDate, endDate, minPoints);
     if (timeline.length === 0) return [];
 
     const storeAnchors = stores
