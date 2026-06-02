@@ -364,7 +364,7 @@ import {
     readStoredAllergyProfile,
     serializeAiCheckResponse,
 } from '../utils/aiCheckUtils';
-import { functions as appwriteFunctions } from '../lib/appwrite';
+import { account as appwriteAccount, client as appwriteClient, functions as appwriteFunctions } from '../lib/appwrite';
 import { createFunctionExecutionJson } from '../utils/appwriteFunctionExecution';
 import useCurrencyStore from '../stores/currencyStore';
 import useAuthStore from '../stores/authStore';
@@ -467,9 +467,31 @@ const ChatScreenHeader = ({
 const AI_CHECK_FUNCTION_ID = import.meta.env.VITE_APPWRITE_FUNCTION_AI_CHECK || '';
 const AI_CHECK_MODE = import.meta.env.VITE_AI_CHECK_MODE || 'legacy';
 
+let cachedAppwriteJwt = '';
+let cachedAppwriteJwtExpiresAt = 0;
+
+const ensureAppwriteJwt = async () => {
+    const now = Date.now();
+    if (cachedAppwriteJwt && cachedAppwriteJwtExpiresAt > now + 30_000) {
+        return cachedAppwriteJwt;
+    }
+
+    const jwt = await appwriteAccount.createJWT();
+    const token = String(jwt?.jwt || '').trim();
+    if (!token) throw new Error('Appwrite JWT is empty.');
+
+    cachedAppwriteJwt = token;
+    // JWTs are typically valid for ~60 minutes; refresh a bit earlier.
+    cachedAppwriteJwtExpiresAt = now + 55 * 60 * 1000;
+
+    appwriteClient.setJWT(token);
+    return token;
+};
+
 const runAiCheckFunction = async (payload) => {
     if (AI_CHECK_MODE !== 'hybrid' || !AI_CHECK_FUNCTION_ID) return null;
     try {
+        await ensureAppwriteJwt();
         const parsed = await createFunctionExecutionJson(
             appwriteFunctions,
             AI_CHECK_FUNCTION_ID,
@@ -483,6 +505,10 @@ const runAiCheckFunction = async (payload) => {
 };
 
 const AI_DEBUG = import.meta.env.VITE_AI_DEBUG === 'true';
+const OPENROUTER_MODEL =
+    import.meta.env.VITE_OPENROUTER_MODEL ||
+    // Stable default on OpenRouter; change in .env without redeploying code.
+    'openai/gpt-4o-mini';
 
 const extractOpenRouterError = (error) => {
     const status =
@@ -2228,7 +2254,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
             });
 
             const completion = await openai.chat.completions.create({
-                model: "google/gemini-2.0-flash-001",
+                model: OPENROUTER_MODEL,
                 messages: [{ role: "system", content: clampText(prompt, 12000) }, ...boundedThread],
             });
 
@@ -2253,6 +2279,8 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 errorMessage += "Authentication failed (API key / referer).";
             } else if (detail.status === 400) {
                 errorMessage += "Request rejected (bad request / model / prompt too large).";
+            } else if (detail.status === 404 && /No endpoints found for/i.test(detail.message || '')) {
+                errorMessage += "AI model is not available. Please try again (or switch the model).";
             } else if (detail.status === 413) {
                 errorMessage += "Request too large. Please try a shorter message.";
             } else if (detail.status === 429) {
