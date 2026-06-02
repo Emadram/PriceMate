@@ -215,6 +215,7 @@ const SupermarketProfile = () => {
         ? Math.max(...products.map((p) => new Date(p.$updatedAt).getTime()))
         : null;
     const lastUpdateValue = latestProductUpdate || supermarket.lastUpdatedAt || supermarket.updatedAt || supermarket.$updatedAt || null;
+    const shouldAlignBranchDropdownRight = String(supermarket?.name || '').trim().length >= 18;
 
     return (
         <div className="min-h-screen bg-[#FDFDFD] dark:bg-[#0A0A0B] pb-safe">
@@ -314,7 +315,15 @@ const SupermarketProfile = () => {
                                                         className="fixed inset-0 z-40" 
                                                         onClick={() => setIsBranchDropdownOpen(false)}
                                                     ></div>
-                                                    <div className="absolute right-0 mt-3 w-[min(18rem,calc(100vw-2rem))] bg-white dark:bg-[#1C1C1E] rounded-[1.5rem] shadow-2xl border border-gray-100 dark:border-white/5 py-3 z-50 animate-in fade-in slide-in-from-top-2 max-h-[min(60vh,24rem)] overflow-y-auto overscroll-contain">
+                                                    <div
+                                                        className={`absolute mt-3 ${
+                                                            shouldAlignBranchDropdownRight ? 'right-0' : 'left-0'
+                                                        } ${
+                                                            shouldAlignBranchDropdownRight
+                                                                ? 'w-[min(18rem,calc(100vw-2rem))]'
+                                                                : 'w-72'
+                                                        } bg-white dark:bg-[#1C1C1E] rounded-[1.5rem] shadow-2xl border border-gray-100 dark:border-white/5 py-3 z-50 animate-in fade-in slide-in-from-top-2 max-h-[min(60vh,24rem)] overflow-y-auto overscroll-contain`}
+                                                    >
                                                         <div className="px-4 py-2 mb-2">
                                                             <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">{t('branches', 'Branches')}</p>
                                                         </div>

@@ -2149,25 +2149,43 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         // Catalog-only policy: for product-related questions, refuse if the product is not in PriceMate.
         // We use the full-catalog resolver (Appwrite) rather than the in-chat 50-item sample.
         const loweredMessage = String(userMessage || '').toLowerCase();
+        const mentionsNearestStore =
+            loweredMessage.includes('near me') ||
+            loweredMessage.includes('closest market') ||
+            loweredMessage.includes('closest supermarket') ||
+            loweredMessage.includes('nearest store') ||
+            loweredMessage.includes('nearest market') ||
+            loweredMessage.includes('en yakin') ||
+            loweredMessage.includes('yakınımdaki') ||
+            loweredMessage.includes('yakinimdaki');
+
+        const hasExplicitBarcode = /\b\d{8,14}\b/.test(loweredMessage);
+        const hasExplicitProductHint = Boolean(effectiveBarcode || mergedProductProfile || productMatch);
+
+        // Catalog-only gating should ONLY apply when the user is asking about a specific product.
         const isProductSpecific =
-            /\b\d{8,14}\b/.test(loweredMessage) ||
-            loweredMessage.includes('ingredient') ||
-            loweredMessage.includes('ingredients') ||
-            loweredMessage.includes('allergen') ||
-            loweredMessage.includes('allergens') ||
-            loweredMessage.includes('suitable') ||
-            loweredMessage.includes('safe') ||
-            loweredMessage.includes('compare') ||
-            loweredMessage.includes('cheapest') ||
-            loweredMessage.includes('price') ||
-            loweredMessage.includes('barcode') ||
-            loweredMessage.includes('içerik') ||
-            loweredMessage.includes('icerik') ||
-            loweredMessage.includes('içindekiler') ||
-            loweredMessage.includes('uygun') ||
-            loweredMessage.includes('en ucuz') ||
-            loweredMessage.includes('fiyat') ||
-            loweredMessage.includes('barkod');
+            hasExplicitBarcode ||
+            ((loweredMessage.includes('ingredient') ||
+                loweredMessage.includes('ingredients') ||
+                loweredMessage.includes('allergen') ||
+                loweredMessage.includes('allergens') ||
+                loweredMessage.includes('içerik') ||
+                loweredMessage.includes('icerik') ||
+                loweredMessage.includes('içindekiler')) &&
+                hasExplicitProductHint) ||
+            ((loweredMessage.includes('compare') ||
+                loweredMessage.includes('price') ||
+                loweredMessage.includes('cheapest') ||
+                loweredMessage.includes('en ucuz') ||
+                loweredMessage.includes('fiyat')) &&
+                hasExplicitProductHint) ||
+            (loweredMessage.includes('barcode') || loweredMessage.includes('barkod')) ||
+            ((loweredMessage.includes('suitable') ||
+                loweredMessage.includes('safe') ||
+                loweredMessage.includes('uygun')) &&
+                hasExplicitProductHint);
+
+        const shouldBypassCatalogGate = mentionsNearestStore && !hasExplicitProductHint;
 
         if (isProductSpecific) {
             try {
@@ -2178,10 +2196,14 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                         const reply =
                             buildCategoryAlternativesReply(bestGuess, fullProductList, t) ||
                             t('ai_catalog_only_refusal');
-                        await addMessage(user.$id, 'assistant', reply, user);
+                        if (!shouldBypassCatalogGate) {
+                            await addMessage(user.$id, 'assistant', reply, user);
+                        }
                     }
-                    setIsLoading(false);
-                    return;
+                    if (!shouldBypassCatalogGate) {
+                        setIsLoading(false);
+                        return;
+                    }
                 }
             } catch {
                 // If catalog lookup fails, fall back to normal behavior rather than blocking all chat.
