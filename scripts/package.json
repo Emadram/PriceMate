@@ -5,6 +5,9 @@
   "scripts": {
     "seed:prices-all": "node seed_prices_for_all_supermarkets.js",
     "seed:price-history": "node seed_price_history.js",
+    "seed:products-by-category": "node seed_products_by_category.js",
+    "fix:missing-product-images": "node fix_missing_product_images.js",
+    "cleanup:seeded-products": "node cleanup_seeded_products.js",
     "test": "node --test test/*.test.js"
   }
 }

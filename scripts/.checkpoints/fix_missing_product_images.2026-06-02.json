@@ -1,0 +1,1028 @@
+{
+  "processed": {
+    "6a1ea670000feed564a5": {
+      "fileId": "6a1eab3a001d97edc8ae",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab3a001d97edc8ae/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:06:51.604Z"
+    },
+    "6a1ea670000fe5afdb82": {
+      "fileId": "6a1eab3a001d8799247d",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab3a001d8799247d/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:06:51.607Z"
+    },
+    "6a1ea670000fc134d3d5": {
+      "fileId": "6a1eab3a001d3c06ef52",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab3a001d3c06ef52/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:06:51.693Z"
+    },
+    "6a1ea670000fe3487a46": {
+      "fileId": "6a1eab3a001da9d4b409",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab3a001da9d4b409/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:06:51.715Z"
+    },
+    "6a1ea670000feee88850": {
+      "fileId": "6a1eab3b002cdc6ddaa3",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab3b002cdc6ddaa3/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:06:52.841Z"
+    },
+    "6a1ea670000fef859689": {
+      "fileId": "6a1eab3b002cb4211bd9",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab3b002cb4211bd9/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:06:52.851Z"
+    },
+    "6a1ea670000fee03a5f0": {
+      "fileId": "6a1eab3b002cd0b4a328",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab3b002cd0b4a328/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:06:52.867Z"
+    },
+    "6a1ea670000fe8acb841": {
+      "fileId": "6a1eab3b002cef0c3aa4",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab3b002cef0c3aa4/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:06:52.870Z"
+    },
+    "6a1ea670002778885b4e": {
+      "fileId": "6a1eab3c003695d8ebe0",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab3c003695d8ebe0/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:06:53.888Z"
+    },
+    "6a1ea67000278870eb9d": {
+      "fileId": "6a1eab3c0036629ade10",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab3c0036629ade10/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:06:53.997Z"
+    },
+    "6a1ea670002787ff0019": {
+      "fileId": "6a1eab3c00369d038ce3",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab3c00369d038ce3/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:06:54.008Z"
+    },
+    "6a1ea67000278cf0b4ba": {
+      "fileId": "6a1eab3c00368a741257",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab3c00368a741257/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:06:54.074Z"
+    },
+    "6a1ea67000278a0c20cd": {
+      "fileId": "6a1eab3e0004b3b85450",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab3e0004b3b85450/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:06:55.137Z"
+    },
+    "6a1ea67000278c1ab869": {
+      "fileId": "6a1eab3e0004c0f16baa",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab3e0004c0f16baa/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:06:55.171Z"
+    },
+    "6a1ea670002786b5cd85": {
+      "fileId": "6a1eab3e0004c1dca0de",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab3e0004c1dca0de/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:06:55.182Z"
+    },
+    "6a1ea67000278061c7ce": {
+      "fileId": "6a1eab3e0004bbdaa838",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab3e0004bbdaa838/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:06:55.285Z"
+    },
+    "6a1ea67100012dac810e": {
+      "fileId": "6a1eab3f0011e2984f72",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab3f0011e2984f72/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:06:56.342Z"
+    },
+    "6a1ea67100013ad38a38": {
+      "fileId": "6a1eab3f0011d554e6d4",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab3f0011d554e6d4/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:06:56.444Z"
+    },
+    "6a1ea671000118951994": {
+      "fileId": "6a1eab3f0011eb0d50fb",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab3f0011eb0d50fb/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:06:56.520Z"
+    },
+    "6a1ea67100012382725b": {
+      "fileId": "6a1eab3f0011e1ee2a82",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab3f0011e1ee2a82/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:06:56.561Z"
+    },
+    "6a1ea67100012ff33b21": {
+      "fileId": "6a1eab9100258562ebe8",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab9100258562ebe8/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:18.725Z"
+    },
+    "6a1ea67100013ae0e4b5": {
+      "fileId": "6a1eab910025c646b36c",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab910025c646b36c/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:18.735Z"
+    },
+    "6a1ea6710001243fab60": {
+      "fileId": "6a1eab910025de90c3cf",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab910025de90c3cf/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:18.735Z"
+    },
+    "6a1ea67100013763691f": {
+      "fileId": "6a1eab910025e02519b6",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab910025e02519b6/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:19.108Z"
+    },
+    "6a1ea67100187e27b6df": {
+      "fileId": "6a1eab930006d3b814ce",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab930006d3b814ce/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:20.287Z"
+    },
+    "6a1ea671001879538a8b": {
+      "fileId": "6a1eab930006f048376d",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab930006f048376d/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:20.298Z"
+    },
+    "6a1ea671001876b278de": {
+      "fileId": "6a1eab9300071c08b51f",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab9300071c08b51f/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:20.311Z"
+    },
+    "6a1ea671001864544ac6": {
+      "fileId": "6a1eab930006e718735b",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab930006e718735b/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:20.328Z"
+    },
+    "6a1ea67100188723df05": {
+      "fileId": "6a1eab9400148be8ed7e",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab9400148be8ed7e/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:21.469Z"
+    },
+    "6a1ea671001861bb49c7": {
+      "fileId": "6a1eab94001481020816",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab94001481020816/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:21.469Z"
+    },
+    "6a1ea671001877a7e8db": {
+      "fileId": "6a1eab940014849aa46e",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab940014849aa46e/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:22.194Z"
+    },
+    "6a1ea6710018725d9ab3": {
+      "fileId": "6a1eab940014810d9fbe",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab940014810d9fbe/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:22.211Z"
+    },
+    "6a1ea671002f89652f16": {
+      "fileId": "6a1eab96000d3734dff3",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab96000d3734dff3/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:24.093Z"
+    },
+    "6a1ea671002f7c77e608": {
+      "fileId": "6a1eab96000d499d981b",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab96000d499d981b/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:24.267Z"
+    },
+    "6a1ea671002f73cd6a53": {
+      "fileId": "6a1eab96000d5a65020f",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab96000d5a65020f/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:24.686Z"
+    },
+    "6a1ea671002f73306abc": {
+      "fileId": "6a1eab96000d50cc912f",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab96000d50cc912f/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:25.974Z"
+    },
+    "6a1ea671002f8a3b9eac": {
+      "fileId": "6a1eab99003d079f0232",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab99003d079f0232/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:27.204Z"
+    },
+    "6a1ea671002f6208d4b4": {
+      "fileId": "6a1eab99003cf6b00f79",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab99003cf6b00f79/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:27.456Z"
+    },
+    "6a1ea671002f7acaa168": {
+      "fileId": "6a1eab99003d08809572",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab99003d08809572/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:27.780Z"
+    },
+    "6a1ea671002f7ab1b3fc": {
+      "fileId": "6a1eab99003ce1a41c1b",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab99003ce1a41c1b/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:27.784Z"
+    },
+    "6a1ea6720007efd94252": {
+      "fileId": "6a1eab9b0031214dd5e9",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab9b0031214dd5e9/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:28.842Z"
+    },
+    "6a1ea6720007d8ebbb98": {
+      "fileId": "6a1eab9b003104f1318f",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab9b003104f1318f/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:28.865Z"
+    },
+    "6a1ea6720007e7f80575": {
+      "fileId": "6a1eab9b003138ee13d0",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab9b003138ee13d0/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:29.434Z"
+    },
+    "6a1ea6720007e67cf30e": {
+      "fileId": "6a1eab9b0031205a5d17",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab9b0031205a5d17/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:30.078Z"
+    },
+    "6a1ea6720007e84a03d5": {
+      "fileId": "6a1eab9e0004e8d34b93",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab9e0004e8d34b93/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:31.574Z"
+    },
+    "6a1ea6720007e01749e2": {
+      "fileId": "6a1eab9e000509d41721",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab9e000509d41721/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:31.608Z"
+    },
+    "6a1ea6720007efe9026d": {
+      "fileId": "6a1eab9e00051c0d13c2",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab9e00051c0d13c2/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:31.613Z"
+    },
+    "6a1ea6720007e35fcc1a": {
+      "fileId": "6a1eab9e0004f7cf3720",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab9e0004f7cf3720/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:31.628Z"
+    },
+    "6a1ea672001e156a99ec": {
+      "fileId": "6a1eab9f0027680e3971",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab9f0027680e3971/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:33.877Z"
+    },
+    "6a1ea672001dec9b02bd": {
+      "fileId": "6a1eab9f002760363e83",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab9f002760363e83/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:33.913Z"
+    },
+    "6a1ea672001dfb0648cf": {
+      "fileId": "6a1eab9f002751db72dc",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab9f002751db72dc/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:33.936Z"
+    },
+    "6a1ea672001df5c1f6eb": {
+      "fileId": "6a1eab9f0027451457dc",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eab9f0027451457dc/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:33.980Z"
+    },
+    "6a1ea672001e0da27b6e": {
+      "fileId": "6a1eaba1003d548cda9f",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eaba1003d548cda9f/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:35.013Z"
+    },
+    "6a1ea672001dc2c88212": {
+      "fileId": "6a1eaba1003d6b1fe48e",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eaba1003d6b1fe48e/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:35.124Z"
+    },
+    "6a1ea672001de4b49f25": {
+      "fileId": "6a1eaba1003d6d975875",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eaba1003d6d975875/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:35.128Z"
+    },
+    "6a1ea672001dd8d8772a": {
+      "fileId": "6a1eaba1003d4ff2c95c",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eaba1003d4ff2c95c/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:35.138Z"
+    },
+    "6a1ea67200360a77e690": {
+      "fileId": "6a1eaba30008c5167fb3",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eaba30008c5167fb3/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:36.273Z"
+    },
+    "6a1ea6720036051eb6fa": {
+      "fileId": "6a1eaba30008c714c70d",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eaba30008c714c70d/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:36.478Z"
+    },
+    "6a1ea672003609205eb7": {
+      "fileId": "6a1eaba30008b75600ca",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eaba30008b75600ca/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:36.541Z"
+    },
+    "6a1ea672003613548ba8": {
+      "fileId": "6a1eaba30008a74f7824",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eaba30008a74f7824/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:36.623Z"
+    },
+    "6a1ea6720036016a5b5b": {
+      "fileId": "6a1eaba400271c1b93a2",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eaba400271c1b93a2/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:38.713Z"
+    },
+    "6a1ea67200360c6117e2": {
+      "fileId": "6a1eaba4002710060bd8",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eaba4002710060bd8/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:39.736Z"
+    },
+    "6a1ea67200361e30cd27": {
+      "fileId": "6a1eaba40026f12b6461",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eaba40026f12b6461/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:39.788Z"
+    },
+    "6a1ea67200361e118e74": {
+      "fileId": "6a1eaba400270e7eeb4b",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eaba400270e7eeb4b/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:40.043Z"
+    },
+    "6a1ea6730010c5bcdbb3": {
+      "fileId": "6a1eaba80002cdfd45ff",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eaba80002cdfd45ff/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:41.202Z"
+    },
+    "6a1ea6730010b701a505": {
+      "fileId": "6a1eaba80002e76d4d2a",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eaba80002e76d4d2a/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:42.174Z"
+    },
+    "6a1ea6730010c3da4c88": {
+      "fileId": "6a1eaba80002d97e3ae5",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eaba80002d97e3ae5/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:42.197Z"
+    },
+    "6a1ea6730010c83d755e": {
+      "fileId": "6a1eaba80002dc752431",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eaba80002dc752431/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:42.590Z"
+    },
+    "6a1ea6730010b420a190": {
+      "fileId": "6a1eabaa0024f0696923",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabaa0024f0696923/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:43.708Z"
+    },
+    "6a1ea6730010c4480906": {
+      "fileId": "6a1eabaa0025085a3e49",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabaa0025085a3e49/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:43.745Z"
+    },
+    "6a1ea6730010bf5b4b83": {
+      "fileId": "6a1eabaa0024f5cfca73",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabaa0024f5cfca73/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:43.746Z"
+    },
+    "6a1ea6730010a7f412c7": {
+      "fileId": "6a1eabaa0024e682d6fb",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabaa0024e682d6fb/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:43.782Z"
+    },
+    "6a1ea673002a7f6e36f2": {
+      "fileId": "6a1eabab0030ecaf6914",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabab0030ecaf6914/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:44.900Z"
+    },
+    "6a1ea673002a87b91251": {
+      "fileId": "6a1eabab0031017016b0",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabab0031017016b0/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:44.922Z"
+    },
+    "6a1ea673002a895ba756": {
+      "fileId": "6a1eabab0030fb4009a5",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabab0030fb4009a5/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:44.922Z"
+    },
+    "6a1ea673002a9725cb3a": {
+      "fileId": "6a1eabab0030f94912c4",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabab0030f94912c4/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:44.969Z"
+    },
+    "6a1ea673002a8f12ff31": {
+      "fileId": "6a1eabac003cbec2e81b",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabac003cbec2e81b/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:46.333Z"
+    },
+    "6a1ea673002a69e7d333": {
+      "fileId": "6a1eabac003cc5a63d7d",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabac003cc5a63d7d/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:46.344Z"
+    },
+    "6a1ea673002a9502c52d": {
+      "fileId": "6a1eabac003cbe93bc03",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabac003cbe93bc03/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:46.361Z"
+    },
+    "6a1ea673002a72459e62": {
+      "fileId": "6a1eabac003c9e0e51b7",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabac003c9e0e51b7/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:46.957Z"
+    },
+    "6a1ea6740006267b08ea": {
+      "fileId": "6a1eabae003bd5540867",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabae003bd5540867/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:48.083Z"
+    },
+    "6a1ea67400062903bff4": {
+      "fileId": "6a1eabae003be84b4de2",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabae003be84b4de2/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:48.083Z"
+    },
+    "6a1ea67400063aeb2f7d": {
+      "fileId": "6a1eabae003becdcaf41",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabae003becdcaf41/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:48.083Z"
+    },
+    "6a1ea67400062c7e839c": {
+      "fileId": "6a1eabae003bef2eef71",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabae003bef2eef71/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:48.108Z"
+    },
+    "6a1ea67400063ada35fb": {
+      "fileId": "6a1eabb000070a896d9c",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb000070a896d9c/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:49.240Z"
+    },
+    "6a1ea67400063b0ed4e9": {
+      "fileId": "6a1eabb00006dcb17758",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb00006dcb17758/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:49.268Z"
+    },
+    "6a1ea67400062f0ece6e": {
+      "fileId": "6a1eabb00006ec483e7d",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb00006ec483e7d/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:49.269Z"
+    },
+    "6a1ea6740006325f202d": {
+      "fileId": "6a1eabb00006f0f56333",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb00006f0f56333/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:49.286Z"
+    },
+    "6a1ea674002a8b529e75": {
+      "fileId": "6a1eabb10011fd673761",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb10011fd673761/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:50.364Z"
+    },
+    "6a1ea674002a774ae376": {
+      "fileId": "6a1eabb10011f461a0c8",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb10011f461a0c8/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:50.407Z"
+    },
+    "6a1ea674002a739325c9": {
+      "fileId": "6a1eabb10011f72ba661",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb10011f72ba661/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:50.426Z"
+    },
+    "6a1ea674002a80377bb8": {
+      "fileId": "6a1eabb10011e2054acf",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb10011e2054acf/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:50.449Z"
+    },
+    "6a1ea674002a7bb0cf2f": {
+      "fileId": "6a1eabb2001c2c426612",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb2001c2c426612/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:51.606Z"
+    },
+    "6a1ea674002a8b263e59": {
+      "fileId": "6a1eabb2001c16249546",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb2001c16249546/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:51.606Z"
+    },
+    "6a1ea674002a8be9b2be": {
+      "fileId": "6a1eabb2001c279638ab",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb2001c279638ab/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:51.662Z"
+    },
+    "6a1ea674002a81cae5cf": {
+      "fileId": "6a1eabb2001c1849450f",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb2001c1849450f/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:51.711Z"
+    },
+    "6a1ea6750004ca4cb4b5": {
+      "fileId": "6a1eabb3002c880c9e17",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb3002c880c9e17/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:52.807Z"
+    },
+    "6a1ea6750004b8a53fa4": {
+      "fileId": "6a1eabb3002c7f58e53a",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb3002c7f58e53a/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:52.815Z"
+    },
+    "6a1ea6750004a77ce94e": {
+      "fileId": "6a1eabb3002c8f3347a6",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb3002c8f3347a6/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:52.830Z"
+    },
+    "6a1ea6750004ca349055": {
+      "fileId": "6a1eabb3002c93a460a6",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb3002c93a460a6/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:52.879Z"
+    },
+    "6a1ea6750004c0bba1f1": {
+      "fileId": "6a1eabb400370581b313",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb400370581b313/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:53.881Z"
+    },
+    "6a1ea6750004bf89d16e": {
+      "fileId": "6a1eabb4003707eb6caf",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb4003707eb6caf/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:54.050Z"
+    },
+    "6a1ea6750004ab089a02": {
+      "fileId": "6a1eabb40036f8e8a6b6",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb40036f8e8a6b6/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:54.104Z"
+    },
+    "6a1ea6750004ca61c4be": {
+      "fileId": "6a1eabb4003712343cb7",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb4003712343cb7/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:54.138Z"
+    },
+    "6a1ea675001c444b19b7": {
+      "fileId": "6a1eabb60008bb8c70f0",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb60008bb8c70f0/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:55.288Z"
+    },
+    "6a1ea675001c426c9558": {
+      "fileId": "6a1eabb60008c7964a49",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb60008c7964a49/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:55.294Z"
+    },
+    "6a1ea675001c3f552255": {
+      "fileId": "6a1eabb60008b201a3a4",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb60008b201a3a4/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:55.299Z"
+    },
+    "6a1ea675001c43da8352": {
+      "fileId": "6a1eabb60008a7068796",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb60008a7068796/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:55.331Z"
+    },
+    "6a1ea675001c4d8b99d5": {
+      "fileId": "6a1eabb70014be40d054",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb70014be40d054/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:56.415Z"
+    },
+    "6a1ea675001c49f3c739": {
+      "fileId": "6a1eabb70014b6eb23c3",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb70014b6eb23c3/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:56.448Z"
+    },
+    "6a1ea675001c5f02ba01": {
+      "fileId": "6a1eabb70014bd92a70e",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb70014bd92a70e/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:56.465Z"
+    },
+    "6a1ea675001c40e99247": {
+      "fileId": "6a1eabb70014b5f0b4b4",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb70014b5f0b4b4/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:56.557Z"
+    },
+    "6a1ea6750032f7a6363b": {
+      "fileId": "6a1eabb80022de3b8d3a",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb80022de3b8d3a/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:57.558Z"
+    },
+    "6a1ea675003309e32a5e": {
+      "fileId": "6a1eabb80022ec8901d5",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb80022ec8901d5/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:57.643Z"
+    },
+    "6a1ea67500330ebe71e4": {
+      "fileId": "6a1eabb80022eca92475",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb80022eca92475/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:57.718Z"
+    },
+    "6a1ea6750032f3a9b41d": {
+      "fileId": "6a1eabb80022ff9f222e",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb80022ff9f222e/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:57.763Z"
+    },
+    "6a1ea6750032faacebd0": {
+      "fileId": "6a1eabb9002fdadaed80",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb9002fdadaed80/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:58.855Z"
+    },
+    "6a1ea6750032f7adc0dd": {
+      "fileId": "6a1eabb9002fe8155be1",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb9002fe8155be1/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:58.855Z"
+    },
+    "6a1ea6750032fcd62f0a": {
+      "fileId": "6a1eabb9002fd0bf0b96",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb9002fd0bf0b96/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:58.881Z"
+    },
+    "6a1ea6750032edee4727": {
+      "fileId": "6a1eabb9002fbe0928ad",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabb9002fbe0928ad/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:58.918Z"
+    },
+    "6a1ea676000ced5e17bc": {
+      "fileId": "6a1eabba00399b00a63f",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabba00399b00a63f/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:08:59.997Z"
+    },
+    "6a1ea676000ce5d99b53": {
+      "fileId": "6a1eabba0039a9004fb7",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabba0039a9004fb7/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:00.014Z"
+    },
+    "6a1ea676000ce078585c": {
+      "fileId": "6a1eabba0039acc920b3",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabba0039acc920b3/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:00.056Z"
+    },
+    "6a1ea676000cd6d46542": {
+      "fileId": "6a1eabba0039921b48c0",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabba0039921b48c0/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:00.060Z"
+    },
+    "6a1ea676000ceb126f9d": {
+      "fileId": "6a1eabbc0003da9de7ad",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabbc0003da9de7ad/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:01.210Z"
+    },
+    "6a1ea676000ce6ff8978": {
+      "fileId": "6a1eabbc0003c6e62657",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabbc0003c6e62657/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:01.235Z"
+    },
+    "6a1ea676000ce4028ef9": {
+      "fileId": "6a1eabbc0003f1f967b5",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabbc0003f1f967b5/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:01.324Z"
+    },
+    "6a1ea676000cd961dfe4": {
+      "fileId": "6a1eabbc0003e5c41018",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabbc0003e5c41018/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:01.328Z"
+    },
+    "6a1ea6760024cc571e1e": {
+      "fileId": "6a1eabbd00148a775548",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabbd00148a775548/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:02.556Z"
+    },
+    "6a1ea6760024bb644404": {
+      "fileId": "6a1eabbd001489503046",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabbd001489503046/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:02.604Z"
+    },
+    "6a1ea6760024aba61f46": {
+      "fileId": "6a1eabbd00148d00e20c",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabbd00148d00e20c/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:02.759Z"
+    },
+    "6a1ea6760024a85ed5f9": {
+      "fileId": "6a1eabbd001482d4709f",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabbd001482d4709f/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:02.759Z"
+    },
+    "6a1ea6760024a3a778f3": {
+      "fileId": "6a1eabbe002f85725b3b",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabbe002f85725b3b/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:03.971Z"
+    },
+    "6a1ea6760024be0a75da": {
+      "fileId": "6a1eabbe002f869ef67d",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabbe002f869ef67d/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:03.981Z"
+    },
+    "6a1ea6760024b592dde4": {
+      "fileId": "6a1eabbe002f76931a4a",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabbe002f76931a4a/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:04.012Z"
+    },
+    "6a1ea6760024aaae3649": {
+      "fileId": "6a1eabbe002f814c0a24",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabbe002f814c0a24/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:04.146Z"
+    },
+    "6a1ea676003cb6abca9f": {
+      "fileId": "6a1eabc000093b5913e9",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabc000093b5913e9/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:05.310Z"
+    },
+    "6a1ea676003ccce59a0c": {
+      "fileId": "6a1eabc0000922510006",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabc0000922510006/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:05.337Z"
+    },
+    "6a1ea676003cb3d2f92f": {
+      "fileId": "6a1eabc000092e23ccc0",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabc000092e23ccc0/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:05.369Z"
+    },
+    "6a1ea676003cc39b854b": {
+      "fileId": "6a1eabc0000930a639cd",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabc0000930a639cd/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:05.419Z"
+    },
+    "6a1ea676003cc2d7dad0": {
+      "fileId": "6a1eabc1001a4e6f5cbe",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabc1001a4e6f5cbe/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:06.505Z"
+    },
+    "6a1ea676003ccfb8bbf9": {
+      "fileId": "6a1eabc1001a4ab30aab",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabc1001a4ab30aab/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:06.524Z"
+    },
+    "6a1ea676003ccead0bf4": {
+      "fileId": "6a1eabc1001a410c9b29",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabc1001a410c9b29/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:06.630Z"
+    },
+    "6a1ea676003cc0ef4804": {
+      "fileId": "6a1eabc1001a319ca89a",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabc1001a319ca89a/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:06.669Z"
+    },
+    "6a1ea6770016a3d90fc1": {
+      "fileId": "6a1eabc20029dbcd4a0c",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabc20029dbcd4a0c/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:07.786Z"
+    },
+    "6a1ea677001695237c34": {
+      "fileId": "6a1eabc20029eabb73b5",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabc20029eabb73b5/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:07.801Z"
+    },
+    "6a1ea67700169bf996cb": {
+      "fileId": "6a1eabc20029e6cd6ada",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabc20029e6cd6ada/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:07.809Z"
+    },
+    "6a1ea6770016a37158e6": {
+      "fileId": "6a1eabc20029ee20d4cf",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabc20029ee20d4cf/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:07.860Z"
+    },
+    "6a1ea67700168e65f1ee": {
+      "fileId": "6a1eabc30035deae674c",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabc30035deae674c/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:08.952Z"
+    },
+    "6a1ea6770016a483efd9": {
+      "fileId": "6a1eabc30035c47c74b1",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabc30035c47c74b1/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:08.953Z"
+    },
+    "6a1ea6770016a04246cf": {
+      "fileId": "6a1eabc30035d9aed0ae",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabc30035d9aed0ae/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:08.999Z"
+    },
+    "6a1ea677001690215d08": {
+      "fileId": "6a1eabc30035d67d5b23",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabc30035d67d5b23/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:09.038Z"
+    },
+    "6a1ea677002f20e7c45c": {
+      "fileId": "6a1eabc50002699258e4",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabc50002699258e4/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:10.130Z"
+    },
+    "6a1ea677002f23c9b0d8": {
+      "fileId": "6a1eabc50002722f9948",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabc50002722f9948/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:10.139Z"
+    },
+    "6a1ea677002f30633c41": {
+      "fileId": "6a1eabc5000277e0545c",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabc5000277e0545c/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:10.316Z"
+    },
+    "6a1ea677002f28a74a32": {
+      "fileId": "6a1eabc5000271298ee9",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabc5000271298ee9/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:10.318Z"
+    },
+    "6a1ea677002f2faf4981": {
+      "fileId": "6a1eabc60013fb2a449d",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabc60013fb2a449d/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:11.401Z"
+    },
+    "6a1ea677002f2e67a0e6": {
+      "fileId": "6a1eabc60013ee9f1849",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabc60013ee9f1849/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:11.480Z"
+    },
+    "6a1ea677002f217d8e0b": {
+      "fileId": "6a1eabc60013feebdd77",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabc60013feebdd77/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:11.483Z"
+    },
+    "6a1ea677002f18fcba3e": {
+      "fileId": "6a1eabc60013fc950e8f",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabc60013fc950e8f/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:11.701Z"
+    },
+    "6a1ea678000acfa1031e": {
+      "fileId": "6a1eabc7002be9cb7469",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabc7002be9cb7469/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:12.709Z"
+    },
+    "6a1ea678000ac94d7d6d": {
+      "fileId": "6a1eabc7002be3d38bc6",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabc7002be3d38bc6/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:12.785Z"
+    },
+    "6a1ea678000abd22f7dc": {
+      "fileId": "6a1eabc7002bee00c2c1",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabc7002bee00c2c1/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:12.829Z"
+    },
+    "6a1ea678000ac0e30b4a": {
+      "fileId": "6a1eabc7002bd94dd67e",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabc7002bd94dd67e/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:12.909Z"
+    },
+    "6a1ea678000ac0c48db3": {
+      "fileId": "6a1eabc80038e3b9fdd7",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabc80038e3b9fdd7/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:13.991Z"
+    },
+    "6a1ea678000abd40b48f": {
+      "fileId": "6a1eabc80038f24a81c8",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabc80038f24a81c8/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:13.991Z"
+    },
+    "6a1ea678000accd9a3ca": {
+      "fileId": "6a1eabc80038eca1ccbb",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabc80038eca1ccbb/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:14.064Z"
+    },
+    "6a1ea678000ac3b6b4d2": {
+      "fileId": "6a1eabc80038d07d6f8f",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabc80038d07d6f8f/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:14.064Z"
+    },
+    "6a1ea67800223e3851bb": {
+      "fileId": "6a1eabca000401a351f7",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabca000401a351f7/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:15.152Z"
+    },
+    "6a1ea67800223834cd7c": {
+      "fileId": "6a1eabca00041aac7e64",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabca00041aac7e64/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:15.152Z"
+    },
+    "6a1ea678002241add3d3": {
+      "fileId": "6a1eabca00042d1c0de9",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabca00042d1c0de9/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:15.153Z"
+    },
+    "6a1ea678002244649a1c": {
+      "fileId": "6a1eabca000424b32248",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabca000424b32248/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:15.198Z"
+    },
+    "6a1ea67800225b6ad30d": {
+      "fileId": "6a1eabcb000c69db3f54",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabcb000c69db3f54/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:16.313Z"
+    },
+    "6a1ea678002253591693": {
+      "fileId": "6a1eabcb000c79ddff43",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabcb000c79ddff43/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:16.348Z"
+    },
+    "6a1ea67800225df67d47": {
+      "fileId": "6a1eabcb000c7572d5d4",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabcb000c7572d5d4/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:16.348Z"
+    },
+    "6a1ea67800225ff5980a": {
+      "fileId": "6a1eabcb000c63c3903b",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabcb000c63c3903b/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:16.995Z"
+    },
+    "6a1ea678003a165c2c03": {
+      "fileId": "6a1eabcc003e3b53bcb2",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabcc003e3b53bcb2/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:18.755Z"
+    },
+    "6a1ea678003a3c6e0b09": {
+      "fileId": "6a1eabcc003e4e4a9d6b",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabcc003e4e4a9d6b/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:18.938Z"
+    },
+    "6a1ea678003a2303211a": {
+      "fileId": "6a1eabcc003e457a5535",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabcc003e457a5535/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:18.975Z"
+    },
+    "6a1ea678003a2e1265ad": {
+      "fileId": "6a1eabcc003e5b8af5bf",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabcc003e5b8af5bf/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:19.177Z"
+    },
+    "6a1ea678003a26f2d299": {
+      "fileId": "6a1eabcf000b2af9f6ec",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabcf000b2af9f6ec/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:20.250Z"
+    },
+    "6a1ea678003a3fe0ba2c": {
+      "fileId": "6a1eabcf000b35a2245a",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabcf000b35a2245a/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:20.329Z"
+    },
+    "6a1ea678003a03c0cc78": {
+      "fileId": "6a1eabcf000b3774387d",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabcf000b3774387d/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:20.332Z"
+    },
+    "6a1ea678003a2f24c000": {
+      "fileId": "6a1eabcf000b1f00ab9b",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabcf000b1f00ab9b/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:20.341Z"
+    },
+    "6a1ea679001616f063e5": {
+      "fileId": "6a1eabd000155a969cfe",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabd000155a969cfe/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:21.547Z"
+    },
+    "6a1ea67900161c2dc80b": {
+      "fileId": "6a1eabd000155b45e919",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabd000155b45e919/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:21.547Z"
+    },
+    "6a1ea6790016104ece03": {
+      "fileId": "6a1eabd000155a64444f",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabd000155a64444f/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:21.552Z"
+    },
+    "6a1ea679001615fcca9a": {
+      "fileId": "6a1eabd000155f2fae28",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabd000155f2fae28/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:21.625Z"
+    },
+    "6a1ea679001611b2e782": {
+      "fileId": "6a1eabd1002729850f30",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabd1002729850f30/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:22.676Z"
+    },
+    "6a1ea67900161e9d0973": {
+      "fileId": "6a1eabd1002738ee0b43",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabd1002738ee0b43/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:22.722Z"
+    },
+    "6a1ea67900161429ac2e": {
+      "fileId": "6a1eabd1002722ab53fb",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabd1002722ab53fb/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:22.756Z"
+    },
+    "6a1ea67900161cfa82e9": {
+      "fileId": "6a1eabd100271fd1f4f0",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabd100271fd1f4f0/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:22.756Z"
+    },
+    "6a1ea679002d65c97fa1": {
+      "fileId": "6a1eabd2002f4686ced3",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabd2002f4686ced3/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:24.210Z"
+    },
+    "6a1ea679002d670fd455": {
+      "fileId": "6a1eabd2002f43fe879f",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabd2002f43fe879f/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:24.227Z"
+    },
+    "6a1ea679002d6d1a777d": {
+      "fileId": "6a1eabd2002f5a25a2da",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabd2002f5a25a2da/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:24.357Z"
+    },
+    "6a1ea679002d68087ec5": {
+      "fileId": "6a1eabd2002f58f4a616",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabd2002f58f4a616/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:24.412Z"
+    },
+    "6a1ea679002d6e1f4d11": {
+      "fileId": "6a1eabd40019c7f2184e",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabd40019c7f2184e/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:25.497Z"
+    },
+    "6a1ea679002d6f3c95de": {
+      "fileId": "6a1eabd40019cc5f7dd0",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabd40019cc5f7dd0/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:25.533Z"
+    },
+    "6a1ea679002d6dce7cb3": {
+      "fileId": "6a1eabd40019c70ced44",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabd40019c70ced44/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:25.573Z"
+    },
+    "6a1ea679002d6a26eae2": {
+      "fileId": "6a1eabd40019c6404a1d",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eabd40019c6404a1d/view?project=68f5e984002817f132e2",
+      "at": "2026-06-02T10:09:25.574Z"
+    },
+    "6a14425c0036cfd197d3": {
+      "fileId": "6a1eae580009fbd3608f",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eae580009fbd3608f/view?project=68f5e984002817f132e2",
+      "source": "placeholder",
+      "barcode": "5900951313592",
+      "name": "Twix",
+      "at": "2026-06-02T10:20:09.390Z"
+    },
+    "6a143f850030d1184677": {
+      "fileId": "6a1eae58001a0a02d655",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eae58001a0a02d655/view?project=68f5e984002817f132e2",
+      "source": "placeholder",
+      "barcode": "0460053126469",
+      "name": "Protein Milk",
+      "at": "2026-06-02T10:20:09.635Z"
+    },
+    "6a1439a700134fb61268": {
+      "fileId": "6a1eae590005e5769e2b",
+      "imageUrl": "https://cloud.appwrite.io/v1/storage/buckets/SupermarketsLogo/files/6a1eae590005e5769e2b/view?project=68f5e984002817f132e2",
+      "source": "placeholder",
+      "barcode": "5449000054227",
+      "name": "Cocacola",
+      "at": "2026-06-02T10:20:10.209Z"
+    }
+  }
+}

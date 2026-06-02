@@ -4,8 +4,48 @@ Operational scripts you run manually during development.
 
 ### Contents
 - `seed_sample_data.js`: seed sample categories, products, supermarkets, and current prices.
+- `seed_products_by_category.js`: create new products per canonical category (idempotent).
 - `seed_prices_for_all_supermarkets.js`: ensure every supermarket has every product in `prices_collection` (large seed).
 - `seed_price_history.js`: seed realistic **historical** rows in `price_history` (2023 → recent) for charts.
+- `fix_missing_product_images.js`: upload placeholder PNG for products missing images.
+
+### Seed products by category (new products)
+
+Creates **new products** for the canonical categories (Beverage/Snacks/Dairy/Bakery/Seafood/Fruit/Frozen/Canned),
+with deterministic fake barcodes (`869…`) and `categoryId` assigned by `categoryName`.
+
+From `PriceMate/`:
+
+```bash
+# Preview (no writes)
+npm run seed:products-by-category -- --dry-run
+
+# Seed only one category (5 products)
+npm run seed:products-by-category -- --category=Beverage --per-category=5
+
+# Full seed (25 per category)
+npm run seed:products-by-category -- --per-category=25
+```
+
+If you need to revert the synthetic products created by this script:
+
+```bash
+# Preview what would be deleted
+npm --prefix scripts run cleanup:seeded-products -- --dry-run
+
+# Delete seeded products (and optionally their prices)
+npm --prefix scripts run cleanup:seeded-products -- --delete-prices
+```
+
+**Flags:**
+
+| Flag | Description |
+|------|-------------|
+| `--dry-run` | Print counts + sample only |
+| `--category=Beverage` | Limit to one category name |
+| `--per-category=25` | How many new products per category |
+| `--max-total=N` | Cap total new products |
+| `--concurrency=8` | Parallel Appwrite creates |
 
 ### Seed prices for all supermarkets (catalog availability)
 
@@ -76,7 +116,15 @@ npm run seed:price-history -- --product-id=<product-$id> --per-product-points=50
 
 ### Recommended staged run (large seed)
 
-1) Prices first:
+1) Products first:
+
+```bash
+npm run seed:products-by-category -- --dry-run
+npm run seed:products-by-category -- --category=Beverage --per-category=5
+npm run seed:products-by-category -- --per-category=25
+```
+
+2) Prices:
 
 ```bash
 npm run seed:prices-all -- --dry-run
@@ -85,13 +133,44 @@ npm run seed:prices-all -- --limit-pairs=2000
 npm run seed:prices-all
 ```
 
-2) History second:
+3) History:
 
 ```bash
 npm run seed:price-history -- --dry-run --per-product-points=50
 npm run seed:price-history -- --max-products=10 --per-product-points=50
 npm run seed:price-history -- --per-product-points=50
 ```
+
+### Fix missing product images (upload placeholder PNG)
+
+If a product has no `imageUrl` (and no other supported image fields), this script uploads a small placeholder PNG to the Appwrite `product-images` bucket and sets `products.imageUrl` to the file view URL.
+
+From `PriceMate/`:
+
+```bash
+# Preview (no writes)
+npm run fix:missing-product-images -- --dry-run
+
+# Fix up to 5 products
+npm run fix:missing-product-images -- --limit=5
+
+# By default this ALSO fixes placeholder URLs (like via.placeholder.com) used by the seeders.
+# To only fix truly empty image fields:
+npm run fix:missing-product-images -- --dry-run --no-include-placeholders
+
+# Force overwrite existing imageUrl (not recommended normally)
+npm run fix:missing-product-images -- --force --limit=5
+```
+
+**Flags:**
+
+| Flag | Description |
+|------|-------------|
+| `--dry-run` | Print counts only |
+| `--limit=N` | Cap number of products updated |
+| `--concurrency=4` | Parallel uploads/updates |
+| `--force` | Overwrite even if `imageUrl` already exists |
+| `--checkpoint-file=...` | Resume support file (JSON) |
 
 **Tests:** `npm run test:scripts` (from `PriceMate/`) runs unit tests for the generator in `scripts/test/`.
 
