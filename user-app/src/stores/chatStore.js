@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { db, Query, client, DATABASE_ID, COLLECTIONS, ID } from '../lib/appwrite';
+import { applyTitleOverlay } from '../utils/aiMemoryUtils';
 
 /** Messages with no `conversationId` in Appwrite are grouped under this id in the UI. */
 export const LEGACY_CONVERSATION_ID = 'legacy';
@@ -110,6 +111,42 @@ const listAllThreadDocuments = async (userId, conversationId) => {
     return all;
 };
 
+const listAllMemoryDocuments = async (userId, conversationId = null) => {
+    if (!userId || !db.aiChatMemory) return [];
+    const baseQueries = [
+        Query.equal('userId', userId),
+        Query.orderAsc('$id'),
+        Query.limit(100),
+    ];
+    if (conversationId && conversationId !== LEGACY_CONVERSATION_ID) {
+        baseQueries.unshift(Query.equal('conversationId', conversationId));
+    }
+
+    const all = [];
+    let lastId;
+    for (;;) {
+        const pageQueries = lastId ? [...baseQueries, Query.cursorAfter(lastId)] : baseQueries;
+        const res = await db.aiChatMemory.list(pageQueries);
+        if (res.documents.length === 0) break;
+        all.push(...res.documents);
+        if (res.documents.length < 100) break;
+        lastId = res.documents[res.documents.length - 1].$id;
+    }
+    return all;
+};
+
+const deleteMemoryDocuments = async (userId, conversationId = null) => {
+    try {
+        const docs = await listAllMemoryDocuments(userId, conversationId);
+        await Promise.all(docs.map((doc) => db.aiChatMemory.delete(doc.$id)));
+        return true;
+    } catch (error) {
+        const msg = String(error?.message || '');
+        if (error?.code === 404 || /not found|collection/i.test(msg)) return false;
+        throw error;
+    }
+};
+
 /** Serialize session bootstrap so overlapping calls (Strict Mode, fast navigation) never double-run the empty-session branch. */
 let initSessionMutex = Promise.resolve();
 
@@ -217,8 +254,16 @@ const useChatStore = create((set, get) => ({
                 if (response.documents.length < 100) break;
                 lastId = response.documents[response.documents.length - 1].$id;
             }
+            let summaries = buildSummariesFromDocuments(allDocs);
+            try {
+                const titleDocs = await listAllMemoryDocuments(userId);
+                const conversationTitleDocs = titleDocs.filter((d) => d.memoryType === 'conversation_title');
+                summaries = applyTitleOverlay(summaries, conversationTitleDocs);
+            } catch {
+                // best-effort; title overlay failure must never break the conversation list
+            }
             set({
-                conversationSummaries: buildSummariesFromDocuments(allDocs),
+                conversationSummaries: summaries,
                 summariesLoading: false,
             });
         } catch (error) {
@@ -359,6 +404,7 @@ const useChatStore = create((set, get) => ({
         try {
             const docs = await listAllThreadDocuments(userId, conversationId);
             await Promise.all(docs.map((d) => db.chatHistory.delete(d.$id)));
+            await deleteMemoryDocuments(userId, conversationId);
 
             const wasActive = get().activeConversationId === conversationId;
 
@@ -375,6 +421,18 @@ const useChatStore = create((set, get) => ({
         } catch (error) {
             console.error('Failed to delete conversation:', error);
             set({ error: error.message });
+        }
+    },
+
+    clearConversationMemory: async (userId, conversationId) => {
+        if (!userId || !conversationId || conversationId === LEGACY_CONVERSATION_ID) return false;
+        try {
+            await deleteMemoryDocuments(userId, conversationId);
+            return true;
+        } catch (error) {
+            console.error('Failed to clear conversation memory:', error);
+            set({ error: error.message });
+            return false;
         }
     },
 

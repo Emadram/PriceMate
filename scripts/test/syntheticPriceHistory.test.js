@@ -2,6 +2,8 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
     buildTimeline,
+    buildTimelineFixedCount,
+    buildScatteredTimeline,
     createRng,
     hashSeed,
     inflationMultiplierAt,
@@ -36,6 +38,35 @@ describe('buildTimeline', () => {
         const timeline = buildTimeline(start, end, 50);
         assert.ok(timeline.length >= 50);
         assert.equal(timeline[0].getTime(), start.getTime());
+    });
+});
+
+describe('buildScatteredTimeline', () => {
+    const start = new Date(Date.UTC(2023, 0, 1));
+    const end = new Date(Date.UTC(2025, 4, 20));
+
+    it('returns exactly totalPoints strictly increasing timestamps', () => {
+        const rng = createRng(hashSeed('prod_scatter_test'));
+        const timeline = buildScatteredTimeline(start, end, 20, rng);
+        assert.equal(timeline.length, 20);
+        assert.equal(timeline[0].getTime(), start.getTime());
+        assert.equal(timeline[timeline.length - 1].getTime(), end.getTime());
+        for (let i = 1; i < timeline.length; i++) {
+            assert.ok(timeline[i].getTime() > timeline[i - 1].getTime());
+        }
+    });
+
+    it('is less uniform than evenly spaced timeline', () => {
+        const rng = createRng(hashSeed('prod_scatter_variance'));
+        const scattered = buildScatteredTimeline(start, end, 20, rng);
+        const even = buildTimelineFixedCount(start, end, 20);
+        const gaps = (arr) =>
+            arr.slice(1).map((d, i) => d.getTime() - arr[i].getTime());
+        const variance = (values) => {
+            const mean = values.reduce((a, b) => a + b, 0) / values.length;
+            return values.reduce((acc, v) => acc + (v - mean) ** 2, 0) / values.length;
+        };
+        assert.ok(variance(gaps(scattered)) > variance(gaps(even)) * 1.5);
     });
 });
 
@@ -128,6 +159,19 @@ describe('generateSyntheticHistory', () => {
         const first = payloads[0];
         const last = payloads.filter((p) => p.supermarketId === 's1').at(-1);
         assert.ok(first.price < last.price * 0.95);
+    });
+
+    it('scattered mode returns exactly totalPoints rows', () => {
+        const payloads = generateSyntheticHistory({
+            productId: 'prod_scattered_20',
+            stores: [{ supermarketId: 's1', priceId: 'price_sc', currentPrice: 42 }],
+            productMeta: { name: 'Ice Cream' },
+            startDate,
+            endDate,
+            totalPoints: 20,
+            timelineMode: 'scattered',
+        });
+        assert.equal(payloads.length, 20);
     });
 });
 

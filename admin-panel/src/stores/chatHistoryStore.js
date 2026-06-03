@@ -27,6 +27,22 @@ const listAllPages = async (listFn, baseQueries) => {
     return all;
 };
 
+const deleteMemoryFor = async (userId, threadKey = null) => {
+    if (!db.aiChatMemory || !userId) return;
+    try {
+        const baseQueries = [Query.equal('userId', userId), Query.orderAsc('$id')];
+        if (threadKey && threadKey !== LEGACY_THREAD_KEY) {
+            baseQueries.unshift(Query.equal('conversationId', threadKey));
+        }
+        const docs = await listAllPages(db.aiChatMemory.list.bind(db.aiChatMemory), baseQueries);
+        await Promise.all(docs.map((doc) => db.aiChatMemory.delete(doc.$id)));
+    } catch (error) {
+        const msg = String(error?.message || '');
+        if (error?.code === 404 || /not found|collection/i.test(msg)) return;
+        throw error;
+    }
+};
+
 const mapDocumentToMessage = (msg) => ({
     id: msg.$id,
     text: msg.text || msg.content || '',
@@ -124,6 +140,7 @@ export const useChatHistoryStore = create((set) => ({
 
             const toDelete = await listAllPages(db.chatHistory.list.bind(db.chatHistory), baseQueries);
             await Promise.all(toDelete.map((doc) => db.chatHistory.delete(doc.$id)));
+            await deleteMemoryFor(userId, threadKey);
 
             set((state) => {
                 const msgs = state.groupedHistory[userId] || [];
@@ -150,6 +167,7 @@ export const useChatHistoryStore = create((set) => ({
             ]);
 
             await Promise.all(toDelete.map((doc) => db.chatHistory.delete(doc.$id)));
+            await deleteMemoryFor(userId);
 
             set((state) => {
                 const updated = { ...state.groupedHistory };

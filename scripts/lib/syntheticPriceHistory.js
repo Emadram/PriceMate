@@ -136,6 +136,49 @@ export const buildTimeline = (start, end, minPoints = 50) => {
 };
 
 /**
+ * Unevenly spaced timeline for chart demos (seeded, sorted, min gap between points).
+ * @param {Date} start
+ * @param {Date} end
+ * @param {number} totalPoints
+ * @param {() => number} rng returns value in [0, 1)
+ * @param {{ minGapDays?: number }} [options]
+ * @returns {Date[]}
+ */
+export const buildScatteredTimeline = (start, end, totalPoints, rng, options = {}) => {
+    const n = Math.max(2, Math.floor(totalPoints));
+    const startMs = start.getTime();
+    const endMs = end.getTime();
+    const span = Math.max(1, endMs - startMs);
+    const minGapMs = Math.max(MS_DAY, (options.minGapDays ?? 4) * MS_DAY);
+
+    const msList = [];
+    for (let i = 0; i < n; i++) {
+        msList.push(startMs + rng() * span);
+    }
+    msList.sort((a, b) => a - b);
+
+    msList[0] = startMs;
+    msList[n - 1] = endMs;
+
+    for (let i = 1; i < n; i++) {
+        if (msList[i] - msList[i - 1] < minGapMs) {
+            msList[i] = msList[i - 1] + minGapMs;
+        }
+    }
+
+    if (msList[n - 1] > endMs) {
+        msList[n - 1] = endMs;
+        for (let i = n - 2; i >= 1; i--) {
+            const maxAllowed = msList[i + 1] - minGapMs;
+            if (msList[i] > maxAllowed) msList[i] = maxAllowed;
+        }
+        msList[0] = startMs;
+    }
+
+    return msList.map((ms) => new Date(Math.min(endMs, Math.max(startMs, Math.round(ms)))));
+};
+
+/**
  * @param {Date} date
  * @param {string} category
  * @returns {number}
@@ -164,6 +207,7 @@ const roundPrice = (value) => Math.round(value * 100) / 100;
  * @param {number} [options.totalPoints]
  * @param {number} [options.minPoints] legacy alias
  * @param {number} [options.storeBias]
+ * @param {'even'|'scattered'} [options.timelineMode]
  * @returns {object[]}
  */
 export const generateSyntheticHistory = (options) => {
@@ -176,14 +220,20 @@ export const generateSyntheticHistory = (options) => {
         totalPoints,
         minPoints = 50,
         storeBias = 0.03,
+        timelineMode = 'even',
     } = options;
 
     if (!stores?.length) return [];
 
     const rng = createRng(hashSeed(productId));
-    const timeline = Number.isFinite(Number(totalPoints))
-        ? buildTimelineFixedCount(startDate, endDate, Number(totalPoints))
-        : buildTimeline(startDate, endDate, minPoints);
+    let timeline;
+    if (timelineMode === 'scattered' && Number.isFinite(Number(totalPoints))) {
+        timeline = buildScatteredTimeline(startDate, endDate, Number(totalPoints), rng);
+    } else if (Number.isFinite(Number(totalPoints))) {
+        timeline = buildTimelineFixedCount(startDate, endDate, Number(totalPoints));
+    } else {
+        timeline = buildTimeline(startDate, endDate, minPoints);
+    }
     if (timeline.length === 0) return [];
 
     const storeAnchors = stores

@@ -7,6 +7,7 @@ Operational scripts you run manually during development.
 - `seed_products_by_category.js`: create new products per canonical category (idempotent).
 - `seed_prices_for_all_supermarkets.js`: ensure every supermarket has every product in `prices_collection` (large seed).
 - `seed_price_history.js`: seed realistic **historical** rows in `price_history` (2023 → recent) for charts.
+- `seed_price_history_targeted.js`: seed **20 scattered** history rows for **exactly 4** CLI-specified products (demo charts).
 - `fix_missing_product_images.js`: upload placeholder PNG for products missing images.
 
 ### Seed products by category (new products)
@@ -113,6 +114,42 @@ npm run seed:price-history -- --product-id=<product-$id> --per-product-points=50
 | `--concurrency=8` | Parallel Appwrite creates |
 
 **Volume:** ~50+ documents per priced product (e.g. 100 products ≈ 5,000 rows). Run in dev/staging.
+
+### Seed price history (targeted: 4 products × 20 scattered points)
+
+For demo charts or a small set of showcase products. Requires **exactly 4** Appwrite product `$id`s and seeds **20 history rows per product** (rotated across supermarkets) with **uneven timestamps** by default.
+
+From `PriceMate/`:
+
+```bash
+# Preview (no writes) — replace with your four product $ids
+npm run seed:price-history-targeted -- --dry-run \
+  --product-ids=ID1,ID2,ID3,ID4
+
+# Insert
+npm run seed:price-history-targeted -- \
+  --product-ids=ID1,ID2,ID3,ID4
+
+# Re-seed (clear prior synthetic rows for those products only)
+npm run seed:price-history-targeted -- \
+  --product-ids=ID1,ID2,ID3,ID4 --clear-synthetic --force
+```
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--product-ids=id1,id2,id3,id4` | required | Exactly 4 comma-separated product `$id`s |
+| `--per-product-points=20` | `20` | Total history rows per product |
+| `--timeline=scattered` | `scattered` | Uneven dates (`even` for uniform spacing) |
+| `--start=2023-01-01` | `2023-01-01` | Range start (UTC) |
+| `--end=YYYY-MM-DD` | 7 days ago | Range end |
+| `--dry-run` | off | Print per-product stats + sample payloads |
+| `--force` | off | Insert even if product already has ≥ 20 history rows |
+| `--clear-synthetic` | off | Delete `synthetic_seed` rows for the 4 IDs before insert |
+| `--concurrency=8` | `8` | Parallel Appwrite creates |
+
+Each product must already have at least one row in `prices_collection` (run `seed:prices-all` first if needed).
 
 ### Recommended staged run (large seed)
 

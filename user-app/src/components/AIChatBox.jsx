@@ -364,13 +364,19 @@ import {
     readStoredAllergyProfile,
     serializeAiCheckResponse,
 } from '../utils/aiCheckUtils';
+import {
+    fetchMemoryForPrompt,
+    buildPromptWithMemory,
+    maybeSummarize,
+    maybeExtractFacts,
+    maybeTitleGenerate,
+} from '../utils/aiMemoryUtils';
 import { account as appwriteAccount, client as appwriteClient, functions as appwriteFunctions } from '../lib/appwrite';
 import { createFunctionExecutionJson } from '../utils/appwriteFunctionExecution';
 import useCurrencyStore from '../stores/currencyStore';
 import useAuthStore from '../stores/authStore';
 import useChatStore, { CHAT_ERROR_MISSING_CONVERSATION_ID } from '../stores/chatStore';
 import AppLogo from './AppLogo';
-import { lockDocumentScroll, releaseDocumentScrollLock } from '../utils/documentScrollLock';
 
 const ChatScreenHeader = ({
     variant,
@@ -2227,6 +2233,9 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 }
             });
 
+            const memCtx = await fetchMemoryForPrompt(user.$id, activeConversationId)
+                .catch(() => ({ conversationSummary: null, userFacts: null }));
+
             const promptContext = buildRankedProductContextLines(fullProductList, userMessage, userAiProfile);
             const storeContext = buildSupermarketContextLines(supermarketList, userLocation);
             const storeLocationStatus = isUserLocationAvailableForStores(userLocation)
@@ -2370,7 +2379,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
 
             const completion = await openai.chat.completions.create({
                 model: OPENROUTER_MODEL,
-                messages: [{ role: "system", content: clampText(prompt, 12000) }, ...boundedThread],
+                messages: [{ role: "system", content: clampText(buildPromptWithMemory(prompt, memCtx), 12000) }, ...boundedThread],
             });
 
             const text = completion.choices[0]?.message?.content || "No response received.";
@@ -2383,6 +2392,52 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 } catch (e) {
                     console.debug('Intent cache set failed', e);
                 }
+
+                const msgs = useChatStore.getState().messages;
+                const msgCount = msgs.length;
+
+                void (async () => {
+                    try {
+                        await maybeSummarize({
+                            openai,
+                            userId: user.$id,
+                            conversationId: activeConversationId,
+                            messages: msgs,
+                            model: OPENROUTER_MODEL,
+                        });
+                    } catch (e) {
+                        console.error('[Memory] summarize failed:', e);
+                    }
+                })();
+
+                void (async () => {
+                    try {
+                        await maybeExtractFacts({
+                            openai,
+                            userId: user.$id,
+                            conversationId: activeConversationId,
+                            assistantReply: sanitizedText,
+                            userMessage,
+                        });
+                    } catch (e) {
+                        console.error('[Memory] extractFacts failed:', e);
+                    }
+                })();
+
+                void (async () => {
+                    try {
+                        await maybeTitleGenerate({
+                            openai,
+                            userId: user.$id,
+                            conversationId: activeConversationId,
+                            firstUserMessage: userMessage,
+                            model: OPENROUTER_MODEL,
+                            messageCount: msgCount,
+                        });
+                    } catch (e) {
+                        console.error('[Memory] titleGenerate failed:', e);
+                    }
+                })();
             }
         } catch (error) {
             const detail = extractOpenRouterError(error);

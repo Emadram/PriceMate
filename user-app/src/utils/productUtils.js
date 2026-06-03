@@ -29,6 +29,13 @@ const PRODUCT_LIST_SELECT = [
     'code',
     'brand',
     'brands',
+    'ingredientsText',
+    'allergens',
+    'nutritionSource',
+    'sugarsPer100g',
+    'sodiumMgPer100g',
+    'caffeineMgPerL',
+    'nutritionUpdatedAt',
     'imageUrl',
     'image',
     'image_url',
@@ -781,6 +788,9 @@ export const persistIngredientPayloadToCatalogProduct = async (productDoc, paylo
             ingredientsText: incomingNutrition.ingredientsText || currentNutrition.ingredientsText || '',
             nutritionSource: incomingNutrition.nutritionSource || currentNutrition.nutritionSource || '',
         };
+        const allergens = Array.isArray(payload?.allergens)
+            ? payload.allergens.map((item) => String(item || '').trim()).filter(Boolean).slice(0, 30)
+            : [];
 
         const hasMergedData =
             mergedNutrition.sugarsPer100g !== null ||
@@ -791,8 +801,31 @@ export const persistIngredientPayloadToCatalogProduct = async (productDoc, paylo
 
         if (!hasMergedData) return false;
 
+        const explicitPayload = {
+            ingredientsText: mergedNutrition.ingredientsText,
+            allergens,
+            nutritionSource: mergedNutrition.nutritionSource || 'PriceMate',
+            nutritionUpdatedAt: new Date().toISOString(),
+        };
+        if (mergedNutrition.sugarsPer100g !== null) explicitPayload.sugarsPer100g = mergedNutrition.sugarsPer100g;
+        if (mergedNutrition.sodiumMgPer100g !== null) explicitPayload.sodiumMgPer100g = mergedNutrition.sodiumMgPer100g;
+        if (mergedNutrition.caffeineMgPerL !== null) explicitPayload.caffeineMgPerL = mergedNutrition.caffeineMgPerL;
+
+        try {
+            await db.products.update(productDoc.$id, explicitPayload);
+            return true;
+        } catch (schemaError) {
+            const message = String(schemaError?.message || '');
+            if (!/Unknown attribute|Invalid document structure|attribute/i.test(message)) {
+                throw schemaError;
+            }
+        }
+
         const baseDescription = stripNutritionMeta(productDoc.description || '');
-        const nextDescription = `${baseDescription}${NUTRITION_META_MARKER}${JSON.stringify(mergedNutrition)}`;
+        const nextDescription = `${baseDescription}${NUTRITION_META_MARKER}${JSON.stringify({
+            ...mergedNutrition,
+            allergens,
+        })}`;
 
         if (String(productDoc.description || '') === nextDescription) {
             return false;
@@ -815,11 +848,14 @@ export const ingredientPayloadFromAppwriteProduct = (doc) => {
 
     const hiddenNutrition = extractNutritionMeta(doc.description);
 
-    // Prefer nested `nutrition` object (new format), then the hidden description block, then legacy top-level fields
-    const sugarsPer100g = parseNutritionNumber(doc?.nutrition?.sugarsPer100g ?? hiddenNutrition?.sugarsPer100g ?? doc.sugarsPer100g);
-    const sodiumMgPer100g = parseNutritionNumber(doc?.nutrition?.sodiumMgPer100g ?? hiddenNutrition?.sodiumMgPer100g ?? doc.sodiumMgPer100g);
-    const caffeineMgPerL = parseNutritionNumber(doc?.nutrition?.caffeineMgPerL ?? hiddenNutrition?.caffeineMgPerL ?? doc.caffeineMgPerL);
-    const ingredientsText = String(doc?.nutrition?.ingredientsText ?? hiddenNutrition?.ingredientsText ?? (doc.ingredientsText || '')).trim();
+    // Prefer explicit fields, then nested `nutrition`, then the hidden description block used before the schema existed.
+    const sugarsPer100g = parseNutritionNumber(doc.sugarsPer100g ?? doc?.nutrition?.sugarsPer100g ?? hiddenNutrition?.sugarsPer100g);
+    const sodiumMgPer100g = parseNutritionNumber(doc.sodiumMgPer100g ?? doc?.nutrition?.sodiumMgPer100g ?? hiddenNutrition?.sodiumMgPer100g);
+    const caffeineMgPerL = parseNutritionNumber(doc.caffeineMgPerL ?? doc?.nutrition?.caffeineMgPerL ?? hiddenNutrition?.caffeineMgPerL);
+    const ingredientsText = String(doc.ingredientsText ?? doc?.nutrition?.ingredientsText ?? hiddenNutrition?.ingredientsText ?? '').trim();
+    const allergens = Array.isArray(doc.allergens)
+        ? doc.allergens
+        : (Array.isArray(hiddenNutrition?.allergens) ? hiddenNutrition.allergens : []);
 
     const hasData =
         sugarsPer100g !== null || sodiumMgPer100g !== null || caffeineMgPerL !== null || ingredientsText.length > 0;
@@ -833,7 +869,7 @@ export const ingredientPayloadFromAppwriteProduct = (doc) => {
         ingredientsList: ingredientsText
             ? ingredientsText.split(/[,;]+/).map((item) => item.trim()).filter(Boolean)
             : [],
-        allergens: [],
+        allergens: allergens.map((item) => String(item || '').replace(/^[a-z]{2}:/, '').replace(/_/g, ' ').trim()).filter(Boolean),
         nutriments: {
             sugarsPer100g,
             sodiumMgPer100g,
@@ -843,7 +879,7 @@ export const ingredientPayloadFromAppwriteProduct = (doc) => {
         },
         source: 'PriceMate',
         sourceUrl: '',
-        nutritionSourceLabel: String(doc?.nutrition?.nutritionSource ?? hiddenNutrition?.nutritionSource ?? (doc.nutritionSource || '')).trim(),
+        nutritionSourceLabel: String(doc.nutritionSource ?? doc?.nutrition?.nutritionSource ?? hiddenNutrition?.nutritionSource ?? '').trim(),
     };
 };
 
