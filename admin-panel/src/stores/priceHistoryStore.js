@@ -1,40 +1,76 @@
 import { create } from 'zustand';
 import { db } from '../lib/appwrite';
 import { Query } from 'appwrite';
+import {
+    PRICE_BACKFILL_SELECT,
+    listAllDocuments,
+    buildBackfillPayloads,
+    createHistoryInBatches,
+} from '../utils/priceHistoryBackfill';
+import { buildOpeImportPayloads } from '../utils/openPriceEngineImport';
 
-const usePriceHistoryStore = create((set) => ({
+const DEFAULT_PAGE_SIZE = 50;
+
+const usePriceHistoryStore = create((set, get) => ({
     history: [],
     loading: false,
     error: null,
+    page: 1,
+    pageSize: DEFAULT_PAGE_SIZE,
+    total: 0,
 
-    fetchHistory: async () => {
+    setPage: (page) => set({ page: Math.max(1, page) }),
+
+    fetchHistoryPage: async (page = get().page, pageSize = get().pageSize) => {
         set({ loading: true, error: null });
         try {
+            const offset = (page - 1) * pageSize;
             const response = await db.priceHistory.list([
                 Query.orderDesc('timestamp'),
-                Query.limit(200)
+                Query.limit(pageSize),
+                Query.offset(offset),
             ]);
-            set({ history: response.documents, loading: false });
+            set({
+                history: response.documents,
+                total: response.total ?? response.documents.length,
+                page,
+                pageSize,
+                loading: false,
+            });
         } catch (error) {
             console.error('Fetch price history error:', error);
             set({ error: error.message, loading: false });
         }
     },
 
+    /** Loads current page only (replaces full-collection fetch). */
+    fetchHistory: async () => {
+        const { page, pageSize } = get();
+        return get().fetchHistoryPage(page, pageSize);
+    },
+
     addHistory: async (data) => {
         set({ loading: true, error: null });
         try {
-            await db.priceHistory.create({
+            const created = await db.priceHistory.create({
                 priceId: data.priceId || null,
                 price: parseFloat(data.price),
                 productId: data.productId,
                 supermarketId: data.supermarketId,
                 timestamp: data.timestamp,
                 isPromotional: data.isPromotional || false,
-                priceChangeReason: data.priceChangeReason || null
+                priceChangeReason: data.priceChangeReason || null,
             });
-            await usePriceHistoryStore.getState().fetchHistory();
-            set({ loading: false });
+            const { page, pageSize } = get();
+            if (page === 1) {
+                set((state) => ({
+                    history: [created, ...state.history].slice(0, pageSize),
+                    total: (state.total || 0) + 1,
+                    loading: false,
+                }));
+            } else {
+                await get().fetchHistoryPage(page, pageSize);
+            }
             return true;
         } catch (error) {
             console.error('Add price history error:', error);
@@ -46,17 +82,21 @@ const usePriceHistoryStore = create((set) => ({
     updateHistory: async (id, data) => {
         set({ loading: true, error: null });
         try {
-            await db.priceHistory.update(id, {
+            const updated = await db.priceHistory.update(id, {
                 priceId: data.priceId || null,
                 price: parseFloat(data.price),
                 productId: data.productId,
                 supermarketId: data.supermarketId,
                 timestamp: data.timestamp,
                 isPromotional: data.isPromotional || false,
-                priceChangeReason: data.priceChangeReason || null
+                priceChangeReason: data.priceChangeReason || null,
             });
-            await usePriceHistoryStore.getState().fetchHistory();
-            set({ loading: false });
+            set((state) => ({
+                history: state.history.map((row) =>
+                    row.$id === id ? { ...row, ...updated } : row
+                ),
+                loading: false,
+            }));
             return true;
         } catch (error) {
             console.error('Update price history error:', error);
@@ -69,8 +109,11 @@ const usePriceHistoryStore = create((set) => ({
         set({ loading: true, error: null });
         try {
             await db.priceHistory.delete(id);
-            await usePriceHistoryStore.getState().fetchHistory();
-            set({ loading: false });
+            set((state) => ({
+                history: state.history.filter((row) => row.$id !== id),
+                total: Math.max(0, (state.total || 0) - 1),
+                loading: false,
+            }));
             return true;
         } catch (error) {
             console.error('Delete price history error:', error);
@@ -79,64 +122,167 @@ const usePriceHistoryStore = create((set) => ({
         }
     },
 
-    syncFromPrices: async (limit = 200) => {
-        set({ loading: true, error: null });
-        try {
-            const historyResponse = await db.priceHistory.list([
-                Query.limit(limit),
-                Query.select(['$id', 'priceId'])
-            ]);
+    /** @deprecated Use backfillFromPrices */
+    syncFromPrices: async () => get().backfillFromPrices(),
 
-            const existingPriceIds = new Set(
-                historyResponse.documents
-                    .map((doc) => doc.priceId)
-                    .filter((value) => value)
+    backfillFromPrices: async (onProgress) => {
+        set({ loading: true, error: null });
+
+        const report = (patch) => {
+            onProgress?.(patch);
+        };
+
+        try {
+            report({ phase: 'loading_existing', processed: 0, total: 0, created: 0, skipped: 0, failed: 0 });
+
+            const historyDocs = await listAllDocuments(
+                (queries) => db.priceHistory.list(queries),
+                [Query.select(['$id', 'priceId'])]
             );
 
-            const pricesResponse = await db.prices.list([
-                Query.limit(limit),
-                Query.orderDesc('$updatedAt'),
-                Query.select(['*', 'products.$id', 'supermarkets.$id'])
-            ]);
+            const existingPriceIds = new Set(
+                historyDocs.map((doc) => doc.priceId).filter(Boolean)
+            );
 
-            let createdCount = 0;
+            report({ phase: 'loading_prices', processed: 0, total: 0, created: 0, skipped: 0, failed: 0 });
 
-            for (const price of pricesResponse.documents) {
-                if (price.$id && existingPriceIds.has(price.$id)) {
-                    continue;
+            const prices = await listAllDocuments(
+                (queries) => db.prices.list(queries),
+                [Query.orderDesc('$updatedAt'), Query.select(PRICE_BACKFILL_SELECT)]
+            );
+
+            const { payloads, skippedExisting, skippedInvalid } = buildBackfillPayloads(
+                prices,
+                existingPriceIds
+            );
+
+            const skipped = skippedExisting + skippedInvalid;
+
+            report({
+                phase: 'creating',
+                processed: 0,
+                total: payloads.length,
+                created: 0,
+                skipped,
+                failed: 0,
+            });
+
+            const { created, failed, errors } = await createHistoryInBatches(
+                payloads,
+                (payload) => db.priceHistory.create(payload),
+                {
+                    onProgress: (stats) => {
+                        report({
+                            phase: 'creating',
+                            processed: stats.processed,
+                            total: payloads.length,
+                            created: stats.created,
+                            skipped,
+                            failed: stats.failed,
+                        });
+                    },
                 }
+            );
 
-                const productId = typeof price.products === 'object' ? price.products.$id : price.products || price.productId;
-                const supermarketId = typeof price.supermarkets === 'object' ? price.supermarkets.$id : price.supermarkets || price.supermarketId;
+            await get().fetchHistoryPage(1, get().pageSize);
+            set({ loading: false, page: 1 });
 
-                if (!productId || !supermarketId) {
-                    continue;
-                }
+            return {
+                success: true,
+                createdCount: created,
+                skipped,
+                skippedExisting,
+                skippedInvalid,
+                failed,
+                totalPrices: prices.length,
+                errors,
+            };
+        } catch (error) {
+            console.error('Backfill price history from prices error:', error);
+            set({ error: error.message, loading: false });
+            return {
+                success: false,
+                createdCount: 0,
+                skipped: 0,
+                skippedExisting: 0,
+                skippedInvalid: 0,
+                failed: 0,
+                totalPrices: 0,
+                errors: [error.message],
+            };
+        }
+    },
 
-                const timestamp = price.$updatedAt || price.updatedAt || price.$createdAt || new Date().toISOString();
+    importHistoryBatch: async (rows, options, onProgress) => {
+        set({ loading: true, error: null });
 
-                await db.priceHistory.create({
-                    priceId: price.$id || null,
-                    price: parseFloat(price.price),
-                    productId,
-                    supermarketId,
-                    timestamp,
-                    isPromotional: false,
-                    priceChangeReason: null
-                });
+        const report = (patch) => onProgress?.(patch);
 
-                createdCount += 1;
+        try {
+            const { payloads, skipped: skippedDupes } = buildOpeImportPayloads(rows, options);
+
+            if (payloads.length === 0) {
+                set({ loading: false });
+                return {
+                    success: true,
+                    createdCount: 0,
+                    skipped: skippedDupes,
+                    failed: 0,
+                    total: 0,
+                    errors: [],
+                };
             }
 
-            await usePriceHistoryStore.getState().fetchHistory();
-            set({ loading: false });
-            return { success: true, createdCount };
+            report({
+                phase: 'creating',
+                processed: 0,
+                total: payloads.length,
+                created: 0,
+                skipped: skippedDupes,
+                failed: 0,
+            });
+
+            const { created, failed, errors } = await createHistoryInBatches(
+                payloads,
+                (payload) => db.priceHistory.create(payload),
+                {
+                    onProgress: (stats) => {
+                        report({
+                            phase: 'creating',
+                            processed: stats.processed,
+                            total: payloads.length,
+                            created: stats.created,
+                            skipped: skippedDupes,
+                            failed: stats.failed,
+                        });
+                    },
+                }
+            );
+
+            await get().fetchHistoryPage(1, get().pageSize);
+            set({ loading: false, page: 1 });
+
+            return {
+                success: true,
+                createdCount: created,
+                skipped: skippedDupes,
+                failed,
+                total: payloads.length,
+                errors,
+            };
         } catch (error) {
-            console.error('Sync price history from prices error:', error);
+            console.error('OPE import batch error:', error);
             set({ error: error.message, loading: false });
-            return { success: false, createdCount: 0 };
+            return {
+                success: false,
+                createdCount: 0,
+                skipped: 0,
+                failed: 0,
+                total: 0,
+                errors: [error.message],
+            };
         }
-    }
+    },
 }));
 
 export default usePriceHistoryStore;

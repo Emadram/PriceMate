@@ -328,14 +328,13 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import {
     fetchProducts,
-    fetchAllPrices,
+    fetchPricesForProducts,
     fetchIngredientsByBarcode,
     searchIngredientsByName,
     resolveCatalogProductForIngredients,
     ingredientPayloadFromAppwriteProduct,
     persistIngredientPayloadToCatalogProduct,
-    fetchOffCacheSnapshot,
-    normalizeOffCacheDoc,
+    normalizeProduct,
     resolveOffCacheProductForIngredients,
     ingredientPayloadFromOffCache,
     buildSupermarketContextLines,
@@ -343,7 +342,19 @@ import {
     isUserLocationAvailableForStores,
     resolvePriceSupermarketMeta,
 } from '../utils/productUtils';
+import {
+    findBestProductMatch,
+    scoreProductNameMatch,
+    FUZZY_MATCH_MIN_SCORE,
+} from '../utils/productNameMatch';
 import useUserLocation from '../hooks/useUserLocation';
+import useComposerKeyboardLift from '../hooks/useComposerKeyboardLift';
+import { prefersKeyboardResizeViewport, usesAiChatFixedMobileChrome } from '../utils/platform';
+import {
+    polishMessageSegments,
+    scrubPunctuationAfterProductTags,
+    tokenizeMessageContent,
+} from '../utils/chatMessageContent';
 import useSupermarketsStore from '../stores/supermarketsStore';
 import {
     buildAiProfileCacheKey,
@@ -353,10 +364,19 @@ import {
     readStoredAllergyProfile,
     serializeAiCheckResponse,
 } from '../utils/aiCheckUtils';
-import { functions as appwriteFunctions } from '../lib/appwrite';
+import {
+    fetchMemoryForPrompt,
+    buildPromptWithMemory,
+    maybeSummarize,
+    maybeExtractFacts,
+    maybeTitleGenerate,
+} from '../utils/aiMemoryUtils';
+import { account as appwriteAccount, client as appwriteClient, functions as appwriteFunctions } from '../lib/appwrite';
+import { createFunctionExecutionJson } from '../utils/appwriteFunctionExecution';
 import useCurrencyStore from '../stores/currencyStore';
 import useAuthStore from '../stores/authStore';
 import useChatStore, { CHAT_ERROR_MISSING_CONVERSATION_ID } from '../stores/chatStore';
+import AppLogo from './AppLogo';
 
 const ChatScreenHeader = ({
     variant,
@@ -368,10 +388,11 @@ const ChatScreenHeader = ({
     onNewChat,
     onClose,
     showDragHandle,
+    headerRef,
     t,
 }) => {
     const isPage = variant === 'page';
-    const [logoFailed, setLogoFailed] = useState(false);
+    const iosFixedChrome = isPage && usesAiChatFixedMobileChrome();
 
     return (
         <>
@@ -380,7 +401,16 @@ const ChatScreenHeader = ({
                     <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
                 </div>
             ) : null}
-            <header className="pricemate-mobile-chrome sticky top-0 z-10 shrink-0 border-b border-gray-100 dark:border-gray-700/50 px-3.5 pb-3 pt-[calc(0.5rem+env(safe-area-inset-top,0px))] sm:px-5 sm:py-4 sm:pt-[calc(0.65rem+env(safe-area-inset-top,0px))]">
+            <header
+                ref={headerRef}
+                className={`pricemate-mobile-chrome shrink-0 border-b border-gray-100 dark:border-gray-700/50 px-3.5 pb-3 pt-[calc(0.5rem+env(safe-area-inset-top,0px))] sm:px-5 sm:py-4 sm:pt-[calc(0.65rem+env(safe-area-inset-top,0px))] ${
+                    iosFixedChrome
+                        ? 'max-md:fixed max-md:inset-x-0 max-md:top-[var(--app-vv-top,0px)] max-md:z-[10001] max-md:bg-white max-md:dark:bg-gray-900'
+                        : isPage
+                          ? 'z-10 max-md:sticky max-md:top-0 max-md:z-20'
+                          : 'z-10'
+                }`}
+            >
                 <div className="flex items-center gap-2.5 min-w-0">
                     {user ? (
                         <button
@@ -394,20 +424,7 @@ const ChatScreenHeader = ({
                     ) : (
                         <span className="w-10 shrink-0 sm:hidden" aria-hidden />
                     )}
-                    <div className="w-9 h-9 rounded-2xl bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center shrink-0 border border-brand-100 dark:border-brand-800/40 overflow-hidden">
-                        {!logoFailed ? (
-                            <img
-                                src="/LogoPriceMate.png"
-                                alt=""
-                                className="h-6 w-6 object-contain"
-                                loading="eager"
-                                decoding="async"
-                                onError={() => setLogoFailed(true)}
-                            />
-                        ) : (
-                            <FiCpu className="text-lg text-brand-600 dark:text-brand-400" aria-hidden />
-                        )}
-                    </div>
+                    <AppLogo variant="ai" size="xs" alt="" shellClassName="shadow-none" />
                     <div className="flex-1 min-w-0 flex flex-col justify-center">
                         <div className="flex items-center gap-2 min-w-0 leading-none">
                             <h1 className="font-black text-sm sm:text-[15px] truncate normal-case tracking-tight text-brand-700 dark:text-brand-400">
@@ -456,21 +473,135 @@ const ChatScreenHeader = ({
 const AI_CHECK_FUNCTION_ID = import.meta.env.VITE_APPWRITE_FUNCTION_AI_CHECK || '';
 const AI_CHECK_MODE = import.meta.env.VITE_AI_CHECK_MODE || 'legacy';
 
+let cachedAppwriteJwt = '';
+let cachedAppwriteJwtExpiresAt = 0;
+
+const ensureAppwriteJwt = async () => {
+    const now = Date.now();
+    if (cachedAppwriteJwt && cachedAppwriteJwtExpiresAt > now + 30_000) {
+        return cachedAppwriteJwt;
+    }
+
+    const jwt = await appwriteAccount.createJWT();
+    const token = String(jwt?.jwt || '').trim();
+    if (!token) throw new Error('Appwrite JWT is empty.');
+
+    cachedAppwriteJwt = token;
+    // JWTs are typically valid for ~60 minutes; refresh a bit earlier.
+    cachedAppwriteJwtExpiresAt = now + 55 * 60 * 1000;
+
+    appwriteClient.setJWT(token);
+    return token;
+};
+
 const runAiCheckFunction = async (payload) => {
     if (AI_CHECK_MODE !== 'hybrid' || !AI_CHECK_FUNCTION_ID) return null;
     try {
-        const execution = await appwriteFunctions.createExecution(
+        await ensureAppwriteJwt();
+        const parsed = await createFunctionExecutionJson(
+            appwriteFunctions,
             AI_CHECK_FUNCTION_ID,
-            JSON.stringify(payload),
-            false
+            payload
         );
-        if (!execution?.response) return null;
-        const parsed = JSON.parse(execution.response);
         return parsed && typeof parsed === 'object' ? parsed : null;
     } catch (error) {
         console.debug('AI check function unavailable, falling back locally:', error?.message || error);
         return null;
     }
+};
+
+const AI_DEBUG = import.meta.env.VITE_AI_DEBUG === 'true';
+const OPENROUTER_MODEL =
+    import.meta.env.VITE_OPENROUTER_MODEL ||
+    // Stable default on OpenRouter; change in .env without redeploying code.
+    'openai/gpt-4o-mini';
+
+const extractOpenRouterError = (error) => {
+    const status =
+        error?.status ||
+        error?.response?.status ||
+        error?.cause?.status ||
+        null;
+
+    const message =
+        error?.error?.message ||
+        error?.response?.data?.error?.message ||
+        error?.response?.data?.message ||
+        error?.message ||
+        String(error || '');
+
+    const code =
+        error?.error?.code ||
+        error?.response?.data?.error?.code ||
+        error?.code ||
+        null;
+
+    const provider =
+        error?.error?.metadata?.provider_name ||
+        error?.response?.data?.error?.metadata?.provider_name ||
+        null;
+
+    return { status, code, provider, message };
+};
+
+const clampText = (value, maxChars) => {
+    const text = String(value || '');
+    if (text.length <= maxChars) return text;
+    return `${text.slice(0, maxChars)}…`;
+};
+
+const buildThreadForApi = (messages = [], { maxMessages = 18, maxCharsPerMessage = 1200 } = {}) => {
+    const normalized = (Array.isArray(messages) ? messages : [])
+        .filter(Boolean)
+        .map((m) => ({
+            role: m.role === 'assistant' ? 'assistant' : 'user',
+            content: clampText(m.content, maxCharsPerMessage),
+        }));
+
+    if (normalized.length <= maxMessages) return normalized;
+    return normalized.slice(normalized.length - maxMessages);
+};
+
+const extractCategoryKey = (product) => {
+    const raw = product?.categoryId;
+    if (!raw) return '';
+    if (typeof raw === 'string') return raw;
+    if (Array.isArray(raw) && raw.length > 0) {
+        const first = raw[0];
+        return first?.$id || first?.categoryId || first?.id || first?.categoryName || first?.name || '';
+    }
+    if (typeof raw === 'object') {
+        return raw.$id || raw.categoryId || raw.id || raw.categoryName || raw.name || '';
+    }
+    return '';
+};
+
+const buildCategoryAlternativesReply = (product, products, t) => {
+    const categoryKey = extractCategoryKey(product);
+    if (!categoryKey) return '';
+
+    const candidates = (Array.isArray(products) ? products : [])
+        .filter((p) => p && extractCategoryKey(p) === categoryKey)
+        .filter((p) => String(p.barcode || p.code || '').trim().length > 0)
+        .filter((p) => String(p.name || p.productName || '').trim().length > 0)
+        .filter((p) => Array.isArray(p.prices) && p.prices.length > 0);
+
+    const picked = candidates.slice(0, 3);
+    if (picked.length === 0) return '';
+
+    const lines = picked.map((p) => {
+        const barcode = String(p.barcode || p.code || '').trim();
+        const name = String(p.name || p.productName || '').trim();
+        return `- ${name} [BARCODE:${barcode}]`;
+    });
+
+    return [
+        t?.('ai_catalog_only_refusal_help', "That product isn’t available in PriceMate yet. Here are some alternatives in the same category:") ||
+            "That product isn’t available in PriceMate yet. Here are some alternatives in the same category:",
+        ...lines,
+        t?.('ai_catalog_only_refusal_hint', "If you share a barcode, I can check the exact item.") ||
+            "If you share a barcode, I can check the exact item.",
+    ].join('\n');
 };
 
 const profileHasPersonalization = (profile = {}) =>
@@ -517,26 +648,6 @@ const ChatProductThumb = ({ src, alt, className = 'w-full h-full' }) => {
             onError={() => setFailed(true)}
         />
     );
-};
-
-const tokenizeMessageContent = (text) => {
-    const combinedRegex = /\[(?:BARCODE|ID):([\w\d-]+)\]|\[STORE:([\w\d-]+)\]/gi;
-    const segments = [];
-    let lastIndex = 0;
-    let match = combinedRegex.exec(text);
-    while (match) {
-        if (match.index > lastIndex) {
-            segments.push({ type: 'text', value: text.slice(lastIndex, match.index) });
-        }
-        if (match[1]) segments.push({ type: 'barcode', value: match[1] });
-        if (match[2]) segments.push({ type: 'store', value: match[2] });
-        lastIndex = match.index + match[0].length;
-        match = combinedRegex.exec(text);
-    }
-    if (lastIndex < text.length) {
-        segments.push({ type: 'text', value: text.slice(lastIndex) });
-    }
-    return segments;
 };
 
 const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [], allSupermarkets = [], t }) => {
@@ -824,13 +935,14 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [], allSup
         
         // Remove empty lines created by removals
         text = text.replace(/\n\s*\n/g, '\n').trim();
+        text = scrubPunctuationAfterProductTags(text);
 
         const ingredientCardData = msg.role === 'assistant' ? parseIngredientCardData(text) : null;
         if (ingredientCardData) {
             return renderIngredientCard(ingredientCardData);
         }
 
-        const segments = tokenizeMessageContent(text);
+        const segments = polishMessageSegments(tokenizeMessageContent(text));
         const isMostExpensiveRequest = text.toLowerCase().includes('most expensive') || text.toLowerCase().includes('pahalı');
         const isCheapestRequest = text.toLowerCase().includes('cheapest') || text.toLowerCase().includes('en ucuz');
 
@@ -984,10 +1096,15 @@ const buildRankedProductContextLines = (products, userHint, aiProfile = {}) => {
             })
     );
     const scored = products.map((p) => {
-        const blob = norm(`${p.name || ''} ${p.productName || ''} ${p.categoryId?.categoryName || ''}`);
+        const displayName = p.name || p.productName || '';
+        const blob = norm(`${displayName} ${p.categoryId?.categoryName || ''}`);
         let score = 0;
         for (const w of words) {
             if (blob.includes(w)) score++;
+        }
+        const fuzzyScore = scoreProductNameMatch(userHint, displayName);
+        if (fuzzyScore >= FUZZY_MATCH_MIN_SCORE) {
+            score += Math.round(fuzzyScore * 6);
         }
         for (const w of dietaryBoostWords) {
             if (blob.includes(w)) score += 2;
@@ -1023,6 +1140,12 @@ const buildRankedProductContextLines = (products, userHint, aiProfile = {}) => {
 };
 
 const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
+    const isPageVariant = variant === 'page';
+    const [composerFocused, setComposerFocused] = useState(false);
+    const composerAnchoredToNav = prefersKeyboardResizeViewport();
+    useComposerKeyboardLift(isPageVariant && isOpen && !composerAnchoredToNav, {
+        active: composerFocused,
+    });
     const { t, i18n } = useTranslation();
     const { convert, getCurrencySymbol, currency } = useCurrencyStore();
     const user = useAuthStore(state => state.user);
@@ -1044,6 +1167,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
 
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const lastResolvedProductRef = useRef({ barcode: '', name: '' });
     const [mobileListOpen, setMobileListOpen] = useState(false);
     const [fullProductList, setFullProductList] = useState([]);
     const [supermarketList, setSupermarketList] = useState([]);
@@ -1051,8 +1175,11 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
     const fetchSupermarkets = useSupermarketsStore((state) => state.fetchSupermarkets);
     const messagesEndRef = useRef(null);
     const messagesScrollRef = useRef(null);
+    const headerRef = useRef(null);
     const inputRef = useRef(null);
     const formRef = useRef(null);
+    const composerStackRef = useRef(null);
+    const composerFocusedRef = useRef(false);
 
     const mobileQuickPrompts = [
         {
@@ -1092,7 +1219,9 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         },
     ];
 
-    const mobileEmptyActions = mobileQuickPrompts.slice(0, 4);
+    const featuredQuickPrompts = mobileQuickPrompts.filter((item) =>
+        ['cheapest', 'ingredients', 'compare', 'suitable'].includes(item.key)
+    );
 
     const beginNewConversation = () => {
         startNewConversation();
@@ -1104,6 +1233,54 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         setInput(prompt);
         requestAnimationFrame(() => inputRef.current?.focus());
     };
+
+    const showQuickPrompts =
+        Boolean(user) &&
+        !summariesLoading &&
+        !historyLoading &&
+        !isLoading &&
+        history.length === 0;
+
+    const renderQuickPromptSuggestions = (showHero = true) => (
+        <div className={showHero ? 'mx-auto w-full max-w-md space-y-4 pt-2' : 'mx-auto w-full max-w-md space-y-3 pt-1'}>
+            {showHero && (
+                <div className="rounded-[1.75rem] bg-gradient-to-br from-brand-600 via-brand-600 to-brand-700 p-5 text-white shadow-xl shadow-brand-600/20">
+                    <div className="flex items-center gap-3">
+                        <div className="h-11 w-11 rounded-2xl bg-white/10 flex items-center justify-center backdrop-blur-sm shrink-0">
+                            <FiCpu size={22} className="text-white/85" />
+                        </div>
+                        <div className="min-w-0">
+                            <h2 className="text-lg font-black tracking-tight">{t('ai_chat_empty_title', 'What do you want to check?')}</h2>
+                            <p className="text-white/80 text-xs sm:text-sm mt-0.5 leading-relaxed">
+                                {t('ai_chat_empty_description')}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+            <div className="grid grid-cols-2 gap-2">
+                {featuredQuickPrompts.map((item) => {
+                    const Icon = item.Icon;
+                    return (
+                        <button
+                            key={item.key}
+                            type="button"
+                            onClick={() => applyQuickPrompt(item.prompt)}
+                            className="min-h-24 rounded-3xl border border-gray-200 bg-white px-4 py-3.5 text-left text-gray-800 shadow-sm transition active:scale-[0.98] dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                        >
+                            <span className="mb-2 flex h-9 w-9 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 dark:bg-brand-900/30 dark:text-brand-300">
+                                <Icon size={17} />
+                            </span>
+                            <span className="block text-[12px] font-black leading-tight">{item.label}</span>
+                            <span className="mt-1 block text-[10px] font-semibold leading-4 text-gray-500 dark:text-gray-400">
+                                {item.description}
+                            </span>
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
 
     const maxChatIndex = conversationSummaries.reduce(
         (m, s) => Math.max(m, s.chatIndex ?? 0),
@@ -1141,13 +1318,25 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         }
     }, [user?.$id, resetChat]);
 
+    const chatSessionInitForUserRef = useRef(null);
+
+    useEffect(() => {
+        if (!user?.$id) {
+            chatSessionInitForUserRef.current = null;
+            chatContextLoadedRef.current = false;
+        }
+    }, [user?.$id]);
+
     useEffect(() => {
         if (!isOpen || !user?.$id) return;
+        if (chatSessionInitForUserRef.current === user.$id) return;
+        chatSessionInitForUserRef.current = user.$id;
         const run = async () => {
             try {
                 await initializeChatSession(user.$id);
             } catch (e) {
                 console.error('Chat sync on open failed:', e);
+                chatSessionInitForUserRef.current = null;
             }
         };
         void run();
@@ -1157,12 +1346,83 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         if (!isOpen) setMobileListOpen(false);
     }, [isOpen]);
 
+    // When the chat list overlay is open on mobile, hide global bottom tabs to
+    // avoid visual overlap with the header/title on iPhone.
+    useEffect(() => {
+        if (typeof document === 'undefined') return undefined;
+        if (!isPageVariant) return undefined;
+
+        const { body } = document;
+        if (isOpen && mobileListOpen) {
+            body.classList.add('pricemate-ai-chat-list-open');
+        } else {
+            body.classList.remove('pricemate-ai-chat-list-open');
+        }
+        return () => body.classList.remove('pricemate-ai-chat-list-open');
+    }, [isPageVariant, isOpen, mobileListOpen]);
+
     useEffect(() => {
         const el = inputRef.current;
         if (!el) return;
         el.style.height = 'auto';
         el.style.height = `${Math.min(el.scrollHeight, 132)}px`;
     }, [input]);
+
+    const isPage = variant === 'page';
+    const iosFixedChrome = isPage && usesAiChatFixedMobileChrome();
+
+    useEffect(() => {
+        if (!isPage || !isOpen || typeof window === 'undefined') return undefined;
+
+        const onViewportChange = () => {
+            if (composerFocusedRef.current) {
+                requestAnimationFrame(() => scrollMessagesToBottom());
+            }
+        };
+
+        const vv = window.visualViewport;
+        vv?.addEventListener('resize', onViewportChange, { passive: true });
+        vv?.addEventListener('scroll', onViewportChange, { passive: true });
+        return () => {
+            vv?.removeEventListener('resize', onViewportChange);
+            vv?.removeEventListener('scroll', onViewportChange);
+        };
+    }, [isPage, isOpen]);
+
+    useEffect(() => {
+        if (!isPage || !isOpen || typeof document === 'undefined') return undefined;
+
+        const root = document.documentElement;
+        const measure = () => {
+            const composerEl = composerStackRef.current;
+            const headerEl = headerRef.current;
+            if (composerEl) {
+                const h = Math.round(composerEl.getBoundingClientRect().height || 0);
+                if (h > 0) root.style.setProperty('--mobile-ai-composer-h', `${h}px`);
+            }
+            if (headerEl) {
+                const h = Math.round(headerEl.getBoundingClientRect().height || 0);
+                if (h > 0) root.style.setProperty('--mobile-ai-header-h', `${h}px`);
+            }
+        };
+
+        measure();
+        const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+        if (composerStackRef.current) ro?.observe(composerStackRef.current);
+        if (headerRef.current) ro?.observe(headerRef.current);
+        window.addEventListener('resize', measure, { passive: true });
+
+        const vv = window.visualViewport;
+        vv?.addEventListener('resize', measure, { passive: true });
+
+        return () => {
+            ro?.disconnect();
+            window.removeEventListener('resize', measure);
+            vv?.removeEventListener('resize', measure);
+            root.style.removeProperty('--mobile-ai-composer-h');
+            root.style.removeProperty('--mobile-ai-header-h');
+        };
+    }, [isPage, isOpen, mobileListOpen, chatWriteError]);
 
     const scrollMessagesToBottom = () => {
         const pane = messagesScrollRef.current;
@@ -1192,117 +1452,46 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         requestAnimationFrame(() => scrollMessagesToTop());
     }, [history, isLoading, activeConversationId, historyLoading]);
 
-    // Fetch context data (products and prices) to inform the AI
+    const chatContextLoadedRef = useRef(false);
+
     useEffect(() => {
+        if (!isOpen) return;
+        if (chatContextLoadedRef.current && fullProductList.length > 0) return;
+
+        let cancelled = false;
         const loadContext = async () => {
             try {
-                const [products, prices, offCache, supermarkets] = await Promise.all([
-                    fetchProducts(50), 
-                    fetchAllPrices(),
-                    fetchOffCacheSnapshot(20),
+                const products = await fetchProducts(50);
+                const productIds = products.map((p) => p.$id).filter(Boolean);
+                const [prices, supermarkets] = await Promise.all([
+                    fetchPricesForProducts(productIds),
                     fetchSupermarkets(),
                 ]);
-                
-                // Keep the structural product list for the component to use
-                const productsWithData = products.map(p => {
-                    const productPrices = prices.filter(pr => {
-                        const pid = Array.isArray(pr.products) ? pr.products[0]?.$id : (pr.productID || pr.products?.$id);
-                        return pid === p.$id;
-                    });
-                    return { ...p, prices: productPrices };
-                });
 
-                const offCacheProducts = (offCache || [])
-                    .map((doc) => normalizeOffCacheDoc(doc))
-                    .filter(Boolean)
-                    .map((p) => ({ ...p, prices: [] }));
+                if (cancelled) return;
+
+                const productsWithData = products.map((p) => normalizeProduct(p, prices));
 
                 const enrichedProducts = enrichProductPricesWithSupermarkets(
                     productsWithData,
                     Array.isArray(supermarkets) ? supermarkets : []
                 );
-                setFullProductList([...enrichedProducts, ...offCacheProducts]);
+                setFullProductList(enrichedProducts);
                 setSupermarketList(Array.isArray(supermarkets) ? supermarkets : []);
+                chatContextLoadedRef.current = true;
             } catch (error) {
-                console.error("Error loading chat context:", error);
+                console.error('Error loading chat context:', error);
             }
         };
-        loadContext();
-    }, [fetchSupermarkets]);
+        void loadContext();
+        return () => {
+            cancelled = true;
+        };
+    }, [isOpen, fetchSupermarkets, fullProductList.length]);
 
     const extractBarcode = (message) => {
         const match = message.match(/\b\d{8,14}\b/);
         return match ? match[0] : null;
-    };
-
-    const normalizeProductKey = (value) =>
-        String(value || '')
-            .toLowerCase()
-            .replace(/[^a-z0-9ğüşöçı]/gi, '');
-
-    const findProductMatch = (message, extraCandidates = []) => {
-        const lowered = message.toLowerCase();
-        let best = null;
-        let bestLength = 0;
-        const nMsg = normalizeProductKey(lowered);
-
-        const consider = (product, scoreLength) => {
-            if (scoreLength > bestLength) {
-                best = product;
-                bestLength = scoreLength;
-            }
-        };
-
-        const primaryList = fullProductList;
-        const secondaryList = Array.isArray(extraCandidates) ? extraCandidates : [];
-
-        primaryList.forEach((product) => {
-            const rawName = product.name || product.productName || '';
-            const name = rawName.toLowerCase();
-            if (!name) return;
-
-            if (lowered.includes(name)) {
-                consider(product, name.length);
-                return;
-            }
-
-            const nName = normalizeProductKey(rawName);
-            if (nName.length >= 4 && nMsg.includes(nName)) {
-                consider(product, nName.length);
-            }
-        });
-
-        if (!best && secondaryList.length > 0) {
-            secondaryList.forEach((product) => {
-                const rawName = product.name || product.productName || '';
-                const name = rawName.toLowerCase();
-                if (!name) return;
-
-                if (lowered.includes(name)) {
-                    consider(product, name.length);
-                    return;
-                }
-
-                const nName = normalizeProductKey(rawName);
-                if (nName.length >= 4 && nMsg.includes(nName)) {
-                    consider(product, nName.length);
-                }
-            });
-        }
-
-        if (!best && /\bcoke\b/i.test(lowered)) {
-            const cokeMatch =
-                primaryList.find((p) => {
-                    const n = normalizeProductKey(p.name || p.productName || '');
-                    return n.includes('coca') && n.includes('cola');
-                }) ||
-                primaryList.find((p) =>
-                    normalizeProductKey(p.name || p.productName || '').includes('coca')
-                );
-            if (cokeMatch) best = cokeMatch;
-        }
-
-        return best;
     };
 
     const extractQuotedProduct = (message) => {
@@ -1660,15 +1849,51 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
     const handleSend = async (e) => {
         e.preventDefault();
         if (!input.trim() || isLoading) return;
-        if (!user?.$id || !activeConversationId) return;
+        if (!user?.$id) return;
+
+        if (!activeConversationId) {
+            beginNewConversation();
+        }
 
         const userMessage = input.trim();
         setInput('');
 
+        const looksLikeIngredientFollowUp = (message) => {
+            const lowered = String(message || '').toLowerCase();
+            return (
+                lowered.includes('ingredient') ||
+                lowered.includes('ingredients') ||
+                lowered.includes('allergen') ||
+                lowered.includes('allergens') ||
+                lowered.includes('içerik') ||
+                lowered.includes('icerik') ||
+                lowered.includes('içindekiler') ||
+                lowered.includes('icindekiler')
+            );
+        };
+
+        const hasExplicitProductHint = (message) => {
+            const lowered = String(message || '').toLowerCase();
+            if (/\b\d{8,14}\b/.test(lowered)) return true; // barcode
+            const match = findBestProductMatch(message, fullProductList);
+            if (match?.product && match.score >= FUZZY_MATCH_MIN_SCORE) return true;
+            // If the user explicitly names something short like "milk", fuzzy match will usually catch it.
+            return false;
+        };
+
+        const contextFallback =
+            looksLikeIngredientFollowUp(userMessage) && !hasExplicitProductHint(userMessage)
+                ? lastResolvedProductRef.current
+                : { barcode: '', name: '' };
+
         const barcodeFromMessage = extractBarcode(userMessage);
-        const productMatch = findProductMatch(userMessage);
-        const catalog = await resolveCatalogProductForIngredients(userMessage);
-        const offCache = await resolveOffCacheProductForIngredients(userMessage);
+        const localProductMatch = findBestProductMatch(userMessage, fullProductList);
+        const productMatch = localProductMatch?.product || null;
+        const resolveMessageForCatalog = contextFallback?.barcode
+            ? `${userMessage}\n[BARCODE:${contextFallback.barcode}]`
+            : userMessage;
+        const catalog = await resolveCatalogProductForIngredients(resolveMessageForCatalog);
+        const offCache = await resolveOffCacheProductForIngredients(resolveMessageForCatalog);
         const mergedProductProfile = productMatch || catalog.product || offCache.product;
         const effectiveBarcode =
             barcodeFromMessage ||
@@ -1676,9 +1901,19 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
             offCache.barcode ||
             productMatch?.barcode ||
             productMatch?.code ||
+            contextFallback?.barcode ||
             '';
         const catalogDisplayName =
             catalog.catalogName || offCache.name || productMatch?.name || productMatch?.productName || '';
+        const effectiveDisplayName =
+            catalogDisplayName || contextFallback?.name || mergedProductProfile?.name || mergedProductProfile?.productName || '';
+
+        if (effectiveBarcode || effectiveDisplayName) {
+            lastResolvedProductRef.current = {
+                barcode: effectiveBarcode || lastResolvedProductRef.current.barcode,
+                name: effectiveDisplayName || lastResolvedProductRef.current.name,
+            };
+        }
 
         // Use store to add user message
         if (user?.$id) {
@@ -1943,35 +2178,61 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         // Catalog-only policy: for product-related questions, refuse if the product is not in PriceMate.
         // We use the full-catalog resolver (Appwrite) rather than the in-chat 50-item sample.
         const loweredMessage = String(userMessage || '').toLowerCase();
+        const mentionsNearestStore =
+            loweredMessage.includes('near me') ||
+            loweredMessage.includes('closest market') ||
+            loweredMessage.includes('closest supermarket') ||
+            loweredMessage.includes('nearest store') ||
+            loweredMessage.includes('nearest market') ||
+            loweredMessage.includes('en yakin') ||
+            loweredMessage.includes('yakınımdaki') ||
+            loweredMessage.includes('yakinimdaki');
+
+        const hasExplicitBarcode = /\b\d{8,14}\b/.test(loweredMessage);
+        const hasExplicitProductHintNow = Boolean(effectiveBarcode || mergedProductProfile || productMatch);
+
+        // Catalog-only gating should ONLY apply when the user is asking about a specific product.
         const isProductSpecific =
-            /\b\d{8,14}\b/.test(loweredMessage) ||
-            loweredMessage.includes('ingredient') ||
-            loweredMessage.includes('ingredients') ||
-            loweredMessage.includes('allergen') ||
-            loweredMessage.includes('allergens') ||
-            loweredMessage.includes('suitable') ||
-            loweredMessage.includes('safe') ||
-            loweredMessage.includes('compare') ||
-            loweredMessage.includes('cheapest') ||
-            loweredMessage.includes('price') ||
-            loweredMessage.includes('barcode') ||
-            loweredMessage.includes('içerik') ||
-            loweredMessage.includes('icerik') ||
-            loweredMessage.includes('içindekiler') ||
-            loweredMessage.includes('uygun') ||
-            loweredMessage.includes('en ucuz') ||
-            loweredMessage.includes('fiyat') ||
-            loweredMessage.includes('barkod');
+            hasExplicitBarcode ||
+            ((loweredMessage.includes('ingredient') ||
+                loweredMessage.includes('ingredients') ||
+                loweredMessage.includes('allergen') ||
+                loweredMessage.includes('allergens') ||
+                loweredMessage.includes('içerik') ||
+                loweredMessage.includes('icerik') ||
+                loweredMessage.includes('içindekiler')) &&
+                hasExplicitProductHintNow) ||
+            ((loweredMessage.includes('compare') ||
+                loweredMessage.includes('price') ||
+                loweredMessage.includes('cheapest') ||
+                loweredMessage.includes('en ucuz') ||
+                loweredMessage.includes('fiyat')) &&
+                hasExplicitProductHintNow) ||
+            (loweredMessage.includes('barcode') || loweredMessage.includes('barkod')) ||
+            ((loweredMessage.includes('suitable') ||
+                loweredMessage.includes('safe') ||
+                loweredMessage.includes('uygun')) &&
+                hasExplicitProductHintNow);
+
+        const shouldBypassCatalogGate = mentionsNearestStore && !hasExplicitProductHintNow;
 
         if (isProductSpecific) {
             try {
-                const catalogOnly = await resolveCatalogProductForIngredients(userMessage);
+                const catalogOnly = await resolveCatalogProductForIngredients(resolveMessageForCatalog);
                 if (!catalogOnly?.product) {
                     if (user?.$id) {
-                        await addMessage(user.$id, 'assistant', t('ai_catalog_only_refusal'), user);
+                        const bestGuess = localProductMatch?.product || mergedProductProfile || null;
+                        const reply =
+                            buildCategoryAlternativesReply(bestGuess, fullProductList, t) ||
+                            t('ai_catalog_only_refusal');
+                        if (!shouldBypassCatalogGate) {
+                            await addMessage(user.$id, 'assistant', reply, user);
+                        }
                     }
-                    setIsLoading(false);
-                    return;
+                    if (!shouldBypassCatalogGate) {
+                        setIsLoading(false);
+                        return;
+                    }
                 }
             } catch {
                 // If catalog lookup fails, fall back to normal behavior rather than blocking all chat.
@@ -1994,6 +2255,9 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                     "X-Title": "PriceMate",
                 }
             });
+
+            const memCtx = await fetchMemoryForPrompt(user.$id, activeConversationId)
+                .catch(() => ({ conversationSummary: null, userFacts: null }));
 
             const promptContext = buildRankedProductContextLines(fullProductList, userMessage, userAiProfile);
             const storeContext = buildSupermarketContextLines(supermarketList, userLocation);
@@ -2039,10 +2303,23 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 - When mentioning a specific store, include [STORE:<id>] from NEARBY STORES (same pattern as [BARCODE:...]).
                 - Do not invent stores or coordinates not listed in NEARBY STORES.
 
+                CLOSEST + CHEAPEST:
+                - When the user wants the nearest store, closest option, or cheapest price, name the product first (ask if missing).
+                - Combine NEARBY STORES (distance) with WEBSITE PRODUCT DATA (price): prefer a store that is reasonably close and has a low price.
+                - Give one clear recommendation in 1–2 sentences, then at most two alternatives with store name, price, and distance when known.
+
+                COMPARE / RANK BY PRICE:
+                - When the user wants to compare or rank supermarkets for one product, use only prices from WEBSITE PRODUCT DATA.
+                - List supermarkets for that product from cheapest to most expensive (up to 5 lines), e.g. "1. Store — 12.50 TRY [STORE:id]".
+                - If the product is unclear, ask which product before ranking.
+
                 PRODUCT + STORE RULES:
                 - When mentioning a product that has prices in WEBSITE PRODUCT DATA, always name the supermarket for the price you cite (e.g. "at Migros").
                 - For "cheapest" answers, use the lowest-price store from the data; do not invent store names.
                 - Prefer a short sentence plus [BARCODE:...]; include the store name in the sentence when stating a price.
+                - Treat minor spelling, spacing, and brand shorthand as the same product when WEBSITE PRODUCT DATA or a resolved barcode indicates a match (e.g. "coco cola", "coca cola", "coke" → Coca-Cola).
+                - Do not ask the user to re-type the brand if a catalog product was already resolved in the message context.
+                - If no reasonable catalog match exists, ask for a barcode or a more specific product name—do not guess.
 
                 PRODUCT LIMITS (STRICT):
                 - Mention at most three [BARCODE:...] products per reply.
@@ -2071,40 +2348,61 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 1. Answer questions about products, prices, shopping, and ingredient suitability within the PriceMate app.
                 2. If the user asks about something unrelated, politely say you only assist with product-related queries.
                 3. Recommend specific products using the data provided—respect the PRODUCT LIMITS above.
-                4. If the user asks for "cheapest" or "best deal", highlight at most a few; do not list everything.
+                4. If the user asks for "cheapest" or "best deal", highlight at most a few; for "compare" or "rank", use a numbered cheapest-first list (see COMPARE / RANK BY PRICE).
                 5. If the user asks for "most expensive" or "premium", highlight at most a few; do not list everything.
                 6. For category-style questions, suggest at most three relevant items from the sample, then briefly ask the user to be more specific if the catalog is huge.
                 7. For every product you mention, you must include its barcode ID in square brackets like this: [BARCODE:123456].
                 8. Do not use [ID:123456], only use the word BARCODE in the brackets.
-                9. Minimize text. Do not describe features or give long intros. Just a short sentence and the barcode(s).
-                10. Do not repeat price lists (e.g., "- Store: X TRY"). The UI will show the card automatically.
-                11. Use the exact product names from the context.
-                12. If ingredient suitability data is provided, summarize it briefly and do not refuse to answer.
-                13. If you are unsure, ask the user for the barcode or exact product name instead of giving a generic refusal.
-                14. For ingredient safety answers, treat Open Food Facts as the source of truth and mention it in the source line.
-                15. Never restate the full user question; keep the answer short and direct.
+                9. Do not put punctuation (especially a period) immediately after [BARCODE:...] or [STORE:...]—the app shows a product card there.
+                10. Minimize text. Do not describe features or give long intros. Just a short sentence and the barcode(s).
+                11. Do not repeat price lists (e.g., "- Store: X TRY"). The UI will show the card automatically.
+                12. Use the exact product names from the context.
+                13. If ingredient suitability data is provided, summarize it briefly and do not refuse to answer.
+                14. If you are unsure, ask the user for the barcode or exact product name instead of giving a generic refusal.
+                15. For ingredient safety answers, treat Open Food Facts as the source of truth and mention it in the source line.
+                16. Never restate the full user question; keep the answer short and direct.
             `;
 
-            const openRouterMessage = effectiveBarcode && !barcodeFromMessage
-                ? `Intent: ${intentSummary || userMessage}\nKnown barcode: [BARCODE:${effectiveBarcode}]`
-                : `Intent: ${intentSummary || userMessage}`;
+            const resolvedDisplayName =
+                catalogDisplayName ||
+                contextFallback?.name ||
+                localProductMatch?.matchedName ||
+                mergedProductProfile?.name ||
+                mergedProductProfile?.productName ||
+                '';
+            let openRouterMessage = `Intent: ${intentSummary || userMessage}`;
+            if (effectiveBarcode) {
+                openRouterMessage += `\nKnown barcode: [BARCODE:${effectiveBarcode}]`;
+            }
+            if (resolvedDisplayName && effectiveBarcode) {
+                openRouterMessage += `\nResolved catalog product: ${resolvedDisplayName} [BARCODE:${effectiveBarcode}]`;
+            }
+            if (!barcodeFromMessage && contextFallback?.barcode) {
+                openRouterMessage += `\nFollow-up context: user did not name a new product; reuse last product [BARCODE:${contextFallback.barcode}]`;
+            }
 
-            const threadForApi = useChatStore
+            const threadForApiRaw = useChatStore
                 .getState()
-                .messages.map((m) => ({ role: m.role, content: m.content }));
+                .messages
+                .map((m) => ({ role: m.role, content: m.content }));
             if (
-                threadForApi.length > 0 &&
-                threadForApi[threadForApi.length - 1].role === 'user'
+                threadForApiRaw.length > 0 &&
+                threadForApiRaw[threadForApiRaw.length - 1].role === 'user'
             ) {
-                threadForApi[threadForApi.length - 1] = {
+                threadForApiRaw[threadForApiRaw.length - 1] = {
                     role: 'user',
                     content: openRouterMessage,
                 };
             }
 
+            const boundedThread = buildThreadForApi(threadForApiRaw, {
+                maxMessages: 18,
+                maxCharsPerMessage: 1200,
+            });
+
             const completion = await openai.chat.completions.create({
-                model: "google/gemini-2.0-flash-001",
-                messages: [{ role: "system", content: prompt }, ...threadForApi],
+                model: OPENROUTER_MODEL,
+                messages: [{ role: "system", content: clampText(buildPromptWithMemory(prompt, memCtx), 12000) }, ...boundedThread],
             });
 
             const text = completion.choices[0]?.message?.content || "No response received.";
@@ -2117,16 +2415,82 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 } catch (e) {
                     console.debug('Intent cache set failed', e);
                 }
+
+                const msgs = useChatStore.getState().messages;
+                const msgCount = msgs.length;
+
+                void (async () => {
+                    try {
+                        await maybeSummarize({
+                            openai,
+                            userId: user.$id,
+                            conversationId: activeConversationId,
+                            messages: msgs,
+                            model: OPENROUTER_MODEL,
+                        });
+                    } catch (e) {
+                        console.error('[Memory] summarize failed:', e);
+                    }
+                })();
+
+                void (async () => {
+                    try {
+                        await maybeExtractFacts({
+                            openai,
+                            userId: user.$id,
+                            conversationId: activeConversationId,
+                            assistantReply: sanitizedText,
+                            userMessage,
+                        });
+                    } catch (e) {
+                        console.error('[Memory] extractFacts failed:', e);
+                    }
+                })();
+
+                void (async () => {
+                    try {
+                        await maybeTitleGenerate({
+                            openai,
+                            userId: user.$id,
+                            conversationId: activeConversationId,
+                            firstUserMessage: userMessage,
+                            model: OPENROUTER_MODEL,
+                            messageCount: msgCount,
+                        });
+                    } catch (e) {
+                        console.error('[Memory] titleGenerate failed:', e);
+                    }
+                })();
             }
         } catch (error) {
-            console.error("AI Error details:", error);
+            const detail = extractOpenRouterError(error);
+            console.error("AI Error details:", error, detail);
             let errorMessage = "Sorry, I can't connect to the AI right now. ";
-            if (error.message?.includes("API Key")) {
+            if (detail.message?.includes("API Key") || detail.message?.includes("api key")) {
                 errorMessage += "There's an issue with the API Key configuration.";
-            } else if (error.status === 429) {
+            } else if (detail.status === 401 || detail.status === 403) {
+                errorMessage += "Authentication failed (API key / referer).";
+            } else if (detail.status === 400) {
+                errorMessage += "Request rejected (bad request / model / prompt too large).";
+            } else if (detail.status === 404 && /No endpoints found for/i.test(detail.message || '')) {
+                errorMessage += "AI model is not available. Please try again (or switch the model).";
+            } else if (detail.status === 413) {
+                errorMessage += "Request too large. Please try a shorter message.";
+            } else if (detail.status === 429) {
                 errorMessage += "Rate limit exceeded. Please wait a moment.";
+            } else if (!detail.status && /failed to fetch|networkerror|load failed/i.test(detail.message || '')) {
+                errorMessage += "Network/CORS blocked the request from the browser.";
             } else {
                 errorMessage += "Please try again in a few moments.";
+            }
+
+            if (AI_DEBUG) {
+                const bits = [
+                    detail.status ? `status=${detail.status}` : null,
+                    detail.code ? `code=${detail.code}` : null,
+                    detail.provider ? `provider=${detail.provider}` : null,
+                ].filter(Boolean);
+                errorMessage += `\n(Debug) ${bits.join(' ')}\n(Debug) ${clampText(detail.message, 220)}`;
             }
             
             if (user?.$id) {
@@ -2140,10 +2504,34 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
     if (!isOpen) return null;
 
     const effectiveOnClose = typeof onClose === 'function' ? onClose : () => {};
-    const isPage = variant === 'page';
     const composerPadClass = isPage
         ? 'px-4 py-3 sm:px-5 sm:py-4'
         : 'px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px)+var(--bottom-nav-h,0px))] sm:px-5 sm:py-4';
+
+    const composerMobileBottom = iosFixedChrome
+        ? 'max-md:bottom-[calc(var(--bottom-nav-h,0px)+env(safe-area-inset-bottom,0px)+var(--keyboard-inset-bottom,0px))]'
+        : '';
+
+    const composerStackClass = isPage
+        ? iosFixedChrome
+            ? `shrink-0 border-t border-gray-100/80 dark:border-gray-700/50 max-md:fixed max-md:inset-x-0 max-md:z-[10000] ${composerMobileBottom} max-md:bg-white max-md:dark:bg-gray-900 ${mobileListOpen ? 'max-md:hidden' : ''}`
+            : `shrink-0 border-t border-gray-100/80 dark:border-gray-700/50 ${mobileListOpen ? 'max-md:hidden' : ''}`
+        : 'shrink-0';
+
+    const composerFormClass = isPage
+        ? `${composerPadClass} max-md:bg-white max-md:dark:bg-gray-900 border-t border-gray-100/80 dark:border-gray-700/50 sm:bg-white sm:dark:bg-gray-800 sm:border-gray-100 sm:dark:border-gray-700`
+        : `${composerPadClass} bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700`;
+
+    const handleComposerFocus = () => {
+        composerFocusedRef.current = true;
+        setComposerFocused(true);
+        requestAnimationFrame(() => scrollMessagesToBottom());
+    };
+
+    const handleComposerBlur = () => {
+        composerFocusedRef.current = false;
+        setComposerFocused(false);
+    };
 
     const renderConversationList = (afterPick) => {
         if (!user?.$id) return null;
@@ -2217,7 +2605,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
             <div
                 className={
                     isPage
-                        ? 'w-full flex flex-col h-full min-h-0 overflow-hidden'
+                        ? 'w-full flex flex-col flex-1 h-full min-h-0 overflow-hidden'
                         : 'fixed bottom-0 left-0 right-0 z-[9999] flex h-[85dvh] max-h-[85dvh] w-full touch-pan-y flex-col overflow-hidden rounded-t-2xl border-0 bg-white shadow-2xl animate-in slide-in-from-bottom-4 duration-300 dark:border-gray-700 dark:bg-gray-800 sm:inset-auto sm:bottom-4 sm:right-4 sm:z-[2000] sm:h-[min(640px,90vh)] sm:max-h-none sm:w-[400px] sm:rounded-2xl sm:border sm:border-gray-200 sm:shadow-2xl sm:slide-in-from-bottom-5 sm:slide-in-from-right md:w-[448px]'
                 }
             >
@@ -2231,6 +2619,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 onNewChat={beginNewConversation}
                 onClose={effectiveOnClose}
                 showDragHandle={!isPage}
+                headerRef={headerRef}
                 t={t}
             />
 
@@ -2271,11 +2660,14 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                         </div>
                     )}
 
+                    <div className="relative flex-1 min-h-0 flex flex-col">
                     <div
                         ref={messagesScrollRef}
                         className={
                             isPage
-                                ? 'flex-1 overflow-y-auto overscroll-contain px-4 pt-2.5 pb-3 space-y-3.5 bg-gray-50 dark:bg-gray-900 min-h-0'
+                                ? iosFixedChrome
+                                    ? 'flex-1 overflow-y-auto overscroll-contain px-4 pt-2.5 pb-3 space-y-3.5 bg-gray-50 dark:bg-gray-900 min-h-0 max-md:pt-[var(--mobile-ai-header-h,4.5rem)] max-md:pb-[calc(var(--mobile-ai-composer-h,5.5rem)+var(--keyboard-inset-bottom,0px))]'
+                                    : 'flex-1 overflow-y-auto overscroll-contain scroll-pb-[var(--mobile-ai-composer-h,5.5rem)] px-4 pt-2.5 pb-3 max-md:pb-[var(--mobile-ai-composer-h,5.5rem)] space-y-3.5 bg-gray-50 dark:bg-gray-900 min-h-0'
                                 : 'flex-1 overflow-y-auto overscroll-contain scroll-pb-[calc(var(--bottom-nav-h,0px)+7.5rem)] px-4 pt-2.5 pb-[calc(0.875rem+var(--bottom-nav-h,0px))] sm:px-5 sm:pt-3 sm:pb-[calc(1rem+var(--bottom-nav-h,0px))] space-y-3.5 bg-gray-50 dark:bg-gray-900 min-h-0'
                         }
                     >
@@ -2286,64 +2678,19 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                                 </p>
                             </div>
                         )}
-                        {user && !activeConversationId && (
-                            summariesLoading ? (
-                                <div className="flex justify-center py-12">
-                                    <FiLoader className="animate-spin text-brand-600" />
-                                </div>
-                            ) : (
-                                <div className="mx-auto w-full max-w-md space-y-4 pt-2">
-                                    <div className="rounded-[1.75rem] bg-gradient-to-br from-brand-600 via-brand-600 to-brand-700 p-5 text-white shadow-xl shadow-brand-600/20">
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-11 w-11 rounded-2xl bg-white/10 flex items-center justify-center backdrop-blur-sm shrink-0">
-                                                <FiCpu size={22} className="text-white/85" />
-                                            </div>
-                                            <div className="min-w-0">
-                                                <h2 className="text-lg font-black tracking-tight">{t('ai_chat_empty_title', 'What do you want to check?')}</h2>
-                                                <p className="text-white/80 text-xs sm:text-sm mt-0.5 leading-relaxed">
-                                                    {t('ai_chat_empty_description', 'Pick a shortcut or type your own shopping question.')}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        {/* Removed large 'NEW' button per request; use plus icons in the list to start new chats. */}
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {mobileEmptyActions.map((item) => {
-                                            const Icon = item.Icon;
-                                            return (
-                                            <button
-                                                key={item.key}
-                                                type="button"
-                                                onClick={() => applyQuickPrompt(item.prompt)}
-                                                className="min-h-24 rounded-3xl border border-gray-200 bg-white px-4 py-3.5 text-left text-gray-800 shadow-sm transition active:scale-[0.98] dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-                                            >
-                                                <span className="mb-2 flex h-9 w-9 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 dark:bg-brand-900/30 dark:text-brand-300">
-                                                    <Icon size={17} />
-                                                </span>
-                                                <span className="block text-[12px] font-black leading-tight">{item.label}</span>
-                                                <span className="mt-1 block text-[10px] font-semibold leading-4 text-gray-500 dark:text-gray-400">{item.description}</span>
-                                            </button>
-                                            );
-                                        })}
-                                    </div>
-
-                                    {/* Guide text removed per request. */}
-                                </div>
-                            )
+                        {user && !activeConversationId && summariesLoading && (
+                            <div className="flex justify-center py-12">
+                                <FiLoader className="animate-spin text-brand-600" />
+                            </div>
                         )}
+                        {showQuickPrompts && renderQuickPromptSuggestions(!activeConversationId)}
                         {user && activeConversationId && historyLoading && (
                             <div className="flex justify-center py-12">
                                 <FiLoader className="animate-spin text-brand-600" />
                             </div>
                         )}
-                        {user && activeConversationId && !historyLoading && (
+                        {user && activeConversationId && !historyLoading && !showQuickPrompts && (
                             <>
-                                {history.length === 0 && !isLoading && (
-                                    <p className="text-center text-xs text-gray-500 dark:text-gray-400 py-2">
-                                        {t('ai_chat_thread_empty')}
-                                    </p>
-                                )}
                                 {history.map((msg, idx) => (
                                     <ChatMessage
                                         key={msg.$id || idx}
@@ -2364,65 +2711,80 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                                 )}
                             </>
                         )}
+                        {!isPage && (
+                            <div
+                                className="sticky bottom-0 z-[1] -mt-20 h-20 pointer-events-none bg-gradient-to-t from-gray-50 via-gray-50/90 to-transparent dark:from-gray-900 dark:via-gray-900/90"
+                                aria-hidden
+                            />
+                        )}
                         <div ref={messagesEndRef} />
                     </div>
 
-                    {user && chatWriteError && (
-                        <div className="shrink-0 px-4 py-2.5 bg-red-50 dark:bg-red-900/20 border-t border-red-100 dark:border-red-800/40 flex gap-2 items-start justify-between">
-                            <p className="text-xs text-red-800 dark:text-red-200 flex-1 leading-relaxed">
-                                {chatWriteError === CHAT_ERROR_MISSING_CONVERSATION_ID
-                                    ? t('chat_error_schema_conversation_id')
-                                    : chatWriteError}
-                            </p>
-                            <button
-                                type="button"
-                                onClick={() => clearChatWriteError()}
-                                className="text-xs font-bold text-red-700 dark:text-red-300 shrink-0 px-1"
-                                aria-label={t('chat_error_dismiss')}
-                            >
-                                ×
-                            </button>
-                        </div>
-                    )}
-
-                    <form
-                        ref={formRef}
-                        onSubmit={handleSend}
-                        className={`${composerPadClass} bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 shrink-0`}
+                    <div
+                        ref={composerStackRef}
+                        data-testid="ai-chat-composer-stack"
+                        className={composerStackClass}
                     >
-                        <div className="relative flex items-end gap-2">
-                            <textarea
-                                ref={inputRef}
-                                rows={1}
-                                value={input}
-                                onChange={(e) => setInput(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && !e.shiftKey) {
-                                        e.preventDefault();
-                                        formRef.current?.requestSubmit();
-                                    }
-                                }}
+                        {user && chatWriteError && (
+                            <div className={`shrink-0 px-4 py-2.5 bg-red-50 dark:bg-red-900/20 border-t border-red-100 dark:border-red-800/40 flex gap-2 items-start justify-between ${isPage ? 'max-md:bg-red-50 max-md:dark:bg-red-900/20' : 'max-md:pricemate-ai-composer-overlay'}`}>
+                                <p className="text-xs text-red-800 dark:text-red-200 flex-1 leading-relaxed">
+                                    {chatWriteError === CHAT_ERROR_MISSING_CONVERSATION_ID
+                                        ? t('chat_error_schema_conversation_id')
+                                        : chatWriteError}
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => clearChatWriteError()}
+                                    className="text-xs font-bold text-red-700 dark:text-red-300 shrink-0 px-1"
+                                    aria-label={t('chat_error_dismiss')}
+                                >
+                                    ×
+                                </button>
+                            </div>
+                        )}
+
+                        <form
+                            ref={formRef}
+                            onSubmit={handleSend}
+                            data-testid="ai-chat-composer-form"
+                            className={composerFormClass}
+                        >
+                            <div className="relative flex items-end gap-2">
+                                <textarea
+                                    ref={inputRef}
+                                    data-ai-composer-input
+                                    rows={1}
+                                    value={input}
+                                    onChange={(e) => setInput(e.target.value)}
+                                    onFocus={handleComposerFocus}
+                                    onBlur={handleComposerBlur}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                            e.preventDefault();
+                                            formRef.current?.requestSubmit();
+                                        }
+                                    }}
                                 placeholder={
                                     !user
                                         ? t('ai_chat_login_placeholder')
-                                        : !activeConversationId
-                                          ? t('ai_chat_placeholder_no_thread')
-                                          : t('ai_chat_input_placeholder')
+                                        : t('ai_chat_input_placeholder')
                                 }
-                                disabled={isLoading || !user || !activeConversationId}
-                                className="flex-1 max-h-32 min-h-12 resize-none bg-gray-50 dark:bg-gray-900 border-none rounded-[1.25rem] py-3.5 px-4 text-[16px] sm:text-sm leading-6 sm:leading-5 focus:ring-2 focus:ring-brand-500 transition-all dark:text-white disabled:opacity-50"
-                            />
-                            <button
-                                type="submit"
+                                disabled={isLoading || !user}
+                                    className="flex-1 max-h-32 min-h-12 resize-none bg-gray-50 dark:bg-gray-900 border-none rounded-[1.25rem] py-3.5 px-4 text-[16px] sm:text-sm leading-6 sm:leading-5 focus:ring-2 focus:ring-brand-500 transition-all dark:text-white disabled:opacity-50"
+                                />
+                                <button
+                                    type="submit"
                                 disabled={
-                                    !input.trim() || isLoading || !user || !activeConversationId
+                                    !input.trim() || isLoading || !user
                                 }
-                                className="min-h-12 min-w-12 bg-brand-600 hover:bg-brand-700 text-white px-4 rounded-[1.15rem] transition-all active:scale-90 disabled:opacity-50 disabled:active:scale-100 shadow-lg shadow-brand-200 dark:shadow-none flex items-center justify-center"
-                            >
-                                <FiSend />
-                            </button>
-                        </div>
-                    </form>
+                                    className="min-h-12 min-w-12 bg-brand-600 hover:bg-brand-700 text-white px-4 rounded-[1.15rem] transition-all active:scale-90 disabled:opacity-50 disabled:active:scale-100 shadow-lg shadow-brand-200 dark:shadow-none flex items-center justify-center"
+                                >
+                                    <FiSend />
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                    </div>
                 </div>
             </div>
         </div>

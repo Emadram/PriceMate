@@ -7,6 +7,10 @@ const OFF_CACHE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 const SUGAR_THRESHOLD_G_PER_100G = 22.5;
 const SODIUM_THRESHOLD_MG_PER_100G = 600;
 const CAFFEINE_THRESHOLD_MG_PER_L = 150;
+const MEMORY_VERSION = 1;
+const MEMORY_SUMMARY_MAX_CHARS = 1500;
+const MEMORY_FACTS_MAX = 25;
+const MEMORY_FACT_MAX_CHARS = 180;
 
 const memoryCache = new Map();
 const inflight = new Map();
@@ -15,6 +19,7 @@ const COLLECTIONS = {
     PRODUCTS: process.env.APPWRITE_COLLECTION_PRODUCTS || process.env.VITE_APPWRITE_COLLECTION_PRODUCTS || 'products',
     PRICES: process.env.APPWRITE_COLLECTION_PRICES || process.env.VITE_APPWRITE_COLLECTION_PRICES || 'prices_collection',
     OFF_CACHE: process.env.APPWRITE_COLLECTION_OFF_CACHE || process.env.VITE_APPWRITE_COLLECTION_OFF_CACHE || 'off_cache',
+    AI_CHAT_MEMORY: process.env.APPWRITE_COLLECTION_AI_CHAT_MEMORY || process.env.VITE_APPWRITE_COLLECTION_AI_CHAT_MEMORY || 'ai_chat_memory',
 };
 
 const NO_ALLERGY_VALUES = new Set([
@@ -252,11 +257,14 @@ const parseNutriments = (product) => {
 const payloadFromCatalogProduct = (doc) => {
     if (!doc) return null;
     const hidden = extractNutritionMeta(doc.description);
-    const ingredientsText = String(doc?.nutrition?.ingredientsText ?? hidden?.ingredientsText ?? doc.ingredientsText ?? '').trim();
+    const ingredientsText = String(doc.ingredientsText ?? doc?.nutrition?.ingredientsText ?? hidden?.ingredientsText ?? '').trim();
+    const allergens = Array.isArray(doc.allergens)
+        ? doc.allergens
+        : (Array.isArray(hidden?.allergens) ? hidden.allergens : []);
     const nutriments = {
-        sugarsPer100g: parseNumber(doc?.nutrition?.sugarsPer100g ?? hidden?.sugarsPer100g ?? doc.sugarsPer100g),
-        sodiumMgPer100g: parseNumber(doc?.nutrition?.sodiumMgPer100g ?? hidden?.sodiumMgPer100g ?? doc.sodiumMgPer100g),
-        caffeineMgPerL: parseNumber(doc?.nutrition?.caffeineMgPerL ?? hidden?.caffeineMgPerL ?? doc.caffeineMgPerL),
+        sugarsPer100g: parseNumber(doc.sugarsPer100g ?? doc?.nutrition?.sugarsPer100g ?? hidden?.sugarsPer100g),
+        sodiumMgPer100g: parseNumber(doc.sodiumMgPer100g ?? doc?.nutrition?.sodiumMgPer100g ?? hidden?.sodiumMgPer100g),
+        caffeineMgPerL: parseNumber(doc.caffeineMgPerL ?? doc?.nutrition?.caffeineMgPerL ?? hidden?.caffeineMgPerL),
     };
     if (!ingredientsText && Object.values(nutriments).every((value) => value === null)) return null;
     return {
@@ -264,10 +272,10 @@ const payloadFromCatalogProduct = (doc) => {
         name: doc.name || doc.productName || 'Unknown Product',
         brand: doc.brand || '',
         ingredientsText,
-        allergens: [],
+        allergens: allergens.map((item) => String(item || '').replace(/^[a-z]{2}:/, '').replace(/_/g, ' ').trim()).filter(Boolean),
         nutriments,
         source: 'PriceMate',
-        asOf: doc.$updatedAt || doc.$createdAt || new Date().toISOString(),
+        asOf: doc.nutritionUpdatedAt || doc.$updatedAt || doc.$createdAt || new Date().toISOString(),
     };
 };
 
@@ -504,6 +512,175 @@ const termsForAllergies = (labels) => Array.from(new Set(labels.flatMap((label) 
     return group ? group.terms : [normalized];
 }).filter(Boolean)));
 
+const clampChars = (value, max) => {
+    const text = String(value || '').replace(/\s+/g, ' ').trim();
+    return text.length <= max ? text : `${text.slice(0, max - 3).trim()}...`;
+};
+
+const estimateTokens = (value) => Math.ceil(String(value || '').length / 4);
+
+const safeParseFacts = (value) => {
+    try {
+        const parsed = typeof value === 'string' ? JSON.parse(value || '[]') : value;
+        return Array.isArray(parsed) ? parsed : [];
+    } catch {
+        return [];
+    }
+};
+
+const normalizeMemory = (doc = null, userId = '', conversationId = '') => {
+    const facts = safeParseFacts(doc?.factsJson)
+        .map((fact) => clampChars(fact, MEMORY_FACT_MAX_CHARS))
+        .filter(Boolean)
+        .slice(0, MEMORY_FACTS_MAX);
+    return {
+        id: doc?.$id || '',
+        userId: doc?.userId || userId,
+        conversationId: doc?.conversationId || conversationId,
+        summary: clampChars(doc?.summary || '', MEMORY_SUMMARY_MAX_CHARS),
+        facts,
+        lastProductBarcode: String(doc?.lastProductBarcode || '').trim(),
+        lastProductName: String(doc?.lastProductName || '').trim(),
+        messageCount: Number.isFinite(Number(doc?.messageCount)) ? Number(doc.messageCount) : 0,
+        tokenEstimate: Number.isFinite(Number(doc?.tokenEstimate)) ? Number(doc.tokenEstimate) : 0,
+        updatedAt: doc?.updatedAt || doc?.$updatedAt || '',
+        version: Number.isFinite(Number(doc?.version)) ? Number(doc.version) : MEMORY_VERSION,
+    };
+};
+
+const memorySnapshot = (memory) => {
+    if (!memory) return null;
+    return {
+        summary: memory.summary || '',
+        factCount: memory.facts?.length || 0,
+        lastProductBarcode: memory.lastProductBarcode || '',
+        lastProductName: memory.lastProductName || '',
+        messageCount: memory.messageCount || 0,
+        tokenEstimate: memory.tokenEstimate || 0,
+        updatedAt: memory.updatedAt || '',
+    };
+};
+
+const loadChatMemory = async (databases, databaseId, userId, conversationId, log) => {
+    if (!databases || !userId || !conversationId || conversationId === 'legacy') return null;
+    try {
+        const res = await listDocuments(databases, databaseId, COLLECTIONS.AI_CHAT_MEMORY, [
+            sdk.Query.equal('userId', userId),
+            sdk.Query.equal('conversationId', conversationId),
+            sdk.Query.limit(1),
+        ]);
+        const memory = normalizeMemory(res.documents?.[0] || null, userId, conversationId);
+        metric(log, res.documents?.[0] ? 'memory_hit' : 'memory_miss', { conversationId });
+        return memory;
+    } catch (err) {
+        metric(log, 'memory_unavailable', { reason: err?.code || 'error' });
+        return null;
+    }
+};
+
+const explicitFactsFromQuery = (query, allergyPrefs = [], userProfile = {}) => {
+    const text = normalizeText(query);
+    const facts = [];
+    const has = (items) => items.some((item) => text.includes(item));
+    if (has(['allergic to', 'allergy to', 'alerjim var', 'alerji'])) {
+        for (const group of ALLERGEN_GROUPS) {
+            if (group.terms.some((term) => text.includes(term))) {
+                facts.push(`User explicitly mentioned allergy context for ${group.label}.`);
+            }
+        }
+    }
+    const avoidMatch = text.match(/\bavoid\s+([a-z0-9ğüşöçı\s-]{2,48})/i);
+    if (avoidMatch?.[1]) facts.push(`User asked to avoid ${avoidMatch[1].trim()}.`);
+    for (const allergy of allergyPrefs || []) {
+        const normalized = normalizeAllergy(allergy);
+        if (normalized) facts.push(`Saved allergy profile includes ${normalized}.`);
+    }
+    for (const pref of userProfile.dietaryPreferences || []) facts.push(`Saved dietary preference: ${pref}.`);
+    for (const item of userProfile.avoidIngredients || []) facts.push(`Saved avoid ingredient: ${item}.`);
+    return facts.map((fact) => clampChars(fact, MEMORY_FACT_MAX_CHARS));
+};
+
+const mergeFacts = (current = [], incoming = []) => {
+    const seen = new Set();
+    const merged = [];
+    for (const fact of [...incoming, ...current]) {
+        const normalized = normalizeText(fact);
+        if (!normalized || seen.has(normalized)) continue;
+        seen.add(normalized);
+        merged.push(clampChars(fact, MEMORY_FACT_MAX_CHARS));
+        if (merged.length >= MEMORY_FACTS_MAX) break;
+    }
+    return merged;
+};
+
+const buildMemorySummary = (memory, query, result, facts) => {
+    const lines = [];
+    const lastProduct = result?.product?.name || memory?.lastProductName || '';
+    if (lastProduct) lines.push(`Last checked product: ${lastProduct}.`);
+    if (result?.status) lines.push(`Last AI result: ${result.status}.`);
+    if (facts.length) lines.push(`Useful context: ${facts.slice(0, 6).join(' ')}`);
+    if (query) lines.push(`Recent request: ${clampChars(query, 180)}`);
+    return clampChars(lines.join(' '), MEMORY_SUMMARY_MAX_CHARS);
+};
+
+const saveChatMemory = async ({ databases, databaseId, memory, payload, result, log }) => {
+    if (!databases || !memory || !memory.userId || !memory.conversationId) return null;
+    const userProfile = normalizeUserProfile(payload.userProfile || {});
+    const product = result?.product || {};
+    const nextFacts = mergeFacts(
+        memory.facts,
+        explicitFactsFromQuery(payload.query, payload.allergyPrefs || [], userProfile)
+    );
+    const nextMemory = {
+        ...memory,
+        facts: nextFacts,
+        summary: buildMemorySummary(memory, payload.query, result, nextFacts),
+        lastProductBarcode: product.barcode || memory.lastProductBarcode || '',
+        lastProductName: product.name || memory.lastProductName || '',
+        messageCount: (memory.messageCount || 0) + 1,
+        updatedAt: new Date().toISOString(),
+        version: MEMORY_VERSION,
+    };
+    nextMemory.tokenEstimate = estimateTokens(`${nextMemory.summary} ${nextMemory.facts.join(' ')}`);
+
+    const data = {
+        userId: nextMemory.userId,
+        conversationId: nextMemory.conversationId,
+        summary: nextMemory.summary,
+        factsJson: JSON.stringify(nextMemory.facts),
+        lastProductBarcode: nextMemory.lastProductBarcode,
+        lastProductName: nextMemory.lastProductName,
+        messageCount: nextMemory.messageCount,
+        tokenEstimate: nextMemory.tokenEstimate,
+        updatedAt: nextMemory.updatedAt,
+        version: nextMemory.version,
+    };
+
+    try {
+        if (nextMemory.id) {
+            await databases.updateDocument(databaseId, COLLECTIONS.AI_CHAT_MEMORY, nextMemory.id, data);
+        } else {
+            const created = await databases.createDocument(databaseId, COLLECTIONS.AI_CHAT_MEMORY, sdk.ID.unique(), data);
+            nextMemory.id = created.$id;
+        }
+        metric(log, 'memory_saved', { factCount: nextMemory.facts.length });
+        return nextMemory;
+    } catch (err) {
+        metric(log, 'memory_save_failed', { reason: err?.code || 'error' });
+        return memory;
+    }
+};
+
+const profilePersonalizationReasons = (userProfile = {}, allergyPrefs = [], memory = null, usedMemoryProduct = false) => {
+    const reasons = [];
+    if ((allergyPrefs || []).map(normalizeAllergy).filter(Boolean).length > 0) reasons.push('saved allergies');
+    if ((userProfile.avoidIngredients || []).length > 0) reasons.push('avoid ingredients');
+    if ((userProfile.dietaryPreferences || []).length > 0) reasons.push('dietary preferences');
+    if ((userProfile.nutritionPriorities || []).length > 0) reasons.push('nutrition priorities');
+    if (usedMemoryProduct || memory?.summary || memory?.facts?.length) reasons.push('this chat memory');
+    return Array.from(new Set(reasons));
+};
+
 const detectIngredientConditions = (query, allergyPrefs, userProfile = {}) => {
     const text = normalizeText(query);
     const has = (items) => items.some((item) => text.includes(item));
@@ -631,7 +808,12 @@ const evaluateIngredient = (payload, query, allergyPrefs, userProfile = {}) => {
 };
 
 const runIngredientCheck = async (ctx, payload) => {
-    const resolved = await resolveIngredientPayload(ctx);
+    const usedMemoryProduct = !ctx.barcodeHint && !ctx.nameHint && !!(ctx.memory?.lastProductBarcode || ctx.memory?.lastProductName);
+    const resolved = await resolveIngredientPayload({
+        ...ctx,
+        barcodeHint: ctx.barcodeHint || ctx.memory?.lastProductBarcode || '',
+        nameHint: ctx.nameHint || ctx.memory?.lastProductName || '',
+    });
     const product = productShape(resolved.product) || (resolved.payload ? {
         id: '',
         barcode: resolved.payload.barcode || '',
@@ -641,6 +823,7 @@ const runIngredientCheck = async (ctx, payload) => {
     } : null);
     const userProfile = normalizeUserProfile(payload.userProfile || {});
     const check = evaluateIngredient(resolved.payload, payload.query, payload.allergyPrefs || [], userProfile);
+    const personalizedBy = profilePersonalizationReasons(userProfile, payload.allergyPrefs || [], ctx.memory, usedMemoryProduct);
     return {
         mode: 'ingredient_safety',
         product,
@@ -648,6 +831,7 @@ const runIngredientCheck = async (ctx, payload) => {
             status: check.status,
             checks: check.checks,
             allergenTargets: check.allergenTargets,
+            personalizedBy,
             reasons: check.reasons,
             ingredients: resolved.payload?.ingredientsText || '',
             allergens: resolved.payload?.allergens || [],
@@ -660,6 +844,8 @@ const runIngredientCheck = async (ctx, payload) => {
         source: 'PriceMate',
         asOf: resolved.payload?.asOf || new Date().toISOString(),
         stale: false,
+        memoryUsed: usedMemoryProduct,
+        personalizedBy,
         errorCode: product ? '' : 'product_not_found',
     };
 };
@@ -745,7 +931,7 @@ const aggregatePrices = (prices, query, userProfile = {}) => {
     };
 };
 
-const runPriceCheck = async ({ databases, databaseId, query, barcodeHint, nameHint, userProfile, log }) => {
+const runPriceCheck = async ({ databases, databaseId, query, barcodeHint, nameHint, userProfile, memory, log }) => {
     if (!databases) {
         return {
             mode: 'price_check',
@@ -761,7 +947,13 @@ const runPriceCheck = async ({ databases, databaseId, query, barcodeHint, nameHi
         };
     }
 
-    const product = await findCatalogProduct(databases, databaseId, query, barcodeHint, nameHint);
+    const product = await findCatalogProduct(
+        databases,
+        databaseId,
+        query,
+        barcodeHint || memory?.lastProductBarcode || '',
+        nameHint || memory?.lastProductName || ''
+    );
     if (!product) {
         return {
             mode: 'price_check',
@@ -831,6 +1023,8 @@ module.exports = async ({ req, res, log, error }) => {
     const query = String(payload.query || '').trim();
     const mode = classifyIntent(query);
     const { databases, databaseId, configError } = createDatabases();
+    const userId = String(payload.userId || '').trim();
+    const conversationId = String(payload.conversationId || '').trim();
     const base = {
         correlationId,
         mode,
@@ -842,6 +1036,8 @@ module.exports = async ({ req, res, log, error }) => {
         source: 'PriceMate',
         asOf: new Date().toISOString(),
         stale: false,
+        memorySnapshot: null,
+        personalizedBy: [],
         errorCode: configError,
     };
 
@@ -849,9 +1045,10 @@ module.exports = async ({ req, res, log, error }) => {
         return json(res, { ...base, mode: 'generic', errorCode: 'empty_query' });
     }
 
-    const key = `${mode}:${query}:${JSON.stringify(payload.allergyPrefs || [])}:${JSON.stringify(payload.userProfile || {})}:${payload.barcodeHint || ''}:${payload.nameHint || ''}`;
+    const key = `${mode}:${query}:${JSON.stringify(payload.allergyPrefs || [])}:${JSON.stringify(payload.userProfile || {})}:${payload.barcodeHint || ''}:${payload.nameHint || ''}:${conversationId}`;
     return withInflight(key, async () => {
         try {
+            const memory = await loadChatMemory(databases, databaseId, userId, conversationId, log);
             const ctx = {
                 databases,
                 databaseId,
@@ -859,6 +1056,7 @@ module.exports = async ({ req, res, log, error }) => {
                 barcodeHint: payload.barcodeHint || '',
                 nameHint: payload.nameHint || '',
                 userProfile: payload.userProfile || {},
+                memory,
                 log,
             };
 
@@ -868,15 +1066,37 @@ module.exports = async ({ req, res, log, error }) => {
                     query,
                     allergyPrefs: Array.isArray(payload.allergyPrefs) ? payload.allergyPrefs : [],
                 });
-                return json(res, { ...base, ...result, correlationId, errorCode: result.errorCode || configError || '' });
+                const nextMemory = await saveChatMemory({ databases, databaseId, memory, payload: { ...payload, query }, result, log });
+                return json(res, {
+                    ...base,
+                    ...result,
+                    correlationId,
+                    memorySnapshot: memorySnapshot(nextMemory || memory),
+                    errorCode: result.errorCode || configError || '',
+                });
             }
 
             if (mode === 'price_check') {
                 const result = await runPriceCheck(ctx);
-                return json(res, { ...base, ...result, correlationId, errorCode: result.errorCode || configError || '' });
+                const nextMemory = await saveChatMemory({ databases, databaseId, memory, payload: { ...payload, query }, result, log });
+                return json(res, {
+                    ...base,
+                    ...result,
+                    correlationId,
+                    memorySnapshot: memorySnapshot(nextMemory || memory),
+                    errorCode: result.errorCode || configError || '',
+                });
             }
 
-            return json(res, { ...base, mode: 'generic', errorCode: '' });
+            const nextMemory = await saveChatMemory({
+                databases,
+                databaseId,
+                memory,
+                payload: { ...payload, query },
+                result: { mode: 'generic', status: 'ok', product: null },
+                log,
+            });
+            return json(res, { ...base, mode: 'generic', memorySnapshot: memorySnapshot(nextMemory || memory), errorCode: '' });
         } catch (err) {
             error(err);
             return json(res, {

@@ -1,7 +1,8 @@
 import { create } from 'zustand';
-import { db } from '../lib/appwrite';
+import { fetchSupermarketsCatalog } from '../utils/productUtils';
 
-const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const CACHE_TTL_MS = 30 * 60 * 1000;
+const CATALOG_LIMIT = 100;
 
 const useSupermarketsStore = create((set, get) => ({
     supermarkets: [],
@@ -9,22 +10,33 @@ const useSupermarketsStore = create((set, get) => ({
     error: null,
     lastFetchedAt: 0,
 
-    fetchSupermarkets: async () => {
+    fetchSupermarkets: async ({ force = false } = {}) => {
         const now = Date.now();
-        const { lastFetchedAt, supermarkets } = get();
-        if (Array.isArray(supermarkets) && supermarkets.length > 0 && now - lastFetchedAt < CACHE_TTL_MS) {
+        const { lastFetchedAt, supermarkets, loading } = get();
+        if (
+            !force &&
+            Array.isArray(supermarkets) &&
+            supermarkets.length > 0 &&
+            now - lastFetchedAt < CACHE_TTL_MS
+        ) {
             return supermarkets;
         }
+        if (loading && !force) return supermarkets;
+
         set({ loading: true, error: null });
         try {
-            const response = await db.supermarkets.list();
-            set({ supermarkets: response.documents, loading: false, lastFetchedAt: now });
-            return response.documents;
+            const documents = await fetchSupermarketsCatalog(CATALOG_LIMIT);
+            set({
+                supermarkets: documents,
+                loading: false,
+                lastFetchedAt: Date.now(),
+            });
+            return documents;
         } catch (error) {
             set({ error: error.message, loading: false });
             return [];
         }
-    }
+    },
 }));
 
 export default useSupermarketsStore;

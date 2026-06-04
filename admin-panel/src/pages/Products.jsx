@@ -7,10 +7,11 @@ import useProductsStore from '../stores/productsStore';
 import useCategoriesStore from '../stores/categoriesStore';
 import useSupermarketsStore from '../stores/supermarketsStore';
 import Sidebar from '../components/Sidebar';
-import { client, DATABASE_ID, COLLECTIONS, functions } from '../lib/appwrite';
+import { DATABASE_ID, COLLECTIONS } from '../lib/appwrite';
+import useDebouncedRealtimeRefresh from '../hooks/useDebouncedRealtimeRefresh';
+import { executeOffProxy, OFF_PROXY_FUNCTION_ID } from '../utils/executeOffProxy';
 
 const OFF_RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
-const OFF_PROXY_FUNCTION_ID = import.meta.env.VITE_APPWRITE_FUNCTION_OFF_PROXY || '';
 const NUTRITION_META_MARKER = '\n\n[PriceMate Nutrition]\n';
 
 const stripNutritionMeta = (value) => {
@@ -40,6 +41,7 @@ const Products = () => {
         page, 
         limit, 
         fetchProducts, 
+        setLimit,
         deleteProduct, 
         uploadProductImage 
     } = useProductsStore();
@@ -71,6 +73,7 @@ const Products = () => {
     const [filterCategory, setFilterCategory] = useState('');
     const [sortConfig, setSortConfig] = useState({ key: null, direction: 'ascending' });
     const [lastUpdated, setLastUpdated] = useState(null);
+    const [jumpPage, setJumpPage] = useState('');
     const isFresh = useFreshIndicator(lastUpdated);
     const resetOffLookup = () => setOffLookup({ loading: false, error: '', results: [] });
 
@@ -123,18 +126,11 @@ const Products = () => {
 
     const callOffProxy = useCallback(async (payload) => {
         if (!OFF_PROXY_FUNCTION_ID) return null;
-        try {
-            const execution = await functions.createExecution(
-                OFF_PROXY_FUNCTION_ID,
-                JSON.stringify(payload),
-                false
-            );
-            if (!execution?.response) return null;
-            return JSON.parse(execution.response);
-        } catch (error) {
-            console.error('OFF proxy error:', error);
-            return { ok: false, status: 0, error: 'Proxy error' };
+        const result = await executeOffProxy(payload);
+        if (!result?.ok && result?.error) {
+            console.error('OFF proxy error:', result.error);
         }
+        return result;
     }, []);
 
     const normalizeOffResult = (product) => {
@@ -349,15 +345,28 @@ const Products = () => {
         await Promise.all([
             fetchProducts(page),
             fetchCategories(),
-            fetchSupermarkets()
+            fetchSupermarkets(),
         ]);
         setLastUpdated(new Date().toISOString());
     }, [fetchProducts, fetchCategories, fetchSupermarkets, page]);
+
+    const refreshProductsOnly = useCallback(async () => {
+        await fetchProducts(page, { force: true });
+        setLastUpdated(new Date().toISOString());
+    }, [fetchProducts, page]);
+
+    const refreshReferenceData = useCallback(async () => {
+        await Promise.all([fetchCategories(), fetchSupermarkets()]);
+    }, [fetchCategories, fetchSupermarkets]);
 
     useEffect(() => {
         const t = setTimeout(() => refreshData(), 0);
         return () => clearTimeout(t);
     }, [refreshData]);
+
+    useEffect(() => {
+        setJumpPage(String(page));
+    }, [page]);
 
     // `isFresh` indicator handled by useFreshIndicator to avoid rapid flicker
 
@@ -367,22 +376,39 @@ const Products = () => {
         }
     }, [showModal]);
 
-    useEffect(() => {
-        const channels = [
-            `databases.${DATABASE_ID}.collections.${COLLECTIONS.PRODUCTS}.documents`,
+    useDebouncedRealtimeRefresh(
+        `databases.${DATABASE_ID}.collections.${COLLECTIONS.PRODUCTS}.documents`,
+        refreshProductsOnly
+    );
+    useDebouncedRealtimeRefresh(
+        [
             `databases.${DATABASE_ID}.collections.${COLLECTIONS.CATEGORIES}.documents`,
-            `databases.${DATABASE_ID}.collections.${COLLECTIONS.SUPERMARKETS}.documents`
-        ];
-
-        const unsubscribe = client.subscribe(channels, () => {
-            setTimeout(() => refreshData(), 0);
-        });
-
-        return () => unsubscribe();
-    }, [refreshData]);
+            `databases.${DATABASE_ID}.collections.${COLLECTIONS.SUPERMARKETS}.documents`,
+        ],
+        refreshReferenceData
+    );
 
     const handlePageChange = (newPage) => {
-        fetchProducts(newPage);
+        const totalPages = Math.max(1, Math.ceil(total / limit));
+        const next = Math.max(1, Math.min(totalPages, Number(newPage)));
+        if (!Number.isFinite(next)) return;
+        fetchProducts(next);
+        setLastUpdated(new Date().toISOString());
+    };
+
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+
+    const handleJumpSubmit = (event) => {
+        event.preventDefault();
+        const next = Number(String(jumpPage || '').trim());
+        if (!Number.isFinite(next)) return;
+        handlePageChange(Math.max(1, Math.min(totalPages, Math.floor(next))));
+    };
+
+    const handleLimitChange = (event) => {
+        const next = Number(event.target.value);
+        setLimit(next);
+        fetchProducts(1);
         setLastUpdated(new Date().toISOString());
     };
 
@@ -584,6 +610,21 @@ const Products = () => {
                                     ))}
                                 </select>
                             </div>
+                            <div className="flex items-center gap-3 text-sm font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.15em] whitespace-nowrap">
+                                <span>Show:</span>
+                                <select
+                                    value={limit}
+                                    onChange={handleLimitChange}
+                                    className="bg-gray-50 dark:bg-gray-900 border-none px-4 py-2 rounded-xl focus:ring-0 cursor-pointer text-brand-700 dark:text-brand-300 font-black text-xs tracking-widest uppercase transition-all hover:bg-brand-50 dark:hover:bg-brand-900/30"
+                                >
+                                    {[10, 25, 50, 100].map((n) => (
+                                        <option key={n} value={n}>
+                                            {n}
+                                        </option>
+                                    ))}
+                                </select>
+                                <span>products</span>
+                            </div>
                         </div>
                         <div className="flex items-center gap-4">
                             <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Showing:</span>
@@ -687,9 +728,31 @@ const Products = () => {
                     {!loading && total > 0 && (
                         <div className="flex items-center justify-between mt-8 px-8">
                             <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">
-                                Page {page} of {Math.ceil(total / limit)} ({total} total)
+                                Page {page} of {totalPages} ({total} total)
                             </span>
                             <div className="flex items-center gap-2">
+                                <form onSubmit={handleJumpSubmit} className="hidden sm:flex items-center gap-2 mr-2">
+                                    <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+                                        Go to
+                                    </span>
+                                    <input
+                                        value={jumpPage}
+                                        onChange={(e) => setJumpPage(e.target.value)}
+                                        inputMode="numeric"
+                                        pattern="\\d*"
+                                        className="w-16 px-3 py-2 rounded-xl text-[12px] font-black text-gray-900 dark:text-white bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 focus:ring-2 focus:ring-brand-500/20 outline-none"
+                                        aria-label="Go to page"
+                                    />
+                                    <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+                                        / {totalPages}
+                                    </span>
+                                    <button
+                                        type="submit"
+                                        className="px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-white dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-brand-600 hover:text-white shadow-sm border border-gray-100 dark:border-gray-700"
+                                    >
+                                        Go
+                                    </button>
+                                </form>
                                 <button
                                     onClick={() => handlePageChange(page - 1)}
                                     disabled={page === 1}

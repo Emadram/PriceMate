@@ -118,7 +118,7 @@ vi.mock('../stores/chatStore', () => ({
 
 vi.mock('../utils/productUtils', () => ({
     fetchProducts: vi.fn().mockResolvedValue([]),
-    fetchAllPrices: vi.fn().mockResolvedValue([]),
+    fetchPricesForProducts: vi.fn().mockResolvedValue([]),
     fetchIngredientsByBarcode: vi.fn(),
     searchIngredientsByName: vi.fn(),
     resolveCatalogProductForIngredients: vi.fn(),
@@ -126,6 +126,7 @@ vi.mock('../utils/productUtils', () => ({
     persistIngredientPayloadToCatalogProduct: vi.fn(),
     fetchOffCacheSnapshot: vi.fn().mockResolvedValue([]),
     normalizeOffCacheDoc: vi.fn(),
+    normalizeProduct: vi.fn((product, prices = []) => ({ ...product, prices })),
     resolveOffCacheProductForIngredients: vi.fn(),
     ingredientPayloadFromOffCache: vi.fn(),
     buildSupermarketContextLines: vi.fn(() => '- [STORE:test] Test Store'),
@@ -547,10 +548,30 @@ describe('FloatingAIChatLauncher — Task 2: ai-open body class preservation', (
 
             await new Promise((resolve) => setTimeout(resolve, 0));
 
-            // Launcher is not rendered → ai-open must NOT be on body.
+            // Launcher is not mounted on mobile → ai-open must NOT be on body.
             expect(document.body.classList.contains('ai-open')).toBe(false);
+            expect(document.getElementById('pricemate-ai-launcher')).toBeNull();
         }
     );
+
+    it('does not mount launcher DOM on mobile viewport', () => {
+        Object.defineProperty(window, 'matchMedia', {
+            writable: true,
+            value: vi.fn().mockImplementation((query) => ({
+                matches: query === '(min-width: 768px)' ? false : false,
+                media: query,
+                onchange: null,
+                addListener: vi.fn(),
+                removeListener: vi.fn(),
+                addEventListener: vi.fn(),
+                removeEventListener: vi.fn(),
+                dispatchEvent: vi.fn(),
+            })),
+        });
+
+        const { container } = render(<FloatingAIChatLauncher />);
+        expect(container.firstChild).toBeNull();
+    });
 });
 
 describe('AIChatBox — page variant immersive header', () => {
@@ -564,6 +585,8 @@ describe('AIChatBox — page variant immersive header', () => {
         expect(header).not.toBeNull();
         expect(header.classList.contains('pricemate-mobile-chrome')).toBe(true);
         expect(header.className).not.toContain('bg-gradient-to-r');
+        expect(header.className).toMatch(/\bshrink-0\b/);
+        expect(header.className).toMatch(/max-md:sticky/);
         expect(getByRole('heading', { name: /ai_chat_title/i }).className).toContain('text-brand-700');
         expect(container.querySelector('.grid.grid-cols-3')).toBeNull();
     });
@@ -577,14 +600,24 @@ describe('AIChatBox — page variant immersive header', () => {
         expect(handles.length).toBe(0);
     });
 
-    it('page variant composer does not reserve bottom-nav height (immersive shell handles it)', () => {
-        const { container } = render(
+    it('page variant composer is in-flow at bottom on mobile (not viewport-fixed)', () => {
+        const { getByTestId, container } = render(
             <AIChatBox isOpen={true} onClose={() => {}} variant="page" />
         );
 
-        const form = container.querySelector('form');
-        expect(form).not.toBeNull();
-        expect(form.className).not.toContain('bottom-nav-h');
+        const stack = getByTestId('ai-chat-composer-stack');
+        expect(stack.className).toMatch(/shrink-0/);
+        expect(stack.className).not.toMatch(/max-md:fixed/);
+        expect(stack.className).not.toMatch(/pricemate-ai-composer-nav-anchor/);
+        expect(stack.className).not.toMatch(/composer-keyboard-lift/);
+
+        const header = container.querySelector('header');
+        expect(header).not.toBeNull();
+        expect(header.className).toMatch(/max-md:sticky/);
+
+        const form = getByTestId('ai-chat-composer-form');
+        expect(form.className).toMatch(/max-md:bg-white/);
+        expect(form.className).not.toMatch(/pricemate-ai-composer-overlay/);
     });
 
     it('drawer variant composer reserves bottom-nav height above tab bar', () => {
@@ -631,6 +664,16 @@ describe('AIChatBox — page variant immersive header', () => {
         authState.user = null;
     });
 
+    it('shows quick prompt shortcuts on a new empty conversation thread', () => {
+        authState.user = { $id: 'user-1', name: 'Test User' };
+        const { getByText } = render(
+            <AIChatBox isOpen={true} onClose={() => {}} variant="page" />
+        );
+        expect(getByText('ai_chat_quick_cheapest')).toBeTruthy();
+        expect(getByText('ai_chat_quick_compare')).toBeTruthy();
+        authState.user = null;
+    });
+
     it('does not render composer quick-prompt suggestion pills in the form', () => {
         authState.user = { $id: 'user-1', name: 'Test User' };
         const { container } = render(
@@ -640,6 +683,21 @@ describe('AIChatBox — page variant immersive header', () => {
         const form = container.querySelector('form');
         expect(form).not.toBeNull();
         expect(form.querySelectorAll('.rounded-full.border-brand-100').length).toBe(0);
+        authState.user = null;
+    });
+
+    it('enables composer for logged-in users without an active conversation', () => {
+        authState.user = { $id: 'user-1', name: 'Test User' };
+        const { container } = render(
+            <AIChatBox isOpen={true} onClose={() => {}} variant="page" />
+        );
+
+        const textarea = container.querySelector('textarea');
+        const submit = container.querySelector('button[type="submit"]');
+        expect(textarea).not.toBeNull();
+        expect(textarea.disabled).toBe(false);
+        expect(submit).not.toBeNull();
+        expect(submit.disabled).toBe(true);
         authState.user = null;
     });
 });

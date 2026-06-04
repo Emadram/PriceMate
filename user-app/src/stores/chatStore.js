@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { db, Query, client, DATABASE_ID, COLLECTIONS, ID } from '../lib/appwrite';
+import { applyTitleOverlay } from '../utils/aiMemoryUtils';
 
 /** Messages with no `conversationId` in Appwrite are grouped under this id in the UI. */
 export const LEGACY_CONVERSATION_ID = 'legacy';
@@ -110,8 +111,56 @@ const listAllThreadDocuments = async (userId, conversationId) => {
     return all;
 };
 
+const listAllMemoryDocuments = async (userId, conversationId = null) => {
+    if (!userId || !db.aiChatMemory) return [];
+    const baseQueries = [
+        Query.equal('userId', userId),
+        Query.orderAsc('$id'),
+        Query.limit(100),
+    ];
+    if (conversationId && conversationId !== LEGACY_CONVERSATION_ID) {
+        baseQueries.unshift(Query.equal('conversationId', conversationId));
+    }
+
+    const all = [];
+    let lastId;
+    for (;;) {
+        const pageQueries = lastId ? [...baseQueries, Query.cursorAfter(lastId)] : baseQueries;
+        const res = await db.aiChatMemory.list(pageQueries);
+        if (res.documents.length === 0) break;
+        all.push(...res.documents);
+        if (res.documents.length < 100) break;
+        lastId = res.documents[res.documents.length - 1].$id;
+    }
+    return all;
+};
+
+const deleteMemoryDocuments = async (userId, conversationId = null) => {
+    try {
+        const docs = await listAllMemoryDocuments(userId, conversationId);
+        await Promise.all(docs.map((doc) => db.aiChatMemory.delete(doc.$id)));
+        return true;
+    } catch (error) {
+        const msg = String(error?.message || '');
+        if (error?.code === 404 || /not found|collection/i.test(msg)) return false;
+        throw error;
+    }
+};
+
 /** Serialize session bootstrap so overlapping calls (Strict Mode, fast navigation) never double-run the empty-session branch. */
 let initSessionMutex = Promise.resolve();
+
+const SUMMARIES_TTL_MS = 2 * 60 * 1000;
+
+const patchSummaryAfterMessage = (summaries, conversationId, timestamp) => {
+    const idx = summaries.findIndex((s) => s.id === conversationId);
+    if (idx < 0) return summaries;
+
+    const next = [...summaries];
+    next[idx] = { ...next[idx], updatedAt: timestamp };
+    next.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+    return next;
+};
 
 const lastConversationStorageKey = (userId) => `pricemate_last_conversation_${userId}`;
 
@@ -149,6 +198,8 @@ const useChatStore = create((set, get) => ({
     summariesLoading: false,
     error: null,
     unsubscribe: null,
+    summariesUserId: null,
+    summariesFetchedAt: null,
 
     resetChat: () => {
         if (get().unsubscribe) {
@@ -163,6 +214,8 @@ const useChatStore = create((set, get) => ({
             summariesLoading: false,
             error: null,
             unsubscribe: null,
+            summariesUserId: null,
+            summariesFetchedAt: null,
         });
     },
 
@@ -196,8 +249,21 @@ const useChatStore = create((set, get) => ({
 
     clearChatWriteError: () => set({ error: null }),
 
-    fetchConversationSummaries: async (userId) => {
+    fetchConversationSummaries: async (userId, { force = false } = {}) => {
         if (!userId) return;
+
+        const { summariesUserId, summariesFetchedAt, conversationSummaries, summariesLoading } = get();
+        if (
+            !force &&
+            summariesUserId === userId &&
+            summariesFetchedAt &&
+            Date.now() - summariesFetchedAt < SUMMARIES_TTL_MS &&
+            conversationSummaries.length > 0
+        ) {
+            return;
+        }
+        if (summariesLoading && !force) return;
+
         set({ summariesLoading: true, error: null });
         try {
             const baseQueries = [
@@ -217,9 +283,35 @@ const useChatStore = create((set, get) => ({
                 if (response.documents.length < 100) break;
                 lastId = response.documents[response.documents.length - 1].$id;
             }
+            let summaries = buildSummariesFromDocuments(allDocs);
+            try {
+                if (db.aiChatMemory) {
+                    const titleDocs = [];
+                    let lastId;
+                    for (;;) {
+                        const queries = [
+                            Query.equal('userId', userId),
+                            Query.equal('memoryType', 'conversation_title'),
+                            Query.orderAsc('$id'),
+                            Query.limit(100),
+                        ];
+                        if (lastId) queries.push(Query.cursorAfter(lastId));
+                        const res = await db.aiChatMemory.list(queries);
+                        if (res.documents.length === 0) break;
+                        titleDocs.push(...res.documents);
+                        if (res.documents.length < 100) break;
+                        lastId = res.documents[res.documents.length - 1].$id;
+                    }
+                    summaries = applyTitleOverlay(summaries, titleDocs);
+                }
+            } catch {
+                // best-effort; title overlay failure must never break the conversation list
+            }
             set({
-                conversationSummaries: buildSummariesFromDocuments(allDocs),
+                conversationSummaries: summaries,
                 summariesLoading: false,
+                summariesUserId: userId,
+                summariesFetchedAt: Date.now(),
             });
         } catch (error) {
             console.error('Failed to fetch conversation summaries:', error);
@@ -276,11 +368,11 @@ const useChatStore = create((set, get) => ({
     /**
      * Refresh thread list and restore the last active conversation (or most recent thread).
      */
-    initializeChatSession: async (userId) => {
+    initializeChatSession: async (userId, { forceSummaries = false } = {}) => {
         if (!userId) return;
 
         const job = initSessionMutex.then(async () => {
-            await get().fetchConversationSummaries(userId);
+            await get().fetchConversationSummaries(userId, { force: forceSummaries });
             const summaries = get().conversationSummaries;
             const storedId = readLastConversationId(userId);
             const targetId = resolveConversationToRestore(summaries, storedId);
@@ -329,7 +421,22 @@ const useChatStore = create((set, get) => ({
             }
 
             writeLastConversationId(userId, activeConversationId);
-            await get().fetchConversationSummaries(userId);
+
+            const hasSummary = get().conversationSummaries.some(
+                (s) => s.id === activeConversationId
+            );
+            if (!hasSummary) {
+                await get().fetchConversationSummaries(userId, { force: true });
+            } else {
+                set((state) => ({
+                    conversationSummaries: patchSummaryAfterMessage(
+                        state.conversationSummaries,
+                        activeConversationId,
+                        doc.timestamp || doc.$createdAt
+                    ),
+                    summariesFetchedAt: Date.now(),
+                }));
+            }
             return doc;
         } catch (error) {
             console.error('Failed to save message:', error);
@@ -359,6 +466,7 @@ const useChatStore = create((set, get) => ({
         try {
             const docs = await listAllThreadDocuments(userId, conversationId);
             await Promise.all(docs.map((d) => db.chatHistory.delete(d.$id)));
+            await deleteMemoryDocuments(userId, conversationId);
 
             const wasActive = get().activeConversationId === conversationId;
 
@@ -375,6 +483,18 @@ const useChatStore = create((set, get) => ({
         } catch (error) {
             console.error('Failed to delete conversation:', error);
             set({ error: error.message });
+        }
+    },
+
+    clearConversationMemory: async (userId, conversationId) => {
+        if (!userId || !conversationId || conversationId === LEGACY_CONVERSATION_ID) return false;
+        try {
+            await deleteMemoryDocuments(userId, conversationId);
+            return true;
+        } catch (error) {
+            console.error('Failed to clear conversation memory:', error);
+            set({ error: error.message });
+            return false;
         }
     },
 

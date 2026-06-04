@@ -1,4 +1,10 @@
 import { db, Query, COLLECTIONS, functions } from '../lib/appwrite';
+import { createFunctionExecutionJson } from './appwriteFunctionExecution';
+import {
+    buildCatalogSearchTerms,
+    findBestProductMatch,
+    FUZZY_MATCH_MIN_SCORE,
+} from './productNameMatch';
 
 const cacheStore = new Map();
 const inflightRequests = new Map();
@@ -13,11 +19,69 @@ const CACHE_TTL = {
 const OFF_CACHE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 const OFF_MEMORY_TTL_MS = 5 * 60 * 1000;
 const OFF_SEARCH_TTL_MS = 2 * 60 * 1000;
+const PRODUCT_LIST_SELECT = [
+    '$id',
+    '$createdAt',
+    '$updatedAt',
+    'name',
+    'product_name',
+    'barcode',
+    'code',
+    'brand',
+    'brands',
+    'ingredientsText',
+    'allergens',
+    'nutritionSource',
+    'sugarsPer100g',
+    'sodiumMgPer100g',
+    'caffeineMgPerL',
+    'nutritionUpdatedAt',
+    'imageUrl',
+    'image',
+    'image_url',
+    'image_front_url',
+    'description',
+    'unit',
+    'quantity',
+    'weight',
+    'nutriscore_grade',
+    'allergens_tags',
+    'categories',
+    'categoryId.*',
+];
+const PRODUCT_PRICE_SELECT = [
+    '$id',
+    '$createdAt',
+    '$updatedAt',
+    'price',
+    'currency',
+    'products.$id',
+    'supermarkets.$id',
+];
+/** Optional expanded supermarket fields (only attrs present in Appwrite schema). */
+export const COMPARISON_PRICE_SELECT = [
+    ...PRODUCT_PRICE_SELECT,
+    'supermarkets.name',
+    'supermarkets.branchName',
+    'supermarkets.address',
+    'supermarkets.latitude',
+    'supermarkets.longitude',
+    'supermarkets.icon',
+    'supermarkets.rating',
+    'supermarkets.reviewsCount',
+    'supermarkets.parentId',
+    'supermarkets.isParent',
+];
+export { PRODUCT_PRICE_SELECT };
 const OFF_API_BASE = 'https://world.openfoodfacts.org';
 const OFF_DEBUG = import.meta.env.VITE_OFF_DEBUG === 'true';
 const OFF_PROXY_FUNCTION_ID = import.meta.env.VITE_APPWRITE_FUNCTION_OFF_PROXY || '';
 const OFF_RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
 const NUTRITION_META_MARKER = '\n\n[PriceMate Nutrition]\n';
+const pricesIndexCache = new WeakMap();
+const priceFieldSupport = {
+    products: null,
+};
 
 export const stripNutritionMeta = (value) => {
     const text = String(value || '');
@@ -45,13 +109,7 @@ const logOffDebug = (...args) => {
 const callOffProxy = async (payload) => {
     if (!OFF_PROXY_FUNCTION_ID) return null;
     try {
-        const execution = await functions.createExecution(
-            OFF_PROXY_FUNCTION_ID,
-            JSON.stringify(payload),
-            false
-        );
-        if (!execution?.response) return null;
-        return JSON.parse(execution.response);
+        return await createFunctionExecutionJson(functions, OFF_PROXY_FUNCTION_ID, payload);
     } catch (error) {
         logOffDebug('proxy-error', { message: error?.message || String(error) });
         return { ok: false, status: 0, error: 'Proxy error' };
@@ -460,8 +518,58 @@ export const ingredientPayloadFromOffCache = (doc) => {
     };
 };
 
+const OFF_CACHE_UNAVAILABLE_KEY = 'pricemate:offCacheUnavailable';
+let offCacheCollectionAvailable = null;
+
+const readOffCacheUnavailableFlag = () => {
+    try {
+        return sessionStorage.getItem(OFF_CACHE_UNAVAILABLE_KEY) === '1';
+    } catch {
+        return false;
+    }
+};
+
+const markOffCacheUnavailable = () => {
+    offCacheCollectionAvailable = false;
+    try {
+        sessionStorage.setItem(OFF_CACHE_UNAVAILABLE_KEY, '1');
+    } catch {
+        // ignore storage failures
+    }
+};
+
+const isOffCacheUnavailableError = (error) => {
+    const code = error?.code;
+    const message = String(error?.message || '').toLowerCase();
+    return (
+        code === 404 ||
+        message.includes('not found') ||
+        message.includes('collection with the requested id could not be found')
+    );
+};
+
+const isOffCacheEnabled = () => {
+    const envFlag = import.meta.env.VITE_APPWRITE_OFF_CACHE_ENABLED;
+    if (envFlag === 'false' || envFlag === '0') return false;
+    if (offCacheCollectionAvailable === false) return false;
+    if (offCacheCollectionAvailable === null && readOffCacheUnavailableFlag()) {
+        offCacheCollectionAvailable = false;
+        return false;
+    }
+    return true;
+};
+
+const handleOffCacheError = (error, context) => {
+    if (isOffCacheUnavailableError(error)) {
+        markOffCacheUnavailable();
+        logOffDebug('collection-unavailable', { context });
+        return;
+    }
+    console.warn(`OFF cache ${context} failed:`, error?.message || error);
+};
+
 export const fetchOffCacheByBarcode = async (barcode) => {
-    if (!barcode) return null;
+    if (!barcode || !isOffCacheEnabled()) return null;
     try {
         const res = await db.offCache.list([
             Query.equal('barcode', String(barcode)),
@@ -477,14 +585,14 @@ export const fetchOffCacheByBarcode = async (barcode) => {
         }
         return null;
     } catch (error) {
-        console.warn('OFF cache lookup failed:', error?.message || error);
+        handleOffCacheError(error, 'lookup');
         return null;
     }
 };
 
 export const searchOffCacheByName = async (name, limit = 5) => {
     const term = String(name || '').trim();
-    if (!term) return [];
+    if (!term || !isOffCacheEnabled()) return [];
     try {
         const res = await db.offCache.list([
             Query.search('name', term),
@@ -497,12 +605,13 @@ export const searchOffCacheByName = async (name, limit = 5) => {
         }
         return fresh;
     } catch (error) {
-        console.warn('OFF cache name search failed:', error?.message || error);
+        handleOffCacheError(error, 'name search');
         return [];
     }
 };
 
 export const fetchOffCacheSnapshot = async (limit = 30) => {
+    if (!isOffCacheEnabled()) return [];
     try {
         const res = await db.offCache.list([
             Query.limit(limit),
@@ -511,13 +620,13 @@ export const fetchOffCacheSnapshot = async (limit = 30) => {
         const docs = res.documents || [];
         return docs.filter((doc) => isOffCacheFresh(doc));
     } catch (error) {
-        console.warn('OFF cache snapshot failed:', error?.message || error);
+        handleOffCacheError(error, 'snapshot');
         return [];
     }
 };
 
 const saveOffCacheRecord = async (record) => {
-    if (!record || !record.barcode) return null;
+    if (!record || !record.barcode || !isOffCacheEnabled()) return null;
     try {
         const existing = await db.offCache.list([
             Query.equal('barcode', record.barcode),
@@ -531,7 +640,7 @@ const saveOffCacheRecord = async (record) => {
         const created = await db.offCache.create(record);
         return created?.$id || null;
     } catch (error) {
-        console.warn('OFF cache save failed:', error?.message || error);
+        handleOffCacheError(error, 'save');
         return null;
     }
 };
@@ -679,6 +788,9 @@ export const persistIngredientPayloadToCatalogProduct = async (productDoc, paylo
             ingredientsText: incomingNutrition.ingredientsText || currentNutrition.ingredientsText || '',
             nutritionSource: incomingNutrition.nutritionSource || currentNutrition.nutritionSource || '',
         };
+        const allergens = Array.isArray(payload?.allergens)
+            ? payload.allergens.map((item) => String(item || '').trim()).filter(Boolean).slice(0, 30)
+            : [];
 
         const hasMergedData =
             mergedNutrition.sugarsPer100g !== null ||
@@ -689,8 +801,31 @@ export const persistIngredientPayloadToCatalogProduct = async (productDoc, paylo
 
         if (!hasMergedData) return false;
 
+        const explicitPayload = {
+            ingredientsText: mergedNutrition.ingredientsText,
+            allergens,
+            nutritionSource: mergedNutrition.nutritionSource || 'PriceMate',
+            nutritionUpdatedAt: new Date().toISOString(),
+        };
+        if (mergedNutrition.sugarsPer100g !== null) explicitPayload.sugarsPer100g = mergedNutrition.sugarsPer100g;
+        if (mergedNutrition.sodiumMgPer100g !== null) explicitPayload.sodiumMgPer100g = mergedNutrition.sodiumMgPer100g;
+        if (mergedNutrition.caffeineMgPerL !== null) explicitPayload.caffeineMgPerL = mergedNutrition.caffeineMgPerL;
+
+        try {
+            await db.products.update(productDoc.$id, explicitPayload);
+            return true;
+        } catch (schemaError) {
+            const message = String(schemaError?.message || '');
+            if (!/Unknown attribute|Invalid document structure|attribute/i.test(message)) {
+                throw schemaError;
+            }
+        }
+
         const baseDescription = stripNutritionMeta(productDoc.description || '');
-        const nextDescription = `${baseDescription}${NUTRITION_META_MARKER}${JSON.stringify(mergedNutrition)}`;
+        const nextDescription = `${baseDescription}${NUTRITION_META_MARKER}${JSON.stringify({
+            ...mergedNutrition,
+            allergens,
+        })}`;
 
         if (String(productDoc.description || '') === nextDescription) {
             return false;
@@ -713,11 +848,14 @@ export const ingredientPayloadFromAppwriteProduct = (doc) => {
 
     const hiddenNutrition = extractNutritionMeta(doc.description);
 
-    // Prefer nested `nutrition` object (new format), then the hidden description block, then legacy top-level fields
-    const sugarsPer100g = parseNutritionNumber(doc?.nutrition?.sugarsPer100g ?? hiddenNutrition?.sugarsPer100g ?? doc.sugarsPer100g);
-    const sodiumMgPer100g = parseNutritionNumber(doc?.nutrition?.sodiumMgPer100g ?? hiddenNutrition?.sodiumMgPer100g ?? doc.sodiumMgPer100g);
-    const caffeineMgPerL = parseNutritionNumber(doc?.nutrition?.caffeineMgPerL ?? hiddenNutrition?.caffeineMgPerL ?? doc.caffeineMgPerL);
-    const ingredientsText = String(doc?.nutrition?.ingredientsText ?? hiddenNutrition?.ingredientsText ?? (doc.ingredientsText || '')).trim();
+    // Prefer explicit fields, then nested `nutrition`, then the hidden description block used before the schema existed.
+    const sugarsPer100g = parseNutritionNumber(doc.sugarsPer100g ?? doc?.nutrition?.sugarsPer100g ?? hiddenNutrition?.sugarsPer100g);
+    const sodiumMgPer100g = parseNutritionNumber(doc.sodiumMgPer100g ?? doc?.nutrition?.sodiumMgPer100g ?? hiddenNutrition?.sodiumMgPer100g);
+    const caffeineMgPerL = parseNutritionNumber(doc.caffeineMgPerL ?? doc?.nutrition?.caffeineMgPerL ?? hiddenNutrition?.caffeineMgPerL);
+    const ingredientsText = String(doc.ingredientsText ?? doc?.nutrition?.ingredientsText ?? hiddenNutrition?.ingredientsText ?? '').trim();
+    const allergens = Array.isArray(doc.allergens)
+        ? doc.allergens
+        : (Array.isArray(hiddenNutrition?.allergens) ? hiddenNutrition.allergens : []);
 
     const hasData =
         sugarsPer100g !== null || sodiumMgPer100g !== null || caffeineMgPerL !== null || ingredientsText.length > 0;
@@ -731,7 +869,7 @@ export const ingredientPayloadFromAppwriteProduct = (doc) => {
         ingredientsList: ingredientsText
             ? ingredientsText.split(/[,;]+/).map((item) => item.trim()).filter(Boolean)
             : [],
-        allergens: [],
+        allergens: allergens.map((item) => String(item || '').replace(/^[a-z]{2}:/, '').replace(/_/g, ' ').trim()).filter(Boolean),
         nutriments: {
             sugarsPer100g,
             sodiumMgPer100g,
@@ -741,7 +879,7 @@ export const ingredientPayloadFromAppwriteProduct = (doc) => {
         },
         source: 'PriceMate',
         sourceUrl: '',
-        nutritionSourceLabel: String(doc?.nutrition?.nutritionSource ?? hiddenNutrition?.nutritionSource ?? (doc.nutritionSource || '')).trim(),
+        nutritionSourceLabel: String(doc.nutritionSource ?? doc?.nutrition?.nutritionSource ?? hiddenNutrition?.nutritionSource ?? '').trim(),
     };
 };
 
@@ -779,21 +917,24 @@ export const resolveCatalogProductForIngredients = async (userMessage) => {
         }
     }
 
-    const lowered = trimmed.toLowerCase().replace(/\b\d{8,14}\b/g, ' ');
-    const terms = lowered
-        .split(/\s+/)
-        .filter((w) => w.length >= 2 && !CATALOG_RESOLVE_STOPWORDS.has(w))
-        .sort((a, b) => b.length - a.length);
+    const searchTerms = buildCatalogSearchTerms(trimmed).filter(
+        (term) => term.length >= 2 && !CATALOG_RESOLVE_STOPWORDS.has(term)
+    );
 
-    for (const term of terms) {
+    const pickFromDocuments = (documents, term) => {
+        if (!documents?.length) return null;
+        const fuzzy = findBestProductMatch(trimmed, documents, { minScore: FUZZY_MATCH_MIN_SCORE });
+        if (fuzzy?.product) return fuzzy.product;
+        const nameLower = (d) => (d.name || '').toLowerCase();
+        return documents.find((d) => nameLower(d).includes(term)) || documents[0];
+    };
+
+    for (const term of searchTerms) {
         if (term.length < 2) continue;
         try {
-            // No Query.select: Appwrite rejects the request if any selected attribute is missing from the schema.
             const res = await db.products.list([Query.search('name', term), Query.limit(8)]);
-            if (res.documents.length > 0) {
-                const nameLower = (d) => (d.name || '').toLowerCase();
-                const best =
-                    res.documents.find((d) => nameLower(d).includes(term)) || res.documents[0];
+            const best = pickFromDocuments(res.documents, term);
+            if (best) {
                 return {
                     product: best,
                     catalogBarcode: best.barcode || '',
@@ -806,12 +947,21 @@ export const resolveCatalogProductForIngredients = async (userMessage) => {
     }
 
     try {
-        const res = await db.products.list([Query.limit(500), Query.orderDesc('$createdAt')]);
+        const res = await db.products.list([Query.limit(80), Query.orderDesc('$createdAt')]);
+        const fuzzy = findBestProductMatch(trimmed, res.documents, { minScore: FUZZY_MATCH_MIN_SCORE });
+        if (fuzzy?.product) {
+            return {
+                product: fuzzy.product,
+                catalogBarcode: fuzzy.product.barcode || '',
+                catalogName: fuzzy.matchedName || fuzzy.product.name || '',
+            };
+        }
+
         let best = null;
         let bestScore = 0;
         for (const d of res.documents) {
             const n = (d.name || '').toLowerCase();
-            for (const term of terms) {
+            for (const term of searchTerms) {
                 if (term.length >= 3 && n.includes(term) && term.length >= bestScore) {
                     best = d;
                     bestScore = term.length;
@@ -892,6 +1042,25 @@ export const getRelationshipId = (field) => {
     return field.$id;
 };
 
+const normalizeProductKey = (value) => {
+    if (value === null || value === undefined) return null;
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number') return String(value);
+    const relId = getRelationshipId(value);
+    return relId ? String(relId) : null;
+};
+
+const getPriceProductId = (price) => {
+    if (!price) return null;
+    const relId = getRelationshipId(price.products);
+    if (relId) return String(relId);
+    return (
+        normalizeProductKey(price.productId) ||
+        normalizeProductKey(price.productID) ||
+        normalizeProductKey(price.product)
+    );
+};
+
 // Helper to safely get attribute from relationship (only if expanded)
 export const getRelationshipAttribute = (field, attribute) => {
     if (!field) return null;
@@ -902,6 +1071,27 @@ export const getRelationshipAttribute = (field, attribute) => {
         return field[attribute];
     }
     return null;
+};
+
+const getPricesIndex = (prices) => {
+    if (!Array.isArray(prices)) return null;
+    const cached = pricesIndexCache.get(prices);
+    if (cached) return cached;
+
+    const index = new Map();
+    for (const price of prices) {
+        const productId = getPriceProductId(price);
+        if (!productId) continue;
+        const bucket = index.get(productId);
+        if (bucket) {
+            bucket.push(price);
+        } else {
+            index.set(productId, [price]);
+        }
+    }
+
+    pricesIndexCache.set(prices, index);
+    return index;
 };
 
 /** Expanded category document for icon/label (not a bare relation id string). */
@@ -926,7 +1116,7 @@ export const fetchAllPrices = async (limit = 200) => {
         const response = await db.prices.list([
             Query.limit(limit),
             Query.orderDesc('$createdAt'),
-            Query.select(['*', 'products.*', 'supermarkets.*', 'products.categoryId.*'])
+            Query.select(PRODUCT_PRICE_SELECT)
         ]);
         setCachedValue(cacheKey, response.documents, CACHE_TTL.allPrices);
         return response.documents;
@@ -941,10 +1131,12 @@ export const fetchAllPrices = async (limit = 200) => {
  */
 export const getPricesForProduct = (prices, productId) => {
     if (!prices || !productId) return [];
-    return prices.filter(price => {
-        const priceProductId = getRelationshipId(price.products);
-        return priceProductId === productId;
-    });
+    const index = getPricesIndex(prices);
+    if (index) {
+        const bucket = index.get(productId);
+        if (bucket) return bucket;
+    }
+    return prices.filter((price) => getPriceProductId(price) === productId);
 };
 
 /**
@@ -1198,9 +1390,47 @@ export const resolvePriceSupermarketMeta = (price, supermarkets = []) => {
     };
 };
 
-/**
- * Attach normalized supermarket fields to each price on product list (AI chat / cards).
- */
+/** Expand slim price rows with full supermarket documents (for comparison / maps). */
+export const enrichPricesWithSupermarketDocs = (prices, supermarkets = []) => {
+    if (!Array.isArray(prices) || prices.length === 0) return prices;
+    const catalog = Array.isArray(supermarkets) ? supermarkets : [];
+    if (catalog.length === 0) return prices;
+
+    const byId = new Map(catalog.map((store) => [store.$id, store]));
+
+    return prices.map((price) => {
+        const supermarketId = getRelationshipId(price.supermarkets) || price.supermarketId || null;
+        if (!supermarketId) return price;
+
+        const rel = price.supermarkets;
+        const hasExpanded =
+            rel &&
+            typeof rel === 'object' &&
+            !Array.isArray(rel) &&
+            (rel.name != null || rel.branchName != null || rel.latitude != null);
+        if (hasExpanded) return price;
+
+        const doc = byId.get(supermarketId);
+        if (!doc) return price;
+        return { ...price, supermarkets: doc };
+    });
+};
+
+export const fetchSupermarketsCatalog = async (limit = 100) => {
+    const cacheKey = `supermarkets:catalog:${limit}`;
+    const cached = getCachedValue(cacheKey);
+    if (cached) return cached;
+
+    try {
+        const response = await db.supermarkets.list([Query.limit(limit)]);
+        setCachedValue(cacheKey, response.documents, CACHE_TTL.categories);
+        return response.documents;
+    } catch (error) {
+        console.warn('Supermarket catalog fetch failed:', error?.message || error);
+        return [];
+    }
+};
+
 export const enrichProductPricesWithSupermarkets = (products, supermarkets = []) => {
     const list = Array.isArray(products) ? products : [];
     return list.map((product) => {
@@ -1226,9 +1456,7 @@ export const normalizeProduct = (product, prices = []) => {
     if (!product) return null;
 
     const productId = product.$id || product.code; // code is used by OFF
-    const productPrices = Array.isArray(prices) 
-        ? prices.filter(p => getRelationshipId(p.products) === productId)
-        : [];
+    const productPrices = getPricesForProduct(prices, productId);
 
     const cheapest = productPrices.length > 0 
         ? productPrices.reduce((min, p) => p.price < min.price ? p : min, productPrices[0])
@@ -1316,77 +1544,64 @@ export const formatLastUpdate = (timestamp) => {
  * Fetch price history for a specific product
  */
 export const fetchPriceHistory = async (productId, branchId = null) => {
+    if (!productId) return [];
+
     try {
         const historyColl = COLLECTIONS.PRICE_HISTORY || 'price_history';
         const historyDocs = [];
         const historyIds = new Set();
 
-        const buildHistoryQueries = (productField, branchField) => {
-            const queries = [
-                Query.equal(productField, productId),
-                Query.orderAsc('timestamp'),
-                Query.limit(200)
-            ];
-
-            if (branchId) {
-                queries.push(Query.equal(branchField, branchId));
-            }
-
-            return queries;
-        };
+        const HISTORY_PAGE_SIZE = 100;
+        const HISTORY_MAX_DOCS = 120;
 
         const fetchHistoryByField = async (productField, branchField) => {
             try {
-                const response = await db.priceHistory.list(
-                    buildHistoryQueries(productField, branchField)
-                );
-
-                response.documents.forEach((doc) => {
-                    if (!historyIds.has(doc.$id)) {
-                        historyIds.add(doc.$id);
-                        historyDocs.push(doc);
+                let cursor = null;
+                while (historyDocs.length < HISTORY_MAX_DOCS) {
+                    const queries = [
+                        Query.equal(productField, productId),
+                        Query.orderAsc('timestamp'),
+                        Query.limit(HISTORY_PAGE_SIZE),
+                    ];
+                    if (branchId) {
+                        queries.push(Query.equal(branchField, branchId));
                     }
-                });
+                    if (cursor) {
+                        queries.push(Query.cursorAfter(cursor));
+                    }
+                    const response = await db.priceHistory.list(queries);
+                    const docs = response.documents || [];
+                    docs.forEach((doc) => {
+                        if (!historyIds.has(doc.$id)) {
+                            historyIds.add(doc.$id);
+                            historyDocs.push(doc);
+                        }
+                    });
+                    if (docs.length < HISTORY_PAGE_SIZE) break;
+                    cursor = docs[docs.length - 1]?.$id;
+                    if (!cursor) break;
+                }
             } catch (innerError) {
                 if (innerError.code === 404) {
-                    console.warn(`Price history collection "${historyColl}" not found in Appwrite. Please ensure it is created.`);
-                } else {
-                    console.warn('Price history query failed:', innerError.message);
+                    console.warn(`Price history collection "${historyColl}" not found in Appwrite.`);
                 }
             }
         };
 
         await fetchHistoryByField('productId', 'supermarketId');
-        await fetchHistoryByField('products', 'supermarkets');
 
-        const priceDocs = [];
-        const priceQueries = (productField, branchField) => {
-            const queries = [
-                Query.equal(productField, productId),
-                Query.limit(200),
-                Query.select(['*', 'supermarkets.*'])
-            ];
-
+        let priceDocs = [];
+        try {
+            priceDocs = await fetchPricesForProducts([productId]);
             if (branchId) {
-                queries.push(Query.equal(branchField, branchId));
+                priceDocs = priceDocs.filter((price) => {
+                    const smId = getRelationshipId(price.supermarkets) || price.supermarketId;
+                    return smId === branchId;
+                });
             }
-
-            return queries;
-        };
-
-        const fetchPriceStack = async (productField, branchField) => {
-            try {
-                const response = await db.prices.list(
-                    priceQueries(productField, branchField)
-                );
-                priceDocs.push(...response.documents);
-            } catch (innerError) {
-                console.warn('Price stack query failed:', innerError.message);
-            }
-        };
-
-        await fetchPriceStack('products', 'supermarkets');
-        await fetchPriceStack('productId', 'supermarketId');
+        } catch (innerError) {
+            console.warn('Price stack query failed:', innerError?.message || innerError);
+        }
 
         const merged = [];
 
@@ -1525,20 +1740,54 @@ export const fetchPricesForProducts = async (productIds) => {
     const cached = getCachedValue(cacheKey);
     if (cached) return cached;
 
+    const isMissingAttributeError = (error) => {
+        const message = String(error?.message || '').toLowerCase();
+        if (error?.code === 400 && (message.includes('attribute') || message.includes('schema'))) {
+            return true;
+        }
+        return false;
+    };
+
     return withInflight(cacheKey, async () => {
         // Appwrite Query.equal supports arrays, but large arrays should be chunked
         const CHUNK_SIZE = 25;
         const allPrices = [];
+        const seenPriceIds = new Set();
+
+        const addPrices = (prices) => {
+            for (const price of prices) {
+                if (!price?.$id || seenPriceIds.has(price.$id)) continue;
+                seenPriceIds.add(price.$id);
+                allPrices.push(price);
+            }
+        };
+
+        const fetchByField = async (field, ids, select) => {
+            if (!ids.length) return [];
+            if (priceFieldSupport[field] === false) return [];
+            try {
+                const response = await db.prices.list([
+                    Query.equal(field, ids),
+                    Query.limit(100),
+                    Query.select(select)
+                ]);
+                priceFieldSupport[field] = true;
+                return response.documents;
+            } catch (error) {
+                if (isMissingAttributeError(error)) {
+                    priceFieldSupport[field] = false;
+                    return [];
+                }
+                console.error('Error fetching prices for batch products:', error);
+                return [];
+            }
+        };
 
         try {
             for (let i = 0; i < normalizedIds.length; i += CHUNK_SIZE) {
                 const chunk = normalizedIds.slice(i, i + CHUNK_SIZE);
-                const response = await db.prices.list([
-                    Query.equal('products', chunk),
-                    Query.limit(100),
-                    Query.select(['*', 'supermarkets.*'])
-                ]);
-                allPrices.push(...response.documents);
+                const batch = await fetchByField('products', chunk, PRODUCT_PRICE_SELECT);
+                addPrices(batch);
             }
             setCachedValue(cacheKey, allPrices, CACHE_TTL.prices);
             return allPrices;
@@ -1557,7 +1806,7 @@ export const fetchProductByBarcode = async (barcode) => {
         const response = await db.products.list([
             Query.equal('barcode', barcode),
             Query.limit(1),
-            Query.select(['*', 'categoryId.*'])
+            Query.select(PRODUCT_LIST_SELECT)
         ]);
 
         if (response.documents.length > 0) {
@@ -1567,7 +1816,7 @@ export const fetchProductByBarcode = async (barcode) => {
         const fallback = await db.products.list([
             Query.equal('$id', barcode),
             Query.limit(1),
-            Query.select(['*', 'categoryId.*'])
+            Query.select(PRODUCT_LIST_SELECT)
         ]);
 
         return fallback.documents[0] || null;

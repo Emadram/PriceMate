@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import useAuthStore from './stores/authStore';
 import useThemeStore from './stores/themeStore';
@@ -30,32 +30,44 @@ import Navbar from './components/Navbar';
 import NavigationListener from './components/NavigationListener';
 import { startOverflowDetector } from './utils/overflowDetector';
 import usePreventBrowserZoom from './hooks/usePreventBrowserZoom';
+import { isDesktopViewport } from './utils/platform';
 
 const AUTH_ROUTE_PREFIXES = ['/login', '/register', '/verify-email', '/forgot-password', '/reset-password'];
-const IMMERSIVE_ROUTE_PREFIXES = ['/ai-chat'];
+const AI_CHAT_ROUTE_PREFIXES = ['/ai-chat'];
 
 const matchesRoutePrefix = (pathname, prefixes) =>
   prefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
 const AppShell = ({ children }) => {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const isAuthRoute = matchesRoutePrefix(pathname, AUTH_ROUTE_PREFIXES);
-  const isImmersiveRoute = matchesRoutePrefix(pathname, IMMERSIVE_ROUTE_PREFIXES);
-  const hideAiLauncher = isAuthRoute || isImmersiveRoute;
+  const isAiChatRoute = matchesRoutePrefix(pathname, AI_CHAT_ROUTE_PREFIXES);
+  const hideAiLauncher = isAuthRoute || isAiChatRoute;
   const hideGlobalNav = isAuthRoute;
-  const hideMobileTopLogo = isAuthRoute || isImmersiveRoute;
-  const mobileTopPadding = hideMobileTopLogo ? '' : 'pt-20';
-  const immersiveShellClass = isImmersiveRoute
-    ? 'pricemate-immersive-shell md:relative md:static md:h-auto md:overflow-visible md:flex-none'
-    : '';
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || isAuthRoute || isAiChatRoute) return undefined;
+    if (isDesktopViewport()) return undefined;
+
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('openAI') !== '1') return undefined;
+
+      params.delete('openAI');
+      const qs = params.toString();
+      navigate(`/ai-chat${qs ? `?${qs}` : ''}`, { replace: true });
+    } catch {
+      // ignore
+    }
+    return undefined;
+  }, [pathname, isAuthRoute, isAiChatRoute, navigate]);
 
   return (
     <>
-      {!hideGlobalNav && <Navbar hideMobileTopLogo={hideMobileTopLogo} />}
-      <div className={`overflow-x-hidden ${mobileTopPadding} ${immersiveShellClass}`}>
-        <div className={isImmersiveRoute ? 'h-full min-h-0 overflow-hidden flex flex-col md:h-auto md:overflow-visible' : undefined}>
+      {!hideGlobalNav && <Navbar />}
+      <div className="overflow-x-hidden pt-safe md:pt-0">
           {children}
-        </div>
       </div>
       {!hideAiLauncher && <FloatingAIChatLauncher />}
     </>

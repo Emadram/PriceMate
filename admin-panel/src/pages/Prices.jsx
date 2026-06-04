@@ -8,7 +8,8 @@ import useProductsStore from '../stores/productsStore';
 import useSupermarketsStore from '../stores/supermarketsStore';
 import useAdminAuthStore from '../stores/adminAuthStore';
 import Sidebar from '../components/Sidebar';
-import { client, DATABASE_ID, COLLECTIONS } from '../lib/appwrite';
+import { DATABASE_ID, COLLECTIONS } from '../lib/appwrite';
+import useDebouncedRealtimeRefresh from '../hooks/useDebouncedRealtimeRefresh';
 
 const Prices = () => {
     const { 
@@ -22,7 +23,8 @@ const Prices = () => {
         updatePrice, 
         deletePrice 
     } = usePricesStore();
-    const { products, fetchProducts } = useProductsStore();
+    const { productOptions, fetchProductOptions } = useProductsStore();
+    const catalogProducts = productOptions;
     const { supermarkets, fetchSupermarkets } = useSupermarketsStore();
     const adminUser = useAdminAuthStore((state) => state.user);
 
@@ -47,11 +49,20 @@ const Prices = () => {
     const refreshData = useCallback(async () => {
         await Promise.all([
             fetchPrices(page),
-            fetchProducts(),
-            fetchSupermarkets()
+            fetchProductOptions(),
+            fetchSupermarkets(),
         ]);
         setLastUpdated(new Date().toISOString());
-    }, [fetchPrices, fetchProducts, fetchSupermarkets, page]);
+    }, [fetchPrices, fetchProductOptions, fetchSupermarkets, page]);
+
+    const refreshPricesOnly = useCallback(async () => {
+        await fetchPrices(page, { force: true });
+        setLastUpdated(new Date().toISOString());
+    }, [fetchPrices, page]);
+
+    const refreshReferenceData = useCallback(async () => {
+        await Promise.all([fetchProductOptions(), fetchSupermarkets()]);
+    }, [fetchProductOptions, fetchSupermarkets]);
 
     useEffect(() => {
         const t = setTimeout(() => refreshData(), 0);
@@ -60,19 +71,17 @@ const Prices = () => {
 
     // `isFresh` indicator handled by useFreshIndicator to avoid rapid flicker
 
-    useEffect(() => {
-        const channels = [
-            `databases.${DATABASE_ID}.collections.${COLLECTIONS.PRICES}.documents`,
+    useDebouncedRealtimeRefresh(
+        `databases.${DATABASE_ID}.collections.${COLLECTIONS.PRICES}.documents`,
+        refreshPricesOnly
+    );
+    useDebouncedRealtimeRefresh(
+        [
             `databases.${DATABASE_ID}.collections.${COLLECTIONS.PRODUCTS}.documents`,
-            `databases.${DATABASE_ID}.collections.${COLLECTIONS.SUPERMARKETS}.documents`
-        ];
-
-        const unsubscribe = client.subscribe(channels, () => {
-            setTimeout(() => refreshData(), 0);
-        });
-
-        return () => unsubscribe();
-    }, [refreshData]);
+            `databases.${DATABASE_ID}.collections.${COLLECTIONS.SUPERMARKETS}.documents`,
+        ],
+        refreshReferenceData
+    );
 
     const handlePageChange = (newPage) => {
         fetchPrices(newPage);
@@ -261,7 +270,7 @@ const Prices = () => {
                                     className="w-full pl-11 pr-4 py-4 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl focus:ring-2 focus:ring-brand-500/20 outline-none transition-all text-sm font-bold text-gray-900 dark:text-white appearance-none cursor-pointer hover:bg-white dark:hover:bg-gray-900"
                                 >
                                     <option value="">All products</option>
-                                    {products.map(p => (
+                                    {catalogProducts.map(p => (
                                         <option key={p.$id} value={p.$id}>{p.name}</option>
                                     ))}
                                 </select>
@@ -443,7 +452,7 @@ const Prices = () => {
                                     required
                                 >
                                     <option value="">Select Asset</option>
-                                    {products.map((product) => (
+                                    {catalogProducts.map((product) => (
                                         <option key={product.$id} value={product.$id}>
                                             {product.name}
                                         </option>

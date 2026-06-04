@@ -18,7 +18,12 @@ const usePricesStore = create((set, get) => ({
 
     setPage: (page) => set({ page }),
 
-    fetchPrices: async (page = 1) => {
+    fetchPrices: async (page = 1, { force = false } = {}) => {
+        const { page: currentPage, prices, loading } = get();
+        if (!force && page === currentPage && prices.length > 0 && !loading) {
+            return;
+        }
+
         set({ loading: true, error: null });
         try {
             const limit = get().limit;

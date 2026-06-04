@@ -1,0 +1,17 @@
+{
+  "name": "pricemate-scripts",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "seed:prices-all": "node seed_prices_for_all_supermarkets.js",
+    "seed:price-history": "node seed_price_history.js",
+    "seed:price-history-targeted": "node seed_price_history_targeted.js",
+    "seed:products-by-category": "node seed_products_by_category.js",
+    "ensure:ai-schema": "node ensure_ai_schema.js",
+    "migrate:product-nutrition": "node migrate_product_nutrition.js",
+    "fix:missing-product-images": "node fix_missing_product_images.js",
+    "cleanup:seeded-products": "node cleanup_seeded_products.js",
+    "cleanup:invalid-image-products": "node remove_invalid_image_products_and_prices.js",
+    "test": "node --test test/*.test.js"
+  }
+}

@@ -215,6 +215,7 @@ const SupermarketProfile = () => {
         ? Math.max(...products.map((p) => new Date(p.$updatedAt).getTime()))
         : null;
     const lastUpdateValue = latestProductUpdate || supermarket.lastUpdatedAt || supermarket.updatedAt || supermarket.$updatedAt || null;
+    const shouldAlignBranchDropdownRight = String(supermarket?.name || '').trim().length >= 18;
 
     return (
         <div className="min-h-screen bg-[#FDFDFD] dark:bg-[#0A0A0B] pb-safe">
@@ -314,7 +315,15 @@ const SupermarketProfile = () => {
                                                         className="fixed inset-0 z-40" 
                                                         onClick={() => setIsBranchDropdownOpen(false)}
                                                     ></div>
-                                                    <div className="absolute left-0 mt-3 w-72 bg-white dark:bg-[#1C1C1E] rounded-[1.5rem] shadow-2xl border border-gray-100 dark:border-white/5 py-3 z-50 animate-in fade-in slide-in-from-top-2">
+                                                    <div
+                                                        className={`absolute mt-3 ${
+                                                            shouldAlignBranchDropdownRight ? 'right-0' : 'left-0'
+                                                        } ${
+                                                            shouldAlignBranchDropdownRight
+                                                                ? 'w-[min(18rem,calc(100vw-2rem))]'
+                                                                : 'w-72'
+                                                        } bg-white dark:bg-[#1C1C1E] rounded-[1.5rem] shadow-2xl border border-gray-100 dark:border-white/5 py-3 z-50 animate-in fade-in slide-in-from-top-2 max-h-[min(60vh,24rem)] overflow-y-auto overscroll-contain`}
+                                                    >
                                                         <div className="px-4 py-2 mb-2">
                                                             <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">{t('branches', 'Branches')}</p>
                                                         </div>
@@ -325,7 +334,7 @@ const SupermarketProfile = () => {
                                                             <MapPin size={16} className="mt-0.5 text-brand-600 dark:text-brand-500" />
                                                             <div className="flex-1 min-w-0">
                                                                 <p className="text-[10px] font-bold text-brand-600 dark:text-brand-500 uppercase tracking-wider mb-0.5">{t('current', 'Current')}</p>
-                                                                <p className="text-[13px] sm:text-[14px] font-semibold text-gray-900 dark:text-white line-clamp-1">
+                                                                <p className="text-[13px] sm:text-[14px] font-semibold text-gray-900 dark:text-white line-clamp-2 break-words">
                                                                     {supermarket.branchName ? `${supermarket.name} — ${supermarket.branchName}` : supermarket.address || t('this_branch', 'This branch')}
                                                                 </p>
                                                                 {distanceLabel && (
@@ -344,8 +353,8 @@ const SupermarketProfile = () => {
                                                                 className="w-full px-4 py-3 flex items-start gap-3 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors text-left group"
                                                             >
                                                                 <MapPin size={16} className="mt-0.5 text-gray-400 group-hover:text-black dark:group-hover:text-white" />
-                                                                <div>
-                                                                    <p className="text-[13px] sm:text-[14px] font-semibold text-gray-900 dark:text-white line-clamp-1">
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-[13px] sm:text-[14px] font-semibold text-gray-900 dark:text-white line-clamp-2 break-words">
                                                                         {branch.branchName ? `${branch.name || supermarket.name} — ${branch.branchName}` : branch.address || t('branch', 'Branch')}
                                                                     </p>
                                                                     {resolveDistanceKm(branch) !== null && (
@@ -378,11 +387,13 @@ const SupermarketProfile = () => {
                         <div className="bg-gray-50 dark:bg-[#1C1C1E] p-3 sm:p-4 rounded-xl sm:rounded-2xl">
                             <p className="text-[9px] sm:text-[11px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest mb-1">{t('rating', 'Rating')}</p>
                             {ratingValue !== null && ratingValue !== undefined ? (
-                                <div className="flex items-center gap-2">
-                                    <StarRating value={ratingValue} size={14} />
-                                    <p className="text-base sm:text-xl font-bold dark:text-white">{ratingValue}</p>
+                                <div className="flex flex-col gap-0.5 min-w-0 sm:flex-row sm:items-center sm:gap-2">
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                        <StarRating value={ratingValue} size={14} />
+                                        <p className="text-base sm:text-xl font-bold dark:text-white shrink-0">{ratingValue}</p>
+                                    </div>
                                     {reviewsCount !== null && reviewsCount !== undefined && (
-                                        <span className="text-[10px] text-gray-400 font-medium ml-1">({reviewsCount})</span>
+                                        <span className="text-[10px] text-gray-400 font-medium truncate">({reviewsCount})</span>
                                     )}
                                 </div>
                             ) : (
@@ -659,11 +670,8 @@ const SupermarketProfile = () => {
                                 <div className="w-16 h-16 bg-gray-50 dark:bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
                                     <Info className="text-gray-300" />
                                 </div>
-                                <h3 className="text-xl font-semibold dark:text-white mb-2">{t('no_data_yet')}</h3>
-                                <p className="text-gray-500 dark:text-gray-400 mb-8 max-w-sm mx-auto">{t('no_data_yet_subtitle')}</p>
-                                <button className="tap-target bg-black dark:bg-white text-white dark:text-black px-6 py-3 rounded-2xl font-semibold active:scale-95 transition-all">
-                                    Contribute Data
-                                </button>
+                                <h3 className="text-xl font-semibold dark:text-white mb-2">{t('no_products_available')}</h3>
+                                <p className="text-gray-500 dark:text-gray-400 mb-8 max-w-sm mx-auto">{t('no_products_available_subtitle')}</p>
                             </div>
                         )}
                     </section>

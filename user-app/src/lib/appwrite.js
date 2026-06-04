@@ -60,7 +60,8 @@ export const APPWRITE_CONFIG = {
         FAVORITES: import.meta.env.VITE_APPWRITE_COLLECTION_FAVORITES || 'favorites',
         ANNOUNCEMENTS: import.meta.env.VITE_APPWRITE_COLLECTION_ANNOUNCEMENTS || 'announcements',
         CHAT_HISTORY: import.meta.env.VITE_APPWRITE_COLLECTION_CHAT_HISTORY || 'chat_history',
-        OFF_CACHE: import.meta.env.VITE_APPWRITE_COLLECTION_OFF_CACHE || 'off_cache'
+        OFF_CACHE: import.meta.env.VITE_APPWRITE_COLLECTION_OFF_CACHE || 'off_cache',
+        AI_CHAT_MEMORY: import.meta.env.VITE_APPWRITE_COLLECTION_AI_CHAT_MEMORY || 'ai_chat_memory'
     }
 };
 
@@ -73,9 +74,17 @@ import { ID } from 'appwrite';
  * DB Helper - Centralized logic for database operations
  * achieving a cleaner `db.collection.action()` API.
  */
+const logDevListRead = (collectionId) => {
+    if (import.meta.env.DEV) {
+        console.debug('[Appwrite reads]', collectionId);
+    }
+};
+
 const dbAction = {
-    list: (collectionId, queries = []) => 
-        databases.listDocuments(DATABASE_ID, collectionId, queries),
+    list: (collectionId, queries = []) => {
+        logDevListRead(collectionId);
+        return databases.listDocuments(DATABASE_ID, collectionId, queries);
+    },
     get: (collectionId, documentId, queries = []) => 
         databases.getDocument(DATABASE_ID, collectionId, documentId, queries),
     create: (collectionId, data, permissions) => 
@@ -128,12 +137,17 @@ export const db = {
         create: (data) => dbAction.create(COLLECTIONS.CHAT_HISTORY, data),
         delete: (id) => dbAction.delete(COLLECTIONS.CHAT_HISTORY, id),
     },
+    aiChatMemory: {
+        list: (queries) => dbAction.list(COLLECTIONS.AI_CHAT_MEMORY, queries),
+        create: (data) => dbAction.create(COLLECTIONS.AI_CHAT_MEMORY, data),
+        update: (id, data) => dbAction.update(COLLECTIONS.AI_CHAT_MEMORY, id, data),
+        delete: (id) => dbAction.delete(COLLECTIONS.AI_CHAT_MEMORY, id),
+    },
     offCache: {
         list: (queries) => dbAction.list(COLLECTIONS.OFF_CACHE, queries),
         create: (data) => dbAction.create(COLLECTIONS.OFF_CACHE, data),
         update: (id, data) => dbAction.update(COLLECTIONS.OFF_CACHE, id, data),
     }
 };
-
 
 

@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom';
 import { FiPackage, FiShoppingBag, FiGlobe, FiClock, FiAlertTriangle } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import useCurrencyStore from '../stores/currencyStore';
 import useAuthStore from '../stores/authStore';
+import useProductStore from '../stores/productStore';
 import ReportModal from '../components/ReportModal';
 import StarRating from './StarRating';
 import CategoryIconLabel from '../components/CategoryIconLabel';
@@ -29,6 +30,15 @@ const ProductCard = ({ product, prices = [] }) => {
     const imageUrl = product.imageUrl || product.image || product.image_url || product.image_front_url;
     const productKey = product.barcode || product.code || product.$id || product.id || '';
     const [imageFailed, setImageFailed] = useState(false);
+    const prefetchTimerRef = useRef(null);
+    const prefetchProduct = () => {
+        if (!productKey) return;
+        if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
+        prefetchTimerRef.current = setTimeout(() => {
+            prefetchTimerRef.current = null;
+            useProductStore.getState().prefetchProductByBarcode(productKey);
+        }, 400);
+    };
 
     // Freshness indicator logic using actual updatedAt from the cheapest price or product
     const getFreshnessText = () => {
@@ -48,6 +58,9 @@ const ProductCard = ({ product, prices = [] }) => {
         <div className="relative group">
             <Link
                 to={`/price-comparison/${productKey}`}
+                onMouseEnter={prefetchProduct}
+                onFocus={prefetchProduct}
+                onTouchStart={prefetchProduct}
                 className="group block bg-white dark:bg-gray-800 rounded-2xl sm:rounded-3xl p-2.5 sm:p-4 shadow-soft hover:shadow-soft-lg hover:-translate-y-1 transition-all duration-300 border border-transparent hover:border-gray-100 dark:hover:border-gray-700 overflow-hidden"
             >
                 <div className="flex items-center gap-2.5 sm:gap-4 md:gap-5">

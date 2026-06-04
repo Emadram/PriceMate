@@ -3,12 +3,15 @@ import { Link, useLocation } from 'react-router-dom';
 import { FiShoppingBag, FiPackage, FiChevronRight, FiHeart, FiClock } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
 import { db, Query } from '../lib/appwrite';
-import { fetchAllPrices, normalizeProduct } from '../utils/productUtils';
+import { fetchPricesForProducts, normalizeProduct } from '../utils/productUtils';
+import { getCacheEntry, swrGetOrFetch } from '../utils/swrCache';
 import ProductCard from '../components/ProductCard';
 import useFavoritesStore from '../stores/favoritesStore';
 import BackButton from '../components/BackButton';
 import { ProductCardSkeleton } from '../components/SkeletonLoaders';
 import { MobileHeader, MobilePage } from '../components/MobilePageLayout';
+
+const FAVORITES_CACHE_TTL_MS = 2 * 60 * 1000;
 
 const Favorites = () => {
     const { t } = useTranslation();
@@ -20,11 +23,14 @@ const Favorites = () => {
     const { favoriteProducts, favoriteSupermarkets } = useFavoritesStore();
 
     const fetchFavorites = useCallback(async () => {
-        setLoading(true);
-        try {
+        const productKey = (favoriteProducts || []).slice().sort().join(',');
+        const marketKey = (favoriteSupermarkets || []).slice().sort().join(',');
+        const cacheKey = `favorites:v1:${productKey}:${marketKey}`;
+
+        const fetcher = async () => {
             const promises = [];
 
-            if (favoriteProducts && favoriteProducts.length > 0) {
+            if (favoriteProducts?.length > 0) {
                 promises.push(
                     db.products
                         .list([
@@ -33,13 +39,13 @@ const Favorites = () => {
                         ])
                         .then((res) => res.documents)
                 );
-                promises.push(fetchAllPrices());
+                promises.push(fetchPricesForProducts(favoriteProducts));
             } else {
                 promises.push(Promise.resolve([]));
                 promises.push(Promise.resolve([]));
             }
 
-            if (favoriteSupermarkets && favoriteSupermarkets.length > 0) {
+            if (favoriteSupermarkets?.length > 0) {
                 promises.push(
                     db.supermarkets
                         .list([Query.equal('$id', favoriteSupermarkets)])
@@ -50,25 +56,47 @@ const Favorites = () => {
             }
 
             const [productsData, allPrices, supermarketsData] = await Promise.all(promises);
-
             const normalizedProducts = productsData.map((p) => normalizeProduct(p, allPrices));
+            return { products: normalizedProducts, supermarkets: supermarketsData };
+        };
 
-            setProducts(normalizedProducts);
-            setSupermarkets(supermarketsData);
+        setLoading(true);
+        try {
+            const applyPayload = (payload) => {
+                if (!payload) return;
+                setProducts(payload.products || []);
+                setSupermarkets(payload.supermarkets || []);
+            };
+
+            const { data, fromCache, refreshing } = await swrGetOrFetch(cacheKey, {
+                ttlMs: FAVORITES_CACHE_TTL_MS,
+                fetcher,
+                onUpdate: (next) => {
+                    applyPayload(next);
+                    setLoading(false);
+                },
+            });
+
+            if (data) applyPayload(data);
+            if (fromCache && !refreshing) {
+                setLoading(false);
+            } else if (!data) {
+                const entry = getCacheEntry(cacheKey);
+                if (entry?.promise) await entry.promise;
+                applyPayload(getCacheEntry(cacheKey)?.data);
+                setLoading(false);
+            }
         } catch (error) {
             console.error('Error fetching favorites:', error);
+            setLoading(false);
         }
-        setLoading(false);
     }, [favoriteProducts, favoriteSupermarkets]);
 
     useEffect(() => {
-        let cancelled = false;
-        Promise.resolve().then(() => {
-            if (!cancelled) fetchFavorites();
-        });
-        return () => {
-            cancelled = true;
-        };
+        const t = setTimeout(() => {
+            void fetchFavorites();
+        }, 0);
+        return () => clearTimeout(t);
     }, [fetchFavorites]);
 
     const productCount = favoriteProducts?.length ?? 0;
@@ -120,7 +148,7 @@ const Favorites = () => {
                     </div>
                 ) : (
                     <>
-                        <div className="sticky top-[calc(env(safe-area-inset-top,0px)+4.6rem)] md:static z-40 -mx-1 px-1">
+                        <div className="sticky top-[calc(env(safe-area-inset-top,0px)+var(--mobile-header-h,3.25rem))] md:static z-40 -mx-1 px-1">
                             <div className="flex p-1 rounded-2xl bg-gray-200/60 dark:bg-gray-800/80 border border-gray-100 dark:border-gray-700 backdrop-blur-md">
                             <button
                                 type="button"

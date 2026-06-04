@@ -58,7 +58,8 @@ export const APPWRITE_CONFIG = {
         PRICE_HISTORY: import.meta.env.VITE_APPWRITE_COLLECTION_PRICE_HISTORY || 'price_history',
         FEEDBACK: import.meta.env.VITE_APPWRITE_COLLECTION_FEEDBACK || 'feedback',
         ANNOUNCEMENTS: import.meta.env.VITE_APPWRITE_COLLECTION_ANNOUNCEMENTS || 'announcements',
-        CHAT_HISTORY: import.meta.env.VITE_APPWRITE_COLLECTION_CHAT_HISTORY || 'chat_history'
+        CHAT_HISTORY: import.meta.env.VITE_APPWRITE_COLLECTION_CHAT_HISTORY || 'chat_history',
+        AI_CHAT_MEMORY: import.meta.env.VITE_APPWRITE_COLLECTION_AI_CHAT_MEMORY || 'ai_chat_memory'
     }
 };
 
@@ -66,9 +67,17 @@ export const getAppwriteConfig = () => RESOLVED_APPWRITE_CONFIG;
 export const { DATABASE_ID, COLLECTIONS } = APPWRITE_CONFIG;
 export { Query } from 'appwrite';
 
+const logDevListRead = (collectionId) => {
+    if (import.meta.env.DEV) {
+        console.debug('[Appwrite reads]', collectionId);
+    }
+};
+
 const dbAction = {
-    list: (collectionId, queries = []) =>
-        databases.listDocuments(DATABASE_ID, collectionId, queries),
+    list: (collectionId, queries = []) => {
+        logDevListRead(collectionId);
+        return databases.listDocuments(DATABASE_ID, collectionId, queries);
+    },
     get: (collectionId, documentId, queries = []) =>
         databases.getDocument(DATABASE_ID, collectionId, documentId, queries),
     create: (collectionId, data, permissions) =>
@@ -124,8 +133,11 @@ export const db = {
     chatHistory: {
         list: (queries) => dbAction.list(COLLECTIONS.CHAT_HISTORY, queries),
         delete: (id) => dbAction.delete(COLLECTIONS.CHAT_HISTORY, id)
+    },
+    aiChatMemory: {
+        list: (queries) => dbAction.list(COLLECTIONS.AI_CHAT_MEMORY, queries),
+        delete: (id) => dbAction.delete(COLLECTIONS.AI_CHAT_MEMORY, id)
     }
 };
-
 
 

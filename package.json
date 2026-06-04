@@ -5,7 +5,14 @@
     "install:user-app": "npm ci --prefix user-app",
     "build:user-app": "npm run build --prefix user-app",
     "install:admin-panel": "npm ci --prefix admin-panel",
-    "build:admin-panel": "npm run build --prefix admin-panel"
+    "build:admin-panel": "npm run build --prefix admin-panel",
+    "seed:prices-all": "npm --prefix scripts run seed:prices-all --",
+    "seed:products-by-category": "npm --prefix scripts run seed:products-by-category --",
+    "seed:price-history": "npm --prefix scripts run seed:price-history --",
+    "seed:price-history-targeted": "npm --prefix scripts run seed:price-history-targeted --",
+    "fix:missing-product-images": "npm --prefix scripts run fix:missing-product-images --",
+    "cleanup:invalid-image-products": "npm --prefix scripts run cleanup:invalid-image-products -- --",
+    "test:scripts": "npm run test --prefix scripts"
   },
   "dependencies": {
     "dotenv": "^17.3.1",

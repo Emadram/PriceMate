@@ -16,7 +16,8 @@ import {
     LEGACY_THREAD_KEY,
 } from '../stores/chatHistoryStore';
 import Sidebar from '../components/Sidebar';
-import { client, DATABASE_ID, COLLECTIONS } from '../lib/appwrite';
+import { DATABASE_ID, COLLECTIONS } from '../lib/appwrite';
+import useDebouncedRealtimeRefresh from '../hooks/useDebouncedRealtimeRefresh';
 
 const threadLabel = (threadKey, threadMessages) => {
     if (threadKey === LEGACY_THREAD_KEY) return 'Earlier chats';
@@ -32,7 +33,7 @@ const UserChatSessions = () => {
     const {
         groupedHistory,
         loading,
-        fetchHistory,
+        fetchUserMessages,
         deleteThread,
         deleteUserHistory,
     } = useChatHistoryStore();
@@ -41,22 +42,17 @@ const UserChatSessions = () => {
     const isFresh = useFreshIndicator(lastUpdated);
 
     const refreshData = useCallback(async () => {
-        await fetchHistory();
+        if (userId) await fetchUserMessages(userId);
         setLastUpdated(new Date().toISOString());
-    }, [fetchHistory]);
+    }, [fetchUserMessages, userId]);
 
     useEffect(() => {
         const t = setTimeout(() => refreshData(), 0);
         return () => clearTimeout(t);
     }, [refreshData]);
 
-    useEffect(() => {
-        const channel = `databases.${DATABASE_ID}.collections.${COLLECTIONS.CHAT_HISTORY}.documents`;
-        const unsubscribe = client.subscribe(channel, () => {
-            setTimeout(() => refreshData(), 0);
-        });
-        return () => unsubscribe();
-    }, [refreshData]);
+    const chatChannel = `databases.${DATABASE_ID}.collections.${COLLECTIONS.CHAT_HISTORY}.documents`;
+    useDebouncedRealtimeRefresh(chatChannel, refreshData);
 
     // `isFresh` indicator handled by useFreshIndicator to avoid rapid flicker
 

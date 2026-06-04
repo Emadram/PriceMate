@@ -2,8 +2,9 @@ import { useCallback, useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { FiArrowLeft, FiSearch, FiFilter } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
-import { fetchPricesForProducts, searchProducts, fetchCategories, normalizeProduct } from '../utils/productUtils';
+import { fetchPricesForProducts, searchProducts, normalizeProduct } from '../utils/productUtils';
 import { getCacheEntry, swrGetOrFetch } from '../utils/swrCache';
+import useCategoriesStore from '../stores/categoriesStore';
 import ProductCard from '../components/ProductCard';
 import { ProductCardSkeleton } from '../components/SkeletonLoaders';
 import BackButton from '../components/BackButton';
@@ -20,7 +21,7 @@ const SearchResults = () => {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [categories, setCategories] = useState([]);
+    const { categories, fetchCategories } = useCategoriesStore();
 
     // Search form states
     const [searchInput, setSearchInput] = useState(query);
@@ -30,6 +31,32 @@ const SearchResults = () => {
     const prevProductIds = useRef('');
     const prevPrices = useRef([]);
     const requestSeq = useRef(0);
+    const searchChromeRef = useRef(null);
+
+    useEffect(() => {
+        const el = searchChromeRef.current;
+        if (!el || typeof document === 'undefined') return undefined;
+
+        const root = document.documentElement;
+        const setVar = () => {
+            const h = Math.round(el.getBoundingClientRect().height || 0);
+            if (h > 0) root.style.setProperty('--mobile-search-chrome-h', `${h}px`);
+        };
+
+        setVar();
+        const ro = typeof ResizeObserver !== 'undefined'
+            ? new ResizeObserver(setVar)
+            : null;
+        ro?.observe(el);
+        window.addEventListener('resize', setVar, { passive: true });
+        window.addEventListener('orientationchange', setVar, { passive: true });
+
+        return () => {
+            ro?.disconnect();
+            window.removeEventListener('resize', setVar);
+            window.removeEventListener('orientationchange', setVar);
+        };
+    }, []);
 
     // Debounce search input changes to automatically update URL
     useEffect(() => {
@@ -52,10 +79,13 @@ const SearchResults = () => {
 
         const fetcher = async () => {
             // Fetch categories if not already fetched
-            const [searchResults, allCategories] = await Promise.all([
+            const [searchResults] = await Promise.all([
                 searchProducts(query, categoryIdFromUrl, 40, sortBy),
-                categories.length === 0 ? fetchCategories() : Promise.resolve(categories)
             ]);
+            if (categories.length === 0) {
+                await fetchCategories();
+            }
+            const allCategories = useCategoriesStore.getState().categories;
 
             const categoryMap = new Map((allCategories || []).map((cat) => [cat.$id, cat]));
             const enrichedResults = searchResults.map((product) => {
@@ -118,10 +148,6 @@ const SearchResults = () => {
             if (!payload) return;
 
             setProducts(Array.isArray(payload.products) ? payload.products : []);
-            if (Array.isArray(payload.categories) && payload.categories.length > 0) {
-                setCategories(payload.categories);
-            }
-
             // Sync local input with URL
             setSearchInput(payload.query ?? query);
             setSelectedCategory(payload.categoryIdFromUrl ?? categoryIdFromUrl);
@@ -153,7 +179,7 @@ const SearchResults = () => {
             setLoading(false);
             setRefreshing(false);
         }
-    }, [query, categoryIdFromUrl, sortBy, categories]);
+    }, [query, categoryIdFromUrl, sortBy, categories, fetchCategories]);
 
     useEffect(() => {
         const timeoutId = setTimeout(() => {
@@ -174,13 +200,19 @@ const SearchResults = () => {
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-safe md:pb-8">
-            {/* Extended Header for Search Context */}
-            <div className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 md:sticky md:top-16 z-30">
+            {/* Extended Header for Search Context — fixed at top safe area on mobile */}
+            <div
+                ref={searchChromeRef}
+                className="fixed inset-x-0 top-0 pt-safe z-[9990] bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 md:static md:sticky md:top-16 md:z-30 md:pt-0"
+            >
                 <div className="max-w-5xl mx-auto px-3 sm:px-4 py-3 md:py-6">
                     <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-6">
                         <div className="flex items-center justify-between md:justify-start gap-3 md:gap-4 flex-shrink-0">
-                            <BackButton to="/" label={t('go_back_home')} />
-                            <h1 className="text-base sm:text-xl md:text-2xl font-black text-gray-900 dark:text-white tracking-tighter">
+                            <BackButton to="/" label={t('go_back_home')} className="hidden md:flex" />
+                            <h1 className="text-base sm:text-xl md:text-2xl font-black text-gray-900 dark:text-white tracking-tighter md:hidden">
+                                {t('search')}
+                            </h1>
+                            <h1 className="hidden md:block text-base sm:text-xl md:text-2xl font-black text-gray-900 dark:text-white tracking-tighter">
                                 {t('results')}
                             </h1>
                             <div className="md:hidden">
@@ -229,6 +261,7 @@ const SearchResults = () => {
                     </div>
                 </div>
             </div>
+            <div className="md:hidden h-[var(--mobile-search-chrome-h,10rem)] shrink-0" aria-hidden="true" />
 
             <main className="max-w-5xl mx-auto px-4 py-6 md:py-8">
                 <div className="mb-4 md:mb-8 flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">

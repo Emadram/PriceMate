@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { db } from '../lib/appwrite';
 import useAuthStore from '../stores/authStore';
 import BackButton from '../components/BackButton';
+import { MobileHeader, MobilePage } from '../components/MobilePageLayout';
 
 const FeedbackPage = () => {
     const { t } = useTranslation();
@@ -46,17 +47,12 @@ const FeedbackPage = () => {
 
     if (submitted) {
         return (
-            <div className="min-h-screen bg-[#F5F5F7] dark:bg-black text-gray-900 dark:text-gray-100 flex flex-col">
-                <header className="pt-safe bg-white/80 dark:bg-black/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 dark:border-white/5 p-4">
-                    <div className="max-w-4xl mx-auto flex items-center justify-between">
-                        <BackButton to="/profile" label={t('back_to_profile')} />
-                        <h1 className="text-xl font-black text-gray-900 dark:text-white flex items-center gap-2">
-                            <FiMessageSquare className="text-accent-500" />
-                            {t('send_feedback')}
-                        </h1>
-                        <div className="w-10" />
-                    </div>
-                </header>
+            <MobilePage className="flex flex-col">
+                <MobileHeader
+                    title={t('send_feedback')}
+                    icon={FiMessageSquare}
+                    left={<BackButton to="/profile" label={t('back_to_profile')} />}
+                />
                 <div className="flex-1 flex items-center justify-center p-4">
                     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-soft p-8 text-center max-w-md w-full">
                         <div className="flex justify-center mb-4">
@@ -71,22 +67,17 @@ const FeedbackPage = () => {
                         </div>
                     </div>
                 </div>
-            </div>
+            </MobilePage>
         );
     }
 
     return (
-        <div className="min-h-screen bg-[#F5F5F7] dark:bg-black text-gray-900 dark:text-gray-100 pb-safe transition-colors">
-            <header className="pt-safe bg-white/80 dark:bg-black/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 dark:border-white/5 p-4">
-                <div className="max-w-4xl mx-auto flex items-center justify-between">
-                    <BackButton to="/profile" label={t('back_to_profile')} />
-                    <h1 className="text-xl font-black text-gray-900 dark:text-white flex items-center gap-2">
-                        <FiMessageSquare className="text-accent-500" />
-                        {t('send_feedback')}
-                    </h1>
-                    <div className="w-10" />
-                </div>
-            </header>
+        <MobilePage className="transition-colors">
+            <MobileHeader
+                title={t('send_feedback')}
+                icon={FiMessageSquare}
+                left={<BackButton to="/profile" label={t('back_to_profile')} />}
+            />
 
             <main className="max-w-4xl mx-auto p-4">
                 <div className="max-w-2xl mx-auto bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-soft p-6">
@@ -132,7 +123,7 @@ const FeedbackPage = () => {
                     </form>
                 </div>
             </main>
-        </div>
+        </MobilePage>
     );
 };
 

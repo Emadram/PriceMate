@@ -1,6 +1,10 @@
 import { create } from 'zustand';
 import { db, storage, getAppwriteConfig } from '../lib/appwrite';
 import { ID, Query } from 'appwrite';
+import { invalidateCacheKey } from '../utils/readCache';
+
+const PRODUCT_OPTIONS_TTL_MS = 10 * 60 * 1000;
+const PRODUCT_OPTIONS_CACHE_KEY = 'admin:product-options:v1';
 
 const { endpoint: APPWRITE_ENDPOINT, projectId: APPWRITE_PROJECT_ID } = getAppwriteConfig();
 const PRODUCT_IMAGES_BUCKET = import.meta.env.VITE_APPWRITE_BUCKET_SUPERMARKET_LOGOS || 'product-images';
@@ -71,6 +75,8 @@ const attachOptionalNutrition = (payload, data, { allowNullClear = false } = {})
 
 const useProductsStore = create((set, get) => ({
     products: [],
+    productOptions: [],
+    productOptionsFetchedAt: null,
     loading: false,
     error: null,
     total: 0,
@@ -78,27 +84,73 @@ const useProductsStore = create((set, get) => ({
     limit: 10,
 
     setPage: (page) => set({ page }),
+    setLimit: (limit) => set({ limit: Math.max(1, Number(limit) || 10), page: 1 }),
 
-    fetchProducts: async (page = 1) => {
+    fetchProducts: async (page = 1, { force = false } = {}) => {
+        const { limit, page: currentPage, products, loading } = get();
+        if (
+            !force &&
+            page === currentPage &&
+            products.length > 0 &&
+            !loading
+        ) {
+            return;
+        }
+
         set({ loading: true, error: null });
         try {
-            const limit = get().limit;
             const offset = (page - 1) * limit;
 
             const response = await db.products.list([
                 Query.limit(limit),
                 Query.offset(offset),
-                Query.orderDesc('$createdAt')
+                Query.orderDesc('$createdAt'),
             ]);
-            set({ 
-                products: response.documents, 
+            set({
+                products: response.documents,
                 total: response.total,
-                page: page,
-                loading: false 
+                page,
+                loading: false,
             });
         } catch (error) {
             set({ error: error.message, loading: false });
         }
+    },
+
+    fetchProductOptions: async ({ force = false, limit = 100 } = {}) => {
+        const { productOptions, productOptionsFetchedAt, loading } = get();
+        if (
+            !force &&
+            productOptionsFetchedAt &&
+            Date.now() - productOptionsFetchedAt < PRODUCT_OPTIONS_TTL_MS &&
+            productOptions.length > 0
+        ) {
+            return productOptions;
+        }
+        if (loading && !force) return productOptions;
+
+        set({ loading: true, error: null });
+        try {
+            const response = await db.products.list([
+                Query.limit(limit),
+                Query.orderDesc('$createdAt'),
+                Query.select(['$id', 'name', 'barcode', 'brand', 'opeStore', 'opeProductName']),
+            ]);
+            set({
+                productOptions: response.documents,
+                productOptionsFetchedAt: Date.now(),
+                loading: false,
+            });
+            return response.documents;
+        } catch (error) {
+            set({ error: error.message, loading: false });
+            return [];
+        }
+    },
+
+    invalidateProductOptions: () => {
+        invalidateCacheKey(PRODUCT_OPTIONS_CACHE_KEY);
+        set({ productOptionsFetchedAt: null });
     },
 
     uploadProductImage: async (file) => {
@@ -168,6 +220,30 @@ const useProductsStore = create((set, get) => ({
         }
     },
 
+    updateProductOpeMapping: async (id, mapping) => {
+        set({ loading: true, error: null });
+        try {
+            const payload = {};
+            if (mapping?.opeStore != null) payload.opeStore = String(mapping.opeStore).trim();
+            if (mapping?.opeProductName != null) {
+                payload.opeProductName = String(mapping.opeProductName).trim();
+            }
+            if (mapping?.opeLastImportAt != null) payload.opeLastImportAt = mapping.opeLastImportAt;
+            if (!Object.keys(payload).length) {
+                set({ loading: false });
+                return true;
+            }
+            await db.products.update(id, payload);
+            await useProductsStore.getState().fetchProducts();
+            set({ loading: false });
+            return true;
+        } catch (error) {
+            console.warn('OPE mapping update failed (add opeStore, opeProductName, opeLastImportAt to products schema):', error);
+            set({ loading: false });
+            return false;
+        }
+    },
+
     updateProduct: async (id, data) => {
         set({ loading: true, error: null });
         console.log('Updating product:', id, data);
@@ -195,6 +271,16 @@ const useProductsStore = create((set, get) => ({
 
             if (data.supermarkets) {
                 payload.supermarkets = data.supermarkets;
+            }
+
+            if (data.opeStore !== undefined) {
+                payload.opeStore = String(data.opeStore).trim();
+            }
+            if (data.opeProductName !== undefined) {
+                payload.opeProductName = String(data.opeProductName).trim();
+            }
+            if (data.opeLastImportAt !== undefined) {
+                payload.opeLastImportAt = data.opeLastImportAt;
             }
 
             attachOptionalNutrition(payload, data, { allowNullClear: true });

@@ -11,8 +11,13 @@ import {
 import useAdminAuthStore from '../stores/adminAuthStore';
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import useFreshIndicator from '../hooks/useFreshIndicator';
-import { client, DATABASE_ID, COLLECTIONS, Query, db } from '../lib/appwrite';
+import { DATABASE_ID, COLLECTIONS, Query, db } from '../lib/appwrite';
 import Sidebar from '../components/Sidebar';
+import useDebouncedRealtimeRefresh from '../hooks/useDebouncedRealtimeRefresh';
+import { getCacheEntry, isFresh as isCacheFresh, setCacheEntry } from '../utils/readCache';
+
+const DASHBOARD_CHART_CACHE_KEY = 'dashboard:charts:v1';
+const CHART_CACHE_TTL_MS = 4 * 60 * 1000;
 import {
     BRAND_CHART_COLORS,
     CHART_BRAND_STROKE,
@@ -60,10 +65,10 @@ const Dashboard = () => {
     const [rawPricesForMarket, setRawPricesForMarket] = useState([]);
     const [rawSupermarkets, setRawSupermarkets] = useState([]);
     const [lastUpdated, setLastUpdated] = useState(null);
-    const isFresh = useFreshIndicator(lastUpdated);
+    const showFreshIndicator = useFreshIndicator(lastUpdated);
     const inFlightRef = useRef(false);
-    const subscriptionRefreshTimerRef = useRef(null);
     const lastUpdatedMsRef = useRef(0);
+    const chartsFreshRef = useRef(false);
 
     const fetchAll = useCallback(async (listFn, label) => {
         const limit = 100;
@@ -86,114 +91,140 @@ const Dashboard = () => {
         return documents;
     }, []);
 
-    const fetchStats = useCallback(async ({ showLoader = false } = {}) => {
+    const fetchTotalsOnly = useCallback(async () => {
+        const safeList = async (listFn, label) => {
+            try {
+                return await listFn();
+            } catch (error) {
+                console.warn(`Dashboard: Failed to fetch ${label}:`, error.message);
+                return { total: 0, documents: [] };
+            }
+        };
+
+        const [
+            productsRes,
+            pricesRes,
+            categoriesRes,
+            supermarketsRes,
+            pendingReportsRes,
+            outOfStockRes,
+            announcementsRes,
+            chatsRes,
+        ] = await Promise.all([
+            safeList(() => db.products.list([Query.limit(1)]), 'products'),
+            safeList(() => db.prices.list([Query.limit(1)]), 'prices'),
+            safeList(() => db.categories.list([Query.limit(1)]), 'categories'),
+            safeList(() => db.supermarkets.list([Query.limit(1)]), 'supermarkets'),
+            safeList(() => db.feedback.list([
+                Query.equal('status', 'pending'),
+                Query.limit(1),
+            ]), 'pending reports'),
+            safeList(() => db.prices.list([
+                Query.equal('stockStatus', 'out_of_stock'),
+                Query.limit(1),
+            ]), 'stock issues'),
+            safeList(() => db.announcements.list([Query.limit(1)]), 'announcements'),
+            safeList(() => db.chatHistory.list([Query.limit(1)]), 'chat history'),
+        ]);
+
+        setStats({
+            products: productsRes.total || 0,
+            prices: pricesRes.total || 0,
+            supermarkets: supermarketsRes.total || 0,
+            categories: categoriesRes.total || 0,
+            pendingReports: pendingReportsRes.total || 0,
+            outOfStock: outOfStockRes.total || 0,
+            announcements: announcementsRes.total || 0,
+            chats: chatsRes.total || 0,
+        });
+    }, []);
+
+    const fetchChartData = useCallback(async () => {
+        const fourteenDaysAgo = new Date();
+        fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+        const pricesFromMs = fourteenDaysAgo.getTime();
+
+        const [productsDocs, allPricesDocs, supermarketsDocs] = await Promise.all([
+            fetchAll(
+                (offset, limit) => db.products.list([
+                    Query.limit(limit),
+                    Query.offset(offset),
+                    Query.orderDesc('$createdAt'),
+                ]),
+                'products for charts'
+            ),
+            fetchAll(
+                (offset, limit) => db.prices.list([
+                    Query.limit(limit),
+                    Query.offset(offset),
+                    Query.select([
+                        '$id',
+                        '$createdAt',
+                        'products.$id',
+                        'products.name',
+                        'supermarkets.$id',
+                        'supermarkets.name',
+                    ]),
+                ]),
+                'prices for charts'
+            ),
+            fetchAll(
+                (offset, limit) => db.supermarkets.list([
+                    Query.limit(limit),
+                    Query.offset(offset),
+                    Query.select(['$id', 'name']),
+                ]),
+                'supermarkets for charts'
+            ),
+        ]);
+
+        const pricesTrendDocs = allPricesDocs.filter(
+            (p) => new Date(p.$createdAt).getTime() >= pricesFromMs
+        );
+
+        setRawProducts(productsDocs);
+        setRawPrices(pricesTrendDocs);
+        setRawPricesForMarket(allPricesDocs);
+        setRawSupermarkets(supermarketsDocs);
+
+        setCacheEntry(DASHBOARD_CHART_CACHE_KEY, {
+            productsDocs,
+            pricesTrendDocs,
+            allPricesDocs,
+            supermarketsDocs,
+        });
+        chartsFreshRef.current = true;
+    }, [fetchAll]);
+
+    const applyChartCache = useCallback((cached) => {
+        if (!cached?.data) return false;
+        const { productsDocs, pricesTrendDocs, allPricesDocs, supermarketsDocs } = cached.data;
+        setRawProducts(productsDocs || []);
+        setRawPrices(pricesTrendDocs || []);
+        setRawPricesForMarket(allPricesDocs || []);
+        setRawSupermarkets(supermarketsDocs || []);
+        chartsFreshRef.current = true;
+        return true;
+    }, []);
+
+    const fetchStats = useCallback(async ({ showLoader = false, forceCharts = false } = {}) => {
         if (inFlightRef.current) return;
         inFlightRef.current = true;
         if (showLoader) setLoading(true);
         try {
-            const safeList = async (listFn, label) => {
-                try {
-                    return await listFn();
-                } catch (error) {
-                    console.warn(`Dashboard: Failed to fetch ${label}:`, error.message);
-                    return { total: 0, documents: [] };
-                }
-            };
+            const cached = getCacheEntry(DASHBOARD_CHART_CACHE_KEY);
+            const chartsCachedFresh = !forceCharts && isCacheFresh(cached, CHART_CACHE_TTL_MS);
 
-            const [
-                productsRes,
-                pricesRes,
-                categoriesRes,
-                supermarketsRes,
-                pendingReportsRes,
-                outOfStockRes,
-                announcementsRes,
-                chatsRes
-            ] = await Promise.all([
-                safeList(() => db.products.list([
-                    Query.limit(1)
-                ]), 'products'),
-                safeList(() => db.prices.list([
-                    Query.limit(1)
-                ]), 'prices'),
-                safeList(() => db.categories.list([Query.limit(1)]), 'categories'),
-                safeList(() => db.supermarkets.list([
-                    Query.limit(1)
-                ]), 'supermarkets'),
-                safeList(() => db.feedback.list([
-                    Query.equal('status', 'pending'),
-                    Query.limit(1)
-                ]), 'pending reports'),
-                safeList(() => db.prices.list([
-                    Query.equal('stockStatus', 'out_of_stock'),
-                    Query.limit(1)
-                ]), 'stock issues'),
-                safeList(() => db.announcements.list([Query.limit(1)]), 'announcements'),
-                safeList(() => db.chatHistory.list([Query.limit(1)]), 'chat history')
-            ]);
+            if (chartsCachedFresh) {
+                applyChartCache(cached);
+            }
 
-            const fourteenDaysAgo = new Date();
-            fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
-            const pricesFrom = fourteenDaysAgo.toISOString();
+            await fetchTotalsOnly();
 
-            const [productsDocs, pricesDocs, pricesForMarketDocs, supermarketsDocs] = await Promise.all([
-                fetchAll(
-                    (offset, limit) => db.products.list([
-                        Query.limit(limit),
-                        Query.offset(offset),
-                        Query.orderDesc('$createdAt')
-                    ]),
-                    'products for charts'
-                ),
-                fetchAll(
-                    (offset, limit) => db.prices.list([
-                        Query.limit(limit),
-                        Query.offset(offset),
-                        Query.greaterThanEqual('$createdAt', pricesFrom),
-                        Query.orderDesc('$createdAt'),
-                        Query.select(['$id', '$createdAt'])
-                    ]),
-                    'prices for charts'
-                ),
-                fetchAll(
-                    (offset, limit) => db.prices.list([
-                        Query.limit(limit),
-                        Query.offset(offset),
-                        Query.select([
-                            '*',
-                            'products.$id',
-                            'products.name',
-                            'supermarkets.$id',
-                            'supermarkets.name',
-                        ]),
-                    ]),
-                    'prices for market chart'
-                ),
-                fetchAll(
-                    (offset, limit) => db.supermarkets.list([
-                        Query.limit(limit),
-                        Query.offset(offset),
-                        Query.select(['$id', 'name'])
-                    ]),
-                    'supermarkets for charts'
-                )
-            ]);
+            if (!chartsCachedFresh) {
+                await fetchChartData();
+            }
 
-            setRawProducts(productsDocs);
-            setRawPrices(pricesDocs);
-            setRawPricesForMarket(pricesForMarketDocs);
-            setRawSupermarkets(supermarketsDocs);
-
-            setStats({
-                products: productsRes.total || 0,
-                prices: pricesRes.total || 0,
-                supermarkets: supermarketsRes.total || 0,
-                categories: categoriesRes.total || 0,
-                pendingReports: pendingReportsRes.total || 0,
-                outOfStock: outOfStockRes.total || 0,
-                announcements: announcementsRes.total || 0,
-                chats: chatsRes.total || 0
-            });
             const now = Date.now();
             if (now - lastUpdatedMsRef.current >= 1500) {
                 setLastUpdated(new Date(now).toISOString());
@@ -205,7 +236,30 @@ const Dashboard = () => {
             if (showLoader) setLoading(false);
             inFlightRef.current = false;
         }
-    }, [fetchAll]);
+    }, [applyChartCache, fetchChartData, fetchTotalsOnly]);
+
+    const fetchStatsLight = useCallback(async () => {
+        if (inFlightRef.current) return;
+        inFlightRef.current = true;
+        try {
+            const cached = getCacheEntry(DASHBOARD_CHART_CACHE_KEY);
+            if (isCacheFresh(cached, CHART_CACHE_TTL_MS)) {
+                await fetchTotalsOnly();
+            } else {
+                await fetchStats({ showLoader: false, forceCharts: false });
+                return;
+            }
+            const now = Date.now();
+            if (now - lastUpdatedMsRef.current >= 1500) {
+                setLastUpdated(new Date(now).toISOString());
+                lastUpdatedMsRef.current = now;
+            }
+        } catch (error) {
+            console.error('Error fetching dashboard stats (light):', error);
+        } finally {
+            inFlightRef.current = false;
+        }
+    }, [fetchStats, fetchTotalsOnly]);
 
     const getWeeklyTrend = (items = [], dateField = '$createdAt') => {
         if (!items.length) return null;
@@ -300,33 +354,28 @@ const Dashboard = () => {
     }, [rawPrices]);
 
     useEffect(() => {
+        const cached = getCacheEntry(DASHBOARD_CHART_CACHE_KEY);
+        if (isCacheFresh(cached, CHART_CACHE_TTL_MS)) {
+            applyChartCache(cached);
+        }
         const t = setTimeout(() => fetchStats({ showLoader: true }), 0);
-        const channels = [
+        return () => clearTimeout(t);
+    }, [applyChartCache, fetchStats]);
+
+    const dashboardChannels = useMemo(
+        () => [
             `databases.${DATABASE_ID}.collections.${COLLECTIONS.PRODUCTS}.documents`,
             `databases.${DATABASE_ID}.collections.${COLLECTIONS.PRICES}.documents`,
             `databases.${DATABASE_ID}.collections.${COLLECTIONS.CATEGORIES}.documents`,
             `databases.${DATABASE_ID}.collections.${COLLECTIONS.SUPERMARKETS}.documents`,
             `databases.${DATABASE_ID}.collections.${COLLECTIONS.FEEDBACK}.documents`,
             `databases.${DATABASE_ID}.collections.${COLLECTIONS.ANNOUNCEMENTS}.documents`,
-            `databases.${DATABASE_ID}.collections.${COLLECTIONS.CHAT_HISTORY}.documents`
-        ];
-        const unsubscribe = client.subscribe(channels, () => {
-            if (subscriptionRefreshTimerRef.current) {
-                clearTimeout(subscriptionRefreshTimerRef.current);
-            }
-            subscriptionRefreshTimerRef.current = setTimeout(() => {
-                fetchStats({ showLoader: false });
-                subscriptionRefreshTimerRef.current = null;
-            }, 900);
-        });
-        return () => {
-            clearTimeout(t);
-            if (subscriptionRefreshTimerRef.current) {
-                clearTimeout(subscriptionRefreshTimerRef.current);
-            }
-            unsubscribe();
-        };
-    }, [fetchStats]);
+            `databases.${DATABASE_ID}.collections.${COLLECTIONS.CHAT_HISTORY}.documents`,
+        ],
+        []
+    );
+
+    useDebouncedRealtimeRefresh(dashboardChannels, fetchStatsLight, 1500);
 
     // `isFresh` indicator handled by useFreshIndicator to avoid rapid flicker
 
@@ -349,7 +398,7 @@ const Dashboard = () => {
                                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
                                 Live
                             </span>
-                            <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${isFresh ? 'text-green-600' : 'text-gray-400'}`}>
+                            <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${showFreshIndicator ? 'text-green-600' : 'text-gray-400'}`}>
                                 Updated {lastUpdated ? new Date(lastUpdated).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
                             </span>
                         </div>
@@ -364,7 +413,7 @@ const Dashboard = () => {
                         </div>
                         <div className="flex items-center gap-2">
                             <button 
-                                onClick={() => fetchStats({ showLoader: true })}
+                                onClick={() => fetchStats({ showLoader: true, forceCharts: true })}
                                 className="p-2.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-2xl transition-all active:scale-95 border border-gray-200 dark:border-gray-600 shadow-sm"
                                 title="Sync Data"
                             >
@@ -439,7 +488,7 @@ const Dashboard = () => {
                             </div>
                             <div className="flex-1 w-full min-h-0 min-w-0 overflow-hidden">
                                 <div className="w-full h-full min-h-[180px]">
-                                    <ResponsiveContainer width="100%" height="100%">
+                                    <ResponsiveContainer width="100%" height={280}>
                                         <AreaChart data={priceTrendsData}>
                                         <defs>
                                             <linearGradient id="colorSearches" x1="0" y1="0" x2="0" y2="1">
@@ -481,7 +530,7 @@ const Dashboard = () => {
                                 ) : (
                                     <>
                                         <div className="flex-1 min-h-0 w-full overflow-hidden">
-                                            <ResponsiveContainer width="100%" height="100%">
+                                            <ResponsiveContainer width="100%" height={280}>
                                                 <BarChart
                                                     data={marketChartData}
                                                     layout="vertical"

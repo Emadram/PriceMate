@@ -5,8 +5,9 @@ import { useTranslation } from 'react-i18next';
 import useAuthStore from '../stores/authStore';
 import useCurrencyStore from '../stores/currencyStore';
 import useThemeStore from '../stores/themeStore';
+import AppLogo from './AppLogo';
 
-const Navbar = ({ hideMobileTopLogo = false }) => {
+const Navbar = () => {
     const { t, i18n } = useTranslation();
     const user = useAuthStore((state) => state.user);
     const logout = useAuthStore((state) => state.logout);
@@ -21,6 +22,12 @@ const Navbar = ({ hideMobileTopLogo = false }) => {
     }, [fetchRates]);
 
     useEffect(() => {
+        if (typeof document === 'undefined') return undefined;
+        document.documentElement.style.setProperty('--mobile-top-logo-h', '0px');
+        return undefined;
+    }, []);
+
+    useEffect(() => {
         const el = bottomNavRef.current;
         if (!el || typeof document === 'undefined') return undefined;
 
@@ -31,10 +38,15 @@ const Navbar = ({ hideMobileTopLogo = false }) => {
         };
 
         setVar();
+        const ro = typeof ResizeObserver !== 'undefined'
+            ? new ResizeObserver(setVar)
+            : null;
+        ro?.observe(el);
         window.addEventListener('resize', setVar, { passive: true });
         window.addEventListener('orientationchange', setVar, { passive: true });
 
         return () => {
+            ro?.disconnect();
             window.removeEventListener('resize', setVar);
             window.removeEventListener('orientationchange', setVar);
         };
@@ -59,41 +71,13 @@ const Navbar = ({ hideMobileTopLogo = false }) => {
 
     return (
         <>
-            {/* Top mobile header: hidden on immersive routes (e.g. /ai-chat) */}
-            {!hideMobileTopLogo && (
-            <div className="md:hidden fixed top-0 inset-x-0 z-9999 pt-safe px-safe">
-                <div className="mx-2 px-4 py-3 bg-transparent dark:bg-gray-900/95 rounded-b-[1.4rem] backdrop-blur-xl border-b border-gray-800/20">
-                        <Link to="/" className="flex items-center justify-center gap-2 min-w-0">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/90 dark:bg-gray-900/60 shadow-sm shadow-brand-500/15 shrink-0 border border-gray-100/70 dark:border-gray-800/60 overflow-hidden">
-                            <img
-                                src="/LogoPriceMate.png"
-                                alt="PriceMate"
-                                className="h-full w-full object-contain p-1"
-                                loading="eager"
-                                decoding="async"
-                            />
-                        </div>
-                        <span className="text-sm font-black tracking-tight text-gray-900 dark:text-white truncate">PriceMate</span>
-                    </Link>
-                </div>
-            </div>
-            )}
-
-                <nav className="hidden md:block fixed top-0 left-0 right-0 pt-safe z-9999 bg-transparent dark:bg-gray-900/95 backdrop-blur-md transition-colors duration-200">
+            <nav className="hidden md:block fixed top-0 left-0 right-0 pt-safe z-9999 bg-transparent dark:bg-gray-900/95 backdrop-blur-md transition-colors duration-200">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between h-16">
                         {/* Logo */}
                         <div className="flex items-center">
                                 <Link to="/" className="flex-shrink-0 flex items-center gap-2 group">
-                                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/90 dark:bg-gray-900/60 shadow-lg shadow-brand-500/20 group-hover:scale-105 transition-transform border border-gray-100/70 dark:border-gray-800/60 overflow-hidden">
-                                    <img
-                                        src="/LogoPriceMate.png"
-                                        alt="PriceMate"
-                                        className="h-full w-full object-contain p-1"
-                                        loading="eager"
-                                        decoding="async"
-                                    />
-                                </div>
+                                <AppLogo size="sm" shellClassName="group-hover:scale-105 transition-transform" />
                                 <span className="font-black text-2xl text-gray-900 dark:text-white hidden sm:block tracking-tighter">
                                     PriceMate
                                 </span>
@@ -175,9 +159,9 @@ const Navbar = ({ hideMobileTopLogo = false }) => {
             </nav>
 
             {/* Mobile Bottom Navigation */}
-            <div ref={bottomNavRef} className="md:hidden fixed bottom-0 inset-x-0 z-9998 px-safe">
-              <div className="mx-2 mb-2 px-4 py-3 pb-safe-nav pricemate-mobile-chrome rounded-t-[1.75rem]">
-                <div className="flex items-center justify-between max-w-md mx-auto">
+            <div ref={bottomNavRef} className="pricemate-mobile-bottom-nav md:hidden fixed bottom-0 inset-x-0 z-9998">
+              <div className="pt-3 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] px-safe pricemate-mobile-chrome border-t border-gray-100/80 dark:border-gray-800/60 rounded-t-[1.25rem] shadow-[0_-4px_24px_rgba(15,23,42,0.06)]">
+                <div className="flex items-center justify-between max-w-md mx-auto px-3">
                     <NavItem to="/" icon={FiHome} label={t('home')} currentPath={location.pathname} onTap={tapFeedback} />
                     <NavItem to="/search" icon={FiSearch} label={t('search', 'Search')} currentPath={location.pathname} onTap={tapFeedback} />
                     <Link
