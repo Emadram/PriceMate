@@ -521,8 +521,9 @@ const PriceHistory = () => {
                             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-600"></div>
                         </div>
                     ) : (
-                        <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-                            <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-700">
+                        <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700">
+                            <div className="overflow-x-auto">
+                            <table className="min-w-[960px] w-full divide-y divide-gray-100 dark:divide-gray-700">
                                 <thead className="bg-gray-50/50 dark:bg-gray-900/50">
                                     <tr>
                                         <th className="px-8 py-5 text-left text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em]">Product</th>
@@ -531,12 +532,12 @@ const PriceHistory = () => {
                                         <th className="px-8 py-5 text-left text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em]">Timestamp</th>
                                         <th className="px-8 py-5 text-left text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em]">Reason</th>
                                         <th className="px-8 py-5 text-left text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em]">Promo</th>
-                                        <th className="px-8 py-5 text-right text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em]">Actions</th>
+                                        <th className="sticky right-0 z-10 bg-gray-50/50 dark:bg-gray-900/50 px-4 py-5 text-right text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.08)]">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-50 dark:divide-gray-700/50">
                                     {filteredHistory.map((item) => (
-                                        <tr key={item.$id} className="hover:bg-brand-50/40 dark:hover:bg-brand-900/10 transition-colors group">
+                                        <tr key={item.$id} className="group hover:bg-brand-50/40 dark:hover:bg-brand-900/10 transition-colors">
                                             <td className="px-8 py-6 whitespace-nowrap">
                                                 <div className="text-sm font-black text-gray-900 dark:text-white">
                                                     {getProductName(item.productId)}
@@ -576,8 +577,8 @@ const PriceHistory = () => {
                                                     {item.isPromotional ? 'Promo' : 'Standard'}
                                                 </span>
                                             </td>
-                                            <td className="px-8 py-6 whitespace-nowrap text-right">
-                                                <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <td className="sticky right-0 z-10 whitespace-nowrap bg-white px-4 py-4 text-right group-hover:bg-brand-50/40 dark:bg-gray-800 dark:group-hover:bg-brand-900/10 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.08)]">
+                                                <div className="flex items-center justify-end gap-2">
                                                     <button
                                                         onClick={() => handleEdit(item)}
                                                         className="p-3 text-brand-700 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-900/30 rounded-2xl transition-all active:scale-95 border border-transparent hover:border-brand-100 dark:hover:border-brand-800/50"
@@ -596,6 +597,7 @@ const PriceHistory = () => {
                                     ))}
                                 </tbody>
                             </table>
+                            </div>
                             <div className="flex items-center justify-between px-8 py-5 border-t border-gray-100 dark:border-gray-700">
                                 <span className="text-xs font-bold text-gray-500">
                                     Page {page} of {totalPages} · {total} total records

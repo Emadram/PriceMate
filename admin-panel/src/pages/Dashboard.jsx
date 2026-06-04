@@ -160,8 +160,6 @@ const Dashboard = () => {
                     Query.select([
                         '$id',
                         '$createdAt',
-                        'productId',
-                        'supermarketId',
                         'products.$id',
                         'products.name',
                         'supermarkets.$id',
@@ -490,7 +488,7 @@ const Dashboard = () => {
                             </div>
                             <div className="flex-1 w-full min-h-0 min-w-0 overflow-hidden">
                                 <div className="w-full h-full min-h-[180px]">
-                                    <ResponsiveContainer width="100%" height="100%">
+                                    <ResponsiveContainer width="100%" height={280}>
                                         <AreaChart data={priceTrendsData}>
                                         <defs>
                                             <linearGradient id="colorSearches" x1="0" y1="0" x2="0" y2="1">
@@ -532,7 +530,7 @@ const Dashboard = () => {
                                 ) : (
                                     <>
                                         <div className="flex-1 min-h-0 w-full overflow-hidden">
-                                            <ResponsiveContainer width="100%" height="100%">
+                                            <ResponsiveContainer width="100%" height={280}>
                                                 <BarChart
                                                     data={marketChartData}
                                                     layout="vertical"
