@@ -56,7 +56,7 @@ const Prices = () => {
     }, [fetchPrices, fetchProductOptions, fetchSupermarkets, page]);
 
     const refreshPricesOnly = useCallback(async () => {
-        await fetchPrices(page);
+        await fetchPrices(page, { force: true });
         setLastUpdated(new Date().toISOString());
     }, [fetchPrices, page]);
 

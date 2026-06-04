@@ -255,20 +255,37 @@ export async function fetchMemoryForPrompt(userId, conversationId) {
     return { conversationSummary: null, userFacts: null };
   }
 
+  const LEGACY_CONVERSATION_ID = 'legacy';
+
   try {
-    const response = await db.aiChatMemory.list([
+    const summaryQueries = [
       Query.equal('userId', userId),
-      Query.limit(50),
+      Query.equal('memoryType', 'conversation_summary'),
+      Query.limit(1),
+    ];
+    if (conversationId) {
+      if (conversationId === LEGACY_CONVERSATION_ID) {
+        summaryQueries.push(Query.isNull('conversationId'));
+      } else {
+        summaryQueries.push(Query.equal('conversationId', conversationId));
+      }
+    }
+
+    const factsQueries = [
+      Query.equal('userId', userId),
+      Query.equal('memoryType', 'user_facts'),
+      Query.limit(1),
+    ];
+
+    const [summaryRes, factsRes] = await Promise.all([
+      conversationId
+        ? db.aiChatMemory.list(summaryQueries)
+        : Promise.resolve({ documents: [] }),
+      db.aiChatMemory.list(factsQueries),
     ]);
-    const docs = response.documents ?? [];
 
-    // Find conversation_summary for this conversationId
-    const summaryDoc = conversationId
-      ? docs.find(d => d.memoryType === 'conversation_summary' && d.conversationId === conversationId)
-      : null;
-
-    // Find user_facts (scoped to userId only, no conversationId)
-    const factsDoc = docs.find(d => d.memoryType === 'user_facts');
+    const summaryDoc = summaryRes.documents?.[0] ?? null;
+    const factsDoc = factsRes.documents?.[0] ?? null;
 
     const conversationSummary = summaryDoc ? summaryDoc.content : null;
     const userFacts = factsDoc ? parseFactsJson(factsDoc.content) : null;

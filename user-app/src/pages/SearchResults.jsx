@@ -2,8 +2,9 @@ import { useCallback, useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { FiArrowLeft, FiSearch, FiFilter } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
-import { fetchPricesForProducts, searchProducts, fetchCategories, normalizeProduct } from '../utils/productUtils';
+import { fetchPricesForProducts, searchProducts, normalizeProduct } from '../utils/productUtils';
 import { getCacheEntry, swrGetOrFetch } from '../utils/swrCache';
+import useCategoriesStore from '../stores/categoriesStore';
 import ProductCard from '../components/ProductCard';
 import { ProductCardSkeleton } from '../components/SkeletonLoaders';
 import BackButton from '../components/BackButton';
@@ -20,7 +21,7 @@ const SearchResults = () => {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [categories, setCategories] = useState([]);
+    const { categories, fetchCategories } = useCategoriesStore();
 
     // Search form states
     const [searchInput, setSearchInput] = useState(query);
@@ -78,10 +79,13 @@ const SearchResults = () => {
 
         const fetcher = async () => {
             // Fetch categories if not already fetched
-            const [searchResults, allCategories] = await Promise.all([
+            const [searchResults] = await Promise.all([
                 searchProducts(query, categoryIdFromUrl, 40, sortBy),
-                categories.length === 0 ? fetchCategories() : Promise.resolve(categories)
             ]);
+            if (categories.length === 0) {
+                await fetchCategories();
+            }
+            const allCategories = useCategoriesStore.getState().categories;
 
             const categoryMap = new Map((allCategories || []).map((cat) => [cat.$id, cat]));
             const enrichedResults = searchResults.map((product) => {
@@ -144,10 +148,6 @@ const SearchResults = () => {
             if (!payload) return;
 
             setProducts(Array.isArray(payload.products) ? payload.products : []);
-            if (Array.isArray(payload.categories) && payload.categories.length > 0) {
-                setCategories(payload.categories);
-            }
-
             // Sync local input with URL
             setSearchInput(payload.query ?? query);
             setSelectedCategory(payload.categoryIdFromUrl ?? categoryIdFromUrl);
@@ -179,7 +179,7 @@ const SearchResults = () => {
             setLoading(false);
             setRefreshing(false);
         }
-    }, [query, categoryIdFromUrl, sortBy, categories]);
+    }, [query, categoryIdFromUrl, sortBy, categories, fetchCategories]);
 
     useEffect(() => {
         const timeoutId = setTimeout(() => {

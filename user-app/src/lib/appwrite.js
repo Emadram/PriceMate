@@ -74,9 +74,17 @@ import { ID } from 'appwrite';
  * DB Helper - Centralized logic for database operations
  * achieving a cleaner `db.collection.action()` API.
  */
+const logDevListRead = (collectionId) => {
+    if (import.meta.env.DEV) {
+        console.debug('[Appwrite reads]', collectionId);
+    }
+};
+
 const dbAction = {
-    list: (collectionId, queries = []) => 
-        databases.listDocuments(DATABASE_ID, collectionId, queries),
+    list: (collectionId, queries = []) => {
+        logDevListRead(collectionId);
+        return databases.listDocuments(DATABASE_ID, collectionId, queries);
+    },
     get: (collectionId, documentId, queries = []) => 
         databases.getDocument(DATABASE_ID, collectionId, documentId, queries),
     create: (collectionId, data, permissions) => 

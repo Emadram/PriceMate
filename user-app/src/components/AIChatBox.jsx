@@ -1323,6 +1323,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
     useEffect(() => {
         if (!user?.$id) {
             chatSessionInitForUserRef.current = null;
+            chatContextLoadedRef.current = false;
         }
     }, [user?.$id]);
 
@@ -1451,8 +1452,13 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         requestAnimationFrame(() => scrollMessagesToTop());
     }, [history, isLoading, activeConversationId, historyLoading]);
 
-    // Fetch context data (products and prices) to inform the AI
+    const chatContextLoadedRef = useRef(false);
+
     useEffect(() => {
+        if (!isOpen) return;
+        if (chatContextLoadedRef.current && fullProductList.length > 0) return;
+
+        let cancelled = false;
         const loadContext = async () => {
             try {
                 const products = await fetchProducts(50);
@@ -1462,6 +1468,8 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                     fetchSupermarkets(),
                 ]);
 
+                if (cancelled) return;
+
                 const productsWithData = products.map((p) => normalizeProduct(p, prices));
 
                 const enrichedProducts = enrichProductPricesWithSupermarkets(
@@ -1470,12 +1478,16 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 );
                 setFullProductList(enrichedProducts);
                 setSupermarketList(Array.isArray(supermarkets) ? supermarkets : []);
+                chatContextLoadedRef.current = true;
             } catch (error) {
-                console.error("Error loading chat context:", error);
+                console.error('Error loading chat context:', error);
             }
         };
-        loadContext();
-    }, [fetchSupermarkets]);
+        void loadContext();
+        return () => {
+            cancelled = true;
+        };
+    }, [isOpen, fetchSupermarkets, fullProductList.length]);
 
     const extractBarcode = (message) => {
         const match = message.match(/\b\d{8,14}\b/);
