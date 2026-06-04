@@ -7,7 +7,8 @@ import useProductsStore from '../stores/productsStore';
 import useCategoriesStore from '../stores/categoriesStore';
 import useSupermarketsStore from '../stores/supermarketsStore';
 import Sidebar from '../components/Sidebar';
-import { client, DATABASE_ID, COLLECTIONS } from '../lib/appwrite';
+import { DATABASE_ID, COLLECTIONS } from '../lib/appwrite';
+import useDebouncedRealtimeRefresh from '../hooks/useDebouncedRealtimeRefresh';
 import { executeOffProxy, OFF_PROXY_FUNCTION_ID } from '../utils/executeOffProxy';
 
 const OFF_RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
@@ -344,10 +345,19 @@ const Products = () => {
         await Promise.all([
             fetchProducts(page),
             fetchCategories(),
-            fetchSupermarkets()
+            fetchSupermarkets(),
         ]);
         setLastUpdated(new Date().toISOString());
     }, [fetchProducts, fetchCategories, fetchSupermarkets, page]);
+
+    const refreshProductsOnly = useCallback(async () => {
+        await fetchProducts(page, { force: true });
+        setLastUpdated(new Date().toISOString());
+    }, [fetchProducts, page]);
+
+    const refreshReferenceData = useCallback(async () => {
+        await Promise.all([fetchCategories(), fetchSupermarkets()]);
+    }, [fetchCategories, fetchSupermarkets]);
 
     useEffect(() => {
         const t = setTimeout(() => refreshData(), 0);
@@ -366,19 +376,17 @@ const Products = () => {
         }
     }, [showModal]);
 
-    useEffect(() => {
-        const channels = [
-            `databases.${DATABASE_ID}.collections.${COLLECTIONS.PRODUCTS}.documents`,
+    useDebouncedRealtimeRefresh(
+        `databases.${DATABASE_ID}.collections.${COLLECTIONS.PRODUCTS}.documents`,
+        refreshProductsOnly
+    );
+    useDebouncedRealtimeRefresh(
+        [
             `databases.${DATABASE_ID}.collections.${COLLECTIONS.CATEGORIES}.documents`,
-            `databases.${DATABASE_ID}.collections.${COLLECTIONS.SUPERMARKETS}.documents`
-        ];
-
-        const unsubscribe = client.subscribe(channels, () => {
-            setTimeout(() => refreshData(), 0);
-        });
-
-        return () => unsubscribe();
-    }, [refreshData]);
+            `databases.${DATABASE_ID}.collections.${COLLECTIONS.SUPERMARKETS}.documents`,
+        ],
+        refreshReferenceData
+    );
 
     const handlePageChange = (newPage) => {
         const totalPages = Math.max(1, Math.ceil(total / limit));

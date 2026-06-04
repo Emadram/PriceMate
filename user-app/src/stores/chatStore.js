@@ -150,6 +150,18 @@ const deleteMemoryDocuments = async (userId, conversationId = null) => {
 /** Serialize session bootstrap so overlapping calls (Strict Mode, fast navigation) never double-run the empty-session branch. */
 let initSessionMutex = Promise.resolve();
 
+const SUMMARIES_TTL_MS = 2 * 60 * 1000;
+
+const patchSummaryAfterMessage = (summaries, conversationId, timestamp) => {
+    const idx = summaries.findIndex((s) => s.id === conversationId);
+    if (idx < 0) return summaries;
+
+    const next = [...summaries];
+    next[idx] = { ...next[idx], updatedAt: timestamp };
+    next.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+    return next;
+};
+
 const lastConversationStorageKey = (userId) => `pricemate_last_conversation_${userId}`;
 
 const readLastConversationId = (userId) => {
@@ -186,6 +198,8 @@ const useChatStore = create((set, get) => ({
     summariesLoading: false,
     error: null,
     unsubscribe: null,
+    summariesUserId: null,
+    summariesFetchedAt: null,
 
     resetChat: () => {
         if (get().unsubscribe) {
@@ -200,6 +214,8 @@ const useChatStore = create((set, get) => ({
             summariesLoading: false,
             error: null,
             unsubscribe: null,
+            summariesUserId: null,
+            summariesFetchedAt: null,
         });
     },
 
@@ -233,8 +249,21 @@ const useChatStore = create((set, get) => ({
 
     clearChatWriteError: () => set({ error: null }),
 
-    fetchConversationSummaries: async (userId) => {
+    fetchConversationSummaries: async (userId, { force = false } = {}) => {
         if (!userId) return;
+
+        const { summariesUserId, summariesFetchedAt, conversationSummaries, summariesLoading } = get();
+        if (
+            !force &&
+            summariesUserId === userId &&
+            summariesFetchedAt &&
+            Date.now() - summariesFetchedAt < SUMMARIES_TTL_MS &&
+            conversationSummaries.length > 0
+        ) {
+            return;
+        }
+        if (summariesLoading && !force) return;
+
         set({ summariesLoading: true, error: null });
         try {
             const baseQueries = [
@@ -256,15 +285,33 @@ const useChatStore = create((set, get) => ({
             }
             let summaries = buildSummariesFromDocuments(allDocs);
             try {
-                const titleDocs = await listAllMemoryDocuments(userId);
-                const conversationTitleDocs = titleDocs.filter((d) => d.memoryType === 'conversation_title');
-                summaries = applyTitleOverlay(summaries, conversationTitleDocs);
+                if (db.aiChatMemory) {
+                    const titleDocs = [];
+                    let lastId;
+                    for (;;) {
+                        const queries = [
+                            Query.equal('userId', userId),
+                            Query.equal('memoryType', 'conversation_title'),
+                            Query.orderAsc('$id'),
+                            Query.limit(100),
+                        ];
+                        if (lastId) queries.push(Query.cursorAfter(lastId));
+                        const res = await db.aiChatMemory.list(queries);
+                        if (res.documents.length === 0) break;
+                        titleDocs.push(...res.documents);
+                        if (res.documents.length < 100) break;
+                        lastId = res.documents[res.documents.length - 1].$id;
+                    }
+                    summaries = applyTitleOverlay(summaries, titleDocs);
+                }
             } catch {
                 // best-effort; title overlay failure must never break the conversation list
             }
             set({
                 conversationSummaries: summaries,
                 summariesLoading: false,
+                summariesUserId: userId,
+                summariesFetchedAt: Date.now(),
             });
         } catch (error) {
             console.error('Failed to fetch conversation summaries:', error);
@@ -321,11 +368,11 @@ const useChatStore = create((set, get) => ({
     /**
      * Refresh thread list and restore the last active conversation (or most recent thread).
      */
-    initializeChatSession: async (userId) => {
+    initializeChatSession: async (userId, { forceSummaries = false } = {}) => {
         if (!userId) return;
 
         const job = initSessionMutex.then(async () => {
-            await get().fetchConversationSummaries(userId);
+            await get().fetchConversationSummaries(userId, { force: forceSummaries });
             const summaries = get().conversationSummaries;
             const storedId = readLastConversationId(userId);
             const targetId = resolveConversationToRestore(summaries, storedId);
@@ -374,7 +421,22 @@ const useChatStore = create((set, get) => ({
             }
 
             writeLastConversationId(userId, activeConversationId);
-            await get().fetchConversationSummaries(userId);
+
+            const hasSummary = get().conversationSummaries.some(
+                (s) => s.id === activeConversationId
+            );
+            if (!hasSummary) {
+                await get().fetchConversationSummaries(userId, { force: true });
+            } else {
+                set((state) => ({
+                    conversationSummaries: patchSummaryAfterMessage(
+                        state.conversationSummaries,
+                        activeConversationId,
+                        doc.timestamp || doc.$createdAt
+                    ),
+                    summariesFetchedAt: Date.now(),
+                }));
+            }
             return doc;
         } catch (error) {
             console.error('Failed to save message:', error);

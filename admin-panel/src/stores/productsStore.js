@@ -1,6 +1,10 @@
 import { create } from 'zustand';
 import { db, storage, getAppwriteConfig } from '../lib/appwrite';
 import { ID, Query } from 'appwrite';
+import { invalidateCacheKey } from '../utils/readCache';
+
+const PRODUCT_OPTIONS_TTL_MS = 10 * 60 * 1000;
+const PRODUCT_OPTIONS_CACHE_KEY = 'admin:product-options:v1';
 
 const { endpoint: APPWRITE_ENDPOINT, projectId: APPWRITE_PROJECT_ID } = getAppwriteConfig();
 const PRODUCT_IMAGES_BUCKET = import.meta.env.VITE_APPWRITE_BUCKET_SUPERMARKET_LOGOS || 'product-images';
@@ -71,6 +75,8 @@ const attachOptionalNutrition = (payload, data, { allowNullClear = false } = {})
 
 const useProductsStore = create((set, get) => ({
     products: [],
+    productOptions: [],
+    productOptionsFetchedAt: null,
     loading: false,
     error: null,
     total: 0,
@@ -80,26 +86,71 @@ const useProductsStore = create((set, get) => ({
     setPage: (page) => set({ page }),
     setLimit: (limit) => set({ limit: Math.max(1, Number(limit) || 10), page: 1 }),
 
-    fetchProducts: async (page = 1) => {
+    fetchProducts: async (page = 1, { force = false } = {}) => {
+        const { limit, page: currentPage, products, loading } = get();
+        if (
+            !force &&
+            page === currentPage &&
+            products.length > 0 &&
+            !loading
+        ) {
+            return;
+        }
+
         set({ loading: true, error: null });
         try {
-            const limit = get().limit;
             const offset = (page - 1) * limit;
 
             const response = await db.products.list([
                 Query.limit(limit),
                 Query.offset(offset),
-                Query.orderDesc('$createdAt')
+                Query.orderDesc('$createdAt'),
             ]);
-            set({ 
-                products: response.documents, 
+            set({
+                products: response.documents,
                 total: response.total,
-                page: page,
-                loading: false 
+                page,
+                loading: false,
             });
         } catch (error) {
             set({ error: error.message, loading: false });
         }
+    },
+
+    fetchProductOptions: async ({ force = false, limit = 100 } = {}) => {
+        const { productOptions, productOptionsFetchedAt, loading } = get();
+        if (
+            !force &&
+            productOptionsFetchedAt &&
+            Date.now() - productOptionsFetchedAt < PRODUCT_OPTIONS_TTL_MS &&
+            productOptions.length > 0
+        ) {
+            return productOptions;
+        }
+        if (loading && !force) return productOptions;
+
+        set({ loading: true, error: null });
+        try {
+            const response = await db.products.list([
+                Query.limit(limit),
+                Query.orderDesc('$createdAt'),
+                Query.select(['$id', 'name', 'barcode', 'brand', 'opeStore', 'opeProductName']),
+            ]);
+            set({
+                productOptions: response.documents,
+                productOptionsFetchedAt: Date.now(),
+                loading: false,
+            });
+            return response.documents;
+        } catch (error) {
+            set({ error: error.message, loading: false });
+            return [];
+        }
+    },
+
+    invalidateProductOptions: () => {
+        invalidateCacheKey(PRODUCT_OPTIONS_CACHE_KEY);
+        set({ productOptionsFetchedAt: null });
     },
 
     uploadProductImage: async (file) => {

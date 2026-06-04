@@ -67,9 +67,17 @@ export const getAppwriteConfig = () => RESOLVED_APPWRITE_CONFIG;
 export const { DATABASE_ID, COLLECTIONS } = APPWRITE_CONFIG;
 export { Query } from 'appwrite';
 
+const logDevListRead = (collectionId) => {
+    if (import.meta.env.DEV) {
+        console.debug('[Appwrite reads]', collectionId);
+    }
+};
+
 const dbAction = {
-    list: (collectionId, queries = []) =>
-        databases.listDocuments(DATABASE_ID, collectionId, queries),
+    list: (collectionId, queries = []) => {
+        logDevListRead(collectionId);
+        return databases.listDocuments(DATABASE_ID, collectionId, queries);
+    },
     get: (collectionId, documentId, queries = []) =>
         databases.getDocument(DATABASE_ID, collectionId, documentId, queries),
     create: (collectionId, data, permissions) =>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useChatHistoryStore, LEGACY_THREAD_KEY, messageThreadKey } from '../stores/chatHistoryStore';
+import { useChatHistoryStore, LEGACY_THREAD_KEY } from '../stores/chatHistoryStore';
 import {
     FiArrowLeft,
     FiUser,
@@ -16,27 +16,35 @@ const UserChatDetail = () => {
     const { userId, threadKey: threadKeyParam } = useParams();
     const navigate = useNavigate();
     const decodedThreadKey = threadKeyParam ? decodeURIComponent(threadKeyParam) : '';
-    const { groupedHistory, loading, fetchHistory, deleteMessage, deleteUserHistory, deleteThread } =
-        useChatHistoryStore();
+    const {
+        threadDetail,
+        loading,
+        fetchThreadMessages,
+        deleteMessage,
+        deleteUserHistory,
+        deleteThread,
+    } = useChatHistoryStore();
     const [lastUpdated, setLastUpdated] = useState(null);
 
     const loadThread = useCallback(async () => {
-        if (!groupedHistory[userId]) {
-            await fetchHistory();
+        if (userId && decodedThreadKey) {
+            await fetchThreadMessages(userId, decodedThreadKey);
         }
         setLastUpdated(new Date().toISOString());
-    }, [userId, groupedHistory, fetchHistory]);
+    }, [userId, decodedThreadKey, fetchThreadMessages]);
 
     useEffect(() => {
         const t = setTimeout(() => loadThread(), 0);
         return () => clearTimeout(t);
     }, [loadThread]);
 
-    const allMessages = groupedHistory[userId] || [];
-    const messages = allMessages.filter((m) => messageThreadKey(m) === decodedThreadKey);
+    const messages =
+        threadDetail.userId === userId && threadDetail.threadKey === decodedThreadKey
+            ? threadDetail.messages
+            : [];
 
     const userInfo =
-        allMessages.find((msg) => msg.userName || msg.userEmail) || allMessages[0] || {};
+        messages.find((msg) => msg.userName || msg.userEmail) || messages[0] || {};
     const displayName =
         userInfo.userName || userInfo.userEmail || `User ${userId?.slice(0, 8) || ''}`;
 
@@ -50,7 +58,7 @@ const UserChatDetail = () => {
                   return raw.length > 48 ? `${raw.slice(0, 48)}…` : raw;
               })();
 
-    if (loading && allMessages.length === 0) {
+    if (loading && messages.length === 0) {
         return (
             <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900 font-sans">
                 <Sidebar />

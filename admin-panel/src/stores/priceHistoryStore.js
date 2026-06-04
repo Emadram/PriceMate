@@ -9,39 +9,68 @@ import {
 } from '../utils/priceHistoryBackfill';
 import { buildOpeImportPayloads } from '../utils/openPriceEngineImport';
 
-const usePriceHistoryStore = create((set) => ({
+const DEFAULT_PAGE_SIZE = 50;
+
+const usePriceHistoryStore = create((set, get) => ({
     history: [],
     loading: false,
     error: null,
+    page: 1,
+    pageSize: DEFAULT_PAGE_SIZE,
+    total: 0,
 
-    fetchHistory: async () => {
+    setPage: (page) => set({ page: Math.max(1, page) }),
+
+    fetchHistoryPage: async (page = get().page, pageSize = get().pageSize) => {
         set({ loading: true, error: null });
         try {
-            const documents = await listAllDocuments(
-                (queries) => db.priceHistory.list(queries),
-                [Query.orderDesc('timestamp')]
-            );
-            set({ history: documents, loading: false });
+            const offset = (page - 1) * pageSize;
+            const response = await db.priceHistory.list([
+                Query.orderDesc('timestamp'),
+                Query.limit(pageSize),
+                Query.offset(offset),
+            ]);
+            set({
+                history: response.documents,
+                total: response.total ?? response.documents.length,
+                page,
+                pageSize,
+                loading: false,
+            });
         } catch (error) {
             console.error('Fetch price history error:', error);
             set({ error: error.message, loading: false });
         }
     },
 
+    /** Loads current page only (replaces full-collection fetch). */
+    fetchHistory: async () => {
+        const { page, pageSize } = get();
+        return get().fetchHistoryPage(page, pageSize);
+    },
+
     addHistory: async (data) => {
         set({ loading: true, error: null });
         try {
-            await db.priceHistory.create({
+            const created = await db.priceHistory.create({
                 priceId: data.priceId || null,
                 price: parseFloat(data.price),
                 productId: data.productId,
                 supermarketId: data.supermarketId,
                 timestamp: data.timestamp,
                 isPromotional: data.isPromotional || false,
-                priceChangeReason: data.priceChangeReason || null
+                priceChangeReason: data.priceChangeReason || null,
             });
-            await usePriceHistoryStore.getState().fetchHistory();
-            set({ loading: false });
+            const { page, pageSize } = get();
+            if (page === 1) {
+                set((state) => ({
+                    history: [created, ...state.history].slice(0, pageSize),
+                    total: (state.total || 0) + 1,
+                    loading: false,
+                }));
+            } else {
+                await get().fetchHistoryPage(page, pageSize);
+            }
             return true;
         } catch (error) {
             console.error('Add price history error:', error);
@@ -53,17 +82,21 @@ const usePriceHistoryStore = create((set) => ({
     updateHistory: async (id, data) => {
         set({ loading: true, error: null });
         try {
-            await db.priceHistory.update(id, {
+            const updated = await db.priceHistory.update(id, {
                 priceId: data.priceId || null,
                 price: parseFloat(data.price),
                 productId: data.productId,
                 supermarketId: data.supermarketId,
                 timestamp: data.timestamp,
                 isPromotional: data.isPromotional || false,
-                priceChangeReason: data.priceChangeReason || null
+                priceChangeReason: data.priceChangeReason || null,
             });
-            await usePriceHistoryStore.getState().fetchHistory();
-            set({ loading: false });
+            set((state) => ({
+                history: state.history.map((row) =>
+                    row.$id === id ? { ...row, ...updated } : row
+                ),
+                loading: false,
+            }));
             return true;
         } catch (error) {
             console.error('Update price history error:', error);
@@ -76,8 +109,11 @@ const usePriceHistoryStore = create((set) => ({
         set({ loading: true, error: null });
         try {
             await db.priceHistory.delete(id);
-            await usePriceHistoryStore.getState().fetchHistory();
-            set({ loading: false });
+            set((state) => ({
+                history: state.history.filter((row) => row.$id !== id),
+                total: Math.max(0, (state.total || 0) - 1),
+                loading: false,
+            }));
             return true;
         } catch (error) {
             console.error('Delete price history error:', error);
@@ -87,14 +123,8 @@ const usePriceHistoryStore = create((set) => ({
     },
 
     /** @deprecated Use backfillFromPrices */
-    syncFromPrices: async () => {
-        return usePriceHistoryStore.getState().backfillFromPrices();
-    },
+    syncFromPrices: async () => get().backfillFromPrices(),
 
-  /**
-   * One-time backfill: paginate all prices, skip rows that already have history (by priceId), parallel create.
-   * @param {(progress: object) => void} [onProgress]
-   */
     backfillFromPrices: async (onProgress) => {
         set({ loading: true, error: null });
 
@@ -154,8 +184,8 @@ const usePriceHistoryStore = create((set) => ({
                 }
             );
 
-            await usePriceHistoryStore.getState().fetchHistory();
-            set({ loading: false });
+            await get().fetchHistoryPage(1, get().pageSize);
+            set({ loading: false, page: 1 });
 
             return {
                 success: true,
@@ -183,12 +213,6 @@ const usePriceHistoryStore = create((set) => ({
         }
     },
 
-    /**
-     * Bulk-create price_history rows from normalized Open Price Engine data.
-     * @param {{ price: number, timestamp: string }[]} rows
-     * @param {{ productId: string, supermarketId: string, priceChangeReason?: string, opeStore?: string }} options
-     * @param {(progress: object) => void} [onProgress]
-     */
     importHistoryBatch: async (rows, options, onProgress) => {
         set({ loading: true, error: null });
 
@@ -235,8 +259,8 @@ const usePriceHistoryStore = create((set) => ({
                 }
             );
 
-            await usePriceHistoryStore.getState().fetchHistory();
-            set({ loading: false });
+            await get().fetchHistoryPage(1, get().pageSize);
+            set({ loading: false, page: 1 });
 
             return {
                 success: true,

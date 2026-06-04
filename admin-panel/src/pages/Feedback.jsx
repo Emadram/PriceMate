@@ -5,7 +5,8 @@ import { FiMessageSquare, FiTrash2, FiEye, FiCheckCircle, FiClock, FiAlertTriang
 import SortIcon from '../components/SortIcon';
 import useFeedbackStore from '../stores/feedbackStore';
 import Sidebar from '../components/Sidebar';
-import { client, DATABASE_ID, COLLECTIONS } from '../lib/appwrite';
+import { DATABASE_ID, COLLECTIONS } from '../lib/appwrite';
+import useDebouncedRealtimeRefresh from '../hooks/useDebouncedRealtimeRefresh';
 
 const Feedback = () => {
     const { feedback, loading, fetchFeedback, deleteFeedback, updateFeedbackStatus } = useFeedbackStore();
@@ -26,13 +27,8 @@ const Feedback = () => {
         return () => clearTimeout(t);
     }, [refreshData]);
 
-    useEffect(() => {
-        const channel = `databases.${DATABASE_ID}.collections.${COLLECTIONS.FEEDBACK}.documents`;
-        const unsubscribe = client.subscribe(channel, () => {
-            setTimeout(() => refreshData(), 0);
-        });
-        return () => unsubscribe();
-    }, [refreshData]);
+    const feedbackChannel = `databases.${DATABASE_ID}.collections.${COLLECTIONS.FEEDBACK}.documents`;
+    useDebouncedRealtimeRefresh(feedbackChannel, () => refreshData());
 
     // `isFresh` indicator handled by useFreshIndicator to avoid rapid flicker
 

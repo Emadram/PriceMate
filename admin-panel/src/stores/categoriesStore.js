@@ -1,19 +1,46 @@
 import { create } from 'zustand';
 import { db } from '../lib/appwrite';
+import { invalidateCacheKey } from '../utils/readCache';
 
-const useCategoriesStore = create((set) => ({
+const REFERENCE_TTL_MS = 10 * 60 * 1000;
+const CACHE_KEY = 'admin:categories:v1';
+
+const useCategoriesStore = create((set, get) => ({
     categories: [],
     loading: false,
     error: null,
+    lastFetchedAt: null,
 
-    fetchCategories: async () => {
+    fetchCategories: async ({ force = false } = {}) => {
+        const { lastFetchedAt, categories, loading } = get();
+        if (
+            !force &&
+            lastFetchedAt &&
+            Date.now() - lastFetchedAt < REFERENCE_TTL_MS &&
+            categories.length > 0
+        ) {
+            return;
+        }
+        if (loading && !force) return;
+
         set({ loading: true, error: null });
         try {
             const response = await db.categories.list();
-            set({ categories: response.documents, loading: false });
+            set({
+                categories: response.documents,
+                loading: false,
+                lastFetchedAt: Date.now(),
+            });
         } catch (error) {
             set({ error: error.message, loading: false });
         }
+    },
+
+    fetchIfStale: async (force = false) => get().fetchCategories({ force }),
+
+    invalidate: () => {
+        invalidateCacheKey(CACHE_KEY);
+        set({ lastFetchedAt: null });
     },
 
     addCategory: async (data) => {
@@ -33,7 +60,8 @@ const useCategoriesStore = create((set) => ({
 
             const result = await db.categories.create(payload);
             console.log('Category created successfully:', result);
-            await useCategoriesStore.getState().fetchCategories();
+            useCategoriesStore.getState().invalidate();
+            await useCategoriesStore.getState().fetchCategories({ force: true });
             set({ loading: false });
             return true;
         } catch (error) {
@@ -55,7 +83,8 @@ const useCategoriesStore = create((set) => ({
                 categoryName: data.categoryName,
                 icon: data.icon || null
             });
-            await useCategoriesStore.getState().fetchCategories();
+            useCategoriesStore.getState().invalidate();
+            await useCategoriesStore.getState().fetchCategories({ force: true });
             set({ loading: false });
             return true;
         } catch (error) {
@@ -68,7 +97,8 @@ const useCategoriesStore = create((set) => ({
         set({ loading: true, error: null });
         try {
             await db.categories.delete(id);
-            await useCategoriesStore.getState().fetchCategories();
+            useCategoriesStore.getState().invalidate();
+            await useCategoriesStore.getState().fetchCategories({ force: true });
             set({ loading: false });
             return true;
         } catch (error) {

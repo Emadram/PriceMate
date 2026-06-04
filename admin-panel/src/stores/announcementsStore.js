@@ -1,18 +1,36 @@
 import { create } from 'zustand';
 import { db, Query } from '../lib/appwrite';
 
-const useAnnouncementsStore = create((set) => ({
+const ANNOUNCEMENTS_TTL_MS = 3 * 60 * 1000;
+
+const useAnnouncementsStore = create((set, get) => ({
     announcements: [],
     loading: false,
     error: null,
+    lastFetchedAt: null,
 
-    fetchAnnouncements: async () => {
+    fetchAnnouncements: async ({ force = false } = {}) => {
+        const { lastFetchedAt, announcements, loading } = get();
+        if (
+            !force &&
+            lastFetchedAt &&
+            Date.now() - lastFetchedAt < ANNOUNCEMENTS_TTL_MS &&
+            announcements.length > 0
+        ) {
+            return;
+        }
+        if (loading && !force) return;
+
         set({ loading: true, error: null });
         try {
             const response = await db.announcements.list([
-                Query.orderDesc('$createdAt')
+                Query.orderDesc('$createdAt'),
             ]);
-            set({ announcements: response.documents, loading: false });
+            set({
+                announcements: response.documents,
+                loading: false,
+                lastFetchedAt: Date.now(),
+            });
         } catch (error) {
             set({ error: error.message, loading: false });
         }
@@ -25,17 +43,14 @@ const useAnnouncementsStore = create((set) => ({
                 text: data.text,
                 category: data.category || 'general',
                 active: data.active ?? true,
-                createdAt: new Date().toISOString()
+                createdAt: new Date().toISOString(),
             });
-            
-            // Success optimization: Add to state instantly before re-fetching
-            set(state => ({
-                announcements: [newDoc, ...state.announcements],
-                loading: false 
-            }));
 
-            // Sync with backend to ensure data integrity
-            await useAnnouncementsStore.getState().fetchAnnouncements();
+            set((state) => ({
+                announcements: [newDoc, ...state.announcements],
+                loading: false,
+                lastFetchedAt: Date.now(),
+            }));
             return true;
         } catch (error) {
             set({ error: error.message, loading: false });
@@ -46,13 +61,18 @@ const useAnnouncementsStore = create((set) => ({
     updateAnnouncement: async (id, data) => {
         set({ loading: true, error: null });
         try {
-            await db.announcements.update(id, {
+            const updated = await db.announcements.update(id, {
                 text: data.text,
                 category: data.category,
-                active: data.active
+                active: data.active,
             });
-            await useAnnouncementsStore.getState().fetchAnnouncements();
-            set({ loading: false });
+            set((state) => ({
+                announcements: state.announcements.map((row) =>
+                    row.$id === id ? { ...row, ...updated } : row
+                ),
+                loading: false,
+                lastFetchedAt: Date.now(),
+            }));
             return true;
         } catch (error) {
             set({ error: error.message, loading: false });
@@ -64,14 +84,17 @@ const useAnnouncementsStore = create((set) => ({
         set({ loading: true, error: null });
         try {
             await db.announcements.delete(id);
-            await useAnnouncementsStore.getState().fetchAnnouncements();
-            set({ loading: false });
+            set((state) => ({
+                announcements: state.announcements.filter((row) => row.$id !== id),
+                loading: false,
+                lastFetchedAt: Date.now(),
+            }));
             return true;
         } catch (error) {
             set({ error: error.message, loading: false });
             return false;
         }
-    }
+    },
 }));
 
 export default useAnnouncementsStore;

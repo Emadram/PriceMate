@@ -5,7 +5,8 @@ import Sidebar from '../components/Sidebar';
 import usePriceHistoryStore from '../stores/priceHistoryStore';
 import useProductsStore from '../stores/productsStore';
 import useSupermarketsStore from '../stores/supermarketsStore';
-import { client, DATABASE_ID, COLLECTIONS } from '../lib/appwrite';
+import { DATABASE_ID, COLLECTIONS } from '../lib/appwrite';
+import useDebouncedRealtimeRefresh from '../hooks/useDebouncedRealtimeRefresh';
 import {
     isOpeProxyConfigured,
     fetchOpeStores,
@@ -34,9 +35,23 @@ const buildDefaultOpeForm = (supermarketId = '') => {
 };
 
 const PriceHistory = () => {
-    const { history, loading, fetchHistory, addHistory, updateHistory, deleteHistory, backfillFromPrices, importHistoryBatch } = usePriceHistoryStore();
-    const { products, fetchProducts, updateProductOpeMapping } = useProductsStore();
+    const {
+        history,
+        loading,
+        page,
+        pageSize,
+        total,
+        setPage,
+        fetchHistoryPage,
+        addHistory,
+        updateHistory,
+        deleteHistory,
+        backfillFromPrices,
+        importHistoryBatch,
+    } = usePriceHistoryStore();
+    const { products, productOptions, fetchProductOptions, updateProductOpeMapping } = useProductsStore();
     const { supermarkets, fetchSupermarkets } = useSupermarketsStore();
+    const catalogProducts = productOptions.length > 0 ? productOptions : products;
 
     const [showModal, setShowModal] = useState(false);
     const [editing, setEditing] = useState(null);
@@ -72,12 +87,12 @@ const PriceHistory = () => {
 
     const refreshData = useCallback(async () => {
         await Promise.all([
-            fetchHistory(),
-            fetchProducts(),
-            fetchSupermarkets()
+            fetchHistoryPage(page, pageSize),
+            fetchProductOptions(),
+            fetchSupermarkets(),
         ]);
         setLastUpdated(new Date().toISOString());
-    }, [fetchHistory, fetchProducts, fetchSupermarkets]);
+    }, [fetchHistoryPage, fetchProductOptions, fetchSupermarkets, page, pageSize]);
 
     useEffect(() => {
         const t = setTimeout(() => refreshData(), 0);
@@ -118,7 +133,7 @@ const PriceHistory = () => {
     }, [showOpeModal]);
 
     const handleOpeProductChange = (productId) => {
-        const product = products.find((p) => p.$id === productId);
+        const product = catalogProducts.find((p) => p.$id === productId);
         setOpeForm((prev) => ({
             ...prev,
             productId,
@@ -275,22 +290,23 @@ const PriceHistory = () => {
 
     // `isFresh` indicator handled by useFreshIndicator to avoid rapid flicker
 
-    useEffect(() => {
-        const channels = [
-            `databases.${DATABASE_ID}.collections.${COLLECTIONS.PRICE_HISTORY}.documents`,
-            `databases.${DATABASE_ID}.collections.${COLLECTIONS.PRODUCTS}.documents`,
-            `databases.${DATABASE_ID}.collections.${COLLECTIONS.SUPERMARKETS}.documents`
-        ];
+    const priceHistoryChannels = [
+        `databases.${DATABASE_ID}.collections.${COLLECTIONS.PRICE_HISTORY}.documents`,
+        `databases.${DATABASE_ID}.collections.${COLLECTIONS.PRODUCTS}.documents`,
+        `databases.${DATABASE_ID}.collections.${COLLECTIONS.SUPERMARKETS}.documents`,
+    ];
+    useDebouncedRealtimeRefresh(priceHistoryChannels, refreshData);
 
-        const unsubscribe = client.subscribe(channels, () => {
-            setTimeout(() => refreshData(), 0);
-        });
+    const totalPages = Math.max(1, Math.ceil((total || 0) / pageSize));
 
-        return () => unsubscribe();
-    }, [refreshData]);
+    const goToPage = (nextPage) => {
+        const clamped = Math.min(Math.max(1, nextPage), totalPages);
+        setPage(clamped);
+        fetchHistoryPage(clamped, pageSize);
+    };
 
     const getProductName = (id) => {
-        const match = products.find((item) => item.$id === id);
+        const match = catalogProducts.find((item) => item.$id === id);
         return match?.name || 'Unknown Product';
     };
 
@@ -580,6 +596,29 @@ const PriceHistory = () => {
                                     ))}
                                 </tbody>
                             </table>
+                            <div className="flex items-center justify-between px-8 py-5 border-t border-gray-100 dark:border-gray-700">
+                                <span className="text-xs font-bold text-gray-500">
+                                    Page {page} of {totalPages} · {total} total records
+                                </span>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        disabled={page <= 1 || loading}
+                                        onClick={() => goToPage(page - 1)}
+                                        className="px-4 py-2 text-xs font-black uppercase tracking-widest rounded-xl border border-gray-200 dark:border-gray-600 disabled:opacity-40"
+                                    >
+                                        Previous
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={page >= totalPages || loading}
+                                        onClick={() => goToPage(page + 1)}
+                                        className="px-4 py-2 text-xs font-black uppercase tracking-widest rounded-xl border border-gray-200 dark:border-gray-600 disabled:opacity-40"
+                                    >
+                                        Next
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     )}
                 </main>
@@ -632,7 +671,7 @@ const PriceHistory = () => {
                                     required
                                 >
                                     <option value="">Select product</option>
-                                    {products.map((product) => (
+                                    {catalogProducts.map((product) => (
                                         <option key={product.$id} value={product.$id}>
                                             {product.name}
                                         </option>
@@ -910,7 +949,7 @@ const PriceHistory = () => {
                                         required
                                     >
                                         <option value="">Select Product</option>
-                                        {products.map((product) => (
+                                        {catalogProducts.map((product) => (
                                             <option key={product.$id} value={product.$id}>{product.name}</option>
                                         ))}
                                     </select>

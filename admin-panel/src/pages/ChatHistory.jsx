@@ -4,32 +4,35 @@ import { useNavigate } from 'react-router-dom';
 import { FiMessageSquare, FiUser, FiClock, FiSearch, FiChevronRight, FiTrash2 } from 'react-icons/fi';
 import { useChatHistoryStore, groupMessagesByThread } from '../stores/chatHistoryStore';
 import Sidebar from '../components/Sidebar';
-import { client, DATABASE_ID, COLLECTIONS } from '../lib/appwrite';
+import { DATABASE_ID, COLLECTIONS } from '../lib/appwrite';
+import useDebouncedRealtimeRefresh from '../hooks/useDebouncedRealtimeRefresh';
 
 const ChatHistory = () => {
-    const { groupedHistory, loading, fetchHistory, deleteUserHistory } = useChatHistoryStore();
+    const {
+        groupedHistory,
+        loading,
+        sessionIndexCapped,
+        maxMessagesLoaded,
+        fetchSessionIndex,
+        deleteUserHistory,
+    } = useChatHistoryStore();
     const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState('');
     const [lastUpdated, setLastUpdated] = useState(null);
     const isFresh = useFreshIndicator(lastUpdated);
 
-    const refreshData = useCallback(async () => {
-        await fetchHistory();
+    const refreshData = useCallback(async (force = false) => {
+        await fetchSessionIndex({ force });
         setLastUpdated(new Date().toISOString());
-    }, [fetchHistory]);
+    }, [fetchSessionIndex]);
 
     useEffect(() => {
         const t = setTimeout(() => refreshData(), 0);
         return () => clearTimeout(t);
     }, [refreshData]);
 
-    useEffect(() => {
-        const channel = `databases.${DATABASE_ID}.collections.${COLLECTIONS.CHAT_HISTORY}.documents`;
-        const unsubscribe = client.subscribe(channel, () => {
-            setTimeout(() => refreshData(), 0);
-        });
-        return () => unsubscribe();
-    }, [refreshData]);
+    const chatChannel = `databases.${DATABASE_ID}.collections.${COLLECTIONS.CHAT_HISTORY}.documents`;
+    useDebouncedRealtimeRefresh(chatChannel, () => refreshData(true));
 
     // `isFresh` indicator handled by useFreshIndicator to avoid rapid flicker
 
@@ -77,6 +80,11 @@ const ChatHistory = () => {
                             </span>
                         </div>
                         <p className="text-sm text-gray-500 font-medium tracking-tight">Monitoring system intelligence and user queries</p>
+                        {sessionIndexCapped && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                                Showing users from the most recent {maxMessagesLoaded} messages
+                            </p>
+                        )}
                     </div>
                     
                     <div className="relative group max-w-md w-full ml-8 hidden md:block">

@@ -3,7 +3,8 @@ import useFreshIndicator from '../hooks/useFreshIndicator';
 import { FiPlus, FiEdit2, FiTrash2, FiBell, FiCheckCircle, FiXCircle, FiZap, FiAlertTriangle, FiInfo } from 'react-icons/fi';
 import useAnnouncementsStore from '../stores/announcementsStore';
 import Sidebar from '../components/Sidebar';
-import { client, DATABASE_ID, COLLECTIONS } from '../lib/appwrite';
+import { DATABASE_ID, COLLECTIONS } from '../lib/appwrite';
+import useDebouncedRealtimeRefresh from '../hooks/useDebouncedRealtimeRefresh';
 
 const ANNOUNCEMENT_CATEGORY_OPTIONS = [
     { value: 'general', label: 'General' },
@@ -34,13 +35,8 @@ const Announcements = () => {
         return () => clearTimeout(t);
     }, [refreshData]);
 
-    useEffect(() => {
-        const channel = `databases.${DATABASE_ID}.collections.${COLLECTIONS.ANNOUNCEMENTS}.documents`;
-        const unsubscribe = client.subscribe(channel, () => {
-            setTimeout(() => refreshData(), 0);
-        });
-        return () => unsubscribe();
-    }, [refreshData]);
+    const announcementsChannel = `databases.${DATABASE_ID}.collections.${COLLECTIONS.ANNOUNCEMENTS}.documents`;
+    useDebouncedRealtimeRefresh(announcementsChannel, () => refreshData());
 
     // `isFresh` indicator handled by useFreshIndicator to avoid rapid flicker
 

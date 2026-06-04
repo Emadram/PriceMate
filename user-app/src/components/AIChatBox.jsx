@@ -1318,13 +1318,24 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         }
     }, [user?.$id, resetChat]);
 
+    const chatSessionInitForUserRef = useRef(null);
+
+    useEffect(() => {
+        if (!user?.$id) {
+            chatSessionInitForUserRef.current = null;
+        }
+    }, [user?.$id]);
+
     useEffect(() => {
         if (!isOpen || !user?.$id) return;
+        if (chatSessionInitForUserRef.current === user.$id) return;
+        chatSessionInitForUserRef.current = user.$id;
         const run = async () => {
             try {
                 await initializeChatSession(user.$id);
             } catch (e) {
                 console.error('Chat sync on open failed:', e);
+                chatSessionInitForUserRef.current = null;
             }
         };
         void run();

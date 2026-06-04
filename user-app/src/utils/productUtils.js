@@ -947,7 +947,7 @@ export const resolveCatalogProductForIngredients = async (userMessage) => {
     }
 
     try {
-        const res = await db.products.list([Query.limit(500), Query.orderDesc('$createdAt')]);
+        const res = await db.products.list([Query.limit(80), Query.orderDesc('$createdAt')]);
         const fuzzy = findBestProductMatch(trimmed, res.documents, { minScore: FUZZY_MATCH_MIN_SCORE });
         if (fuzzy?.product) {
             return {
@@ -1552,7 +1552,7 @@ export const fetchPriceHistory = async (productId, branchId = null) => {
         const historyIds = new Set();
 
         const HISTORY_PAGE_SIZE = 100;
-        const HISTORY_MAX_DOCS = 1000;
+        const HISTORY_MAX_DOCS = 120;
 
         const fetchHistoryByField = async (productField, branchField) => {
             try {
