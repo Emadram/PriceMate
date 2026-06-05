@@ -14,7 +14,8 @@ const CACHE_TTL = {
     categories: 5 * 60 * 1000,
     allPrices: 30 * 1000,
     search: 30 * 1000,
-    similar: 60 * 1000
+    similar: 60 * 1000,
+    priceHistory: 2 * 60 * 1000,
 };
 const OFF_CACHE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 const OFF_MEMORY_TTL_MS = 5 * 60 * 1000;
@@ -1203,7 +1204,7 @@ export const fetchProducts = async (limit = 50) => {
 /**
  * Fetch similar products for a category (excluding the current product).
  */
-export const fetchSimilarProductsByCategory = async (categoryId, excludeId = null, limit = 6) => {
+export const fetchSimilarProductsByCategory = async (categoryId, excludeId = null, limit = 4) => {
     if (!categoryId) return [];
     const cacheKey = `similar:${categoryId}:${excludeId || 'none'}:${limit}`;
     const cached = getCachedValue(cacheKey);
@@ -1541,11 +1542,26 @@ export const formatLastUpdate = (timestamp) => {
 };
 
 /**
- * Fetch price history for a specific product
+ * Fetch price history for a specific product (in-memory TTL cache).
  */
 export const fetchPriceHistory = async (productId, branchId = null) => {
     if (!productId) return [];
 
+    const cacheKey = `price-history:${productId}:${branchId || 'all'}`;
+    const cached = getCachedValue(cacheKey);
+    if (cached) return cached;
+
+    return withInflight(cacheKey, async () => {
+        const hit = getCachedValue(cacheKey);
+        if (hit) return hit;
+
+        const result = await fetchPriceHistoryUncached(productId, branchId);
+        setCachedValue(cacheKey, result, CACHE_TTL.priceHistory);
+        return result;
+    });
+};
+
+const fetchPriceHistoryUncached = async (productId, branchId = null) => {
     try {
         const historyColl = COLLECTIONS.PRICE_HISTORY || 'price_history';
         const historyDocs = [];
@@ -1840,6 +1856,27 @@ export const fetchSupermarketById = async (id) => {
 };
 
 /**
+ * Cached supermarket document fetch.
+ */
+export const fetchSupermarketByIdCached = async (id) => {
+    if (!id) return null;
+    const cacheKey = `supermarket:doc:${id}`;
+    const cached = getCachedValue(cacheKey);
+    if (cached) return cached;
+
+    return withInflight(cacheKey, async () => {
+        const hit = getCachedValue(cacheKey);
+        if (hit) return hit;
+
+        const data = await fetchSupermarketById(id);
+        if (data) {
+            setCachedValue(cacheKey, data, CACHE_TTL.categories);
+        }
+        return data;
+    });
+};
+
+/**
  * Fetch prices by supermarket ID
  */
 export const fetchPricesBySupermarket = async (supermarketId) => {
@@ -1865,6 +1902,54 @@ export const fetchPricesBySupermarket = async (supermarketId) => {
         console.error('Error fetching supermarket prices:', error);
         return [];
     }
+};
+
+/**
+ * Cached supermarket shelf prices.
+ */
+export const fetchPricesBySupermarketCached = async (supermarketId) => {
+    if (!supermarketId) return [];
+    const cacheKey = `supermarket:prices:${supermarketId}`;
+    const cached = getCachedValue(cacheKey);
+    if (cached) return cached;
+
+    return withInflight(cacheKey, async () => {
+        const hit = getCachedValue(cacheKey);
+        if (hit) return hit;
+
+        const data = await fetchPricesBySupermarket(supermarketId);
+        setCachedValue(cacheKey, data, CACHE_TTL.prices);
+        return data;
+    });
+};
+
+const sortSupermarketBranches = (related, currentId) => {
+    const othersFirst = (related || []).filter((b) => b.$id !== currentId);
+    return [...othersFirst].sort((a, b) =>
+        (a.address || a.branchName || '').localeCompare(b.address || b.branchName || '', undefined, {
+            sensitivity: 'base',
+        })
+    );
+};
+
+/**
+ * Supermarket profile payload for SWR page cache.
+ */
+export const fetchSupermarketProfileBundle = async (supermarketId) => {
+    if (!supermarketId) {
+        return { supermarket: null, branches: [], products: [] };
+    }
+
+    const supermarket = await fetchSupermarketByIdCached(supermarketId);
+    if (!supermarket) {
+        return { supermarket: null, branches: [], products: [] };
+    }
+
+    const related = await resolveRelatedSupermarkets(supermarket);
+    const branches = sortSupermarketBranches(related, supermarketId);
+    const products = await fetchPricesBySupermarketCached(supermarketId);
+
+    return { supermarket, branches, products };
 };
 
 /**
@@ -1905,7 +1990,7 @@ export const resolveRelatedSupermarkets = async (currentDoc) => {
                 Query.limit(50)
             ]);
             addDocs(siblingsResponse.documents);
-            const parent = await fetchSupermarketById(currentDoc.parentId);
+            const parent = await fetchSupermarketByIdCached(currentDoc.parentId);
             if (parent) addDocs([parent]);
         } else {
             const childrenResponse = await db.supermarkets.list([
@@ -2015,3 +2100,43 @@ export const fetchCategories = async () => {
         return [];
     }
 };
+
+/** Price-sensitive cache prefixes cleared on user refresh (not full catalog). */
+export const PRICE_SENSITIVE_CACHE_PREFIXES = [
+    'prices:',
+    'price-history:',
+    'supermarket:prices:',
+    'similar:',
+    'search:',
+];
+
+export function invalidateProductUtilsCache(key) {
+    if (!key) return;
+    cacheStore.delete(key);
+    inflightRequests.delete(key);
+}
+
+export function invalidateProductUtilsByPrefix(prefix) {
+    if (!prefix) return 0;
+    let removed = 0;
+    for (const key of [...cacheStore.keys()]) {
+        if (key.startsWith(prefix)) {
+            cacheStore.delete(key);
+            removed += 1;
+        }
+    }
+    for (const key of [...inflightRequests.keys()]) {
+        if (key.startsWith(prefix)) {
+            inflightRequests.delete(key);
+        }
+    }
+    return removed;
+}
+
+export function invalidateGlobalPriceCaches() {
+    let total = 0;
+    for (const prefix of PRICE_SENSITIVE_CACHE_PREFIXES) {
+        total += invalidateProductUtilsByPrefix(prefix);
+    }
+    return total;
+}

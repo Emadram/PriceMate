@@ -322,26 +322,24 @@ const setCachedIntent = (key, value, ttl) => {
 };
 
 import { useState, useEffect, useRef } from 'react';
-import { FiX, FiSend, FiList, FiLoader, FiExternalLink, FiPackage, FiShoppingBag, FiPlus, FiTrash2, FiChevronLeft, FiCpu, FiMapPin, FiCheckCircle, FiSearch, FiCamera, FiClipboard } from 'react-icons/fi';
+import { FiX, FiSend, FiList, FiLoader, FiExternalLink, FiPackage, FiShoppingBag, FiPlus, FiTrash2, FiChevronLeft, FiCpu, FiMapPin, FiCheckCircle, FiSearch, FiCamera, FiClipboard, FiRefreshCw } from 'react-icons/fi';
 import OpenAI from "openai";
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import {
-    fetchProducts,
-    fetchPricesForProducts,
     fetchIngredientsByBarcode,
     searchIngredientsByName,
     resolveCatalogProductForIngredients,
     ingredientPayloadFromAppwriteProduct,
     persistIngredientPayloadToCatalogProduct,
-    normalizeProduct,
     resolveOffCacheProductForIngredients,
     ingredientPayloadFromOffCache,
     buildSupermarketContextLines,
-    enrichProductPricesWithSupermarkets,
     isUserLocationAvailableForStores,
     resolvePriceSupermarketMeta,
 } from '../utils/productUtils';
+import useAiContextStore from '../stores/aiContextStore';
+import { refreshPageCache } from '../utils/invalidateFreshData';
 import {
     findBestProductMatch,
     scoreProductNameMatch,
@@ -355,7 +353,6 @@ import {
     scrubPunctuationAfterProductTags,
     tokenizeMessageContent,
 } from '../utils/chatMessageContent';
-import useSupermarketsStore from '../stores/supermarketsStore';
 import {
     buildAiProfileCacheKey,
     buildAiCheckFingerprint,
@@ -386,9 +383,11 @@ const ChatScreenHeader = ({
     user,
     onOpenList,
     onNewChat,
+    onRefreshCatalog,
     onClose,
     showDragHandle,
     headerRef,
+    catalogRefreshing = false,
     t,
 }) => {
     const isPage = variant === 'page';
@@ -443,6 +442,17 @@ const ChatScreenHeader = ({
                         ) : null}
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
+                        {onRefreshCatalog ? (
+                            <button
+                                type="button"
+                                onClick={onRefreshCatalog}
+                                disabled={catalogRefreshing}
+                                className="tap-target min-h-10 min-w-10 p-2.5 text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/25 rounded-2xl transition-all active:scale-95 inline-flex items-center justify-center disabled:opacity-50"
+                                aria-label={t('refresh', 'Refresh')}
+                            >
+                                <FiRefreshCw size={18} className={catalogRefreshing ? 'animate-spin' : ''} />
+                            </button>
+                        ) : null}
                         {user ? (
                             <button
                                 type="button"
@@ -1169,10 +1179,13 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
     const [isLoading, setIsLoading] = useState(false);
     const lastResolvedProductRef = useRef({ barcode: '', name: '' });
     const [mobileListOpen, setMobileListOpen] = useState(false);
-    const [fullProductList, setFullProductList] = useState([]);
-    const [supermarketList, setSupermarketList] = useState([]);
+    const fullProductList = useAiContextStore((state) => state.products);
+    const supermarketList = useAiContextStore((state) => state.supermarkets);
+    const loadAiContext = useAiContextStore((state) => state.loadContext);
+    const clearAiContext = useAiContextStore((state) => state.clearContext);
+    const aiContextLoading = useAiContextStore((state) => state.loading);
+    const [catalogRefreshing, setCatalogRefreshing] = useState(false);
     const { location: userLocation } = useUserLocation();
-    const fetchSupermarkets = useSupermarketsStore((state) => state.fetchSupermarkets);
     const messagesEndRef = useRef(null);
     const messagesScrollRef = useRef(null);
     const headerRef = useRef(null);
@@ -1323,9 +1336,9 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
     useEffect(() => {
         if (!user?.$id) {
             chatSessionInitForUserRef.current = null;
-            chatContextLoadedRef.current = false;
+            clearAiContext();
         }
-    }, [user?.$id]);
+    }, [user?.$id, clearAiContext]);
 
     useEffect(() => {
         if (!isOpen || !user?.$id) return;
@@ -1452,42 +1465,32 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         requestAnimationFrame(() => scrollMessagesToTop());
     }, [history, isLoading, activeConversationId, historyLoading]);
 
-    const chatContextLoadedRef = useRef(false);
-
     useEffect(() => {
         if (!isOpen) return;
-        if (chatContextLoadedRef.current && fullProductList.length > 0) return;
 
         let cancelled = false;
-        const loadContext = async () => {
-            try {
-                const products = await fetchProducts(50);
-                const productIds = products.map((p) => p.$id).filter(Boolean);
-                const [prices, supermarkets] = await Promise.all([
-                    fetchPricesForProducts(productIds),
-                    fetchSupermarkets(),
-                ]);
-
-                if (cancelled) return;
-
-                const productsWithData = products.map((p) => normalizeProduct(p, prices));
-
-                const enrichedProducts = enrichProductPricesWithSupermarkets(
-                    productsWithData,
-                    Array.isArray(supermarkets) ? supermarkets : []
-                );
-                setFullProductList(enrichedProducts);
-                setSupermarketList(Array.isArray(supermarkets) ? supermarkets : []);
-                chatContextLoadedRef.current = true;
-            } catch (error) {
+        loadAiContext().catch((error) => {
+            if (!cancelled) {
                 console.error('Error loading chat context:', error);
             }
-        };
-        void loadContext();
+        });
+
         return () => {
             cancelled = true;
         };
-    }, [isOpen, fetchSupermarkets, fullProductList.length]);
+    }, [isOpen, loadAiContext]);
+
+    const handleRefreshCatalog = async () => {
+        setCatalogRefreshing(true);
+        try {
+            refreshPageCache({ priceScope: 'catalog' });
+            await loadAiContext({ force: true });
+        } catch (error) {
+            console.error('Error refreshing AI catalog:', error);
+        } finally {
+            setCatalogRefreshing(false);
+        }
+    };
 
     const extractBarcode = (message) => {
         const match = message.match(/\b\d{8,14}\b/);
@@ -2617,9 +2620,11 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 user={user}
                 onOpenList={() => setMobileListOpen(true)}
                 onNewChat={beginNewConversation}
+                onRefreshCatalog={handleRefreshCatalog}
                 onClose={effectiveOnClose}
                 showDragHandle={!isPage}
                 headerRef={headerRef}
+                catalogRefreshing={catalogRefreshing || aiContextLoading}
                 t={t}
             />
 

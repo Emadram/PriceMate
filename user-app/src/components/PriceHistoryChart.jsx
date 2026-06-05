@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { FiTrendingUp, FiTrendingDown, FiCalendar } from 'react-icons/fi';
 import { fetchPriceHistory } from '../utils/productUtils';
+import { getCacheEntry, swrGetOrFetch } from '../utils/swrCache';
+import { PRICE_HISTORY_CHART_TTL_MS } from '../utils/cacheTtls';
 import useCurrencyStore from '../stores/currencyStore';
 
 const getSupermarketFromPrice = (price) => {
@@ -35,6 +37,75 @@ const formatSupermarketLabel = (name) => {
     return trimmed.length > 14 ? `${trimmed.slice(0, 14)}...` : trimmed;
 };
 
+const buildCurrentPricesSignature = (currentPrices = []) =>
+    currentPrices
+        .map((price) => {
+            const supermarket = getSupermarketFromPrice(price);
+            return `${getSupermarketId(supermarket) || 'unknown'}:${price.price}:${getPriceTimestamp(price) || ''}`;
+        })
+        .sort()
+        .join('|');
+
+const buildChartHistory = (data, currentPrices = []) => {
+    const supermarketLookup = new Map();
+
+    currentPrices.forEach((price) => {
+        const supermarket = getSupermarketFromPrice(price);
+        const supermarketId = getSupermarketId(supermarket);
+        if (supermarketId && typeof supermarket === 'object') {
+            supermarketLookup.set(supermarketId, supermarket);
+        }
+    });
+
+    const historyPoints = data.map((item) => {
+        const timeValue = getHistoryTimestamp(item);
+        if (!timeValue) return null;
+
+        const supermarketId = getSupermarketId(item.supermarketId || item.supermarkets || item.supermarket);
+        const matched = supermarketLookup.get(supermarketId);
+        const displayDate = new Date(timeValue).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' });
+        const supermarketName = matched ? formatSupermarketName(matched) : item.supermarketName || 'Store';
+
+        return {
+            date: new Date(timeValue).getTime(),
+            displayDate,
+            price: Number(item.price),
+            supermarket: supermarketName,
+            supermarketLabel: formatSupermarketLabel(supermarketName),
+            supermarketId,
+            currency: item.currency || 'TRY',
+        };
+    }).filter(Boolean);
+
+    const currentPoints = currentPrices.map((price) => {
+        const supermarket = getSupermarketFromPrice(price);
+        const timeValue = getPriceTimestamp(price);
+        if (!timeValue) return null;
+
+        const supermarketName = formatSupermarketName(supermarket);
+
+        return {
+            date: new Date(timeValue).getTime(),
+            displayDate: new Date(timeValue).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' }),
+            price: Number(price.price),
+            supermarket: supermarketName,
+            supermarketLabel: formatSupermarketLabel(supermarketName),
+            supermarketId: getSupermarketId(supermarket),
+            currency: price.currency || 'TRY',
+        };
+    }).filter(Boolean);
+
+    const merged = [...historyPoints, ...currentPoints];
+    const unique = new Map();
+
+    merged.forEach((item) => {
+        const key = `${item.supermarketId || 'unknown'}-${item.date}-${item.price}`;
+        if (!unique.has(key)) unique.set(key, item);
+    });
+
+    return [...unique.values()].sort((a, b) => a.date - b.date);
+};
+
 const PriceHistoryChart = ({ productId, productName, currentPrices = [] }) => {
     const { convert, getCurrencySymbol } = useCurrencyStore();
     const [history, setHistory] = useState([]);
@@ -65,73 +136,39 @@ const PriceHistoryChart = ({ productId, productName, currentPrices = [] }) => {
                 setHistory([]);
                 return;
             }
-            
-            setLoading(true);
-            try {
+
+            const currentSig = buildCurrentPricesSignature(currentPrices);
+            const key = `price-history-chart:${productId}:${currentSig}`;
+            const fetcher = async () => {
                 const data = await fetchPriceHistory(productId);
-                const supermarketLookup = new Map();
+                return buildChartHistory(data, currentPrices);
+            };
 
-                currentPrices.forEach((price) => {
-                    const supermarket = getSupermarketFromPrice(price);
-                    const supermarketId = getSupermarketId(supermarket);
-                    if (supermarketId && typeof supermarket === 'object') {
-                        supermarketLookup.set(supermarketId, supermarket);
-                    }
+            try {
+                const { data, fromCache, refreshing: willRefresh } = await swrGetOrFetch(key, {
+                    ttlMs: PRICE_HISTORY_CHART_TTL_MS,
+                    fetcher,
+                    onUpdate: (next) => {
+                        setHistory(Array.isArray(next) ? next : []);
+                        setLoading(false);
+                    },
                 });
 
-                const historyPoints = data.map((item) => {
-                    const timeValue = getHistoryTimestamp(item);
-                    if (!timeValue) return null;
-
-                    const supermarketId = getSupermarketId(item.supermarketId || item.supermarkets || item.supermarket);
-                    const matched = supermarketLookup.get(supermarketId);
-                    const displayDate = new Date(timeValue).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' });
-                    const supermarketName = matched ? formatSupermarketName(matched) : item.supermarketName || 'Store';
-
-                    return {
-                        date: new Date(timeValue).getTime(),
-                        displayDate,
-                        price: Number(item.price),
-                        supermarket: supermarketName,
-                        supermarketLabel: formatSupermarketLabel(supermarketName),
-                        supermarketId,
-                        currency: item.currency || 'TRY'
-                    };
-                }).filter(Boolean);
-
-                const currentPoints = currentPrices.map((price) => {
-                    const supermarket = getSupermarketFromPrice(price);
-                    const timeValue = getPriceTimestamp(price);
-                    if (!timeValue) return null;
-
-                    const supermarketName = formatSupermarketName(supermarket);
-
-                    return {
-                        date: new Date(timeValue).getTime(),
-                        displayDate: new Date(timeValue).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' }),
-                        price: Number(price.price),
-                        supermarket: supermarketName,
-                        supermarketLabel: formatSupermarketLabel(supermarketName),
-                        supermarketId: getSupermarketId(supermarket),
-                        currency: price.currency || 'TRY'
-                    };
-                }).filter(Boolean);
-
-                const merged = [...historyPoints, ...currentPoints];
-                const unique = new Map();
-
-                merged.forEach((item) => {
-                    const key = `${item.supermarketId || 'unknown'}-${item.date}-${item.price}`;
-                    if (!unique.has(key)) unique.set(key, item);
-                });
-
-                const formattedData = [...unique.values()].sort((a, b) => a.date - b.date);
-                setHistory(formattedData);
+                if (fromCache && data) {
+                    setHistory(Array.isArray(data) ? data : []);
+                    setLoading(willRefresh);
+                } else {
+                    setLoading(true);
+                    const entry = getCacheEntry(key);
+                    const awaited = entry?.promise ? await entry.promise : await fetcher();
+                    setHistory(Array.isArray(awaited) ? awaited : []);
+                    setLoading(false);
+                }
             } catch (error) {
                 console.error('Error loading history:', error);
                 setHistory([]);
+                setLoading(false);
             }
-            setLoading(false);
         };
 
         loadHistory();

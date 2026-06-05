@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom';
 import { 
     FiArrowLeft, FiMapPin, FiShoppingCart, FiShare2, FiPackage, 
@@ -23,6 +23,8 @@ import useFavoritesStore from '../stores/favoritesStore';
 import useCurrencyStore from '../stores/currencyStore';
 import useUserLocation from '../hooks/useUserLocation';
 import StarRating from '../components/StarRating';
+import RefreshControl from '../components/RefreshControl';
+import { refreshPageCache } from '../utils/invalidateFreshData';
 
 const normalizeStockStatus = (status) => {
     if (!status) return 'in_stock';
@@ -128,6 +130,8 @@ const PriceComparison = () => {
     const [prices, setPrices] = useState([]);
     const [similarProducts, setSimilarProducts] = useState([]);
     const [similarLoading, setSimilarLoading] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
+    const [similarRefreshSeq, setSimilarRefreshSeq] = useState(0);
 
     const getSupermarketFromPrice = (price) => {
         if (!price) return null;
@@ -260,12 +264,12 @@ const PriceComparison = () => {
 
             setSimilarLoading(true);
             try {
-                const candidates = await fetchSimilarProductsByCategory(categoryId, productId, 6);
+                const candidates = await fetchSimilarProductsByCategory(categoryId, productId, 4);
                 const localIds = candidates.filter((p) => p.$id).map((p) => p.$id);
                 const batchPrices = localIds.length > 0
                     ? await fetchPricesForProducts(localIds)
                     : [];
-                const normalized = candidates.map((p) => normalizeProduct(p, batchPrices));
+                const normalized = candidates.map((p) => normalizeProduct(p, batchPrices)).slice(0, 4);
                 if (active) setSimilarProducts(normalized);
             } catch (error) {
                 console.warn('Similar products fetch failed:', error?.message || error);
@@ -278,7 +282,23 @@ const PriceComparison = () => {
         return () => {
             active = false;
         };
-    }, [productId, productCategory, productIsGlobal]);
+    }, [productId, productCategory, productIsGlobal, similarRefreshSeq]);
+
+    const handleRefresh = useCallback(async () => {
+        if (!barcode) return;
+        setRefreshing(true);
+        try {
+            refreshPageCache({
+                priceScope: 'product',
+                productId: product?.$id,
+                barcode,
+            });
+            await fetchProductByBarcode(barcode, { force: true });
+            setSimilarRefreshSeq((n) => n + 1);
+        } finally {
+            setRefreshing(false);
+        }
+    }, [barcode, product?.$id, fetchProductByBarcode]);
 
     const handleShareClick = async () => {
         const shareUrl = window.location.href;
@@ -449,9 +469,16 @@ const PriceComparison = () => {
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-safe md:pb-12">
+            <RefreshControl onRefresh={handleRefresh} externalRefreshing={refreshing || loading} />
             <main className="max-w-4xl mx-auto px-3 sm:px-4 pt-2 pb-6 md:py-8 space-y-3 md:space-y-8">
-                <div className="flex items-center">
+                <div className="flex items-center justify-between gap-2">
                     <BackButton label={t('go_back', 'Go Back')} onClick={handleBack} />
+                    <RefreshControl
+                        onRefresh={handleRefresh}
+                        externalRefreshing={refreshing || loading}
+                        enablePullToRefresh={false}
+                        showDesktopButton
+                    />
                 </div>
                 {locationError && (
                     <div className="rounded-3xl border border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/10 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">

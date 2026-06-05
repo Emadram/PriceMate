@@ -8,11 +8,12 @@ import useNavHistoryStore from '../stores/navHistoryStore';
 import useFavoritesStore from '../stores/favoritesStore';
 import { fetchProducts, fetchPricesForProducts, normalizeProduct } from '../utils/productUtils';
 import { getCacheEntry, swrGetOrFetch } from '../utils/swrCache';
+import { HOME_CACHE_TTL_MS } from '../utils/cacheTtls';
+import { refreshPageCache } from '../utils/invalidateFreshData';
 import ProductCard from '../components/ProductCard';
 import { ProductCardSkeleton } from '../components/SkeletonLoaders';
 import MarketsSection from '../components/MarketsSection';
-
-const HOME_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
+import RefreshControl from '../components/RefreshControl';
 
 const Home = () => {
     const { t } = useTranslation();
@@ -89,15 +90,19 @@ const Home = () => {
         }
     }, [favoriteProductIds]);
 
-    const loadData = useCallback(async () => {
+    const loadData = useCallback(async ({ force = false } = {}) => {
         setError(null);
         const key = `home:v1:${favoritesKey}`;
+
+        if (force) {
+            refreshPageCache({ swrKey: key, priceScope: 'global' });
+        }
 
         const fetcher = async () => {
             // Fetch products and categories (Announcements handled by store)
             const [products, fetchedAnnouncements] = await Promise.all([
                 fetchProducts(12),
-                fetchActiveAnnouncements(5),
+                fetchActiveAnnouncements(5, { force }),
                 fetchCategories()
             ]);
 
@@ -212,10 +217,15 @@ const Home = () => {
         };
     }, [loadData]);
 
+    const handleRefresh = useCallback(async () => {
+        await loadData({ force: true });
+    }, [loadData]);
+
     const greetingKey = getGreetingKey();
 
     return (
         <div className="min-h-screen bg-[#F5F5F7] dark:bg-gray-950 pb-safe md:pb-12 text-gray-900 dark:text-gray-100 selection:bg-brand-500/30 transition-colors">
+            <RefreshControl onRefresh={handleRefresh} externalRefreshing={refreshing} />
             <main className="max-w-5xl mx-auto px-4 pt-2 md:pt-8 space-y-5 sm:space-y-8 md:space-y-12 animate-in fade-in duration-700">
                 {/* Header Section */}
                 <header className="px-1 md:px-0 space-y-2.5 sm:space-y-3">
