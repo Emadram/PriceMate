@@ -8,8 +8,11 @@ import {
     createHistoryInBatches,
 } from '../utils/priceHistoryBackfill';
 import { buildOpeImportPayloads } from '../utils/openPriceEngineImport';
+import { getCacheEntry, setCacheEntry, isFresh } from '../utils/readCache';
 
 const DEFAULT_PAGE_SIZE = 50;
+const PAGE_TTL_MS = 2 * 60 * 1000;
+const pageCacheKey = (page, pageSize) => `admin:price-history:page:${page}:size:${pageSize}`;
 
 const usePriceHistoryStore = create((set, get) => ({
     history: [],
@@ -21,7 +24,23 @@ const usePriceHistoryStore = create((set, get) => ({
 
     setPage: (page) => set({ page: Math.max(1, page) }),
 
-    fetchHistoryPage: async (page = get().page, pageSize = get().pageSize) => {
+    fetchHistoryPage: async (page = get().page, pageSize = get().pageSize, { force = false } = {}) => {
+        const cacheKey = pageCacheKey(page, pageSize);
+
+        if (!force) {
+            const cached = getCacheEntry(cacheKey);
+            if (cached && isFresh(cached, PAGE_TTL_MS)) {
+                set({
+                    history: cached.data.history,
+                    total: cached.data.total,
+                    page,
+                    pageSize,
+                    loading: false,
+                });
+                return;
+            }
+        }
+
         set({ loading: true, error: null });
         try {
             const offset = (page - 1) * pageSize;
@@ -30,9 +49,14 @@ const usePriceHistoryStore = create((set, get) => ({
                 Query.limit(pageSize),
                 Query.offset(offset),
             ]);
-            set({
+            const payload = {
                 history: response.documents,
                 total: response.total ?? response.documents.length,
+            };
+            setCacheEntry(cacheKey, payload);
+            set({
+                history: payload.history,
+                total: payload.total,
                 page,
                 pageSize,
                 loading: false,
@@ -44,9 +68,9 @@ const usePriceHistoryStore = create((set, get) => ({
     },
 
     /** Loads current page only (replaces full-collection fetch). */
-    fetchHistory: async () => {
+    fetchHistory: async ({ force = false } = {}) => {
         const { page, pageSize } = get();
-        return get().fetchHistoryPage(page, pageSize);
+        return get().fetchHistoryPage(page, pageSize, { force });
     },
 
     addHistory: async (data) => {
@@ -69,7 +93,7 @@ const usePriceHistoryStore = create((set, get) => ({
                     loading: false,
                 }));
             } else {
-                await get().fetchHistoryPage(page, pageSize);
+                await get().fetchHistoryPage(page, pageSize, { force: true });
             }
             return true;
         } catch (error) {
@@ -184,7 +208,7 @@ const usePriceHistoryStore = create((set, get) => ({
                 }
             );
 
-            await get().fetchHistoryPage(1, get().pageSize);
+            await get().fetchHistoryPage(1, get().pageSize, { force: true });
             set({ loading: false, page: 1 });
 
             return {
@@ -259,7 +283,7 @@ const usePriceHistoryStore = create((set, get) => ({
                 }
             );
 
-            await get().fetchHistoryPage(1, get().pageSize);
+            await get().fetchHistoryPage(1, get().pageSize, { force: true });
             set({ loading: false, page: 1 });
 
             return {

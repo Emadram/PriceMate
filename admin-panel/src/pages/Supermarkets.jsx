@@ -6,6 +6,14 @@ import useSupermarketsStore from '../stores/supermarketsStore';
 import Sidebar from '../components/Sidebar';
 import AdminPageHeader from '../components/AdminPageHeader';
 import { validateSupermarketCoordinates } from '../utils/coordinateValidation';
+import {
+    createDefaultWeeklyFormState,
+    DAY_LABELS,
+    formStateFromOpeningHours,
+    openingHoursFromFormState,
+    serializeOpeningHours,
+    WEEKDAY_KEYS,
+} from '../utils/storeHours';
 
 const extractGoogleMapsEmbedSrc = (value) => {
     const text = String(value || '').trim();
@@ -30,11 +38,13 @@ const normalizeGoogleMapsEmbed = (value) => {
 const isValidEmbedHtml = (value) => !!extractGoogleMapsEmbedSrc(value);
 
 const Supermarkets = () => {
-    const { supermarkets, loading, fetchSupermarkets, deleteSupermarket, uploadSupermarketLogo, setSupermarketStatus } = useSupermarketsStore();
+    const { supermarkets, loading, fetchSupermarkets, deleteSupermarket, uploadSupermarketLogo } = useSupermarketsStore();
     const [showModal, setShowModal] = useState(false);
     const [editing, setEditing] = useState(null);
     const [uploading, setUploading] = useState(false);
     const [coordinateError, setCoordinateError] = useState('');
+    const [hoursError, setHoursError] = useState('');
+    const [hoursForm, setHoursForm] = useState(createDefaultWeeklyFormState);
 
     const [formData, setFormData] = useState({
         name: '',
@@ -111,6 +121,14 @@ const Supermarkets = () => {
             const parsed = parser(value);
             return Number.isFinite(parsed) ? parsed : null;
         };
+        let openingHours = null;
+        try {
+            openingHours = serializeOpeningHours(openingHoursFromFormState(hoursForm));
+            setHoursError('');
+        } catch (error) {
+            setHoursError(error.message || 'Invalid opening hours');
+            return;
+        }
         const data = {
             ...formData,
             latitude: parseOptionalNumber(formData.latitude, Number.parseFloat),
@@ -119,7 +137,8 @@ const Supermarkets = () => {
             parentId: formData.isParent ? null : formData.parentId,
             embedHtml: hasEmbed ? normalizeGoogleMapsEmbed(trimmedEmbed) : null,
             rating: parseOptionalNumber(formData.rating, Number.parseFloat),
-            reviewsCount: parseOptionalNumber(formData.reviewsCount, (value) => Number.parseInt(value, 10))
+            reviewsCount: parseOptionalNumber(formData.reviewsCount, (value) => Number.parseInt(value, 10)),
+            openingHours,
         };
 
         const saved = editing
@@ -139,7 +158,9 @@ const Supermarkets = () => {
 
     const resetForm = () => {
         setFormData({ name: '', brand: '', branchName: '', latitude: '', longitude: '', address: '', embedHtml: '', phoneNumber: '', email: '', icon: '', isParent: false, parentId: '', googleMapsUrl: '', rating: '', reviewsCount: '' });
+        setHoursForm(createDefaultWeeklyFormState());
         setCoordinateError('');
+        setHoursError('');
     };
 
     const handleEdit = (supermarket) => {
@@ -161,7 +182,9 @@ const Supermarkets = () => {
             rating: supermarket.rating ?? '',
             reviewsCount: supermarket.reviewsCount ?? supermarket.reviewCount ?? ''
         });
+        setHoursForm(formStateFromOpeningHours(supermarket.openingHours));
         setCoordinateError('');
+        setHoursError('');
         setShowModal(true);
     };
 
@@ -290,18 +313,6 @@ const Supermarkets = () => {
                                                     </button>
                                                     <button onClick={() => handleDelete(item.$id)} className="p-3 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-2xl transition-all active:scale-95 border border-transparent hover:border-red-100 dark:hover:border-red-800/50">
                                                         <FiTrash2 size={18} />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-6 whitespace-nowrap text-right text-sm font-medium">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    <button
-                                                        onClick={async () => {
-                                                            const newStatus = (item.status || 'open') === 'open' ? 'close' : 'open';
-                                                            await setSupermarketStatus(item.$id, newStatus);
-                                                        }}
-                                                        className={`px-3 py-2 rounded-2xl font-bold text-sm transition-colors ${((item.status||'open') === 'open') ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
-                                                        {((item.status||'open') === 'open') ? 'Open' : 'Closed'}
                                                     </button>
                                                 </div>
                                             </td>
@@ -547,6 +558,57 @@ const Supermarkets = () => {
                                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                                         className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                                     />
+                                </div>
+                            </div>
+
+                            <div className="rounded-2xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
+                                <div>
+                                    <h3 className="text-sm font-black uppercase tracking-widest text-gray-700 dark:text-gray-200">Opening hours</h3>
+                                    <p className="text-xs text-gray-500 mt-1">Local store time. User app shows open/closed from this schedule.</p>
+                                </div>
+                                {hoursError && (
+                                    <p className="text-xs font-semibold text-red-600">{hoursError}</p>
+                                )}
+                                <div className="space-y-2">
+                                    {[...WEEKDAY_KEYS.slice(1), WEEKDAY_KEYS[0]].map((day) => {
+                                        const row = hoursForm[day];
+                                        return (
+                                            <div key={day} className="grid grid-cols-[7rem_1fr_1fr_auto] gap-2 items-center">
+                                                <span className="text-xs font-bold text-gray-600 dark:text-gray-300">{DAY_LABELS[day]}</span>
+                                                <input
+                                                    type="time"
+                                                    value={row?.start || '08:00'}
+                                                    disabled={row?.closed}
+                                                    onChange={(e) => setHoursForm((prev) => ({
+                                                        ...prev,
+                                                        [day]: { ...prev[day], start: e.target.value },
+                                                    }))}
+                                                    className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-700 disabled:opacity-40"
+                                                />
+                                                <input
+                                                    type="time"
+                                                    value={row?.end || '22:00'}
+                                                    disabled={row?.closed}
+                                                    onChange={(e) => setHoursForm((prev) => ({
+                                                        ...prev,
+                                                        [day]: { ...prev[day], end: e.target.value },
+                                                    }))}
+                                                    className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-700 disabled:opacity-40"
+                                                />
+                                                <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={!!row?.closed}
+                                                        onChange={(e) => setHoursForm((prev) => ({
+                                                            ...prev,
+                                                            [day]: { ...prev[day], closed: e.target.checked },
+                                                        }))}
+                                                    />
+                                                    Closed
+                                                </label>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
 

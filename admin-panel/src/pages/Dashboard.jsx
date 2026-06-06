@@ -17,7 +17,9 @@ import useDebouncedRealtimeRefresh from '../hooks/useDebouncedRealtimeRefresh';
 import { getCacheEntry, isFresh as isCacheFresh, setCacheEntry } from '../utils/readCache';
 
 const DASHBOARD_CHART_CACHE_KEY = 'dashboard:charts:v1';
-const CHART_CACHE_TTL_MS = 4 * 60 * 1000;
+const DASHBOARD_TOTALS_CACHE_KEY = 'dashboard:totals:v1';
+const CHART_CACHE_TTL_MS = 10 * 60 * 1000;
+const TOTALS_CACHE_TTL_MS = 3 * 60 * 1000;
 import {
     BRAND_CHART_COLORS,
     CHART_BRAND_STROKE,
@@ -91,7 +93,13 @@ const Dashboard = () => {
         return documents;
     }, []);
 
-    const fetchTotalsOnly = useCallback(async () => {
+    const fetchTotalsOnly = useCallback(async ({ force = false } = {}) => {
+        const cached = !force ? getCacheEntry(DASHBOARD_TOTALS_CACHE_KEY) : null;
+        if (cached && isCacheFresh(cached, TOTALS_CACHE_TTL_MS)) {
+            setStats(cached.data);
+            return;
+        }
+
         const safeList = async (listFn, label) => {
             try {
                 return await listFn();
@@ -127,7 +135,7 @@ const Dashboard = () => {
             safeList(() => db.chatHistory.list([Query.limit(1)]), 'chat history'),
         ]);
 
-        setStats({
+        const nextStats = {
             products: productsRes.total || 0,
             prices: pricesRes.total || 0,
             supermarkets: supermarketsRes.total || 0,
@@ -136,7 +144,9 @@ const Dashboard = () => {
             outOfStock: outOfStockRes.total || 0,
             announcements: announcementsRes.total || 0,
             chats: chatsRes.total || 0,
-        });
+        };
+        setStats(nextStats);
+        setCacheEntry(DASHBOARD_TOTALS_CACHE_KEY, nextStats);
     }, []);
 
     const fetchChartData = useCallback(async () => {
@@ -219,7 +229,7 @@ const Dashboard = () => {
                 applyChartCache(cached);
             }
 
-            await fetchTotalsOnly();
+            await fetchTotalsOnly({ force: forceCharts });
 
             if (!chartsCachedFresh) {
                 await fetchChartData();
@@ -242,13 +252,19 @@ const Dashboard = () => {
         if (inFlightRef.current) return;
         inFlightRef.current = true;
         try {
-            const cached = getCacheEntry(DASHBOARD_CHART_CACHE_KEY);
-            if (isCacheFresh(cached, CHART_CACHE_TTL_MS)) {
-                await fetchTotalsOnly();
+            const chartsCached = getCacheEntry(DASHBOARD_CHART_CACHE_KEY);
+            const totalsCached = getCacheEntry(DASHBOARD_TOTALS_CACHE_KEY);
+            const chartsCachedFresh = isCacheFresh(chartsCached, CHART_CACHE_TTL_MS);
+            const totalsCachedFresh = isCacheFresh(totalsCached, TOTALS_CACHE_TTL_MS);
+
+            if (chartsCachedFresh && totalsCachedFresh) {
+                applyChartCache(chartsCached);
+                setStats(totalsCached.data);
             } else {
                 await fetchStats({ showLoader: false, forceCharts: false });
                 return;
             }
+
             const now = Date.now();
             if (now - lastUpdatedMsRef.current >= 1500) {
                 setLastUpdated(new Date(now).toISOString());
@@ -259,7 +275,7 @@ const Dashboard = () => {
         } finally {
             inFlightRef.current = false;
         }
-    }, [fetchStats, fetchTotalsOnly]);
+    }, [applyChartCache, fetchStats]);
 
     const getWeeklyTrend = (items = [], dateField = '$createdAt') => {
         if (!items.length) return null;

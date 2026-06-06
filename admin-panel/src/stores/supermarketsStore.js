@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { db, storage, getAppwriteConfig } from '../lib/appwrite';
 import { ID } from 'appwrite';
 import { validateSupermarketCoordinates } from '../utils/coordinateValidation';
-import { invalidateCacheKey } from '../utils/readCache';
+import { invalidateCacheKey, getCacheEntry, setCacheEntry, isFresh } from '../utils/readCache';
 
 const REFERENCE_TTL_MS = 10 * 60 * 1000;
 const CACHE_KEY = 'admin:supermarkets:v1';
@@ -21,26 +21,41 @@ const useSupermarketsStore = create((set, get) => ({
     loading: false,
     error: null,
     lastFetchedAt: null,
+    hasFetched: false,
 
     fetchSupermarkets: async ({ force = false } = {}) => {
-        const { lastFetchedAt, supermarkets, loading } = get();
+        const { lastFetchedAt, hasFetched, loading } = get();
         if (
             !force &&
+            hasFetched &&
             lastFetchedAt &&
-            Date.now() - lastFetchedAt < REFERENCE_TTL_MS &&
-            supermarkets.length > 0
+            Date.now() - lastFetchedAt < REFERENCE_TTL_MS
         ) {
             return;
         }
+
+        const cached = !force ? getCacheEntry(CACHE_KEY) : null;
+        if (cached && isFresh(cached, REFERENCE_TTL_MS)) {
+            set({
+                supermarkets: cached.data,
+                loading: false,
+                lastFetchedAt: cached.updatedAt,
+                hasFetched: true,
+            });
+            return;
+        }
+
         if (loading && !force) return;
 
         set({ loading: true, error: null });
         try {
             const response = await db.supermarkets.list();
+            setCacheEntry(CACHE_KEY, response.documents);
             set({
                 supermarkets: response.documents,
                 loading: false,
                 lastFetchedAt: Date.now(),
+                hasFetched: true,
             });
         } catch (error) {
             set({ error: error.message, loading: false });
@@ -51,7 +66,7 @@ const useSupermarketsStore = create((set, get) => ({
 
     invalidate: () => {
         invalidateCacheKey(CACHE_KEY);
-        set({ lastFetchedAt: null });
+        set({ lastFetchedAt: null, hasFetched: false });
     },
 
     uploadSupermarketLogo: async (file) => {
@@ -91,7 +106,8 @@ const useSupermarketsStore = create((set, get) => ({
                 status: data.status || 'open',
                 googleMapsUrl: data.googleMapsUrl || null,
                 rating: normalizeOptionalNumber(data.rating, Number.parseFloat),
-                reviewsCount: normalizeOptionalNumber(data.reviewsCount, (value) => Number.parseInt(value, 10))
+                reviewsCount: normalizeOptionalNumber(data.reviewsCount, (value) => Number.parseInt(value, 10)),
+                openingHours: data.openingHours || null,
             });
             useSupermarketsStore.getState().invalidate();
             await useSupermarketsStore.getState().fetchSupermarkets({ force: true });
@@ -124,7 +140,8 @@ const useSupermarketsStore = create((set, get) => ({
                 status: data.status ?? undefined,
                 googleMapsUrl: data.googleMapsUrl || null,
                 rating: normalizeOptionalNumber(data.rating, Number.parseFloat),
-                reviewsCount: normalizeOptionalNumber(data.reviewsCount, (value) => Number.parseInt(value, 10))
+                reviewsCount: normalizeOptionalNumber(data.reviewsCount, (value) => Number.parseInt(value, 10)),
+                openingHours: data.openingHours ?? undefined,
             });
             useSupermarketsStore.getState().invalidate();
             await useSupermarketsStore.getState().fetchSupermarkets({ force: true });

@@ -8,14 +8,15 @@ const useFeedbackStore = create((set, get) => ({
     loading: false,
     error: null,
     lastFetchedAt: null,
+    hasFetched: false,
 
     fetchFeedback: async ({ force = false } = {}) => {
-        const { lastFetchedAt, feedback, loading } = get();
+        const { lastFetchedAt, hasFetched, loading } = get();
         if (
             !force &&
+            hasFetched &&
             lastFetchedAt &&
-            Date.now() - lastFetchedAt < FEEDBACK_TTL_MS &&
-            feedback.length > 0
+            Date.now() - lastFetchedAt < FEEDBACK_TTL_MS
         ) {
             return;
         }
@@ -28,6 +29,7 @@ const useFeedbackStore = create((set, get) => ({
                 feedback: response.documents,
                 loading: false,
                 lastFetchedAt: Date.now(),
+                hasFetched: true,
             });
         } catch (error) {
             set({ error: error.message, loading: false });

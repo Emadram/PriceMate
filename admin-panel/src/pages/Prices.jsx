@@ -19,7 +19,8 @@ const Prices = () => {
         page, 
         limit, 
         fetchPrices, 
-        addPrice, 
+        setPage,
+        addPrice,
         updatePrice, 
         deletePrice 
     } = usePricesStore();
@@ -46,28 +47,26 @@ const Prices = () => {
     const [lastUpdated, setLastUpdated] = useState(null);
     const isFresh = useFreshIndicator(lastUpdated);
 
-    const refreshData = useCallback(async () => {
+    const refreshReferenceData = useCallback(async ({ force = false } = {}) => {
         await Promise.all([
-            fetchPrices(page),
-            fetchProductOptions(),
-            fetchSupermarkets(),
+            fetchProductOptions({ force }),
+            fetchSupermarkets({ force }),
         ]);
-        setLastUpdated(new Date().toISOString());
-    }, [fetchPrices, fetchProductOptions, fetchSupermarkets, page]);
+    }, [fetchProductOptions, fetchSupermarkets]);
+
+    useEffect(() => {
+        const t = setTimeout(() => refreshReferenceData(), 0);
+        return () => clearTimeout(t);
+    }, [refreshReferenceData]);
+
+    useEffect(() => {
+        fetchPrices(page);
+    }, [page, fetchPrices]);
 
     const refreshPricesOnly = useCallback(async () => {
         await fetchPrices(page, { force: true });
         setLastUpdated(new Date().toISOString());
     }, [fetchPrices, page]);
-
-    const refreshReferenceData = useCallback(async () => {
-        await Promise.all([fetchProductOptions(), fetchSupermarkets()]);
-    }, [fetchProductOptions, fetchSupermarkets]);
-
-    useEffect(() => {
-        const t = setTimeout(() => refreshData(), 0);
-        return () => clearTimeout(t);
-    }, [refreshData]);
 
     // `isFresh` indicator handled by useFreshIndicator to avoid rapid flicker
 
@@ -84,7 +83,7 @@ const Prices = () => {
     );
 
     const handlePageChange = (newPage) => {
-        fetchPrices(newPage);
+        setPage(newPage);
         setLastUpdated(new Date().toISOString());
     };
 

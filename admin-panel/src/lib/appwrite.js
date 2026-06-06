@@ -1,4 +1,4 @@
-import { Client, Account, Databases, Storage, Functions, Teams, ID } from 'appwrite';
+import { Client, Account, Databases, Storage, Functions, Teams } from 'appwrite';
 
 const resolveAppwriteConfig = () => {
     const endpoint = import.meta.env.VITE_APPWRITE_ENDPOINT;
@@ -65,21 +65,18 @@ export const APPWRITE_CONFIG = {
 
 export const getAppwriteConfig = () => RESOLVED_APPWRITE_CONFIG;
 export const { DATABASE_ID, COLLECTIONS } = APPWRITE_CONFIG;
-export { Query } from 'appwrite';
-
-const logDevListRead = (collectionId) => {
-    if (import.meta.env.DEV) {
-        console.debug('[Appwrite reads]', collectionId);
-    }
-};
+import { ID, Query } from 'appwrite';
+import { recordGetRead, recordListRead } from '../utils/readStats';
 
 const dbAction = {
     list: (collectionId, queries = []) => {
-        logDevListRead(collectionId);
+        recordListRead(collectionId);
         return databases.listDocuments(DATABASE_ID, collectionId, queries);
     },
-    get: (collectionId, documentId, queries = []) =>
-        databases.getDocument(DATABASE_ID, collectionId, documentId, queries),
+    get: (collectionId, documentId, queries = []) => {
+        recordGetRead(collectionId);
+        return databases.getDocument(DATABASE_ID, collectionId, documentId, queries);
+    },
     create: (collectionId, data, permissions) =>
         databases.createDocument(DATABASE_ID, collectionId, ID.unique(), data, permissions),
     update: (collectionId, documentId, data, permissions) =>
@@ -140,4 +137,5 @@ export const db = {
     }
 };
 
+export { Query, ID };
 
