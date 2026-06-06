@@ -1,4 +1,5 @@
 import { Client, Databases, ID, Query } from 'node-appwrite';
+import { DEFAULT_OPENING_HOURS_JSON } from './lib/storeHoursDefaults.js';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -63,7 +64,8 @@ const supermarkets = [
         icon: 'store',
         googleMapsUrl: 'https://maps.google.com/?q=41.0082,28.9784',
         rating: 4.5,
-        reviewsCount: 128
+        reviewsCount: 128,
+        openingHours: DEFAULT_OPENING_HOURS_JSON,
     },
     {
         name: 'GreenGrocer',
@@ -74,7 +76,8 @@ const supermarkets = [
         icon: 'store',
         googleMapsUrl: 'https://maps.google.com/?q=39.9334,32.8597',
         rating: 3.5,
-        reviewsCount: 42
+        reviewsCount: 42,
+        openingHours: DEFAULT_OPENING_HOURS_JSON,
     }
 ];
 

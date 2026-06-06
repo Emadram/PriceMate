@@ -8,6 +8,8 @@
     "seed:price-history-targeted": "node seed_price_history_targeted.js",
     "seed:products-by-category": "node seed_products_by_category.js",
     "ensure:ai-schema": "node ensure_ai_schema.js",
+    "ensure:supermarket-hours-schema": "node ensure_supermarket_hours_schema.js",
+    "backfill:supermarket-hours": "node backfill_supermarket_hours.js",
     "migrate:product-nutrition": "node migrate_product_nutrition.js",
     "fix:missing-product-images": "node fix_missing_product_images.js",
     "cleanup:seeded-products": "node cleanup_seeded_products.js",
