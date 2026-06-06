@@ -5,16 +5,38 @@ import {
     findBestProductMatch,
     FUZZY_MATCH_MIN_SCORE,
 } from './productNameMatch';
+export {
+    getStoreAvailability,
+    getTodayHoursLabel,
+    formatWeeklySchedule,
+    isStoreOpen,
+    parseOpeningHours,
+} from './storeHours';
+import {
+    CATALOG_LIST_TTL_MS,
+    CATALOG_RESOLVE_NEGATIVE_TTL_MS,
+    CATALOG_RESOLVE_TTL_MS,
+    PRICE_BATCH_TTL_MS,
+    PRICE_HISTORY_CHART_TTL_MS,
+} from './cacheTtls';
+
+const READ_DEBUG = import.meta.env.VITE_READ_DEBUG === 'true';
+const logReadDebug = (kind, detail) => {
+    if (READ_DEBUG) console.debug(`[read-cache] ${kind}`, detail);
+};
 
 const cacheStore = new Map();
 const inflightRequests = new Map();
 const CACHE_TTL = {
-    products: 60 * 1000,
-    prices: 30 * 1000,
-    categories: 5 * 60 * 1000,
-    allPrices: 30 * 1000,
-    search: 30 * 1000,
-    similar: 60 * 1000
+    products: CATALOG_LIST_TTL_MS,
+    prices: PRICE_BATCH_TTL_MS,
+    categories: CATALOG_LIST_TTL_MS,
+    allPrices: PRICE_BATCH_TTL_MS,
+    search: PRICE_BATCH_TTL_MS,
+    similar: CATALOG_LIST_TTL_MS,
+    priceHistory: PRICE_HISTORY_CHART_TTL_MS,
+    catalogResolve: CATALOG_RESOLVE_TTL_MS,
+    catalogResolveMiss: CATALOG_RESOLVE_NEGATIVE_TTL_MS,
 };
 const OFF_CACHE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 const OFF_MEMORY_TTL_MS = 5 * 60 * 1000;
@@ -71,6 +93,8 @@ export const COMPARISON_PRICE_SELECT = [
     'supermarkets.reviewsCount',
     'supermarkets.parentId',
     'supermarkets.isParent',
+    'supermarkets.openingHours',
+    'supermarkets.status',
 ];
 export { PRODUCT_PRICE_SELECT };
 const OFF_API_BASE = 'https://world.openfoodfacts.org';
@@ -892,10 +916,42 @@ const CATALOG_RESOLVE_STOPWORDS = new Set([
     'bu', 'şu', 'su', 'mi', 'mı', 'mu', 'mü', 'var', 'içinde', 'nedir',
 ]);
 
+const CATALOG_SCAN_PAGE_SIZE = 100;
+const CATALOG_SCAN_MAX_PAGES = 10;
+
+const searchCatalogProductsByTerm = async (term, limit = 25) => {
+    const normalized = String(term || '').trim().toLowerCase();
+    if (!normalized) return [];
+    try {
+        const res = await db.products.list([
+            Query.limit(limit),
+            Query.contains('name', normalized),
+            Query.select(['*', 'categoryId.*']),
+        ]);
+        if (res.documents?.length) return res.documents;
+    } catch (error) {
+        console.warn('Catalog contains search failed:', error?.message);
+    }
+    return [];
+};
+
+const catalogResolveResult = (product, matchedName = '') => ({
+    product,
+    catalogBarcode: product?.barcode || '',
+    catalogName: matchedName || product?.name || '',
+});
+
 /**
  * Resolve a catalog product from Appwrite for ingredient questions (full DB, not chat's 50-product slice).
  */
-export const resolveCatalogProductForIngredients = async (userMessage) => {
+const normalizeCatalogResolveCacheKey = (userMessage) => {
+    const trimmed = String(userMessage || '').trim();
+    const barcodeMatch = trimmed.match(/\b(\d{8,14})\b/);
+    if (barcodeMatch) return `catalog-resolve:barcode:${barcodeMatch[1]}`;
+    return `catalog-resolve:q:${trimmed.toLowerCase().slice(0, 160)}`;
+};
+
+const resolveCatalogProductForIngredientsUncached = async (userMessage) => {
     const empty = { product: null, catalogBarcode: '', catalogName: '' };
     const trimmed = String(userMessage || '').trim();
     if (!trimmed) return empty;
@@ -906,11 +962,7 @@ export const resolveCatalogProductForIngredients = async (userMessage) => {
             const res = await db.products.list([Query.equal('barcode', barcodeMatch[1]), Query.limit(5)]);
             const doc = res.documents[0];
             if (doc) {
-                return {
-                    product: doc,
-                    catalogBarcode: doc.barcode || barcodeMatch[1],
-                    catalogName: doc.name || '',
-                };
+                return catalogResolveResult(doc);
             }
         } catch (e) {
             console.warn('Catalog barcode lookup failed:', e);
@@ -921,65 +973,106 @@ export const resolveCatalogProductForIngredients = async (userMessage) => {
         (term) => term.length >= 2 && !CATALOG_RESOLVE_STOPWORDS.has(term)
     );
 
-    const pickFromDocuments = (documents, term) => {
+    const pickBestFromDocuments = (documents) => {
         if (!documents?.length) return null;
         const fuzzy = findBestProductMatch(trimmed, documents, { minScore: FUZZY_MATCH_MIN_SCORE });
-        if (fuzzy?.product) return fuzzy.product;
-        const nameLower = (d) => (d.name || '').toLowerCase();
-        return documents.find((d) => nameLower(d).includes(term)) || documents[0];
+        if (fuzzy?.product) {
+            return catalogResolveResult(fuzzy.product, fuzzy.matchedName || fuzzy.product.name || '');
+        }
+        return null;
     };
 
+    const candidateMap = new Map();
     for (const term of searchTerms) {
         if (term.length < 2) continue;
         try {
-            const res = await db.products.list([Query.search('name', term), Query.limit(8)]);
-            const best = pickFromDocuments(res.documents, term);
-            if (best) {
-                return {
-                    product: best,
-                    catalogBarcode: best.barcode || '',
-                    catalogName: best.name || '',
-                };
+            const searchHits = await searchCatalogProductsByTerm(term, 25);
+            for (const doc of searchHits) {
+                if (doc?.$id) candidateMap.set(doc.$id, doc);
             }
         } catch (e) {
-            console.warn('Catalog search failed (index may be missing), trying scan:', e?.message);
+            console.warn('Catalog searchProducts failed:', e?.message);
         }
+
+        try {
+            const res = await db.products.list([Query.search('name', term), Query.limit(8)]);
+            for (const doc of res.documents || []) {
+                if (doc?.$id) candidateMap.set(doc.$id, doc);
+            }
+        } catch (e) {
+            console.warn('Catalog Query.search failed (index may be missing):', e?.message);
+        }
+    }
+
+    const mergedCandidates = pickBestFromDocuments([...candidateMap.values()]);
+    if (mergedCandidates?.product) {
+        return mergedCandidates;
     }
 
     try {
-        const res = await db.products.list([Query.limit(80), Query.orderDesc('$createdAt')]);
-        const fuzzy = findBestProductMatch(trimmed, res.documents, { minScore: FUZZY_MATCH_MIN_SCORE });
-        if (fuzzy?.product) {
-            return {
-                product: fuzzy.product,
-                catalogBarcode: fuzzy.product.barcode || '',
-                catalogName: fuzzy.matchedName || fuzzy.product.name || '',
-            };
-        }
+        let offset = 0;
+        for (let page = 0; page < CATALOG_SCAN_MAX_PAGES; page += 1) {
+            const res = await db.products.list([
+                Query.limit(CATALOG_SCAN_PAGE_SIZE),
+                Query.offset(offset),
+                Query.orderDesc('$createdAt'),
+            ]);
+            const docs = res.documents || [];
+            if (!docs.length) break;
 
-        let best = null;
-        let bestScore = 0;
-        for (const d of res.documents) {
-            const n = (d.name || '').toLowerCase();
-            for (const term of searchTerms) {
-                if (term.length >= 3 && n.includes(term) && term.length >= bestScore) {
-                    best = d;
-                    bestScore = term.length;
+            const fuzzyHit = pickBestFromDocuments(docs);
+            if (fuzzyHit?.product) {
+                return fuzzyHit;
+            }
+
+            let best = null;
+            let bestScore = 0;
+            for (const d of docs) {
+                const n = (d.name || '').toLowerCase();
+                for (const term of searchTerms) {
+                    if (term.length >= 3 && n.includes(term) && term.length >= bestScore) {
+                        best = d;
+                        bestScore = term.length;
+                    }
                 }
             }
-        }
-        if (best) {
-            return {
-                product: best,
-                catalogBarcode: best.barcode || '',
-                catalogName: best.name || '',
-            };
+            if (best) {
+                return catalogResolveResult(best);
+            }
+
+            if (docs.length < CATALOG_SCAN_PAGE_SIZE) break;
+            offset += CATALOG_SCAN_PAGE_SIZE;
         }
     } catch (e) {
-        console.warn('Catalog scan failed:', e);
+        console.warn('Catalog paginated scan failed:', e);
     }
 
     return empty;
+};
+
+export const resolveCatalogProductForIngredients = async (userMessage) => {
+    const trimmed = String(userMessage || '').trim();
+    if (!trimmed) {
+        return { product: null, catalogBarcode: '', catalogName: '' };
+    }
+
+    const cacheKey = normalizeCatalogResolveCacheKey(trimmed);
+    const cached = getCachedValue(cacheKey);
+    if (cached) {
+        logReadDebug('catalog-resolve-hit', { cacheKey });
+        return cached;
+    }
+
+    return withInflight(cacheKey, async () => {
+        const hit = getCachedValue(cacheKey);
+        if (hit) return hit;
+
+        const result = await resolveCatalogProductForIngredientsUncached(trimmed);
+        const ttl = result.product ? CACHE_TTL.catalogResolve : CACHE_TTL.catalogResolveMiss;
+        setCachedValue(cacheKey, result, ttl);
+        logReadDebug('catalog-resolve-miss', { cacheKey, matched: !!result.product });
+        return result;
+    });
 };
 
 export const searchIngredientsByName = async (name) => {
@@ -1203,7 +1296,7 @@ export const fetchProducts = async (limit = 50) => {
 /**
  * Fetch similar products for a category (excluding the current product).
  */
-export const fetchSimilarProductsByCategory = async (categoryId, excludeId = null, limit = 6) => {
+export const fetchSimilarProductsByCategory = async (categoryId, excludeId = null, limit = 4) => {
     if (!categoryId) return [];
     const cacheKey = `similar:${categoryId}:${excludeId || 'none'}:${limit}`;
     const cached = getCachedValue(cacheKey);
@@ -1493,39 +1586,6 @@ export const normalizeProduct = (product, prices = []) => {
 };
 
 /**
- * Checks if a store is currently open based on its opening hours.
- * Expects format: {"Mon": "08:00-22:00", "Tue": "08:00-22:00", ...}
- */
-export const isStoreOpen = (openingHours) => {
-    if (!openingHours) return true; // Default to open if no info
-    
-    try {
-        const hours = typeof openingHours === 'string' ? JSON.parse(openingHours) : openingHours;
-        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        const now = new Date();
-        const dayName = days[now.getDay()];
-        const todayHours = hours[dayName];
-        
-        if (!todayHours || todayHours.toLowerCase() === 'closed') return false;
-        
-        const [start, end] = todayHours.split('-');
-        const [startH, startM] = start.split(':').map(Number);
-        const [endH, endM] = end.split(':').map(Number);
-        
-        const currentH = now.getHours();
-        const currentM = now.getMinutes();
-        const currentTime = currentH * 60 + currentM;
-        const startTime = startH * 60 + startM;
-        const endTime = endH * 60 + endM;
-        
-        return currentTime >= startTime && currentTime < endTime;
-    } catch (e) {
-        console.warn('Error parsing opening hours:', e);
-        return true;
-    }
-};
-
-/**
  * Formats a Date/Timestamp to a human readable "Today, 9:24 AM" etc
  */
 export const formatLastUpdate = (timestamp) => {
@@ -1541,11 +1601,26 @@ export const formatLastUpdate = (timestamp) => {
 };
 
 /**
- * Fetch price history for a specific product
+ * Fetch price history for a specific product (in-memory TTL cache).
  */
 export const fetchPriceHistory = async (productId, branchId = null) => {
     if (!productId) return [];
 
+    const cacheKey = `price-history:${productId}:${branchId || 'all'}`;
+    const cached = getCachedValue(cacheKey);
+    if (cached) return cached;
+
+    return withInflight(cacheKey, async () => {
+        const hit = getCachedValue(cacheKey);
+        if (hit) return hit;
+
+        const result = await fetchPriceHistoryUncached(productId, branchId);
+        setCachedValue(cacheKey, result, CACHE_TTL.priceHistory);
+        return result;
+    });
+};
+
+const fetchPriceHistoryUncached = async (productId, branchId = null) => {
     try {
         const historyColl = COLLECTIONS.PRICE_HISTORY || 'price_history';
         const historyDocs = [];
@@ -1840,6 +1915,27 @@ export const fetchSupermarketById = async (id) => {
 };
 
 /**
+ * Cached supermarket document fetch.
+ */
+export const fetchSupermarketByIdCached = async (id) => {
+    if (!id) return null;
+    const cacheKey = `supermarket:doc:${id}`;
+    const cached = getCachedValue(cacheKey);
+    if (cached) return cached;
+
+    return withInflight(cacheKey, async () => {
+        const hit = getCachedValue(cacheKey);
+        if (hit) return hit;
+
+        const data = await fetchSupermarketById(id);
+        if (data) {
+            setCachedValue(cacheKey, data, CACHE_TTL.categories);
+        }
+        return data;
+    });
+};
+
+/**
  * Fetch prices by supermarket ID
  */
 export const fetchPricesBySupermarket = async (supermarketId) => {
@@ -1865,6 +1961,54 @@ export const fetchPricesBySupermarket = async (supermarketId) => {
         console.error('Error fetching supermarket prices:', error);
         return [];
     }
+};
+
+/**
+ * Cached supermarket shelf prices.
+ */
+export const fetchPricesBySupermarketCached = async (supermarketId) => {
+    if (!supermarketId) return [];
+    const cacheKey = `supermarket:prices:${supermarketId}`;
+    const cached = getCachedValue(cacheKey);
+    if (cached) return cached;
+
+    return withInflight(cacheKey, async () => {
+        const hit = getCachedValue(cacheKey);
+        if (hit) return hit;
+
+        const data = await fetchPricesBySupermarket(supermarketId);
+        setCachedValue(cacheKey, data, CACHE_TTL.prices);
+        return data;
+    });
+};
+
+const sortSupermarketBranches = (related, currentId) => {
+    const othersFirst = (related || []).filter((b) => b.$id !== currentId);
+    return [...othersFirst].sort((a, b) =>
+        (a.address || a.branchName || '').localeCompare(b.address || b.branchName || '', undefined, {
+            sensitivity: 'base',
+        })
+    );
+};
+
+/**
+ * Supermarket profile payload for SWR page cache.
+ */
+export const fetchSupermarketProfileBundle = async (supermarketId) => {
+    if (!supermarketId) {
+        return { supermarket: null, branches: [], products: [] };
+    }
+
+    const supermarket = await fetchSupermarketByIdCached(supermarketId);
+    if (!supermarket) {
+        return { supermarket: null, branches: [], products: [] };
+    }
+
+    const related = await resolveRelatedSupermarkets(supermarket);
+    const branches = sortSupermarketBranches(related, supermarketId);
+    const products = await fetchPricesBySupermarketCached(supermarketId);
+
+    return { supermarket, branches, products };
 };
 
 /**
@@ -1905,7 +2049,7 @@ export const resolveRelatedSupermarkets = async (currentDoc) => {
                 Query.limit(50)
             ]);
             addDocs(siblingsResponse.documents);
-            const parent = await fetchSupermarketById(currentDoc.parentId);
+            const parent = await fetchSupermarketByIdCached(currentDoc.parentId);
             if (parent) addDocs([parent]);
         } else {
             const childrenResponse = await db.supermarkets.list([
@@ -2015,3 +2159,61 @@ export const fetchCategories = async () => {
         return [];
     }
 };
+
+/** Price-sensitive cache prefixes cleared on user refresh. */
+export const PRICE_SENSITIVE_CACHE_PREFIXES = [
+    'prices:',
+    'price-history:',
+    'supermarket:prices:',
+    'similar:',
+    'search:',
+];
+
+/** Catalog/reference prefixes cleared on global pull-to-refresh. */
+export const CATALOG_REFERENCE_CACHE_PREFIXES = [
+    'products:',
+    'categories',
+    'supermarkets:catalog:',
+    'catalog-resolve:',
+];
+
+export function invalidateProductUtilsCache(key) {
+    if (!key) return;
+    cacheStore.delete(key);
+    inflightRequests.delete(key);
+}
+
+export function invalidateProductUtilsByPrefix(prefix) {
+    if (!prefix) return 0;
+    let removed = 0;
+    for (const key of [...cacheStore.keys()]) {
+        if (key.startsWith(prefix)) {
+            cacheStore.delete(key);
+            removed += 1;
+        }
+    }
+    for (const key of [...inflightRequests.keys()]) {
+        if (key.startsWith(prefix)) {
+            inflightRequests.delete(key);
+        }
+    }
+    return removed;
+}
+
+export function invalidateGlobalPriceCaches() {
+    let total = 0;
+    for (const prefix of PRICE_SENSITIVE_CACHE_PREFIXES) {
+        total += invalidateProductUtilsByPrefix(prefix);
+    }
+    logReadDebug('invalidate-prices', { cleared: total });
+    return total;
+}
+
+export function invalidateCatalogReferenceCaches() {
+    let total = 0;
+    for (const prefix of CATALOG_REFERENCE_CACHE_PREFIXES) {
+        total += invalidateProductUtilsByPrefix(prefix);
+    }
+    logReadDebug('invalidate-catalog', { cleared: total });
+    return total;
+}

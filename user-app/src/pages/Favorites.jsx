@@ -5,13 +5,14 @@ import { useTranslation } from 'react-i18next';
 import { db, Query } from '../lib/appwrite';
 import { fetchPricesForProducts, normalizeProduct } from '../utils/productUtils';
 import { getCacheEntry, swrGetOrFetch } from '../utils/swrCache';
+import { FAVORITES_CACHE_TTL_MS } from '../utils/cacheTtls';
+import { refreshPageCache } from '../utils/invalidateFreshData';
 import ProductCard from '../components/ProductCard';
 import useFavoritesStore from '../stores/favoritesStore';
 import BackButton from '../components/BackButton';
 import { ProductCardSkeleton } from '../components/SkeletonLoaders';
 import { MobileHeader, MobilePage } from '../components/MobilePageLayout';
-
-const FAVORITES_CACHE_TTL_MS = 2 * 60 * 1000;
+import RefreshControl from '../components/RefreshControl';
 
 const Favorites = () => {
     const { t } = useTranslation();
@@ -19,13 +20,18 @@ const Favorites = () => {
     const [products, setProducts] = useState([]);
     const [supermarkets, setSupermarkets] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
     const [activeTab, setActiveTab] = useState('products');
     const { favoriteProducts, favoriteSupermarkets } = useFavoritesStore();
 
-    const fetchFavorites = useCallback(async () => {
+    const fetchFavorites = useCallback(async ({ force = false } = {}) => {
         const productKey = (favoriteProducts || []).slice().sort().join(',');
         const marketKey = (favoriteSupermarkets || []).slice().sort().join(',');
         const cacheKey = `favorites:v1:${productKey}:${marketKey}`;
+
+        if (force) {
+            refreshPageCache({ swrKey: cacheKey, priceScope: 'global' });
+        }
 
         const fetcher = async () => {
             const promises = [];
@@ -62,25 +68,28 @@ const Favorites = () => {
 
         setLoading(true);
         try {
-            const applyPayload = (payload) => {
+            const applyPayload = (payload, { isRefresh = false } = {}) => {
                 if (!payload) return;
                 setProducts(payload.products || []);
                 setSupermarkets(payload.supermarkets || []);
+                setRefreshing(!!isRefresh);
             };
 
-            const { data, fromCache, refreshing } = await swrGetOrFetch(cacheKey, {
+            const { data, fromCache, refreshing: willRefresh } = await swrGetOrFetch(cacheKey, {
                 ttlMs: FAVORITES_CACHE_TTL_MS,
                 fetcher,
                 onUpdate: (next) => {
-                    applyPayload(next);
+                    applyPayload(next, { isRefresh: false });
                     setLoading(false);
                 },
             });
 
-            if (data) applyPayload(data);
-            if (fromCache && !refreshing) {
+            if (fromCache && data) {
+                applyPayload(data, { isRefresh: willRefresh });
                 setLoading(false);
             } else if (!data) {
+                setLoading(true);
+                setRefreshing(false);
                 const entry = getCacheEntry(cacheKey);
                 if (entry?.promise) await entry.promise;
                 applyPayload(getCacheEntry(cacheKey)?.data);
@@ -89,8 +98,13 @@ const Favorites = () => {
         } catch (error) {
             console.error('Error fetching favorites:', error);
             setLoading(false);
+            setRefreshing(false);
         }
     }, [favoriteProducts, favoriteSupermarkets]);
+
+    const handleRefresh = useCallback(async () => {
+        await fetchFavorites({ force: true });
+    }, [fetchFavorites]);
 
     useEffect(() => {
         const t = setTimeout(() => {
@@ -110,14 +124,28 @@ const Favorites = () => {
 
     return (
         <MobilePage className="transition-colors">
+            <RefreshControl onRefresh={handleRefresh} externalRefreshing={refreshing || loading} />
             <MobileHeader
                 title={t('favorites')}
                 icon={FiHeart}
                 left={<BackButton to={backTarget} />}
                 right={
-                    <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-red-50 dark:bg-red-900/20 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-red-700 dark:text-red-400">
-                        <FiClock size={10} /> {totalCount}
-                    </span>
+                    <div className="flex items-center gap-2">
+                        {refreshing && (
+                            <span className="text-[9px] font-black uppercase tracking-[0.28em] text-gray-400">
+                                {t('updating', 'Updating')}
+                            </span>
+                        )}
+                        <RefreshControl
+                            onRefresh={handleRefresh}
+                            externalRefreshing={refreshing || loading}
+                            enablePullToRefresh={false}
+                            showDesktopButton
+                        />
+                        <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-red-50 dark:bg-red-900/20 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-red-700 dark:text-red-400">
+                            <FiClock size={10} /> {totalCount}
+                        </span>
+                    </div>
                 }
             />
 

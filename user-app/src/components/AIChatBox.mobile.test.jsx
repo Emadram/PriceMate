@@ -87,6 +87,18 @@ vi.mock('../hooks/useUserLocation', () => ({
     }),
 }));
 
+vi.mock('../stores/aiContextStore', () => ({
+    default: (selector) =>
+        selector({
+            products: [],
+            supermarkets: [],
+            loadedAt: 0,
+            loading: false,
+            loadContext: vi.fn().mockResolvedValue({ products: [], supermarkets: [] }),
+            clearContext: vi.fn(),
+        }),
+}));
+
 vi.mock('../stores/supermarketsStore', () => ({
     default: (selector) => {
         const state = {

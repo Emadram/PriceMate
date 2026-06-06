@@ -1,14 +1,21 @@
 const DEFAULT_TTL_MS = 3 * 60 * 1000;
+const READ_DEBUG = import.meta.env?.VITE_READ_DEBUG === 'true';
 
 const store = new Map();
 
 const now = () => Date.now();
+
+const logReadDebug = (action, key, extra = {}) => {
+  if (!READ_DEBUG) return;
+  console.debug('[readCache]', action, key, extra);
+};
 
 export function getCacheEntry(key) {
   return store.get(key) || null;
 }
 
 export function setCacheEntry(key, data) {
+  logReadDebug('set', key);
   const entry = {
     data,
     updatedAt: now(),
@@ -19,6 +26,7 @@ export function setCacheEntry(key, data) {
 }
 
 export function invalidateCacheKey(key) {
+  logReadDebug('invalidate', key);
   store.delete(key);
 }
 
@@ -47,8 +55,11 @@ export async function swrGetOrFetch(
   const fresh = isFresh(existing, ttlMs);
 
   if (fresh) {
+    logReadDebug('hit', key, { ttlMs });
     return { data: existing.data, fromCache: true, refreshing: false };
   }
+
+  logReadDebug('miss', key, { ttlMs, hasStaleData: !!existing?.data });
 
   const hasStaleData = !!existing?.data;
 

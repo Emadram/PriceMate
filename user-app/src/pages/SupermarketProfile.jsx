@@ -8,16 +8,18 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { 
-    fetchSupermarketById, 
-    fetchPricesBySupermarket, 
+    fetchSupermarketProfileBundle,
     calculateDistance, 
-    resolveRelatedSupermarkets,
-    isStoreOpen,
     formatLastUpdate,
     getRelationshipAttribute,
     hasValidLatLon,
     resolveCoordinates,
+    getStoreAvailability,
 } from '../utils/productUtils';
+import { getCacheEntry, swrGetOrFetch } from '../utils/swrCache';
+import { SUPERMARKET_PROFILE_CACHE_TTL_MS } from '../utils/cacheTtls';
+import { refreshPageCache } from '../utils/invalidateFreshData';
+import RefreshControl from '../components/RefreshControl';
 import ReportModal from '../components/ReportModal';
 import StoreMap from '../components/StoreMap';
 import BackButton from '../components/BackButton';
@@ -54,6 +56,7 @@ const SupermarketProfile = () => {
     const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
     const [isProductReportOpen, setIsProductReportOpen] = useState(false);
     const [productReportTarget, setProductReportTarget] = useState(null);
@@ -107,30 +110,56 @@ const SupermarketProfile = () => {
         }
     };
 
-    const loadSupermarketData = useCallback(async () => {
-        setLoading(true);
-        try {
-            const supermarketData = await fetchSupermarketById(id);
-            if (supermarketData) {
-                setSupermarket(supermarketData);
-                
-                const related = await resolveRelatedSupermarkets(supermarketData);
-                const othersFirst = related.filter((b) => b.$id !== id);
-                const sortedOthers = [...othersFirst].sort((a, b) =>
-                    (a.address || a.branchName || '').localeCompare(b.address || b.branchName || '', undefined, {
-                        sensitivity: 'base'
-                    })
-                );
-                setBranches(sortedOthers);
+    const applyBundle = useCallback((payload, { isRefresh = false } = {}) => {
+        if (!payload) return;
+        setSupermarket(payload.supermarket ?? null);
+        setBranches(Array.isArray(payload.branches) ? payload.branches : []);
+        setProducts(Array.isArray(payload.products) ? payload.products : []);
+        setLoading(false);
+        setRefreshing(!!isRefresh);
+    }, []);
 
-                const productsData = await fetchPricesBySupermarket(id);
-                setProducts(productsData);
+    const loadSupermarketData = useCallback(async ({ force = false } = {}) => {
+        if (!id) return;
+
+        const key = `supermarket-profile:${id}`;
+
+        if (force) {
+            refreshPageCache({
+                swrKey: key,
+                priceScope: 'supermarket',
+                supermarketId: id,
+            });
+        }
+
+        const fetcher = () => fetchSupermarketProfileBundle(id);
+
+        try {
+            const { data, fromCache, refreshing: willRefresh } = await swrGetOrFetch(key, {
+                ttlMs: SUPERMARKET_PROFILE_CACHE_TTL_MS,
+                fetcher,
+                onUpdate: (next) => applyBundle(next, { isRefresh: false }),
+            });
+
+            if (fromCache && data) {
+                applyBundle(data, { isRefresh: willRefresh });
+            } else {
+                setLoading(true);
+                setRefreshing(false);
+                const entry = getCacheEntry(key);
+                const awaited = entry?.promise ? await entry.promise : await fetcher();
+                applyBundle(awaited, { isRefresh: false });
             }
         } catch (error) {
             console.error('Error loading supermarket data:', error);
+            setLoading(false);
+            setRefreshing(false);
         }
-        setLoading(false);
-    }, [id]);
+    }, [id, applyBundle]);
+
+    const handleRefresh = useCallback(async () => {
+        await loadSupermarketData({ force: true });
+    }, [loadSupermarketData]);
 
     useEffect(() => {
         const timeoutId = setTimeout(() => {
@@ -152,7 +181,7 @@ const SupermarketProfile = () => {
         return () => clearTimeout(timeoutId);
     }, [id]);
 
-    if (loading) {
+    if (loading && !supermarket) {
         return (
             <div className="min-h-screen bg-white dark:bg-[#0A0A0B] flex items-center justify-center">
                 <div className="w-10 h-10 border-4 border-black/10 dark:border-white/10 border-t-black dark:border-t-white rounded-full animate-spin"></div>
@@ -207,10 +236,8 @@ const SupermarketProfile = () => {
 
     const ratingValue = supermarket.rating ?? supermarket.avgRating ?? supermarket.averageRating ?? null;
     const reviewsCount = supermarket.reviewsCount ?? supermarket.reviewCount ?? null;
-    const statusFromDb = (supermarket.status || supermarket.storeStatus || '').toString().toLowerCase();
-    const isOpen = statusFromDb
-        ? ['open', 'opened', 'available'].includes(statusFromDb)
-        : isStoreOpen(supermarket.openingHours);
+    const storeAvailability = getStoreAvailability(supermarket);
+    const isOpen = storeAvailability.isOpen;
     const latestProductUpdate = products.length > 0
         ? Math.max(...products.map((p) => new Date(p.$updatedAt).getTime()))
         : null;
@@ -219,9 +246,16 @@ const SupermarketProfile = () => {
 
     return (
         <div className="min-h-screen bg-[#FDFDFD] dark:bg-[#0A0A0B] pb-safe">
+            <RefreshControl onRefresh={handleRefresh} externalRefreshing={refreshing} />
             <div className="max-w-4xl mx-auto px-4 py-4">
-                <div className="flex items-center">
+                <div className="flex items-center justify-between gap-2">
                     <BackButton label={t('go_back', 'Go Back')} onClick={() => navigate(-1)} />
+                    <RefreshControl
+                        onRefresh={handleRefresh}
+                        externalRefreshing={refreshing}
+                        enablePullToRefresh={false}
+                        showDesktopButton
+                    />
                 </div>
             </div>
 
@@ -297,7 +331,12 @@ const SupermarketProfile = () => {
                                     <h1 className="text-xl sm:text-3xl md:text-4xl font-bold text-gray-900 dark:text-white tracking-tight leading-tight">
                                         {supermarket.name}
                                     </h1>
-                                    
+                                    {refreshing && (
+                                        <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                                            {t('updating', 'Updating…')}
+                                        </span>
+                                    )}
+
                                     {/* Branch Selector Hook */}
                                     {(branches.length > 0) && (
                                         <div className="relative">
@@ -426,6 +465,29 @@ const SupermarketProfile = () => {
 
                     {/* Operational Details */}
                     <div className="mt-8 space-y-4">
+                        <div className="rounded-2xl border border-gray-100 dark:border-white/5 bg-white dark:bg-[#1C1C1E] p-4 sm:p-5">
+                            <div className="flex items-center gap-2 mb-4">
+                                <Clock size={16} className="text-brand-600 dark:text-brand-400" />
+                                <h3 className="text-sm font-black uppercase tracking-widest dark:text-white">{t('opening_hours', 'Opening hours')}</h3>
+                            </div>
+                            <div className="space-y-2">
+                                {storeAvailability.weeklySchedule.map((row) => {
+                                    const isToday = row.day === ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date().getDay()];
+                                    const hoursLabel = row.closed
+                                        ? t('closed_today', 'Closed')
+                                        : String(row.hours).replace('-', '–');
+                                    return (
+                                        <div
+                                            key={row.day}
+                                            className={`flex items-center justify-between rounded-xl px-3 py-2 text-sm ${isToday ? 'bg-brand-50 dark:bg-brand-900/20 font-semibold' : 'text-gray-600 dark:text-gray-400'}`}
+                                        >
+                                            <span>{t(`day_${row.day.toLowerCase()}`, row.day)} {isToday && <span className="text-[10px] uppercase tracking-widest text-brand-600 dark:text-brand-300 ml-1">({t('today', 'Today')})</span>}</span>
+                                            <span className={row.closed ? 'text-red-500' : 'dark:text-white'}>{hoursLabel}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
                         <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
                             <div className="flex gap-2">
                                     <div className="flex items-center gap-2">

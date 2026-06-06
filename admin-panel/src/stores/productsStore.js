@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { db, storage, getAppwriteConfig } from '../lib/appwrite';
 import { ID, Query } from 'appwrite';
-import { invalidateCacheKey } from '../utils/readCache';
+import { invalidateCacheKey, getCacheEntry, setCacheEntry, isFresh } from '../utils/readCache';
 
 const PRODUCT_OPTIONS_TTL_MS = 10 * 60 * 1000;
 const PRODUCT_OPTIONS_CACHE_KEY = 'admin:product-options:v1';
@@ -77,6 +77,7 @@ const useProductsStore = create((set, get) => ({
     products: [],
     productOptions: [],
     productOptionsFetchedAt: null,
+    hasProductOptionsFetched: false,
     loading: false,
     error: null,
     total: 0,
@@ -123,10 +124,22 @@ const useProductsStore = create((set, get) => ({
             !force &&
             productOptionsFetchedAt &&
             Date.now() - productOptionsFetchedAt < PRODUCT_OPTIONS_TTL_MS &&
-            productOptions.length > 0
+            get().hasProductOptionsFetched
         ) {
             return productOptions;
         }
+
+        const cached = !force ? getCacheEntry(PRODUCT_OPTIONS_CACHE_KEY) : null;
+        if (cached && isFresh(cached, PRODUCT_OPTIONS_TTL_MS)) {
+            set({
+                productOptions: cached.data,
+                productOptionsFetchedAt: cached.updatedAt,
+                hasProductOptionsFetched: true,
+                loading: false,
+            });
+            return cached.data;
+        }
+
         if (loading && !force) return productOptions;
 
         set({ loading: true, error: null });
@@ -136,9 +149,11 @@ const useProductsStore = create((set, get) => ({
                 Query.orderDesc('$createdAt'),
                 Query.select(['$id', 'name', 'barcode', 'brand', 'opeStore', 'opeProductName']),
             ]);
+            setCacheEntry(PRODUCT_OPTIONS_CACHE_KEY, response.documents);
             set({
                 productOptions: response.documents,
                 productOptionsFetchedAt: Date.now(),
+                hasProductOptionsFetched: true,
                 loading: false,
             });
             return response.documents;
@@ -150,7 +165,7 @@ const useProductsStore = create((set, get) => ({
 
     invalidateProductOptions: () => {
         invalidateCacheKey(PRODUCT_OPTIONS_CACHE_KEY);
-        set({ productOptionsFetchedAt: null });
+        set({ productOptionsFetchedAt: null, hasProductOptionsFetched: false });
     },
 
     uploadProductImage: async (file) => {
@@ -206,6 +221,7 @@ const useProductsStore = create((set, get) => ({
             const result = await db.products.create(payload);
             console.log('Product created successfully:', result);
             await useProductsStore.getState().fetchProducts();
+            get().invalidateProductOptions();
             set({ loading: false });
             return true;
         } catch (error) {
@@ -235,6 +251,7 @@ const useProductsStore = create((set, get) => ({
             }
             await db.products.update(id, payload);
             await useProductsStore.getState().fetchProducts();
+            get().invalidateProductOptions();
             set({ loading: false });
             return true;
         } catch (error) {
@@ -290,6 +307,7 @@ const useProductsStore = create((set, get) => ({
             const result = await db.products.update(id, payload);
             console.log('Product updated successfully:', result);
             await useProductsStore.getState().fetchProducts();
+            get().invalidateProductOptions();
             set({ loading: false });
             return true;
         } catch (error) {
@@ -309,6 +327,7 @@ const useProductsStore = create((set, get) => ({
         try {
             await db.products.delete(id);
             await useProductsStore.getState().fetchProducts();
+            get().invalidateProductOptions();
             set({ loading: false });
             return true;
         } catch (error) {

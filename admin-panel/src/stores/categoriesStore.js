@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { db } from '../lib/appwrite';
-import { invalidateCacheKey } from '../utils/readCache';
+import { invalidateCacheKey, getCacheEntry, setCacheEntry, isFresh } from '../utils/readCache';
 
 const REFERENCE_TTL_MS = 10 * 60 * 1000;
 const CACHE_KEY = 'admin:categories:v1';
@@ -10,26 +10,41 @@ const useCategoriesStore = create((set, get) => ({
     loading: false,
     error: null,
     lastFetchedAt: null,
+    hasFetched: false,
 
     fetchCategories: async ({ force = false } = {}) => {
-        const { lastFetchedAt, categories, loading } = get();
+        const { lastFetchedAt, hasFetched, loading } = get();
         if (
             !force &&
+            hasFetched &&
             lastFetchedAt &&
-            Date.now() - lastFetchedAt < REFERENCE_TTL_MS &&
-            categories.length > 0
+            Date.now() - lastFetchedAt < REFERENCE_TTL_MS
         ) {
             return;
         }
+
+        const cached = !force ? getCacheEntry(CACHE_KEY) : null;
+        if (cached && isFresh(cached, REFERENCE_TTL_MS)) {
+            set({
+                categories: cached.data,
+                loading: false,
+                lastFetchedAt: cached.updatedAt,
+                hasFetched: true,
+            });
+            return;
+        }
+
         if (loading && !force) return;
 
         set({ loading: true, error: null });
         try {
             const response = await db.categories.list();
+            setCacheEntry(CACHE_KEY, response.documents);
             set({
                 categories: response.documents,
                 loading: false,
                 lastFetchedAt: Date.now(),
+                hasFetched: true,
             });
         } catch (error) {
             set({ error: error.message, loading: false });
@@ -40,7 +55,7 @@ const useCategoriesStore = create((set, get) => ({
 
     invalidate: () => {
         invalidateCacheKey(CACHE_KEY);
-        set({ lastFetchedAt: null });
+        set({ lastFetchedAt: null, hasFetched: false });
     },
 
     addCategory: async (data) => {

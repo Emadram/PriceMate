@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import useProductStore from '../stores/productStore';
 import BackButton from '../components/BackButton';
+import RefreshControl from '../components/RefreshControl';
 import { FiPackage, FiCamera } from 'react-icons/fi';
 import { getAppwriteConfig } from '../lib/appwrite';
 import { useTranslation } from 'react-i18next';
+import { refreshPageCache } from '../utils/invalidateFreshData';
 
 const { endpoint: APPWRITE_ENDPOINT, projectId: APPWRITE_PROJECT_ID } = getAppwriteConfig();
 const PRODUCT_IMAGES_BUCKET = import.meta.env.VITE_APPWRITE_BUCKET_PRODUCT_IMAGES || 'product-images';
@@ -17,6 +19,7 @@ const ProductDetails = () => {
     const location = useLocation();
     const { product, loading, error, fetchProductByBarcode } = useProductStore();
     const [imageFailed, setImageFailed] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
 
     const tapFeedback = () => {
         if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
@@ -35,9 +38,25 @@ const ProductDetails = () => {
         }
     }, [barcode, navigate, location.state, fetchProductByBarcode]);
 
-    if (loading) {
+    const handleRefresh = useCallback(async () => {
+        if (!barcode) return;
+        setRefreshing(true);
+        try {
+            refreshPageCache({
+                priceScope: 'product',
+                barcode,
+                productId: product?.$id,
+            });
+            await fetchProductByBarcode(barcode, { force: true });
+        } finally {
+            setRefreshing(false);
+        }
+    }, [barcode, fetchProductByBarcode, product?.$id]);
+
+    if (loading && !product) {
         return (
             <div className="min-h-screen bg-gray-50 pb-safe pt-safe">
+                <RefreshControl onRefresh={handleRefresh} externalRefreshing={refreshing} />
                 <div className="bg-white px-4 sm:px-6 pt-6 sm:pt-10 pb-6 sm:pb-8 rounded-b-[2.25rem] sm:rounded-b-[3rem] shadow-sm mb-5 sm:mb-6">
                     <div className="max-w-4xl mx-auto">
                         <div className="w-10 h-10 rounded-full bg-gray-100 animate-pulse" />
@@ -55,6 +74,7 @@ const ProductDetails = () => {
     if (error || !product) {
         return (
             <div className="min-h-screen bg-gray-50 pb-safe pt-safe">
+                <RefreshControl onRefresh={handleRefresh} externalRefreshing={refreshing} />
                 <div className="bg-white px-4 sm:px-6 pt-6 sm:pt-10 pb-6 sm:pb-8 rounded-b-[2.25rem] sm:rounded-b-[3rem] shadow-sm mb-5 sm:mb-6">
                     <div className="max-w-4xl mx-auto flex items-center">
                         <BackButton label={t('go_back', 'Go Back')} className="-ml-2" />
@@ -91,9 +111,16 @@ const ProductDetails = () => {
 
     return (
         <div className="min-h-screen bg-gray-50 pb-safe-nav pt-safe">
+            <RefreshControl onRefresh={handleRefresh} externalRefreshing={refreshing || loading} />
             <div className="bg-white px-4 sm:px-6 pt-6 sm:pt-10 pb-6 sm:pb-8 rounded-b-[2.25rem] sm:rounded-b-[3rem] shadow-sm mb-5 sm:mb-6">
-                <div className="max-w-4xl mx-auto flex items-center">
+                <div className="max-w-4xl mx-auto flex items-center justify-between gap-2">
                     <BackButton label={t('go_back', 'Go Back')} className="-ml-2" />
+                    <RefreshControl
+                        onRefresh={handleRefresh}
+                        externalRefreshing={refreshing || loading}
+                        enablePullToRefresh={false}
+                        showDesktopButton
+                    />
                 </div>
                 <div className="flex flex-col items-center text-center">
                     <div className="w-36 h-36 sm:w-48 sm:h-48 bg-gray-50 rounded-3xl p-5 sm:p-6 mb-5 sm:mb-6 flex items-center justify-center border border-gray-100">

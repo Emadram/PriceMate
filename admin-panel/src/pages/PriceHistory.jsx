@@ -85,19 +85,26 @@ const PriceHistory = () => {
     const [opeProbing, setOpeProbing] = useState(false);
     const [opeProbeError, setOpeProbeError] = useState('');
 
-    const refreshData = useCallback(async () => {
+    const refreshReferenceData = useCallback(async ({ force = false } = {}) => {
         await Promise.all([
-            fetchHistoryPage(page, pageSize),
-            fetchProductOptions(),
-            fetchSupermarkets(),
+            fetchProductOptions({ force }),
+            fetchSupermarkets({ force }),
         ]);
+    }, [fetchProductOptions, fetchSupermarkets]);
+
+    const refreshHistoryOnly = useCallback(async () => {
+        await fetchHistoryPage(page, pageSize, { force: true });
         setLastUpdated(new Date().toISOString());
-    }, [fetchHistoryPage, fetchProductOptions, fetchSupermarkets, page, pageSize]);
+    }, [fetchHistoryPage, page, pageSize]);
 
     useEffect(() => {
-        const t = setTimeout(() => refreshData(), 0);
+        const t = setTimeout(() => refreshReferenceData(), 0);
         return () => clearTimeout(t);
-    }, [refreshData]);
+    }, [refreshReferenceData]);
+
+    useEffect(() => {
+        fetchHistoryPage(page, pageSize);
+    }, [page, pageSize, fetchHistoryPage]);
 
     useEffect(() => {
         if (!showOpeModal || !isOpeProxyConfigured()) return undefined;
@@ -292,17 +299,19 @@ const PriceHistory = () => {
 
     const priceHistoryChannels = [
         `databases.${DATABASE_ID}.collections.${COLLECTIONS.PRICE_HISTORY}.documents`,
+    ];
+    const priceHistoryReferenceChannels = [
         `databases.${DATABASE_ID}.collections.${COLLECTIONS.PRODUCTS}.documents`,
         `databases.${DATABASE_ID}.collections.${COLLECTIONS.SUPERMARKETS}.documents`,
     ];
-    useDebouncedRealtimeRefresh(priceHistoryChannels, refreshData);
+    useDebouncedRealtimeRefresh(priceHistoryChannels, refreshHistoryOnly);
+    useDebouncedRealtimeRefresh(priceHistoryReferenceChannels, refreshReferenceData);
 
     const totalPages = Math.max(1, Math.ceil((total || 0) / pageSize));
 
     const goToPage = (nextPage) => {
         const clamped = Math.min(Math.max(1, nextPage), totalPages);
         setPage(clamped);
-        fetchHistoryPage(clamped, pageSize);
     };
 
     const getProductName = (id) => {

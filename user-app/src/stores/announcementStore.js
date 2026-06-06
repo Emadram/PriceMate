@@ -9,10 +9,15 @@ const useAnnouncementStore = create((set, get) => ({
     error: null,
     lastFetchedAt: 0,
 
-    fetchActiveAnnouncements: async (limit = 5) => {
+    fetchActiveAnnouncements: async (limit = 5, { force = false } = {}) => {
         const now = Date.now();
         const { lastFetchedAt, announcements } = get();
-        if (Array.isArray(announcements) && announcements.length > 0 && now - lastFetchedAt < CACHE_TTL_MS) {
+        if (
+            !force &&
+            Array.isArray(announcements) &&
+            announcements.length > 0 &&
+            now - lastFetchedAt < CACHE_TTL_MS
+        ) {
             return announcements.slice(0, limit);
         }
         set({ loading: true, error: null });

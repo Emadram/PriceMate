@@ -11,7 +11,8 @@
     "test:price-history-backfill": "node scripts/priceHistoryBackfill.test.mjs",
     "test:ope": "node scripts/openPriceEngineNormalize.test.mjs && node scripts/openPriceEngineImport.test.mjs && node scripts/openPriceEngineMatch.test.mjs",
     "test:appwrite-execution": "node scripts/appwriteFunctionExecution.test.mjs",
-    "test": "npm run test:price-history-backfill && npm run test:ope && npm run test:appwrite-execution",
+    "test:read-cache": "node scripts/readCache.test.mjs",
+    "test": "npm run test:price-history-backfill && npm run test:ope && npm run test:appwrite-execution && npm run test:read-cache",
     "preview": "vite preview"
   },
   "dependencies": {

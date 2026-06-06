@@ -32,17 +32,23 @@ const useCategoriesStore = create((set, get) => ({
     loading: false,
     error: null,
     lastFetchedAt: 0,
+    hasFetched: false,
 
-    fetchCategories: async () => {
+    fetchCategories: async ({ force = false } = {}) => {
         const now = Date.now();
-        const { lastFetchedAt, categories } = get();
-        if (Array.isArray(categories) && categories.length > 0 && now - lastFetchedAt < CACHE_TTL_MS) {
+        const { lastFetchedAt, categories, hasFetched } = get();
+        if (!force && hasFetched && now - lastFetchedAt < CACHE_TTL_MS) {
             return categories;
         }
         set({ loading: true, error: null });
         try {
             const allCategories = await fetchCategories();
-            set({ categories: allCategories, loading: false, lastFetchedAt: now });
+            set({
+                categories: allCategories,
+                loading: false,
+                lastFetchedAt: Date.now(),
+                hasFetched: true,
+            });
             return allCategories;
         } catch (error) {
             console.error('Failed to fetch categories:', error);

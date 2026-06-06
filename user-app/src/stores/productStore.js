@@ -6,9 +6,9 @@ import {
     fetchPricesForProducts,
     fetchSupermarketsCatalog,
 } from '../utils/productUtils';
-
-const CACHE_STALENESS_LIMIT = 5 * 60 * 1000; // 5 minutes
+import { PRODUCT_BARCODE_CACHE_TTL_MS } from '../utils/cacheTtls';
 const inflightProductRequests = new Map();
+const prefetchSessionKeys = new Set();
 
 const normalizeBarcodeKey = (barcode) => String(barcode ?? '').trim();
 
@@ -137,17 +137,46 @@ const useProductStore = create((set, get) => ({
         search: {},
     },
 
-    fetchProductByBarcode: async (barcode) => {
+    invalidateBarcodeCache: (barcode) => {
+        const cacheKey = normalizeBarcodeKey(barcode);
+        if (!cacheKey) return;
+        set((state) => {
+            const nextProducts = { ...state.cache.products };
+            delete nextProducts[cacheKey];
+            return {
+                cache: {
+                    ...state.cache,
+                    products: nextProducts,
+                },
+            };
+        });
+    },
+
+    clearAllProductCaches: () => {
+        set((state) => ({
+            cache: {
+                ...state.cache,
+                products: {},
+                search: {},
+            },
+        }));
+    },
+
+    fetchProductByBarcode: async (barcode, { force = false } = {}) => {
         const cacheKey = normalizeBarcodeKey(barcode);
         if (!cacheKey) {
             set({ loading: false, error: 'Product not found in local or global database', product: null, prices: [] });
             return null;
         }
 
+        if (force) {
+            get().invalidateBarcodeCache(cacheKey);
+        }
+
         try {
             // Check cache
             const cached = get().cache.products[cacheKey];
-            if (cached && (Date.now() - cached.timestamp < CACHE_STALENESS_LIMIT)) {
+            if (!force && cached && (Date.now() - cached.timestamp < PRODUCT_BARCODE_CACHE_TTL_MS)) {
                 set({ 
                     product: cached.product, 
                     prices: cached.prices,
@@ -183,12 +212,21 @@ const useProductStore = create((set, get) => ({
         const cacheKey = normalizeBarcodeKey(barcode);
         if (!cacheKey) return null;
 
+        if (prefetchSessionKeys.has(cacheKey)) {
+            const cached = get().cache.products[cacheKey];
+            if (cached && (Date.now() - cached.timestamp < PRODUCT_BARCODE_CACHE_TTL_MS)) {
+                return cached.product;
+            }
+        }
+
         const cached = get().cache.products[cacheKey];
-        if (cached && (Date.now() - cached.timestamp < CACHE_STALENESS_LIMIT)) {
+        if (cached && (Date.now() - cached.timestamp < PRODUCT_BARCODE_CACHE_TTL_MS)) {
+            prefetchSessionKeys.add(cacheKey);
             return cached.product;
         }
 
         try {
+            prefetchSessionKeys.add(cacheKey);
             const result = await withInflightProduct(cacheKey, () => loadProductPayload(cacheKey));
             if (!result || !result.product) return null;
             cacheOnlyProductResult(set, cacheKey, result.product, result.prices);
@@ -205,7 +243,7 @@ const useProductStore = create((set, get) => ({
         try {
             // Quick Cache Check
             const cached = get().cache.search[query];
-            if (cached && (Date.now() - cached.timestamp < CACHE_STALENESS_LIMIT)) {
+            if (cached && (Date.now() - cached.timestamp < PRODUCT_BARCODE_CACHE_TTL_MS)) {
                 set({ searchResults: cached.results, loading: false });
                 return cached.results;
             }

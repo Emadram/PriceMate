@@ -1,6 +1,10 @@
 import { create } from 'zustand';
 import { db } from '../lib/appwrite';
 import { Query } from 'appwrite';
+import { getCacheEntry, setCacheEntry, isFresh } from '../utils/readCache';
+
+const PAGE_TTL_MS = 2 * 60 * 1000;
+const pageCacheKey = (page) => `admin:prices:page:${page}`;
 
 const normalizeCurrencyForWrite = (value) => {
     if (!value) return value;
@@ -19,10 +23,23 @@ const usePricesStore = create((set, get) => ({
     setPage: (page) => set({ page }),
 
     fetchPrices: async (page = 1, { force = false } = {}) => {
-        const { page: currentPage, prices, loading } = get();
-        if (!force && page === currentPage && prices.length > 0 && !loading) {
-            return;
+        const { page: currentPage, loading } = get();
+        const cacheKey = pageCacheKey(page);
+
+        if (!force) {
+            const cached = getCacheEntry(cacheKey);
+            if (cached && isFresh(cached, PAGE_TTL_MS)) {
+                set({
+                    prices: cached.data.prices,
+                    total: cached.data.total,
+                    page,
+                    loading: false,
+                });
+                return;
+            }
         }
+
+        if (loading && !force && page === currentPage) return;
 
         set({ loading: true, error: null });
         try {
@@ -35,11 +52,16 @@ const usePricesStore = create((set, get) => ({
                 Query.orderDesc('$updatedAt'),
                 Query.select(['*', 'products.name', 'products.$id', 'supermarkets.name', 'supermarkets.$id'])
             ]);
-            set({ 
-                prices: response.documents, 
+            const payload = {
+                prices: response.documents,
                 total: response.total,
-                page: page,
-                loading: false 
+            };
+            setCacheEntry(cacheKey, payload);
+            set({
+                prices: payload.prices,
+                total: payload.total,
+                page,
+                loading: false,
             });
         } catch (error) {
             console.error('Fetch prices error:', error);
@@ -88,7 +110,7 @@ const usePricesStore = create((set, get) => ({
             }
 
             console.log('Price created:', result);
-            await usePricesStore.getState().fetchPrices();
+            await usePricesStore.getState().fetchPrices(get().page, { force: true });
             set({ loading: false });
             return true;
         } catch (error) {
@@ -136,7 +158,7 @@ const usePricesStore = create((set, get) => ({
                 console.warn('Could not log history:', historyErr);
             }
 
-            await usePricesStore.getState().fetchPrices();
+            await usePricesStore.getState().fetchPrices(get().page, { force: true });
             set({ loading: false });
             return true;
         } catch (error) {
@@ -150,7 +172,7 @@ const usePricesStore = create((set, get) => ({
         set({ loading: true, error: null });
         try {
             await db.prices.delete(id);
-            await usePricesStore.getState().fetchPrices();
+            await usePricesStore.getState().fetchPrices(get().page, { force: true });
             set({ loading: false });
             return true;
         } catch (error) {

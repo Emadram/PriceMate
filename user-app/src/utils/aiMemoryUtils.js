@@ -6,6 +6,19 @@
 
 import { db } from '../lib/appwrite.js';
 import { Query } from 'appwrite';
+import { AI_MEMORY_PROMPT_TTL_MS } from './cacheTtls';
+
+const memoryPromptCache = new Map();
+const memoryPromptInflight = new Map();
+
+const memoryPromptCacheKey = (userId, conversationId) =>
+  `${userId}:${conversationId || 'none'}`;
+
+export function invalidateMemoryPromptCache(userId, conversationId = null) {
+  if (!userId) return;
+  memoryPromptCache.delete(memoryPromptCacheKey(userId, conversationId));
+  memoryPromptCache.delete(memoryPromptCacheKey(userId, null));
+}
 
 // ---------------------------------------------------------------------------
 // Trigger predicates
@@ -255,6 +268,17 @@ export async function fetchMemoryForPrompt(userId, conversationId) {
     return { conversationSummary: null, userFacts: null };
   }
 
+  const cacheKey = memoryPromptCacheKey(userId, conversationId);
+  const cached = memoryPromptCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < AI_MEMORY_PROMPT_TTL_MS) {
+    return cached.data;
+  }
+
+  if (memoryPromptInflight.has(cacheKey)) {
+    return memoryPromptInflight.get(cacheKey);
+  }
+
+  const run = (async () => {
   const LEGACY_CONVERSATION_ID = 'legacy';
 
   try {
@@ -294,6 +318,16 @@ export async function fetchMemoryForPrompt(userId, conversationId) {
   } catch {
     return { conversationSummary: null, userFacts: null };
   }
+  })();
+
+  memoryPromptInflight.set(cacheKey, run);
+  try {
+    const data = await run;
+    memoryPromptCache.set(cacheKey, { data, at: Date.now() });
+    return data;
+  } finally {
+    memoryPromptInflight.delete(cacheKey);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -332,6 +366,7 @@ async function upsertMemoryDoc(userId, conversationId, memoryType, content) {
     if (conversationId) data.conversationId = conversationId;
     await db.aiChatMemory.create(data);
   }
+  invalidateMemoryPromptCache(userId, conversationId);
 }
 
 // ---------------------------------------------------------------------------

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { db, Query, client, DATABASE_ID, COLLECTIONS, ID } from '../lib/appwrite';
 import { applyTitleOverlay } from '../utils/aiMemoryUtils';
+import { CHAT_MESSAGES_TTL_MS, CHAT_SUMMARIES_TTL_MS } from '../utils/cacheTtls';
 
 /** Messages with no `conversationId` in Appwrite are grouped under this id in the UI. */
 export const LEGACY_CONVERSATION_ID = 'legacy';
@@ -150,7 +151,28 @@ const deleteMemoryDocuments = async (userId, conversationId = null) => {
 /** Serialize session bootstrap so overlapping calls (Strict Mode, fast navigation) never double-run the empty-session branch. */
 let initSessionMutex = Promise.resolve();
 
-const SUMMARIES_TTL_MS = 2 * 60 * 1000;
+const messagesCache = new Map();
+
+const messagesCacheKey = (userId, conversationId) => `${userId}:${conversationId}`;
+
+const getCachedMessages = (userId, conversationId) => {
+    const entry = messagesCache.get(messagesCacheKey(userId, conversationId));
+    if (!entry) return null;
+    if (Date.now() - entry.fetchedAt > CHAT_MESSAGES_TTL_MS) {
+        messagesCache.delete(messagesCacheKey(userId, conversationId));
+        return null;
+    }
+    return entry.messages;
+};
+
+const setCachedMessages = (userId, conversationId, messages) => {
+    messagesCache.set(messagesCacheKey(userId, conversationId), {
+        messages,
+        fetchedAt: Date.now(),
+    });
+};
+
+const SUMMARIES_TTL_MS = CHAT_SUMMARIES_TTL_MS;
 
 const patchSummaryAfterMessage = (summaries, conversationId, timestamp) => {
     const idx = summaries.findIndex((s) => s.id === conversationId);
@@ -206,6 +228,7 @@ const useChatStore = create((set, get) => ({
             get().unsubscribe();
         }
         initSessionMutex = Promise.resolve();
+        messagesCache.clear();
         set({
             messages: [],
             conversationSummaries: [],
@@ -252,13 +275,12 @@ const useChatStore = create((set, get) => ({
     fetchConversationSummaries: async (userId, { force = false } = {}) => {
         if (!userId) return;
 
-        const { summariesUserId, summariesFetchedAt, conversationSummaries, summariesLoading } = get();
+        const { summariesUserId, summariesFetchedAt, summariesLoading } = get();
         if (
             !force &&
             summariesUserId === userId &&
             summariesFetchedAt &&
-            Date.now() - summariesFetchedAt < SUMMARIES_TTL_MS &&
-            conversationSummaries.length > 0
+            Date.now() - summariesFetchedAt < SUMMARIES_TTL_MS
         ) {
             return;
         }
@@ -320,26 +342,29 @@ const useChatStore = create((set, get) => ({
     },
 
     fetchMessagesForConversation: async (userId, conversationId, options = {}) => {
-        const { quiet = false } = options;
+        const { quiet = false, force = false } = options;
         if (!userId || !conversationId) return;
 
         if (get().unsubscribe) {
             get().unsubscribe();
         }
 
-        if (!quiet) {
+        const cachedMessages = !force ? getCachedMessages(userId, conversationId) : null;
+        if (cachedMessages) {
+            if (!quiet) {
+                set({ loading: true, error: null, activeConversationId: conversationId });
+            } else {
+                set({ error: null, activeConversationId: conversationId });
+            }
+            set({ messages: cachedMessages, loading: false });
+            writeLastConversationId(userId, conversationId);
+        } else if (!quiet) {
             set({ loading: true, error: null, activeConversationId: conversationId });
         } else {
             set({ error: null, activeConversationId: conversationId });
         }
 
-        try {
-            const documents = (await listAllThreadDocuments(userId, conversationId)).sort(
-                sortMessagesAsc
-            );
-            set({ messages: documents, loading: false });
-            writeLastConversationId(userId, conversationId);
-
+        const subscribeToThread = () => {
             const unsubscribe = client.subscribe(
                 `databases.${DATABASE_ID}.collections.${COLLECTIONS.CHAT_HISTORY}.documents`,
                 (subResponse) => {
@@ -349,16 +374,32 @@ const useChatStore = create((set, get) => ({
                     if (!messageMatchesActive(payload, userId, activeId)) return;
 
                     if (events.includes('databases.*.collections.*.documents.*.create')) {
-                        set((state) => ({
-                            messages: [...state.messages.filter((m) => m.$id !== payload.$id), payload].sort(
+                        set((state) => {
+                            const nextMessages = [...state.messages.filter((m) => m.$id !== payload.$id), payload].sort(
                                 sortMessagesAsc
-                            ),
-                        }));
+                            );
+                            setCachedMessages(userId, activeId, nextMessages);
+                            return { messages: nextMessages };
+                        });
                     }
                 }
             );
-
             set({ unsubscribe });
+        };
+
+        if (cachedMessages) {
+            subscribeToThread();
+            return;
+        }
+
+        try {
+            const documents = (await listAllThreadDocuments(userId, conversationId)).sort(
+                sortMessagesAsc
+            );
+            setCachedMessages(userId, conversationId, documents);
+            set({ messages: documents, loading: false });
+            writeLastConversationId(userId, conversationId);
+            subscribeToThread();
         } catch (error) {
             console.error('Failed to fetch chat messages:', error);
             set({ error: error.message, loading: false });

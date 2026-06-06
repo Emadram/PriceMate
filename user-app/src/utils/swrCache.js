@@ -29,6 +29,22 @@ export function isFresh(entry, ttlMs = DEFAULT_TTL_MS) {
   return now() - entry.updatedAt <= ttlMs;
 }
 
+export function invalidateCacheKey(key) {
+  store.delete(key);
+}
+
+export function invalidateCacheByPrefix(prefix) {
+  if (!prefix) return 0;
+  let removed = 0;
+  for (const key of [...store.keys()]) {
+    if (key.startsWith(prefix)) {
+      store.delete(key);
+      removed += 1;
+    }
+  }
+  return removed;
+}
+
 export async function swrGetOrFetch(
   key,
   {

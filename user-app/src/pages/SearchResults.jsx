@@ -4,12 +4,13 @@ import { FiArrowLeft, FiSearch, FiFilter } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
 import { fetchPricesForProducts, searchProducts, normalizeProduct } from '../utils/productUtils';
 import { getCacheEntry, swrGetOrFetch } from '../utils/swrCache';
+import { SEARCH_CACHE_TTL_MS } from '../utils/cacheTtls';
+import { refreshPageCache } from '../utils/invalidateFreshData';
 import useCategoriesStore from '../stores/categoriesStore';
 import ProductCard from '../components/ProductCard';
 import { ProductCardSkeleton } from '../components/SkeletonLoaders';
 import BackButton from '../components/BackButton';
-
-const SEARCH_CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes
+import RefreshControl from '../components/RefreshControl';
 
 const SearchResults = () => {
     const { t } = useTranslation();
@@ -73,9 +74,13 @@ const SearchResults = () => {
         return () => clearTimeout(handler);
     }, [searchInput, selectedCategory, query, categoryIdFromUrl, navigate]);
 
-    const loadInitialData = useCallback(async () => {
+    const loadInitialData = useCallback(async ({ force = false } = {}) => {
         const seq = ++requestSeq.current;
         const key = `search:${encodeURIComponent(query)}:${encodeURIComponent(categoryIdFromUrl)}:${encodeURIComponent(sortBy)}`;
+
+        if (force) {
+            refreshPageCache({ swrKey: key, priceScope: 'global' });
+        }
 
         const fetcher = async () => {
             // Fetch categories if not already fetched
@@ -197,9 +202,13 @@ const SearchResults = () => {
         navigate(url);
     };
 
+    const handleRefresh = useCallback(async () => {
+        await loadInitialData({ force: true });
+    }, [loadInitialData]);
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-safe md:pb-8">
+            <RefreshControl onRefresh={handleRefresh} externalRefreshing={refreshing} />
             {/* Extended Header for Search Context — fixed at top safe area on mobile */}
             <div
                 ref={searchChromeRef}
@@ -215,13 +224,19 @@ const SearchResults = () => {
                             <h1 className="hidden md:block text-base sm:text-xl md:text-2xl font-black text-gray-900 dark:text-white tracking-tighter">
                                 {t('results')}
                             </h1>
-                            <div className="md:hidden">
+                            <div className="flex items-center gap-2 md:hidden">
                                 {products.length > 0 && (
                                     <span className="bg-brand-600/10 text-brand-600 dark:text-brand-500 text-[9px] font-black px-2 py-1 rounded-full uppercase tracking-widest">
                                         {t('items_count', { count: products.length, defaultValue: '{{count}} Items' })}
                                     </span>
                                 )}
                             </div>
+                            <RefreshControl
+                                onRefresh={handleRefresh}
+                                externalRefreshing={refreshing}
+                                showDesktopButton
+                                className="hidden md:inline-flex"
+                            />
                         </div>
 
                         <form onSubmit={handleSearch} className="flex-1 flex flex-col sm:flex-row gap-2 md:gap-3">

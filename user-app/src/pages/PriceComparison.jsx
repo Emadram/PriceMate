@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom';
 import { 
     FiArrowLeft, FiMapPin, FiShoppingCart, FiShare2, FiPackage, 
@@ -7,7 +7,7 @@ import {
     FiCalendar, FiTag, FiAlertTriangle, FiInfo 
 } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
-import { calculateDistance, hasValidLatLon, fetchSimilarProductsByCategory, fetchPricesForProducts, getRelationshipId, normalizeProduct, resolveCoordinates } from '../utils/productUtils';
+import { calculateDistance, hasValidLatLon, fetchSimilarProductsByCategory, fetchPricesForProducts, getRelationshipId, normalizeProduct, resolveCoordinates, getStoreAvailability } from '../utils/productUtils';
 import { stripNutritionMeta } from '../utils/productUtils';
 import PriceHistoryChart from '../components/PriceHistoryChart';
 import ReportModal from '../components/ReportModal';
@@ -21,8 +21,11 @@ import useAuthStore from '../stores/authStore';
 import useProductStore from '../stores/productStore';
 import useFavoritesStore from '../stores/favoritesStore';
 import useCurrencyStore from '../stores/currencyStore';
+import useSupermarketsStore from '../stores/supermarketsStore';
 import useUserLocation from '../hooks/useUserLocation';
 import StarRating from '../components/StarRating';
+import RefreshControl from '../components/RefreshControl';
+import { refreshPageCache } from '../utils/invalidateFreshData';
 
 const normalizeStockStatus = (status) => {
     if (!status) return 'in_stock';
@@ -34,7 +37,7 @@ const normalizeStockStatus = (status) => {
 
 const isSupermarketObject = (value) => value != null && typeof value === 'object' && !Array.isArray(value);
 
-const StockBranch = ({ name, status, price, distance, t, currencyLabel, supermarketId }) => {
+const StockBranch = ({ name, status, price, distance, t, currencyLabel, supermarketId, storeIsOpen }) => {
     const normalizedStatus = normalizeStockStatus(status);
     const statusColors = {
         in_stock: "text-green-600 bg-green-50 dark:bg-green-900/20",
@@ -63,6 +66,11 @@ const StockBranch = ({ name, status, price, distance, t, currencyLabel, supermar
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${statusColors[normalizedStatus] || statusColors.in_stock}`}>
                         {getStatusLabel()}
                     </span>
+                    {storeIsOpen !== undefined && storeIsOpen !== null && (
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${storeIsOpen ? 'text-green-600 bg-green-50 dark:bg-green-900/20' : 'text-gray-500 bg-gray-100 dark:bg-gray-800'}`}>
+                            {storeIsOpen ? t('open', 'Open') : t('closed', 'Closed')}
+                        </span>
+                    )}
                 </div>
             </div>
             
@@ -116,6 +124,7 @@ const PriceComparison = () => {
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
     const user = useAuthStore((state) => state.user);
     const { isProductFavorite, toggleProductFavorite } = useFavoritesStore();
+    const { supermarkets: supermarketCatalog, fetchSupermarkets } = useSupermarketsStore();
 
     // From productStore
     const { 
@@ -128,6 +137,8 @@ const PriceComparison = () => {
     const [prices, setPrices] = useState([]);
     const [similarProducts, setSimilarProducts] = useState([]);
     const [similarLoading, setSimilarLoading] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
+    const [similarRefreshSeq, setSimilarRefreshSeq] = useState(0);
 
     const getSupermarketFromPrice = (price) => {
         if (!price) return null;
@@ -170,6 +181,22 @@ const PriceComparison = () => {
     useEffect(() => {
         fetchProductByBarcode(barcode);
     }, [barcode, fetchProductByBarcode]);
+
+    useEffect(() => {
+        fetchSupermarkets();
+    }, [fetchSupermarkets]);
+
+    const resolveSupermarketDoc = useCallback((price) => {
+        const fromPrice = getSupermarketFromPrice(price);
+        if (isSupermarketObject(fromPrice)) return fromPrice;
+        const id = typeof fromPrice === 'string' ? fromPrice : (() => {
+            const supermarket = getSupermarketFromPrice(price);
+            if (!supermarket) return null;
+            return typeof supermarket === 'string' ? supermarket : supermarket.$id;
+        })();
+        if (!id) return null;
+        return (supermarketCatalog || []).find((sm) => sm.$id === id) || fromPrice;
+    }, [supermarketCatalog]);
 
     useEffect(() => {
         if (!rawPrices) return;
@@ -260,12 +287,12 @@ const PriceComparison = () => {
 
             setSimilarLoading(true);
             try {
-                const candidates = await fetchSimilarProductsByCategory(categoryId, productId, 6);
+                const candidates = await fetchSimilarProductsByCategory(categoryId, productId, 4);
                 const localIds = candidates.filter((p) => p.$id).map((p) => p.$id);
                 const batchPrices = localIds.length > 0
                     ? await fetchPricesForProducts(localIds)
                     : [];
-                const normalized = candidates.map((p) => normalizeProduct(p, batchPrices));
+                const normalized = candidates.map((p) => normalizeProduct(p, batchPrices)).slice(0, 4);
                 if (active) setSimilarProducts(normalized);
             } catch (error) {
                 console.warn('Similar products fetch failed:', error?.message || error);
@@ -278,7 +305,23 @@ const PriceComparison = () => {
         return () => {
             active = false;
         };
-    }, [productId, productCategory, productIsGlobal]);
+    }, [productId, productCategory, productIsGlobal, similarRefreshSeq]);
+
+    const handleRefresh = useCallback(async () => {
+        if (!barcode) return;
+        setRefreshing(true);
+        try {
+            refreshPageCache({
+                priceScope: 'product',
+                productId: product?.$id,
+                barcode,
+            });
+            await fetchProductByBarcode(barcode, { force: true });
+            setSimilarRefreshSeq((n) => n + 1);
+        } finally {
+            setRefreshing(false);
+        }
+    }, [barcode, product?.$id, fetchProductByBarcode]);
 
     const handleShareClick = async () => {
         const shareUrl = window.location.href;
@@ -449,9 +492,16 @@ const PriceComparison = () => {
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-safe md:pb-12">
+            <RefreshControl onRefresh={handleRefresh} externalRefreshing={refreshing || loading} />
             <main className="max-w-4xl mx-auto px-3 sm:px-4 pt-2 pb-6 md:py-8 space-y-3 md:space-y-8">
-                <div className="flex items-center">
+                <div className="flex items-center justify-between gap-2">
                     <BackButton label={t('go_back', 'Go Back')} onClick={handleBack} />
+                    <RefreshControl
+                        onRefresh={handleRefresh}
+                        externalRefreshing={refreshing || loading}
+                        enablePullToRefresh={false}
+                        showDesktopButton
+                    />
                 </div>
                 {locationError && (
                     <div className="rounded-3xl border border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/10 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
@@ -667,10 +717,13 @@ const PriceComparison = () => {
                     ) : (
                         <div className="space-y-4">
                                 {sortedPrices.map((priceEntry) => {
-                                    const supermarket = getSupermarketFromPrice(priceEntry);
+                                    const supermarket = resolveSupermarketDoc(priceEntry);
                                     const supermarketId = typeof supermarket === 'string' ? supermarket : supermarket?.$id;
                                     const supermarketName = isSupermarketObject(supermarket) ? (supermarket.name || 'Store') : 'Store';
                                     const supermarketAddress = isSupermarketObject(supermarket) ? supermarket.address : null;
+                                    const storeAvailability = isSupermarketObject(supermarket)
+                                        ? getStoreAvailability(supermarket)
+                                        : null;
                                     const hasCoordinates =
                                         isSupermarketObject(supermarket) &&
                                         hasValidLatLon(supermarket.latitude, supermarket.longitude);
@@ -721,6 +774,11 @@ const PriceComparison = () => {
                                                         {isSupermarketObject(supermarket) && supermarket.branchName && (
                                                             <span className="text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-500 px-2 py-0.5 rounded-full font-bold shrink-0">
                                                                 {supermarket.branchName}
+                                                            </span>
+                                                        )}
+                                                        {storeAvailability && (
+                                                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 ${storeAvailability.isOpen ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'}`}>
+                                                                {storeAvailability.isOpen ? t('open', 'Open') : t('closed', 'Closed')}
                                                             </span>
                                                         )}
                                                     </div>
@@ -805,19 +863,23 @@ const PriceComparison = () => {
                                                     )}
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-2 animate-in slide-in-from-top-2 duration-300">
                                                         {priceEntry._allBranches?.map((branchPrice) => {
-                                                            const branchSM = getSupermarketFromPrice(branchPrice);
+                                                            const branchSM = resolveSupermarketDoc(branchPrice);
+                                                            const branchAvailability = isSupermarketObject(branchSM)
+                                                                ? getStoreAvailability(branchSM)
+                                                                : null;
                                                             const bConverted = convert(branchPrice.price, getPriceCurrency(branchPrice));
                                                             const branchSupermarketId = getSupermarketId(branchPrice);
                                                             return (
                                                                 <StockBranch 
                                                                     key={branchPrice.$id}
-                                                                    name={`${supermarketName} - ${branchSM?.branchName || 'Main'}`}
+                                                                    name={`${supermarketName} - ${isSupermarketObject(branchSM) ? (branchSM.branchName || 'Main') : 'Main'}`}
                                                                     status={branchPrice.stockStatus || 'high'} 
                                                                     t={t}
                                                                     price={`${bConverted}`}
                                                                     currencyLabel={getCurrencySymbol()}
                                                                     distance={branchPrice.distance !== null ? formatDistance(branchPrice.distance) : null}
                                                                     supermarketId={branchSupermarketId}
+                                                                    storeIsOpen={branchAvailability?.isOpen}
                                                                 />
                                                             );
                                                         })}

@@ -41,6 +41,7 @@ const Products = () => {
         page, 
         limit, 
         fetchProducts, 
+        setPage,
         setLimit,
         deleteProduct, 
         uploadProductImage 
@@ -341,28 +342,26 @@ const Products = () => {
         resetOffLookup();
     };
 
-    const refreshData = useCallback(async () => {
+    const refreshReferenceData = useCallback(async ({ force = false } = {}) => {
         await Promise.all([
-            fetchProducts(page),
-            fetchCategories(),
-            fetchSupermarkets(),
+            fetchCategories({ force }),
+            fetchSupermarkets({ force }),
         ]);
-        setLastUpdated(new Date().toISOString());
-    }, [fetchProducts, fetchCategories, fetchSupermarkets, page]);
+    }, [fetchCategories, fetchSupermarkets]);
+
+    useEffect(() => {
+        const t = setTimeout(() => refreshReferenceData(), 0);
+        return () => clearTimeout(t);
+    }, [refreshReferenceData]);
+
+    useEffect(() => {
+        fetchProducts(page);
+    }, [page, fetchProducts]);
 
     const refreshProductsOnly = useCallback(async () => {
         await fetchProducts(page, { force: true });
         setLastUpdated(new Date().toISOString());
     }, [fetchProducts, page]);
-
-    const refreshReferenceData = useCallback(async () => {
-        await Promise.all([fetchCategories(), fetchSupermarkets()]);
-    }, [fetchCategories, fetchSupermarkets]);
-
-    useEffect(() => {
-        const t = setTimeout(() => refreshData(), 0);
-        return () => clearTimeout(t);
-    }, [refreshData]);
 
     useEffect(() => {
         setJumpPage(String(page));
@@ -392,7 +391,7 @@ const Products = () => {
         const totalPages = Math.max(1, Math.ceil(total / limit));
         const next = Math.max(1, Math.min(totalPages, Number(newPage)));
         if (!Number.isFinite(next)) return;
-        fetchProducts(next);
+        setPage(next);
         setLastUpdated(new Date().toISOString());
     };
 
@@ -408,7 +407,6 @@ const Products = () => {
     const handleLimitChange = (event) => {
         const next = Number(event.target.value);
         setLimit(next);
-        fetchProducts(1);
         setLastUpdated(new Date().toISOString());
     };
 
