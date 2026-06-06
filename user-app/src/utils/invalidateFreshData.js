@@ -1,7 +1,10 @@
 import {
+    invalidateCatalogReferenceCaches,
     invalidateGlobalPriceCaches,
     invalidateProductUtilsByPrefix,
 } from './productUtils';
+import useCategoriesStore from '../stores/categoriesStore';
+import useSupermarketsStore from '../stores/supermarketsStore';
 import { invalidateCacheByPrefix, invalidateCacheKey } from './swrCache';
 import useProductStore from '../stores/productStore';
 
@@ -29,6 +32,9 @@ export function refreshPageCache({
 
     if (priceScope === 'global') {
         invalidateGlobalPriceCaches();
+        invalidateCatalogReferenceCaches();
+        useSupermarketsStore.getState().fetchSupermarkets({ force: true });
+        useCategoriesStore.getState().fetchCategories({ force: true });
     } else if (priceScope === 'supermarket' && supermarketId) {
         invalidateProductUtilsByPrefix(`supermarket:prices:${supermarketId}`);
         invalidateCacheKey(`supermarket-profile:${supermarketId}`);

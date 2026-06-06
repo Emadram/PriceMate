@@ -337,6 +337,9 @@ import {
     buildSupermarketContextLines,
     isUserLocationAvailableForStores,
     resolvePriceSupermarketMeta,
+    fetchPricesForProducts,
+    normalizeProduct,
+    enrichProductPricesWithSupermarkets,
 } from '../utils/productUtils';
 import useAiContextStore from '../stores/aiContextStore';
 import { refreshPageCache } from '../utils/invalidateFreshData';
@@ -719,7 +722,7 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [], allSup
                                 {renderStoreBadge(best)}
                             </div>
                         ) : (
-                            <p className="text-xs text-gray-500">{t('no_data_yet')}</p>
+                            <p className="text-xs text-gray-500">{t('catalog_no_prices_yet', 'In catalog — store prices not added yet')}</p>
                         )}
                     </div>
                 </div>
@@ -1084,7 +1087,7 @@ const DIETARY_RESTRICTION_TERMS = {
 };
 
 /** Prefer products that match the user message; fall back to a short sample (prompt cap + relevance). */
-const buildRankedProductContextLines = (products, userHint, aiProfile = {}) => {
+const buildRankedProductContextLines = (products, userHint, aiProfile = {}, resolvedProduct = null) => {
     const norm = (s) =>
         String(s || '')
             .toLowerCase()
@@ -1127,7 +1130,11 @@ const buildRankedProductContextLines = (products, userHint, aiProfile = {}) => {
     scored.sort((a, b) => b.score - a.score);
     const picked = scored.filter((x) => x.score > 0).slice(0, 25).map((x) => x.p);
     const list = picked.length > 0 ? picked : products.slice(0, 15);
-        return list
+    const resolvedId = resolvedProduct?.$id || resolvedProduct?.barcode || '';
+    const mergedList = resolvedProduct
+        ? [resolvedProduct, ...list.filter((p) => (p.$id || p.barcode) !== resolvedId)]
+        : list;
+        return mergedList
         .map((p) => {
             const category = Array.isArray(p.categoryId)
                 ? p.categoryId[0]?.categoryName
@@ -1875,39 +1882,42 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
             );
         };
 
-        const hasExplicitProductHint = (message) => {
+        const hasExplicitProductHint = (message, catalogMatch = null) => {
+            if (catalogMatch?.product) return true;
             const lowered = String(message || '').toLowerCase();
             if (/\b\d{8,14}\b/.test(lowered)) return true; // barcode
             const match = findBestProductMatch(message, fullProductList);
             if (match?.product && match.score >= FUZZY_MATCH_MIN_SCORE) return true;
-            // If the user explicitly names something short like "milk", fuzzy match will usually catch it.
             return false;
         };
 
+        const resolveMessageForCatalog = userMessage;
+        const catalog = await resolveCatalogProductForIngredients(resolveMessageForCatalog);
+        const offCache = await resolveOffCacheProductForIngredients(resolveMessageForCatalog);
+
         const contextFallback =
-            looksLikeIngredientFollowUp(userMessage) && !hasExplicitProductHint(userMessage)
+            looksLikeIngredientFollowUp(userMessage) && !hasExplicitProductHint(userMessage, catalog)
                 ? lastResolvedProductRef.current
                 : { barcode: '', name: '' };
+        const catalogWithFallback = contextFallback?.barcode && !catalog.product
+            ? await resolveCatalogProductForIngredients(`${userMessage}\n[BARCODE:${contextFallback.barcode}]`)
+            : catalog;
+        const effectiveCatalog = catalogWithFallback?.product ? catalogWithFallback : catalog;
 
         const barcodeFromMessage = extractBarcode(userMessage);
         const localProductMatch = findBestProductMatch(userMessage, fullProductList);
         const productMatch = localProductMatch?.product || null;
-        const resolveMessageForCatalog = contextFallback?.barcode
-            ? `${userMessage}\n[BARCODE:${contextFallback.barcode}]`
-            : userMessage;
-        const catalog = await resolveCatalogProductForIngredients(resolveMessageForCatalog);
-        const offCache = await resolveOffCacheProductForIngredients(resolveMessageForCatalog);
-        const mergedProductProfile = productMatch || catalog.product || offCache.product;
+        const mergedProductProfile = productMatch || effectiveCatalog.product || offCache.product;
         const effectiveBarcode =
             barcodeFromMessage ||
-            catalog.catalogBarcode ||
+            effectiveCatalog.catalogBarcode ||
             offCache.barcode ||
             productMatch?.barcode ||
             productMatch?.code ||
             contextFallback?.barcode ||
             '';
         const catalogDisplayName =
-            catalog.catalogName || offCache.name || productMatch?.name || productMatch?.productName || '';
+            effectiveCatalog.catalogName || offCache.name || productMatch?.name || productMatch?.productName || '';
         const effectiveDisplayName =
             catalogDisplayName || contextFallback?.name || mergedProductProfile?.name || mergedProductProfile?.productName || '';
 
@@ -2028,7 +2038,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
             };
 
             // Catalog-only policy: only answer ingredient/safety questions for products available in PriceMate.
-            if (!catalog.product) {
+            if (!effectiveCatalog.product) {
                 if (user?.$id) {
                     await addMessage(user.$id, 'assistant', t('ai_catalog_only_refusal'), user);
                 }
@@ -2037,7 +2047,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
             }
 
             let ingredientPayload =
-                ingredientPayloadFromAppwriteProduct(catalog.product) ||
+                ingredientPayloadFromAppwriteProduct(effectiveCatalog.product) ||
                 ingredientPayloadFromOffCache(offCache.product) ||
                 null;
 
@@ -2068,8 +2078,8 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                         user.$id,
                         'assistant',
                         t('ai_off_miss_catalog_hit', {
-                            name: catalogDisplayName || catalog.product.name || '',
-                            barcode: catalog.catalogBarcode || t('ai_barcode_unknown'),
+                            name: catalogDisplayName || effectiveCatalog.product?.name || '',
+                            barcode: effectiveCatalog.catalogBarcode || t('ai_barcode_unknown'),
                         }),
                         user
                     );
@@ -2079,9 +2089,9 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
             }
 
             // Persist resolved ingredient data to catalog product so future checks can be served locally.
-            if (catalog.product?.$id) {
+            if (effectiveCatalog.product?.$id) {
                 try {
-                    await persistIngredientPayloadToCatalogProduct(catalog.product, ingredientPayload);
+                    await persistIngredientPayloadToCatalogProduct(effectiveCatalog.product, ingredientPayload);
                 } catch {
                     // best-effort only; ingredient check must still return
                 }
@@ -2219,26 +2229,19 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
 
         const shouldBypassCatalogGate = mentionsNearestStore && !hasExplicitProductHintNow;
 
-        if (isProductSpecific) {
-            try {
-                const catalogOnly = await resolveCatalogProductForIngredients(resolveMessageForCatalog);
-                if (!catalogOnly?.product) {
-                    if (user?.$id) {
-                        const bestGuess = localProductMatch?.product || mergedProductProfile || null;
-                        const reply =
-                            buildCategoryAlternativesReply(bestGuess, fullProductList, t) ||
-                            t('ai_catalog_only_refusal');
-                        if (!shouldBypassCatalogGate) {
-                            await addMessage(user.$id, 'assistant', reply, user);
-                        }
-                    }
-                    if (!shouldBypassCatalogGate) {
-                        setIsLoading(false);
-                        return;
-                    }
+        if (isProductSpecific && !effectiveCatalog?.product) {
+            if (user?.$id) {
+                const bestGuess = localProductMatch?.product || mergedProductProfile || null;
+                const reply =
+                    buildCategoryAlternativesReply(bestGuess, fullProductList, t) ||
+                    t('ai_catalog_only_refusal');
+                if (!shouldBypassCatalogGate) {
+                    await addMessage(user.$id, 'assistant', reply, user);
                 }
-            } catch {
-                // If catalog lookup fails, fall back to normal behavior rather than blocking all chat.
+            }
+            if (!shouldBypassCatalogGate) {
+                setIsLoading(false);
+                return;
             }
         }
 
@@ -2262,7 +2265,28 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
             const memCtx = await fetchMemoryForPrompt(user.$id, activeConversationId)
                 .catch(() => ({ conversationSummary: null, userFacts: null }));
 
-            const promptContext = buildRankedProductContextLines(fullProductList, userMessage, userAiProfile);
+            let resolvedCatalogProductForPrompt = null;
+            if (effectiveCatalog.product?.$id) {
+                try {
+                    const priceRows = await fetchPricesForProducts([effectiveCatalog.product.$id]);
+                    const normalized = normalizeProduct(effectiveCatalog.product, priceRows);
+                    if (normalized) {
+                        resolvedCatalogProductForPrompt = enrichProductPricesWithSupermarkets(
+                            [normalized],
+                            Array.isArray(supermarketList) ? supermarketList : []
+                        )[0];
+                    }
+                } catch {
+                    resolvedCatalogProductForPrompt = normalizeProduct(effectiveCatalog.product, []);
+                }
+            }
+
+            const promptContext = buildRankedProductContextLines(
+                fullProductList,
+                userMessage,
+                userAiProfile,
+                resolvedCatalogProductForPrompt
+            );
             const storeContext = buildSupermarketContextLines(supermarketList, userLocation);
             const storeLocationStatus = isUserLocationAvailableForStores(userLocation)
                 ? 'available (distances in NEARBY STORES are precomputed; do not invent km values)'

@@ -8,6 +8,7 @@ import {
 } from '../utils/productUtils';
 import { PRODUCT_BARCODE_CACHE_TTL_MS } from '../utils/cacheTtls';
 const inflightProductRequests = new Map();
+const prefetchSessionKeys = new Set();
 
 const normalizeBarcodeKey = (barcode) => String(barcode ?? '').trim();
 
@@ -211,12 +212,21 @@ const useProductStore = create((set, get) => ({
         const cacheKey = normalizeBarcodeKey(barcode);
         if (!cacheKey) return null;
 
+        if (prefetchSessionKeys.has(cacheKey)) {
+            const cached = get().cache.products[cacheKey];
+            if (cached && (Date.now() - cached.timestamp < PRODUCT_BARCODE_CACHE_TTL_MS)) {
+                return cached.product;
+            }
+        }
+
         const cached = get().cache.products[cacheKey];
         if (cached && (Date.now() - cached.timestamp < PRODUCT_BARCODE_CACHE_TTL_MS)) {
+            prefetchSessionKeys.add(cacheKey);
             return cached.product;
         }
 
         try {
+            prefetchSessionKeys.add(cacheKey);
             const result = await withInflightProduct(cacheKey, () => loadProductPayload(cacheKey));
             if (!result || !result.product) return null;
             cacheOnlyProductResult(set, cacheKey, result.product, result.prices);

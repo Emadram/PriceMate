@@ -39,6 +39,11 @@ describe('productNameMatch', () => {
             expect(scoreProductNameMatch('how much is coke?', 'Coca-Cola')).toBeGreaterThanOrEqual(0.82);
         });
 
+        it('matches cocacola DB spelling via alias', () => {
+            const terms = buildCatalogSearchTerms('Coca-Cola price');
+            expect(terms.some((t) => t.includes('cocacola') || t.includes('coca'))).toBe(true);
+        });
+
         it('does not match unrelated milk to Coca-Cola', () => {
             expect(scoreProductNameMatch('is milk high in sugar?', 'Coca-Cola')).toBeLessThan(0.82);
         });

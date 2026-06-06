@@ -67,26 +67,22 @@ export const APPWRITE_CONFIG = {
 
 export const getAppwriteConfig = () => RESOLVED_APPWRITE_CONFIG;
 export const { DATABASE_ID, COLLECTIONS } = APPWRITE_CONFIG;
-export { Query, ID } from 'appwrite';
-import { ID } from 'appwrite';
+import { ID, Query } from 'appwrite';
+import { recordGetRead, recordListRead } from '../utils/readStats';
 
 /**
  * DB Helper - Centralized logic for database operations
  * achieving a cleaner `db.collection.action()` API.
  */
-const logDevListRead = (collectionId) => {
-    if (import.meta.env.DEV) {
-        console.debug('[Appwrite reads]', collectionId);
-    }
-};
-
 const dbAction = {
     list: (collectionId, queries = []) => {
-        logDevListRead(collectionId);
+        recordListRead(collectionId);
         return databases.listDocuments(DATABASE_ID, collectionId, queries);
     },
-    get: (collectionId, documentId, queries = []) => 
-        databases.getDocument(DATABASE_ID, collectionId, documentId, queries),
+    get: (collectionId, documentId, queries = []) => {
+        recordGetRead(collectionId);
+        return databases.getDocument(DATABASE_ID, collectionId, documentId, queries);
+    },
     create: (collectionId, data, permissions) => 
         databases.createDocument(DATABASE_ID, collectionId, ID.unique(), data, permissions),
     update: (collectionId, documentId, data, permissions) => 
@@ -150,4 +146,5 @@ export const db = {
     }
 };
 
+export { Query, ID };
 

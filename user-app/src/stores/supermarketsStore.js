@@ -9,14 +9,14 @@ const useSupermarketsStore = create((set, get) => ({
     loading: false,
     error: null,
     lastFetchedAt: 0,
+    hasFetched: false,
 
     fetchSupermarkets: async ({ force = false } = {}) => {
         const now = Date.now();
-        const { lastFetchedAt, supermarkets, loading } = get();
+        const { lastFetchedAt, supermarkets, loading, hasFetched } = get();
         if (
             !force &&
-            Array.isArray(supermarkets) &&
-            supermarkets.length > 0 &&
+            hasFetched &&
             now - lastFetchedAt < CACHE_TTL_MS
         ) {
             return supermarkets;
@@ -30,6 +30,7 @@ const useSupermarketsStore = create((set, get) => ({
                 supermarkets: documents,
                 loading: false,
                 lastFetchedAt: Date.now(),
+                hasFetched: true,
             });
             return documents;
         } catch (error) {

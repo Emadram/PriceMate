@@ -145,8 +145,11 @@ function App() {
       }
     }
     
-    // Run system health check in development
-    if (import.meta.env.DEV) {
+    // Run system health check in development (opt-in; disabled during read verification)
+    const runDiagnosticsEnabled =
+      import.meta.env.VITE_RUN_DIAGNOSTICS === 'true' &&
+      import.meta.env.VITE_READ_DEBUG !== 'true';
+    if (import.meta.env.DEV && runDiagnosticsEnabled) {
       runDiagnostics();
     }
   }, [checkSession, setTheme, fetchRates, currency, setCurrency]);

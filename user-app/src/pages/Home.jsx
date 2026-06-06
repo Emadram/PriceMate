@@ -15,6 +15,46 @@ import { ProductCardSkeleton } from '../components/SkeletonLoaders';
 import MarketsSection from '../components/MarketsSection';
 import RefreshControl from '../components/RefreshControl';
 
+const HOME_SWR_KEY = 'home:v1';
+
+const scoreHomeProduct = (product, favoriteProductIds, favoriteCategoryIds) => {
+    let score = 0;
+    if (favoriteProductIds.includes(product.$id)) score += 100;
+    const productCategoryId = Array.isArray(product.categoryId)
+        ? product.categoryId[0]?.$id
+        : product.categoryId?.$id;
+    if (productCategoryId && favoriteCategoryIds.has(productCategoryId)) score += 20;
+    const priceCount = Array.isArray(product.prices) ? product.prices.length : 0;
+    score += Math.min(priceCount, 5);
+    return score;
+};
+
+const personalizeHomeProducts = (products, favoriteProductIds) => {
+    const favoriteCategoryIds = new Set(
+        products
+            .filter((product) => favoriteProductIds.includes(product.$id))
+            .flatMap((product) => {
+                const categoryId = product.categoryId;
+                if (Array.isArray(categoryId)) {
+                    return categoryId.map((item) => item?.$id).filter(Boolean);
+                }
+                return categoryId?.$id ? [categoryId.$id] : [];
+            })
+    );
+
+    return [...products].sort((a, b) => {
+        const scoreDiff =
+            scoreHomeProduct(b, favoriteProductIds, favoriteCategoryIds) -
+            scoreHomeProduct(a, favoriteProductIds, favoriteCategoryIds);
+        if (scoreDiff !== 0) return scoreDiff;
+        return String(a.name || a.productName || '').localeCompare(
+            String(b.name || b.productName || ''),
+            undefined,
+            { sensitivity: 'base' }
+        );
+    });
+};
+
 const Home = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
@@ -24,7 +64,7 @@ const Home = () => {
     const fetchActiveAnnouncements = useAnnouncementStore(state => state.fetchActiveAnnouncements);
     const favoriteProductIds = useFavoritesStore((state) => state.favoriteProducts);
 
-    const [featuredProducts, setFeaturedProducts] = useState([]);
+    const [productPool, setProductPool] = useState([]);
     const [marketInsights, setMarketInsights] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -82,28 +122,24 @@ const Home = () => {
         }
     };
 
-    const favoritesKey = useMemo(() => {
-        try {
-            return Array.isArray(favoriteProductIds) ? favoriteProductIds.slice().sort().join(',') : '';
-        } catch {
-            return '';
-        }
-    }, [favoriteProductIds]);
+    const featuredProducts = useMemo(() => {
+        if (!Array.isArray(productPool) || productPool.length === 0) return [];
+        return personalizeHomeProducts(productPool, favoriteProductIds).slice(0, 4);
+    }, [productPool, favoriteProductIds]);
 
     const loadData = useCallback(async ({ force = false } = {}) => {
         setError(null);
-        const key = `home:v1:${favoritesKey}`;
+        const key = HOME_SWR_KEY;
 
         if (force) {
             refreshPageCache({ swrKey: key, priceScope: 'global' });
         }
 
         const fetcher = async () => {
-            // Fetch products and categories (Announcements handled by store)
             const [products, fetchedAnnouncements] = await Promise.all([
                 fetchProducts(12),
                 fetchActiveAnnouncements(5, { force }),
-                fetchCategories()
+                fetchCategories({ force }),
             ]);
 
             if (!products) throw new Error('Failed to fetch products');
@@ -130,54 +166,15 @@ const Home = () => {
             // Normalize
             const normalizedProducts = products.map((p) => normalizeProduct(p, batchPrices));
 
-            const favoriteCategoryIds = new Set(
-                normalizedProducts
-                    .filter((product) => favoriteProductIds.includes(product.$id))
-                    .flatMap((product) => {
-                        const categoryId = product.categoryId;
-                        if (Array.isArray(categoryId)) {
-                            return categoryId.map((item) => item?.$id).filter(Boolean);
-                        }
-                        return categoryId?.$id ? [categoryId.$id] : [];
-                    })
-            );
-
-            const scoreProduct = (product) => {
-                let score = 0;
-
-                if (favoriteProductIds.includes(product.$id)) {
-                    score += 100;
-                }
-
-                const productCategoryId = Array.isArray(product.categoryId)
-                    ? product.categoryId[0]?.$id
-                    : product.categoryId?.$id;
-
-                if (productCategoryId && favoriteCategoryIds.has(productCategoryId)) {
-                    score += 20;
-                }
-
-                const priceCount = Array.isArray(product.prices) ? product.prices.length : 0;
-                score += Math.min(priceCount, 5);
-
-                return score;
-            };
-
-            const personalizedProducts = [...normalizedProducts].sort((a, b) => {
-                const scoreDiff = scoreProduct(b) - scoreProduct(a);
-                if (scoreDiff !== 0) return scoreDiff;
-                return String(a.name || a.productName || '').localeCompare(String(b.name || b.productName || ''), undefined, { sensitivity: 'base' });
-            });
-
             return {
-                featuredProducts: personalizedProducts.slice(0, 4),
+                productPool: normalizedProducts,
                 marketInsights: announcementInsights,
             };
         };
 
         const applyPayload = (payload, { isRefresh } = {}) => {
             if (!payload) return;
-            setFeaturedProducts(Array.isArray(payload.featuredProducts) ? payload.featuredProducts : []);
+            setProductPool(Array.isArray(payload.productPool) ? payload.productPool : []);
             setMarketInsights(Array.isArray(payload.marketInsights) ? payload.marketInsights : []);
             setLoading(false);
             setRefreshing(!!isRefresh);
@@ -205,7 +202,7 @@ const Home = () => {
             setLoading(false);
             setRefreshing(false);
         }
-    }, [fetchActiveAnnouncements, fetchCategories, favoritesKey, favoriteProductIds]);
+    }, [fetchActiveAnnouncements, fetchCategories]);
 
     useEffect(() => {
         let cancelled = false;

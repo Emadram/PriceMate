@@ -16,6 +16,7 @@ export const PRODUCT_NAME_ALIASES = {
     'coco cola': ['cocacola', 'coca cola', 'coca-cola'],
     'coca-cola': ['cocacola', 'coca cola'],
     cola: ['coca cola', 'cocacola'],
+    cocacola: ['coca cola', 'coca-cola', 'coke'],
 };
 
 export const FUZZY_MATCH_MIN_SCORE = 0.82;

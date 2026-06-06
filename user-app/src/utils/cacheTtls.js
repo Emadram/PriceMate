@@ -21,3 +21,21 @@ export const PRICE_BATCH_TTL_MS = 30 * 1000;
 
 /** Documented alignment with productUtils CACHE_TTL.categories / supermarket doc */
 export const CATALOG_LIST_TTL_MS = 5 * 60 * 1000;
+
+/** AI catalog resolver positive match cache. */
+export const CATALOG_RESOLVE_TTL_MS = 3 * 60 * 1000;
+
+/** Brief cache for unresolved catalog queries (avoid repeated full scans). */
+export const CATALOG_RESOLVE_NEGATIVE_TTL_MS = 45 * 1000;
+
+/** AI memory prompt cache per conversation. */
+export const AI_MEMORY_PROMPT_TTL_MS = 45 * 1000;
+
+/** Chat conversation summaries index. */
+export const CHAT_SUMMARIES_TTL_MS = 5 * 60 * 1000;
+
+/** Chat messages per thread. */
+export const CHAT_MESSAGES_TTL_MS = 2 * 60 * 1000;
+
+/** Favorites sync from Appwrite after login. */
+export const FAVORITES_SYNC_TTL_MS = 2 * 60 * 1000;

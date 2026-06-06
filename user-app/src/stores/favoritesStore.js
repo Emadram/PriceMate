@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { db, Query } from '../lib/appwrite';
 import useAuthStore from './authStore';
+import { FAVORITES_SYNC_TTL_MS } from '../utils/cacheTtls';
 
 const useFavoritesStore = create(
     persist(
@@ -9,12 +10,18 @@ const useFavoritesStore = create(
             favoriteProducts: [],
             favoriteSupermarkets: [],
             loading: false,
+            lastSyncedAt: 0,
             _warnedMissingFavorites: false,
 
             // Fetch favorites from backend
-            syncFavorites: async () => {
+            syncFavorites: async ({ force = false } = {}) => {
                 const user = useAuthStore.getState().user;
                 if (!user) return;
+
+                const { lastSyncedAt } = get();
+                if (!force && lastSyncedAt && Date.now() - lastSyncedAt < FAVORITES_SYNC_TTL_MS) {
+                    return;
+                }
 
                 set({ loading: true });
                 try {
@@ -33,7 +40,8 @@ const useFavoritesStore = create(
                     set({
                         favoriteProducts: [...new Set(products)],
                         favoriteSupermarkets: [...new Set(supermarkets)],
-                        loading: false
+                        loading: false,
+                        lastSyncedAt: Date.now(),
                     });
                 } catch (error) {
                     if (error?.code === 404) {
@@ -135,7 +143,7 @@ const useFavoritesStore = create(
 
             // Clear favorites (e.g. on logout)
             clearFavorites: () => {
-                set({ favoriteProducts: [], favoriteSupermarkets: [] });
+                set({ favoriteProducts: [], favoriteSupermarkets: [], lastSyncedAt: 0 });
             }
         }),
         {

@@ -18,6 +18,7 @@ vi.mock('../lib/appwrite', () => ({
 }));
 
 const {
+    invalidateCatalogReferenceCaches,
     invalidateGlobalPriceCaches,
     invalidateProductUtilsByPrefix,
     invalidateProductUtilsCache,
@@ -58,5 +59,20 @@ describe('productUtils cache invalidation', () => {
         db.products.list.mockClear();
         await fetchProducts(50);
         expect(db.products.list).not.toHaveBeenCalled();
+    });
+
+    it('invalidateCatalogReferenceCaches clears products and categories keys', async () => {
+        const { fetchProducts, fetchCategories } = await import('./productUtils');
+        const { db } = await import('../lib/appwrite');
+
+        db.products.list.mockResolvedValue({ documents: [{ $id: 'p1', name: 'Milk' }] });
+        await fetchProducts(12);
+        await fetchCategories();
+
+        invalidateCatalogReferenceCaches();
+
+        db.products.list.mockClear();
+        await fetchProducts(12);
+        expect(db.products.list).toHaveBeenCalledTimes(1);
     });
 });

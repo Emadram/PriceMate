@@ -10,11 +10,11 @@ import { useTranslation } from 'react-i18next';
 import { 
     fetchSupermarketProfileBundle,
     calculateDistance, 
-    isStoreOpen,
     formatLastUpdate,
     getRelationshipAttribute,
     hasValidLatLon,
     resolveCoordinates,
+    getStoreAvailability,
 } from '../utils/productUtils';
 import { getCacheEntry, swrGetOrFetch } from '../utils/swrCache';
 import { SUPERMARKET_PROFILE_CACHE_TTL_MS } from '../utils/cacheTtls';
@@ -236,10 +236,8 @@ const SupermarketProfile = () => {
 
     const ratingValue = supermarket.rating ?? supermarket.avgRating ?? supermarket.averageRating ?? null;
     const reviewsCount = supermarket.reviewsCount ?? supermarket.reviewCount ?? null;
-    const statusFromDb = (supermarket.status || supermarket.storeStatus || '').toString().toLowerCase();
-    const isOpen = statusFromDb
-        ? ['open', 'opened', 'available'].includes(statusFromDb)
-        : isStoreOpen(supermarket.openingHours);
+    const storeAvailability = getStoreAvailability(supermarket);
+    const isOpen = storeAvailability.isOpen;
     const latestProductUpdate = products.length > 0
         ? Math.max(...products.map((p) => new Date(p.$updatedAt).getTime()))
         : null;
@@ -467,6 +465,29 @@ const SupermarketProfile = () => {
 
                     {/* Operational Details */}
                     <div className="mt-8 space-y-4">
+                        <div className="rounded-2xl border border-gray-100 dark:border-white/5 bg-white dark:bg-[#1C1C1E] p-4 sm:p-5">
+                            <div className="flex items-center gap-2 mb-4">
+                                <Clock size={16} className="text-brand-600 dark:text-brand-400" />
+                                <h3 className="text-sm font-black uppercase tracking-widest dark:text-white">{t('opening_hours', 'Opening hours')}</h3>
+                            </div>
+                            <div className="space-y-2">
+                                {storeAvailability.weeklySchedule.map((row) => {
+                                    const isToday = row.day === ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date().getDay()];
+                                    const hoursLabel = row.closed
+                                        ? t('closed_today', 'Closed')
+                                        : String(row.hours).replace('-', '–');
+                                    return (
+                                        <div
+                                            key={row.day}
+                                            className={`flex items-center justify-between rounded-xl px-3 py-2 text-sm ${isToday ? 'bg-brand-50 dark:bg-brand-900/20 font-semibold' : 'text-gray-600 dark:text-gray-400'}`}
+                                        >
+                                            <span>{t(`day_${row.day.toLowerCase()}`, row.day)} {isToday && <span className="text-[10px] uppercase tracking-widest text-brand-600 dark:text-brand-300 ml-1">({t('today', 'Today')})</span>}</span>
+                                            <span className={row.closed ? 'text-red-500' : 'dark:text-white'}>{hoursLabel}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
                         <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
                             <div className="flex gap-2">
                                     <div className="flex items-center gap-2">
