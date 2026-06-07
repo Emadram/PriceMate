@@ -27,7 +27,7 @@ export const getProductCategoryMeta = (price, t) => {
         getRelationshipName(categoryRel, 'categoryName', 'name') ||
         (typeof t === 'function' ? t('other', 'Other') : 'Other');
     const key = categoryId || String(label).toLowerCase().trim() || 'other';
-    return { key, label: String(label).trim() || 'Other' };
+    return { key, label: String(label).trim() || 'Other', categoryId: categoryRel || null };
 };
 
 /**
@@ -39,9 +39,9 @@ export const groupSupermarketProductsByCategory = (products, t) => {
     const sections = new Map();
 
     for (const price of products || []) {
-        const { key, label } = getProductCategoryMeta(price, t);
+        const { key, label, categoryId } = getProductCategoryMeta(price, t);
         if (!sections.has(key)) {
-            sections.set(key, { key, label, products: [] });
+            sections.set(key, { key, label, categoryId, products: [] });
         }
         sections.get(key).products.push(price);
     }

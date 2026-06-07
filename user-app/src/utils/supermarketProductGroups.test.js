@@ -15,6 +15,7 @@ describe('supermarketProductGroups', () => {
         expect(sections).toHaveLength(2);
         expect(sections[0].label).toBe('Bakery');
         expect(sections[0].products).toHaveLength(1);
+        expect(sections[0].categoryId).toEqual({ $id: 'c1', name: 'Bakery' });
         expect(sections[1].label).toBe('Dairy');
         expect(sections[1].products).toHaveLength(2);
     });

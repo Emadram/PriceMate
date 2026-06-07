@@ -29,6 +29,7 @@ import useUserLocation from '../hooks/useUserLocation';
 import useCurrencyStore from '../stores/currencyStore';
 import StarRating from '../components/StarRating';
 import { groupSupermarketProductsByCategory } from '../utils/supermarketProductGroups';
+import CategoryIconLabel from '../components/CategoryIconLabel';
 
 const extractEmbedSrc = (embedHtml) => {
     const text = String(embedHtml || '').trim();
@@ -721,11 +722,17 @@ const SupermarketProfile = () => {
                             <div className="space-y-6 sm:space-y-8">
                                 {categorySections.map((section) => (
                                     <div key={section.key} className="space-y-3">
-                                        <div className="flex items-center justify-between px-2 gap-2">
-                                            <h3 className="text-base sm:text-lg font-bold dark:text-white tracking-tight">
-                                                {section.label}
-                                            </h3>
-                                            <span className="text-xs font-medium text-gray-400 dark:text-gray-500">
+                                        <div className="flex items-center justify-between px-2 gap-3">
+                                            <CategoryIconLabel
+                                                categoryId={section.categoryId}
+                                                fallbackName={section.label}
+                                                variant="section"
+                                                className="min-w-0 flex-1"
+                                            />
+                                            <span
+                                                className="shrink-0 inline-flex items-center justify-center min-w-[2.5rem] h-8 px-3 rounded-full text-sm font-black tabular-nums bg-brand-600 text-white shadow-md shadow-brand-500/25 ring-1 ring-brand-500/20 dark:bg-brand-500 dark:shadow-brand-500/15"
+                                                aria-label={t('items_count_lower', { count: section.products.length })}
+                                            >
                                                 {section.products.length}
                                             </span>
                                         </div>
