@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom';
 import { 
     FiArrowLeft, FiMapPin, FiShoppingCart, FiShare2, FiPackage, 
-    FiShoppingBag, FiTrendingDown, FiTrendingUp, FiBox, FiHome, FiCamera, 
+    FiShoppingBag, FiTrendingDown, FiTrendingUp, FiBox, FiHome, FiCamera, FiX,
     FiImage, FiNavigation, FiClock, FiCheckCircle, FiAlertCircle, 
     FiCalendar, FiTag, FiAlertTriangle, FiInfo 
 } from 'react-icons/fi';
@@ -139,6 +139,7 @@ const PriceComparison = () => {
     const [similarLoading, setSimilarLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [similarRefreshSeq, setSimilarRefreshSeq] = useState(0);
+    const [scanActionsDismissed, setScanActionsDismissed] = useState(false);
 
     const getSupermarketFromPrice = (price) => {
         if (!price) return null;
@@ -167,6 +168,10 @@ const PriceComparison = () => {
     const getPriceCurrency = (price) => normalizePriceCurrency(price?.currency);
 
     const fromScan = location.state?.fromScan || searchParams.get('fromScan') === '1';
+
+    useEffect(() => {
+        setScanActionsDismissed(false);
+    }, [barcode]);
 
     const handleFavoriteClick = () => {
         if (!user) {
@@ -486,12 +491,10 @@ const PriceComparison = () => {
         navigate('/scan');
     };
 
-    const handleGoHome = () => {
-        navigate('/');
-    };
+    const showScanActions = fromScan && !scanActionsDismissed;
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-safe md:pb-12">
+        <div className={`min-h-screen bg-gray-50 dark:bg-gray-900 pb-safe md:pb-12 ${showScanActions ? 'pb-24' : ''}`}>
             <RefreshControl onRefresh={handleRefresh} externalRefreshing={refreshing || loading} />
             <main className="max-w-4xl mx-auto px-3 sm:px-4 pt-2 pb-6 md:py-8 space-y-3 md:space-y-8">
                 <div className="flex items-center justify-between gap-2">
@@ -919,22 +922,25 @@ const PriceComparison = () => {
 
 
             {/* Quick actions only when coming from scanner */}
-            {fromScan && (
+            {showScanActions && (
                 <div className="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur border-t border-gray-200 dark:border-gray-700 z-40 pb-safe-nav">
-                    <div className="max-w-4xl mx-auto px-4 py-3 flex gap-3">
+                    <div className="max-w-4xl mx-auto px-4 py-3 flex gap-3 items-center">
                         <button
-                            onClick={handleGoHome}
-                            aria-label="Go to home page"
-                            className="tap-target flex-1 inline-flex items-center justify-center gap-2 py-3 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
-                        >
-                            <FiHome /> Home
-                        </button>
-                        <button
+                            type="button"
                             onClick={handleScanAnother}
-                            aria-label="Scan another product"
+                            aria-label={t('scan_another_product')}
                             className="tap-target flex-1 inline-flex items-center justify-center gap-2 py-3 rounded-lg bg-brand-600 text-white hover:bg-brand-700 shadow-lg shadow-brand-500/30 transition"
                         >
-                            <FiCamera /> Scan Another
+                            <FiCamera />
+                            {t('scan_another_product')}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setScanActionsDismissed(true)}
+                            aria-label={t('close')}
+                            className="tap-target shrink-0 inline-flex items-center justify-center h-12 w-12 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+                        >
+                            <FiX size={20} />
                         </button>
                     </div>
                 </div>

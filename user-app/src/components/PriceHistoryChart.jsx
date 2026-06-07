@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { FiTrendingUp, FiTrendingDown, FiCalendar } from 'react-icons/fi';
+import { FiTrendingUp, FiTrendingDown, FiBarChart2 } from 'react-icons/fi';
+import { useTranslation } from 'react-i18next';
 import { fetchPriceHistory } from '../utils/productUtils';
 import { getCacheEntry, swrGetOrFetch } from '../utils/swrCache';
 import { PRICE_HISTORY_CHART_TTL_MS } from '../utils/cacheTtls';
@@ -106,7 +107,22 @@ const buildChartHistory = (data, currentPrices = []) => {
     return [...unique.values()].sort((a, b) => a.date - b.date);
 };
 
+const ChartEmptyState = ({ title, subtitle }) => (
+    <div className="h-56 sm:h-64 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-800/50 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-700/50 text-center p-8">
+        <div className="inline-flex items-center justify-center p-5 bg-gray-100 dark:bg-gray-900/50 rounded-full border border-gray-200 dark:border-gray-700 mb-4">
+            <FiBarChart2 className="text-gray-300 dark:text-gray-600" size={28} />
+        </div>
+        <h4 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-widest">{title}</h4>
+        {subtitle ? (
+            <p className="text-[11px] text-gray-500 dark:text-gray-400 font-medium leading-relaxed mt-2 max-w-[220px]">
+                {subtitle}
+            </p>
+        ) : null}
+    </div>
+);
+
 const PriceHistoryChart = ({ productId, productName, currentPrices = [] }) => {
+    const { t } = useTranslation();
     const { convert, getCurrencySymbol } = useCurrencyStore();
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -245,26 +261,14 @@ const PriceHistoryChart = ({ productId, productName, currentPrices = [] }) => {
         </div>
     );
 
-    if (history.length === 0) return (
-        <div className="h-56 sm:h-64 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-800/50 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-700/50 text-center p-8 group overflow-hidden relative">
-            <div className="absolute inset-0 bg-gradient-to-br from-brand-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
-            <div className="relative z-10 space-y-4">
-                <div className="w-16 h-16 bg-brand-50 dark:bg-brand-900/20 rounded-2xl flex items-center justify-center mx-auto mb-2 text-brand-500/50 group-hover:scale-110 transition-transform duration-500">
-                    <FiCalendar size={32} />
-                </div>
-                <div className="max-w-[200px] mx-auto">
-                    <h4 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-widest mb-1">Pulse Needed</h4>
-                    <p className="text-[11px] text-gray-500 dark:text-gray-400 font-medium leading-relaxed">
-                        Once users start contributing prices, we'll track the deals and trends here!
-                    </p>
-                </div>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-brand-600/10 text-brand-600 dark:text-brand-500 text-[9px] font-black rounded-lg border border-brand-600/20">
-                    <div className="w-1.5 h-1.5 bg-brand-500 rounded-full animate-ping" />
-                    Awaiting First Data Point
-                </div>
-            </div>
-        </div>
-    );
+    if (history.length === 0) {
+        return (
+            <ChartEmptyState
+                title={t('no_available_data')}
+                subtitle={t('no_data_yet_subtitle')}
+            />
+        );
+    }
 
     return (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 sm:p-6 border border-gray-100 dark:border-gray-700">
@@ -320,10 +324,7 @@ const PriceHistoryChart = ({ productId, productName, currentPrices = [] }) => {
 
             <div className="h-56 sm:h-64 w-full">
                 {filteredData.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700/50 text-center p-8">
-                        <div className="text-xs font-black text-gray-500 uppercase tracking-widest">No data in this range</div>
-                        <div className="text-[11px] text-gray-400 mt-2">Try a longer range to see more points.</div>
-                    </div>
+                    <ChartEmptyState title={t('no_available_data')} />
                 ) : (
                     <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={filteredData} margin={{ top: 15, right: 5, left: 5, bottom: 5 }}>
