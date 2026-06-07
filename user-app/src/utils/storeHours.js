@@ -107,15 +107,15 @@ export const getStoreAvailability = (supermarket, now = new Date()) => {
         return {
             isOpen: legacy,
             todayHours: '',
-            weeklySchedule: formatWeeklySchedule(null),
+            weeklySchedule: [],
             source: 'legacy',
         };
     }
 
     return {
-        isOpen: true,
+        isOpen: false,
         todayHours: '',
-        weeklySchedule: formatWeeklySchedule(null),
+        weeklySchedule: [],
         source: 'default',
     };
 };

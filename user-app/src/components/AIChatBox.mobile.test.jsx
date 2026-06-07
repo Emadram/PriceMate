@@ -14,7 +14,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render } from '@testing-library/react';
+import { render, within } from '@testing-library/react';
 
 // ---------------------------------------------------------------------------
 // Mock all heavy dependencies so the component can render in JSDOM
@@ -644,13 +644,26 @@ describe('AIChatBox — page variant immersive header', () => {
 
     it('page variant hides header new-chat button on mobile when logged in', () => {
         authState.user = { $id: 'user-1', name: 'Test User' };
-        const { getByLabelText } = render(
+        const { container, getByTestId } = render(
             <AIChatBox isOpen={true} onClose={() => {}} variant="page" />
         );
 
-        const newChatBtn = getByLabelText('ai_chat_new');
+        const header = container.querySelector('header');
+        expect(header).not.toBeNull();
+        const newChatBtn = within(header).getByLabelText('ai_chat_new');
         expect(newChatBtn.className).toContain('hidden');
         expect(newChatBtn.className).toContain('sm:inline-flex');
+        expect(getByTestId('ai-chat-new-in-list')).toBeTruthy();
+        authState.user = null;
+    });
+
+    it('conversation list includes new-chat button when logged in', () => {
+        authState.user = { $id: 'user-1', name: 'Test User' };
+        const { getByTestId } = render(
+            <AIChatBox isOpen={true} onClose={() => {}} variant="page" />
+        );
+
+        expect(getByTestId('ai-chat-new-in-list')).toBeTruthy();
         authState.user = null;
     });
 
@@ -668,11 +681,11 @@ describe('AIChatBox — page variant immersive header', () => {
 
     it('drawer variant shows header new-chat button when logged in', () => {
         authState.user = { $id: 'user-1', name: 'Test User' };
-        const { getByLabelText } = render(
+        const { getAllByLabelText } = render(
             <AIChatBox isOpen={true} onClose={() => {}} />
         );
 
-        expect(getByLabelText('ai_chat_new')).toBeTruthy();
+        expect(getAllByLabelText('ai_chat_new').length).toBeGreaterThanOrEqual(1);
         authState.user = null;
     });
 

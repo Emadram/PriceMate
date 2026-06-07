@@ -2564,7 +2564,22 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         if (!user?.$id) return null;
         return (
             <div className="flex flex-col h-full min-h-0 bg-gray-100 dark:bg-gray-900/80">
-                <div className="flex-1 overflow-y-auto p-3 sm:p-2 space-y-2.5 sm:space-y-2">
+                <div className="shrink-0 p-3 sm:p-2 pb-2 sm:pb-1 border-b border-gray-200/80 dark:border-gray-700/80">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            beginNewConversation();
+                            afterPick?.();
+                        }}
+                        className="w-full flex items-center justify-center gap-2 min-h-11 rounded-2xl bg-brand-600 text-white font-black text-[11px] uppercase tracking-widest hover:bg-brand-700 active:scale-[0.98] transition-all"
+                        aria-label={t('ai_chat_new')}
+                        data-testid="ai-chat-new-in-list"
+                    >
+                        <FiPlus size={16} />
+                        {t('ai_chat_new', 'New chat')}
+                    </button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-3 sm:p-2 pt-2 sm:pt-1 space-y-2.5 sm:space-y-2">
                     {summariesLoading && conversationRows.length === 0 ? (
                         <div className="flex justify-center p-4">
                             <FiLoader className="animate-spin text-brand-600" />

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
     ShoppingBag, Package, MapPin, Phone, Mail, 
@@ -11,7 +11,6 @@ import {
     fetchSupermarketProfileBundle,
     calculateDistance, 
     formatLastUpdate,
-    getRelationshipAttribute,
     hasValidLatLon,
     resolveCoordinates,
     getStoreAvailability,
@@ -24,12 +23,12 @@ import ReportModal from '../components/ReportModal';
 import StoreMap from '../components/StoreMap';
 import BackButton from '../components/BackButton';
 import FavoriteHeartButton from '../components/FavoriteHeartButton';
-import CategoryIconLabel from '../components/CategoryIconLabel';
 import useFavoritesStore from '../stores/favoritesStore';
 import useAuthStore from '../stores/authStore';
 import useUserLocation from '../hooks/useUserLocation';
 import useCurrencyStore from '../stores/currencyStore';
 import StarRating from '../components/StarRating';
+import { groupSupermarketProductsByCategory } from '../utils/supermarketProductGroups';
 
 const extractEmbedSrc = (embedHtml) => {
     const text = String(embedHtml || '').trim();
@@ -181,6 +180,11 @@ const SupermarketProfile = () => {
         return () => clearTimeout(timeoutId);
     }, [id]);
 
+    const categorySections = useMemo(
+        () => groupSupermarketProductsByCategory(products, t),
+        [products, t]
+    );
+
     if (loading && !supermarket) {
         return (
             <div className="min-h-screen bg-white dark:bg-[#0A0A0B] flex items-center justify-center">
@@ -243,6 +247,97 @@ const SupermarketProfile = () => {
         : null;
     const lastUpdateValue = latestProductUpdate || supermarket.lastUpdatedAt || supermarket.updatedAt || supermarket.$updatedAt || null;
     const shouldAlignBranchDropdownRight = String(supermarket?.name || '').trim().length >= 18;
+
+    const renderSupermarketProductCard = (price) => {
+        const status = (price.stockStatus || '').toLowerCase();
+        const stockBadgeClass =
+            status === 'in-stock' || status === 'in_stock' || status === 'in stock' || status === 'available'
+                ? 'bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400'
+                : status === 'low-stock' || status === 'low_stock' || status === 'low stock' || status === 'low'
+                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300'
+                    : 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400';
+        const stockLabel = price.stockStatus ? price.stockStatus.replace(/[_-]/g, ' ') : '';
+        const productKey =
+            price.products?.barcode ||
+            price.products?.code ||
+            price.products?.$id ||
+            price.productId ||
+            '';
+        const productReportId = price.products?.$id || price.productId || null;
+        const productReportName = price.products?.name || t('product', 'Product');
+        const productBrand = price.products?.brand || price.products?.brands || '';
+
+        return (
+            <Link
+                key={price.$id}
+                to={`/price-comparison/${productKey}`}
+                className="group relative block w-[17rem] sm:w-[19rem] shrink-0 snap-start overflow-hidden rounded-2xl border border-transparent bg-white p-3 shadow-soft transition-all duration-300 hover:-translate-y-1 hover:border-gray-100 hover:shadow-soft-lg dark:bg-gray-800 dark:hover:border-gray-700"
+            >
+                <div className="flex flex-col gap-3">
+                    <div className="relative flex h-28 w-full items-center justify-center overflow-hidden rounded-xl bg-gray-50 dark:bg-gray-900">
+                        {(price.products?.image || price.products?.imageUrl || price.products?.image_url) ? (
+                            <img
+                                src={price.products.image || price.products.imageUrl || price.products.image_url}
+                                alt={price.products.name}
+                                className="h-24 w-24 object-contain mix-blend-multiply transition-transform duration-500 group-hover:scale-110 dark:mix-blend-normal"
+                            />
+                        ) : (
+                            <Package className="h-8 w-8 text-gray-300" />
+                        )}
+                    </div>
+                    <div className="flex min-w-0 flex-col gap-1.5">
+                        <div className="flex items-start justify-between gap-2">
+                            <h3 className="line-clamp-2 text-sm font-semibold leading-tight text-gray-900 transition-colors group-hover:text-brand-600 dark:text-white">
+                                {price.products?.name || t('unknown_product', 'Unknown Product')}
+                            </h3>
+                            {user && (
+                                <button
+                                    type="button"
+                                    onClick={(event) => {
+                                        event.preventDefault();
+                                        event.stopPropagation();
+                                        setProductReportTarget({ id: productReportId, name: productReportName });
+                                        setIsProductReportOpen(true);
+                                    }}
+                                    className="tap-target flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 shadow-sm transition-all hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-400 dark:hover:bg-red-500/25"
+                                    title={t('report_issue', 'Report an issue')}
+                                    aria-label={t('report_issue', 'Report an issue')}
+                                >
+                                    <AlertTriangle size={14} />
+                                </button>
+                            )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                            {price.stockStatus && (
+                                <span className={`shrink-0 text-[9px] font-bold uppercase tracking-tighter px-1.5 py-0.5 rounded-full ${stockBadgeClass}`}>
+                                    {stockLabel}
+                                </span>
+                            )}
+                            {productBrand && (
+                                <span className="truncate text-xs font-medium text-gray-400 dark:text-gray-500">{productBrand}</span>
+                            )}
+                        </div>
+                        <p className="text-[10px] font-bold uppercase tracking-tight text-green-600 dark:text-green-400">
+                            Updated {new Date(price.$updatedAt).toLocaleDateString()}
+                        </p>
+                        <div className="flex flex-wrap items-baseline gap-2 pt-1">
+                            <span className="text-lg font-bold leading-none text-gray-900 dark:text-white">
+                                {getCurrencySymbol()} {convert(price.price)}
+                            </span>
+                            {price.isOnSale && (
+                                <>
+                                    <span className="text-sm font-medium text-gray-400 line-through decoration-red-500/30">
+                                        {getCurrencySymbol()} {convert(price.originalPrice)}
+                                    </span>
+                                    <span className="text-[10px] font-bold rounded-full bg-green-500 px-1.5 py-0.5 text-white">{t('sale', 'SALE')}</span>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </Link>
+        );
+    };
 
     return (
         <div className="min-h-screen bg-[#FDFDFD] dark:bg-[#0A0A0B] pb-safe">
@@ -441,17 +536,22 @@ const SupermarketProfile = () => {
                         </div>
                         <div className="bg-gray-50 dark:bg-[#1C1C1E] p-3 sm:p-4 rounded-xl sm:rounded-2xl">
                             <p className="text-[9px] sm:text-[11px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest mb-1">{t('status', 'Status')}</p>
-                            <div className="flex items-center gap-1.5 pt-1">
-                                {isOpen ? (
-                                    <>
-                                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                                        <p className="text-xs sm:text-sm font-semibold text-green-600 dark:text-green-500">{t('open_now', 'Open Now')}</p>
-                                    </>
-                                ) : (
-                                    <>
-                                        <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                                        <p className="text-xs sm:text-sm font-semibold text-red-600 dark:text-red-500">{t('closed', 'Closed')}</p>
-                                    </>
+                            <div className="flex flex-col gap-0.5 pt-1">
+                                <div className="flex items-center gap-1.5">
+                                    {isOpen ? (
+                                        <>
+                                            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                                            <p className="text-xs sm:text-sm font-semibold text-green-600 dark:text-green-500">{t('open_now', 'Open Now')}</p>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                                            <p className="text-xs sm:text-sm font-semibold text-red-600 dark:text-red-500">{t('closed', 'Closed')}</p>
+                                        </>
+                                    )}
+                                </div>
+                                {storeAvailability.source === 'default' && (
+                                    <p className="text-[10px] text-gray-400 dark:text-gray-500">{t('hours_not_set', 'Hours not set')}</p>
                                 )}
                             </div>
                         </div>
@@ -465,6 +565,7 @@ const SupermarketProfile = () => {
 
                     {/* Operational Details */}
                     <div className="mt-8 space-y-4">
+                        {storeAvailability.source === 'hours' ? (
                         <div className="rounded-2xl border border-gray-100 dark:border-white/5 bg-white dark:bg-[#1C1C1E] p-4 sm:p-5">
                             <div className="flex items-center gap-2 mb-4">
                                 <Clock size={16} className="text-brand-600 dark:text-brand-400" />
@@ -488,6 +589,7 @@ const SupermarketProfile = () => {
                                 })}
                             </div>
                         </div>
+                        ) : null}
                         <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
                             <div className="flex gap-2">
                                     <div className="flex items-center gap-2">
@@ -616,116 +718,22 @@ const SupermarketProfile = () => {
                         </div>
 
                         {products.length > 0 ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-                                {products.map((price) => {
-                                    const status = (price.stockStatus || '').toLowerCase();
-                                    const stockBadgeClass =
-                                        status === 'in-stock' || status === 'in_stock' || status === 'in stock' || status === 'available'
-                                            ? 'bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400'
-                                            : status === 'low-stock' || status === 'low_stock' || status === 'low stock' || status === 'low'
-                                                ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300'
-                                                : 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400';
-                                    const stockLabel = price.stockStatus ? price.stockStatus.replace(/[_-]/g, ' ') : '';
-                                    const productKey =
-                                        price.products?.barcode ||
-                                        price.products?.code ||
-                                        price.products?.$id ||
-                                        price.productId ||
-                                        '';
-                                    const productReportId = price.products?.$id || price.productId || null;
-                                    const productReportName = price.products?.name || t('product', 'Product');
-                                    const categoryFallback =
-                                        price.products?.category ||
-                                        getRelationshipAttribute(price.products?.categoryId, 'categoryName') ||
-                                        getRelationshipAttribute(price.products?.categoryId, 'name') ||
-                                        t('other', 'Other');
-                                    const productBrand =
-                                        price.products?.brand || price.products?.brands || '';
-
-                                    return (
-                                    <Link 
-                                        key={price.$id} 
-                                        to={`/price-comparison/${productKey}`}
-                                        className="group relative block overflow-hidden rounded-2xl sm:rounded-3xl border border-transparent bg-white p-3 sm:p-4 shadow-soft transition-all duration-300 hover:-translate-y-1 hover:border-gray-100 hover:shadow-soft-lg dark:bg-gray-800 dark:hover:border-gray-700"
-                                    >
-                                        <div className="flex items-center gap-3 sm:gap-4 md:gap-5">
-                                            <div className="relative flex h-[4.5rem] w-[4.5rem] shrink-0 items-center justify-center overflow-hidden rounded-xl sm:rounded-2xl bg-gray-50 dark:bg-gray-900 sm:h-24 sm:w-24 md:h-28 md:w-28">
-                                                {(price.products?.image || price.products?.imageUrl || price.products?.image_url) ? (
-                                                    <img 
-                                                        src={price.products.image || price.products.imageUrl || price.products.image_url} 
-                                                        alt={price.products.name} 
-                                                        className="h-[3.5rem] w-[3.5rem] object-contain mix-blend-multiply transition-transform duration-500 group-hover:scale-110 dark:mix-blend-normal sm:h-20 sm:w-20 md:h-24 md:w-24" 
-                                                    />
-                                                ) : (
-                                                    <Package className="h-7 w-7 text-gray-300 sm:h-8 sm:w-8" />
-                                                )}
-                                            </div>
-                                            <div className="flex min-w-0 flex-1 flex-col py-0.5 sm:py-1">
-                                                <div className="mb-auto">
-                                                    <div className="flex items-start justify-between gap-3">
-                                                        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                                                            <h3 className="truncate text-sm font-semibold leading-tight text-gray-900 transition-colors group-hover:text-brand-600 dark:text-white sm:text-base md:text-lg">
-                                                                {price.products?.name || t('unknown_product', 'Unknown Product')}
-                                                            </h3>
-                                                            {price.stockStatus && (
-                                                                <span className={`shrink-0 text-[9px] font-bold uppercase tracking-tighter px-1.5 py-0.5 rounded-full ${stockBadgeClass}`}>
-                                                                    {stockLabel}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        {user && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={(event) => {
-                                                                event.preventDefault();
-                                                                event.stopPropagation();
-                                                                setProductReportTarget({ id: productReportId, name: productReportName });
-                                                                setIsProductReportOpen(true);
-                                                            }}
-                                                            className="tap-target flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 shadow-sm transition-all hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-400 dark:hover:bg-red-500/25"
-                                                            title={t('report_issue', 'Report an issue')}
-                                                            aria-label={t('report_issue', 'Report an issue')}
-                                                        >
-                                                            <AlertTriangle size={16} className="sm:w-[18px] sm:h-[18px]" />
-                                                        </button>
-                                                        )}
-                                                    </div>
-                                                    <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-                                                        <CategoryIconLabel
-                                                            categoryId={price.products?.categoryId}
-                                                            fallbackName={categoryFallback}
-                                                        />
-                                                        {productBrand && (
-                                                            <>
-                                                                <span className="hidden h-1 w-1 shrink-0 rounded-full bg-gray-300 sm:inline dark:bg-gray-600" aria-hidden />
-                                                                <span className="max-w-[40%] truncate text-xs font-medium text-gray-400 sm:max-w-none dark:text-gray-500">{productBrand}</span>
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                    <p className="mt-1 text-[10px] font-bold uppercase tracking-tight text-green-600 dark:text-green-400">
-                                                        Updated {new Date(price.$updatedAt).toLocaleDateString()}
-                                                    </p>
-                                                </div>
-                                                <div className="mt-3 sm:mt-4 flex flex-wrap items-end justify-between gap-2">
-                                                    <div className="flex flex-wrap items-baseline gap-2">
-                                                        <span className="text-lg sm:text-xl font-bold leading-none text-gray-900 dark:text-white">
-                                                            {getCurrencySymbol()} {convert(price.price)}
-                                                        </span>
-                                                        {price.isOnSale && (
-                                                            <>
-                                                                <span className="text-sm font-medium text-gray-400 line-through decoration-red-500/30">
-                                                                    {getCurrencySymbol()} {convert(price.originalPrice)}
-                                                                </span>
-                                                                <span className="text-[10px] font-bold rounded-full bg-green-500 px-1.5 py-0.5 text-white ring-2 ring-white dark:ring-gray-800">{t('sale', 'SALE')}</span>
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
+                            <div className="space-y-6 sm:space-y-8">
+                                {categorySections.map((section) => (
+                                    <div key={section.key} className="space-y-3">
+                                        <div className="flex items-center justify-between px-2 gap-2">
+                                            <h3 className="text-base sm:text-lg font-bold dark:text-white tracking-tight">
+                                                {section.label}
+                                            </h3>
+                                            <span className="text-xs font-medium text-gray-400 dark:text-gray-500">
+                                                {section.products.length}
+                                            </span>
                                         </div>
-                                    </Link>
-                                    );
-                                })}
+                                        <div className="flex overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 gap-3 pb-2 snap-x snap-mandatory">
+                                            {section.products.map((price) => renderSupermarketProductCard(price))}
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         ) : (
                             <div className="bg-white dark:bg-[#121214] rounded-[2.5rem] p-12 text-center border border-dashed border-gray-200 dark:border-white/10 shadow-soft">
