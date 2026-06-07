@@ -26,6 +26,7 @@ import useUserLocation from '../hooks/useUserLocation';
 import StarRating from '../components/StarRating';
 import RefreshControl from '../components/RefreshControl';
 import { refreshPageCache } from '../utils/invalidateFreshData';
+import { validateScannedBarcode } from '../utils/barcodeValidation';
 
 const normalizeStockStatus = (status) => {
     if (!status) return 'in_stock';
@@ -436,6 +437,9 @@ const PriceComparison = () => {
     }
 
     if (error || !product) {
+        const barcodeValidation = barcode ? validateScannedBarcode(barcode) : null;
+        const isInvalidBarcode = !error && barcode && barcodeValidation && !barcodeValidation.ok;
+
         return (
             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
                 <div className="w-full max-w-md rounded-[2rem] bg-white dark:bg-gray-800 shadow-xl border border-gray-100 dark:border-gray-700 p-8 text-center">
@@ -443,14 +447,20 @@ const PriceComparison = () => {
                         <FiPackage className="text-amber-500 text-4xl" />
                     </div>
                     <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-3">
-                        {error ? t('failed_to_load_product') : t('product_not_found')}
+                        {error
+                            ? t('failed_to_load_product')
+                            : isInvalidBarcode
+                                ? t('invalid_barcode')
+                                : t('product_not_found')}
                     </h2>
                     <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400 font-medium leading-relaxed mb-2">
                         {error
                             ? error
-                            : barcode
-                                ? `We could not find a product for barcode ${barcode}. Try scanning again or search manually.`
-                                : 'We could not find a product for this scan. Try scanning again or search manually.'}
+                            : isInvalidBarcode
+                                ? t('invalid_barcode_subtitle')
+                                : barcode
+                                    ? t('barcode_not_in_catalog_subtitle')
+                                    : t('try_search_or_scan', 'Try searching again or scan the barcode.')}
                     </p>
                     {barcode && (
                         <div className="mt-4 mb-6 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gray-50 dark:bg-gray-900/60 text-xs font-bold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
