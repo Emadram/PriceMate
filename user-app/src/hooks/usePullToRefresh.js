@@ -2,6 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 const DEFAULT_THRESHOLD_PX = 64;
 
+const isInsideHorizontalScroller = (target) => {
+    if (!target || typeof target.closest !== 'function') return false;
+    return Boolean(target.closest('[data-horizontal-scroll]'));
+};
+
 /**
  * Pull-to-refresh for mobile scroll containers or window.
  * @param {object} options
@@ -20,10 +25,20 @@ export function usePullToRefresh({
     const [refreshing, setRefreshing] = useState(false);
     const [pullDistance, setPullDistance] = useState(0);
 
+    const startXRef = useRef(0);
     const startYRef = useRef(0);
     const pullingRef = useRef(false);
     const refreshingRef = useRef(false);
     const pullDistanceRef = useRef(0);
+    const horizontalGestureRef = useRef(false);
+
+    const resetPull = useCallback(() => {
+        pullingRef.current = false;
+        horizontalGestureRef.current = false;
+        setPulling(false);
+        pullDistanceRef.current = 0;
+        setPullDistance(0);
+    }, []);
 
     const getScrollTop = useCallback(() => {
         const el = containerRef?.current;
@@ -43,11 +58,9 @@ export function usePullToRefresh({
         } finally {
             refreshingRef.current = false;
             setRefreshing(false);
-            setPullDistance(0);
-            setPulling(false);
-            pullingRef.current = false;
+            resetPull();
         }
-    }, [onRefresh]);
+    }, [onRefresh, resetPull]);
 
     useEffect(() => {
         if (!enabled || typeof window === 'undefined') return undefined;
@@ -59,33 +72,50 @@ export function usePullToRefresh({
             if (refreshingRef.current) return;
             if (getScrollTop() > 0) return;
             if (!e.touches?.length) return;
+            if (isInsideHorizontalScroller(e.target)) {
+                horizontalGestureRef.current = true;
+                return;
+            }
+
+            horizontalGestureRef.current = false;
+            startXRef.current = e.touches[0].clientX;
             startYRef.current = e.touches[0].clientY;
             pullingRef.current = true;
             setPulling(true);
         };
 
         const onTouchMove = (e) => {
-            if (!pullingRef.current || refreshingRef.current) return;
+            if (horizontalGestureRef.current || refreshingRef.current) return;
+            if (!pullingRef.current) return;
             if (getScrollTop() > 0) {
-                pullingRef.current = false;
-                setPulling(false);
+                resetPull();
+                return;
+            }
+
+            const touch = e.touches[0];
+            const deltaX = touch.clientX - startXRef.current;
+            const deltaY = touch.clientY - startYRef.current;
+
+            if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 10) {
+                resetPull();
+                return;
+            }
+
+            if (deltaY <= 0) {
                 setPullDistance(0);
                 return;
             }
-            const delta = e.touches[0].clientY - startYRef.current;
-            if (delta <= 0) {
-                setPullDistance(0);
-                return;
-            }
-            const next = Math.min(delta, thresholdPx * 1.5);
+
+            const next = Math.min(deltaY, thresholdPx * 1.5);
             pullDistanceRef.current = next;
             setPullDistance(next);
-            if (delta > 8) {
+            if (deltaY > 8) {
                 e.preventDefault();
             }
         };
 
         const onTouchEnd = () => {
+            horizontalGestureRef.current = false;
             if (!pullingRef.current || refreshingRef.current) return;
             const shouldRefresh = pullDistanceRef.current >= thresholdPx;
             pullingRef.current = false;
@@ -99,10 +129,7 @@ export function usePullToRefresh({
         };
 
         const onTouchCancel = () => {
-            pullingRef.current = false;
-            setPulling(false);
-            pullDistanceRef.current = 0;
-            setPullDistance(0);
+            resetPull();
         };
 
         target.addEventListener('touchstart', onTouchStart, opts);
@@ -116,7 +143,7 @@ export function usePullToRefresh({
             target.removeEventListener('touchend', onTouchEnd);
             target.removeEventListener('touchcancel', onTouchCancel);
         };
-    }, [enabled, containerRef, getScrollTop, runRefresh, thresholdPx]);
+    }, [enabled, containerRef, getScrollTop, resetPull, runRefresh, thresholdPx]);
 
     const triggerRefresh = useCallback(() => {
         void runRefresh();

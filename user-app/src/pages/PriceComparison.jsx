@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom';
 import { 
     FiArrowLeft, FiMapPin, FiShoppingCart, FiShare2, FiPackage, 
-    FiShoppingBag, FiTrendingDown, FiTrendingUp, FiBox, FiHome, FiCamera, 
+    FiShoppingBag, FiTrendingDown, FiTrendingUp, FiBox, FiHome, FiCamera, FiX,
     FiImage, FiNavigation, FiClock, FiCheckCircle, FiAlertCircle, 
     FiCalendar, FiTag, FiAlertTriangle, FiInfo 
 } from 'react-icons/fi';
@@ -26,6 +26,7 @@ import useUserLocation from '../hooks/useUserLocation';
 import StarRating from '../components/StarRating';
 import RefreshControl from '../components/RefreshControl';
 import { refreshPageCache } from '../utils/invalidateFreshData';
+import { validateScannedBarcode } from '../utils/barcodeValidation';
 
 const normalizeStockStatus = (status) => {
     if (!status) return 'in_stock';
@@ -139,6 +140,7 @@ const PriceComparison = () => {
     const [similarLoading, setSimilarLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [similarRefreshSeq, setSimilarRefreshSeq] = useState(0);
+    const [scanActionsDismissed, setScanActionsDismissed] = useState(false);
 
     const getSupermarketFromPrice = (price) => {
         if (!price) return null;
@@ -167,6 +169,10 @@ const PriceComparison = () => {
     const getPriceCurrency = (price) => normalizePriceCurrency(price?.currency);
 
     const fromScan = location.state?.fromScan || searchParams.get('fromScan') === '1';
+
+    useEffect(() => {
+        setScanActionsDismissed(false);
+    }, [barcode]);
 
     const handleFavoriteClick = () => {
         if (!user) {
@@ -431,6 +437,9 @@ const PriceComparison = () => {
     }
 
     if (error || !product) {
+        const barcodeValidation = barcode ? validateScannedBarcode(barcode) : null;
+        const isInvalidBarcode = !error && barcode && barcodeValidation && !barcodeValidation.ok;
+
         return (
             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
                 <div className="w-full max-w-md rounded-[2rem] bg-white dark:bg-gray-800 shadow-xl border border-gray-100 dark:border-gray-700 p-8 text-center">
@@ -438,14 +447,20 @@ const PriceComparison = () => {
                         <FiPackage className="text-amber-500 text-4xl" />
                     </div>
                     <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-3">
-                        {error ? t('failed_to_load_product') : t('product_not_found')}
+                        {error
+                            ? t('failed_to_load_product')
+                            : isInvalidBarcode
+                                ? t('invalid_barcode')
+                                : t('product_not_found')}
                     </h2>
                     <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400 font-medium leading-relaxed mb-2">
                         {error
                             ? error
-                            : barcode
-                                ? `We could not find a product for barcode ${barcode}. Try scanning again or search manually.`
-                                : 'We could not find a product for this scan. Try scanning again or search manually.'}
+                            : isInvalidBarcode
+                                ? t('invalid_barcode_subtitle')
+                                : barcode
+                                    ? t('barcode_not_in_catalog_subtitle')
+                                    : t('try_search_or_scan', 'Try searching again or scan the barcode.')}
                     </p>
                     {barcode && (
                         <div className="mt-4 mb-6 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gray-50 dark:bg-gray-900/60 text-xs font-bold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
@@ -486,12 +501,10 @@ const PriceComparison = () => {
         navigate('/scan');
     };
 
-    const handleGoHome = () => {
-        navigate('/');
-    };
+    const showScanActions = fromScan && !scanActionsDismissed;
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-safe md:pb-12">
+        <div className={`min-h-screen bg-gray-50 dark:bg-gray-900 pb-safe md:pb-12 ${showScanActions ? 'pb-24' : ''}`}>
             <RefreshControl onRefresh={handleRefresh} externalRefreshing={refreshing || loading} />
             <main className="max-w-4xl mx-auto px-3 sm:px-4 pt-2 pb-6 md:py-8 space-y-3 md:space-y-8">
                 <div className="flex items-center justify-between gap-2">
@@ -919,22 +932,25 @@ const PriceComparison = () => {
 
 
             {/* Quick actions only when coming from scanner */}
-            {fromScan && (
+            {showScanActions && (
                 <div className="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur border-t border-gray-200 dark:border-gray-700 z-40 pb-safe-nav">
-                    <div className="max-w-4xl mx-auto px-4 py-3 flex gap-3">
+                    <div className="max-w-4xl mx-auto px-4 py-3 flex gap-3 items-center">
                         <button
-                            onClick={handleGoHome}
-                            aria-label="Go to home page"
-                            className="tap-target flex-1 inline-flex items-center justify-center gap-2 py-3 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
-                        >
-                            <FiHome /> Home
-                        </button>
-                        <button
+                            type="button"
                             onClick={handleScanAnother}
-                            aria-label="Scan another product"
+                            aria-label={t('scan_another_product')}
                             className="tap-target flex-1 inline-flex items-center justify-center gap-2 py-3 rounded-lg bg-brand-600 text-white hover:bg-brand-700 shadow-lg shadow-brand-500/30 transition"
                         >
-                            <FiCamera /> Scan Another
+                            <FiCamera />
+                            {t('scan_another_product')}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setScanActionsDismissed(true)}
+                            aria-label={t('close')}
+                            className="tap-target shrink-0 inline-flex items-center justify-center h-12 w-12 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+                        >
+                            <FiX size={20} />
                         </button>
                     </div>
                 </div>

@@ -6,6 +6,8 @@ import {
     findBestProductMatch,
     tokenizeProductQuery,
     buildCatalogSearchTerms,
+    messageExplicitlyNamesProduct,
+    isPriceOrCompareIntent,
 } from './productNameMatch';
 
 const cocaCola = { name: 'Coca-Cola', barcode: '5449000000996' };
@@ -74,6 +76,26 @@ describe('productNameMatch', () => {
         it('includes joined and alias terms', () => {
             const terms = buildCatalogSearchTerms('coke ingredients');
             expect(terms.some((t) => t.includes('coca') || t === 'coke')).toBe(true);
+        });
+    });
+
+    describe('messageExplicitlyNamesProduct', () => {
+        const catalog = [cocaCola, milk, pepsi];
+
+        it('returns true when user names a product', () => {
+            expect(messageExplicitlyNamesProduct('cheapest milk near me', catalog)).toBe(true);
+            expect(messageExplicitlyNamesProduct('coco cola price', catalog)).toBe(true);
+        });
+
+        it('returns false for generic closest/cheapest prompt without product', () => {
+            const prompt =
+                'Find the closest supermarket with the cheapest price for a product. Use my location when available. If I did not name a product, ask me which one.';
+            expect(isPriceOrCompareIntent(prompt)).toBe(true);
+            expect(messageExplicitlyNamesProduct(prompt, catalog)).toBe(false);
+        });
+
+        it('returns true for barcode', () => {
+            expect(messageExplicitlyNamesProduct('check 5449000000996', catalog)).toBe(true);
         });
     });
 });

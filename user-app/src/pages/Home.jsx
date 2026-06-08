@@ -329,7 +329,10 @@ const Home = () => {
                         </button>
                     </div>
                     
-                    <div className="flex overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 sm:gap-4 pb-2 snap-x">
+                    <div
+                        data-horizontal-scroll
+                        className="horizontal-scroll flex w-full flex-nowrap overflow-x-auto no-scrollbar -mx-4 px-4 scroll-pl-4 scroll-pr-4 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 sm:gap-4 pb-2 max-sm:snap-none sm:snap-x"
+                    >
                         {loading || categoriesLoading
                             ? [...Array(6)].map((_, i) => <div key={i} className="flex-shrink-0 w-[6.75rem] h-[6.75rem] sm:w-auto sm:h-auto bg-gray-200 dark:bg-gray-800 rounded-2xl sm:rounded-3xl animate-pulse" />)
                             : categories.slice(0, 11).map((cat) => {
@@ -339,7 +342,7 @@ const Home = () => {
                                     <button 
                                         key={cat.$id}
                                         onClick={() => navigate(`/search?category=${cat.$id}`)}
-                                        className="flex-shrink-0 w-[6.75rem] h-[6.75rem] sm:w-auto sm:aspect-square sm:min-h-0 sm:h-auto flex flex-col items-center justify-center p-4 sm:p-6 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[1.5rem] sm:rounded-[2rem] shadow-soft hover:shadow-xl hover:translate-y-[-4px] transition-all group snap-center"
+                                        className="flex-shrink-0 w-[6.75rem] h-[6.75rem] sm:w-auto sm:aspect-square sm:min-h-0 sm:h-auto flex flex-col items-center justify-center p-4 sm:p-6 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[1.5rem] sm:rounded-[2rem] shadow-soft hover:shadow-xl hover:translate-y-[-4px] transition-all group sm:snap-center"
                                     >
                                         <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-gray-50 dark:bg-gray-800 flex items-center justify-center text-xl sm:text-2xl text-brand-600 group-hover:scale-110 transition-transform">
                                             {getIconForCategory(cat)}
@@ -354,7 +357,7 @@ const Home = () => {
                         {!loading && categories.length > 11 && (
                             <button 
                                 onClick={() => navigate('/search')}
-                                className="flex-shrink-0 w-[6.75rem] h-[6.75rem] sm:w-auto sm:aspect-square sm:min-h-0 sm:h-auto flex flex-col items-center justify-center p-4 sm:p-6 bg-brand-600 dark:bg-brand-800 border border-brand-500 dark:border-brand-700 rounded-[1.5rem] sm:rounded-[2rem] shadow-soft dark:shadow-brand-900/40 hover:shadow-xl hover:translate-y-[-4px] transition-all group snap-center"
+                                className="flex-shrink-0 w-[6.75rem] h-[6.75rem] sm:w-auto sm:aspect-square sm:min-h-0 sm:h-auto flex flex-col items-center justify-center p-4 sm:p-6 bg-brand-600 dark:bg-brand-800 border border-brand-500 dark:border-brand-700 rounded-[1.5rem] sm:rounded-[2rem] shadow-soft dark:shadow-brand-900/40 hover:shadow-xl hover:translate-y-[-4px] transition-all group sm:snap-center"
                             >
                                 <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-white/10 flex items-center justify-center text-xl sm:text-2xl text-white group-hover:scale-110 transition-transform">
                                     <FiChevronRight />

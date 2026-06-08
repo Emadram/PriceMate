@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { BarcodeFormat, DecodeHintType } from '@zxing/library';
+import { validateScannedBarcode } from '../utils/barcodeValidation';
 
-const Scanner = ({ onDetected, paused = false }) => {
+const Scanner = ({ onDetected, onInvalidBarcode, paused = false }) => {
     const videoRef = useRef(null);
     const lastCodeRef = useRef(null);
     const readerRef = useRef(null);
@@ -11,6 +12,7 @@ const Scanner = ({ onDetected, paused = false }) => {
     const streamRef = useRef(null);
     const trackRef = useRef(null);
     const onDetectedRef = useRef(onDetected);
+    const onInvalidBarcodeRef = useRef(onInvalidBarcode);
     const candidateRef = useRef({ text: null, count: 0, firstTs: 0, lastTs: 0 });
     const [error, setError] = useState(null);
     const [torchAvailable, setTorchAvailable] = useState(false);
@@ -32,6 +34,10 @@ const Scanner = ({ onDetected, paused = false }) => {
     useEffect(() => {
         onDetectedRef.current = onDetected;
     }, [onDetected]);
+
+    useEffect(() => {
+        onInvalidBarcodeRef.current = onInvalidBarcode;
+    }, [onInvalidBarcode]);
 
     const hints = useMemo(() => {
         // Restrict to common product barcode formats to reduce misreads and speed up decoding.
@@ -246,6 +252,17 @@ const Scanner = ({ onDetected, paused = false }) => {
                             candidateRef.current.count >= REQUIRED_MATCHES &&
                             trimmed !== lastCodeRef.current
                         ) {
+                            const format = typeof result.getBarcodeFormat === 'function'
+                                ? result.getBarcodeFormat()
+                                : undefined;
+                            const validation = validateScannedBarcode(trimmed, format);
+
+                            if (!validation.ok) {
+                                candidateRef.current = { text: null, count: 0, firstTs: 0, lastTs: 0 };
+                                onInvalidBarcodeRef.current?.(trimmed, validation.reason);
+                                return;
+                            }
+
                             triggerHaptic();
                             lastCodeRef.current = trimmed;
                             candidateRef.current = { text: null, count: 0, firstTs: 0, lastTs: 0 };

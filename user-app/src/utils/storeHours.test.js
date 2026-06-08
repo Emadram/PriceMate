@@ -78,9 +78,16 @@ describe('storeHours', () => {
             expect(getStoreAvailability({ status: 'open' }).isOpen).toBe(true);
         });
 
-        it('defaults to open when no hours or status', () => {
+        it('defaults to closed when no hours or status', () => {
             expect(getStoreAvailability({}).source).toBe('default');
-            expect(getStoreAvailability({}).isOpen).toBe(true);
+            expect(getStoreAvailability({}).isOpen).toBe(false);
+            expect(getStoreAvailability({}).weeklySchedule).toEqual([]);
+        });
+
+        it('legacy source has no weekly schedule rows', () => {
+            const result = getStoreAvailability({ status: 'open' });
+            expect(result.source).toBe('legacy');
+            expect(result.weeklySchedule).toEqual([]);
         });
     });
 

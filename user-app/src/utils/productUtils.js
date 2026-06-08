@@ -4,6 +4,9 @@ import {
     buildCatalogSearchTerms,
     findBestProductMatch,
     FUZZY_MATCH_MIN_SCORE,
+    getExplicitProductTokens,
+    hasBarcodeInMessage,
+    isPriceOrCompareIntent,
 } from './productNameMatch';
 export {
     getStoreAvailability,
@@ -955,6 +958,14 @@ const resolveCatalogProductForIngredientsUncached = async (userMessage) => {
     const empty = { product: null, catalogBarcode: '', catalogName: '' };
     const trimmed = String(userMessage || '').trim();
     if (!trimmed) return empty;
+
+    if (
+        !hasBarcodeInMessage(trimmed) &&
+        isPriceOrCompareIntent(trimmed) &&
+        getExplicitProductTokens(trimmed).length === 0
+    ) {
+        return empty;
+    }
 
     const barcodeMatch = trimmed.match(/\b(\d{8,14})\b/);
     if (barcodeMatch) {

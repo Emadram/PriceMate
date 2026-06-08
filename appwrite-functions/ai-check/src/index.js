@@ -194,7 +194,11 @@ const wordsForSearch = (query) => {
         'the', 'a', 'an', 'of', 'in', 'on', 'too', 'very', 'much', 'many', 'price', 'cheapest',
         'cheap', 'expensive', 'cost', 'good', 'better', 'sugar', 'salt', 'sodium', 'caffeine', 'gluten', 'lactose',
         'bu', 'su', 'urun', 'icerik', 'icindekiler', 'uygun', 'guvenli', 'var', 'mi', 'fiyat',
-        'ucuz', 'pahali', 'seker', 'tuz', 'sodyum', 'kafein'
+        'ucuz', 'pahali', 'seker', 'tuz', 'sodyum', 'kafein',
+        'supermarket', 'supermarkets', 'store', 'stores', 'market', 'markets', 'branch', 'branches',
+        'closest', 'nearest', 'nearby', 'location', 'available', 'named', 'which', 'use', 'did', 'not',
+        'name', 'ask', 'one', 'your', 'when', 'from', 'them', 'across', 'rank', 'ranked', 'find', 'compare',
+        'yakin', 'yakınımdaki', 'magaza', 'sube', 'konum', 'kullan', 'hangi',
     ]);
     return normalizeText(query)
         .replace(/\b\d{8,14}\b/g, ' ')
@@ -202,6 +206,25 @@ const wordsForSearch = (query) => {
         .map((word) => word.trim())
         .filter((word) => word.length >= 2 && !stop.has(word))
         .sort((a, b) => b.length - a.length);
+};
+
+const isPriceOrCompareIntent = (query) => {
+    const text = normalizeText(query);
+    return [
+        'cheapest', 'cheap', 'price', 'prices', 'compare', 'rank', 'en ucuz', 'fiyat', 'near me',
+        'closest', 'nearest', 'en yakin', 'yakınımdaki', 'yakinimdaki', 'lowest', 'highest', 'best price',
+    ].some((term) => text.includes(term));
+};
+
+const queryNamesExplicitProduct = (query, barcodeHint = '', nameHint = '') => {
+    if (barcodeHint || barcodeFromQuery(query)) return true;
+    const terms = wordsForSearch(query).filter((term) => term.length >= 3);
+    if (!terms.length) return false;
+    if (nameHint) {
+        const hint = normalizeText(nameHint);
+        if (terms.some((term) => hint.includes(term) || term.includes(hint))) return true;
+    }
+    return false;
 };
 
 const stripNutritionMeta = (value) => {
@@ -947,12 +970,28 @@ const runPriceCheck = async ({ databases, databaseId, query, barcodeHint, nameHi
         };
     }
 
+    const explicitProduct = queryNamesExplicitProduct(query, barcodeHint, nameHint);
+    if (!explicitProduct && isPriceOrCompareIntent(query)) {
+        return {
+            mode: 'generic',
+            product: null,
+            ingredientCheck: null,
+            priceCheck: null,
+            status: 'ok',
+            reasons: ['Ask which product the user wants before running a price check.'],
+            source: 'PriceMate',
+            asOf: new Date().toISOString(),
+            stale: false,
+            errorCode: 'needs_product',
+        };
+    }
+
     const product = await findCatalogProduct(
         databases,
         databaseId,
         query,
-        barcodeHint || memory?.lastProductBarcode || '',
-        nameHint || memory?.lastProductName || ''
+        explicitProduct ? (barcodeHint || memory?.lastProductBarcode || '') : (barcodeHint || ''),
+        explicitProduct ? (nameHint || memory?.lastProductName || '') : (nameHint || '')
     );
     if (!product) {
         return {
