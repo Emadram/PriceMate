@@ -755,8 +755,8 @@ const PriceComparison = () => {
                                     
                                     const updatedAtValue = getPriceTimestamp(priceEntry);
                                     const updatedAt = updatedAtValue ? new Date(updatedAtValue) : new Date();
-                                    const formattedDate = updatedAt.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: '2-digit' });
-                                    const formattedTime = updatedAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                                    const formattedDate = updatedAt.toLocaleDateString(i18n.language, { day: '2-digit', month: '2-digit', year: '2-digit' });
+                                    const formattedTime = updatedAt.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', hour12: true });
                                     const distanceDisplay = priceEntry.distance !== null ? `${priceEntry.distance} km` : t('calculating');
 
                                     return (

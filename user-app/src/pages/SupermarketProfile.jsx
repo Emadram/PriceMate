@@ -319,7 +319,7 @@ const SupermarketProfile = () => {
                             )}
                         </div>
                         <p className="text-[10px] font-bold uppercase tracking-tight text-green-600 dark:text-green-400">
-                            Updated {new Date(price.$updatedAt).toLocaleDateString()}
+                            Updated {new Date(price.$updatedAt).toLocaleDateString(i18n.language)}
                         </p>
                         <div className="flex flex-wrap items-baseline gap-2 pt-1">
                             <span className="text-lg font-bold leading-none text-gray-900 dark:text-white">
@@ -559,7 +559,7 @@ const SupermarketProfile = () => {
                         <div className="bg-gray-50 dark:bg-[#1C1C1E] p-3 sm:p-4 rounded-xl sm:rounded-2xl">
                             <p className="text-[9px] sm:text-[11px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest mb-1">{t('last_updated')}</p>
                             <p className="text-[11px] sm:text-sm font-semibold dark:text-white pt-1 leading-snug">
-                                {lastUpdateValue ? formatLastUpdate(lastUpdateValue) : t('no_updates_yet', 'No updates yet')}
+                                {lastUpdateValue ? formatLastUpdate(lastUpdateValue, i18n.language) : t('no_updates_yet', 'No updates yet')}
                             </p>
                         </div>
                     </div>

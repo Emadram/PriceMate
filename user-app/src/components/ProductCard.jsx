@@ -10,7 +10,7 @@ import StarRating from './StarRating';
 import CategoryIconLabel from '../components/CategoryIconLabel';
 
 const ProductCard = ({ product, prices = [] }) => {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const { convert, currency } = useCurrencyStore();
     const user = useAuthStore((state) => state.user);
     const [isReportOpen, setIsReportOpen] = useState(false);
@@ -48,7 +48,7 @@ const ProductCard = ({ product, prices = [] }) => {
         const parsed = new Date(dateToUse);
         if (Number.isNaN(parsed.getTime())) return t('recently_updated', 'Recently updated');
 
-        const formatted = parsed.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' });
+        const formatted = parsed.toLocaleDateString(i18n.language, { day: '2-digit', month: 'short' });
         return `${t('updated', 'Updated')} ${formatted}`;
     };
 

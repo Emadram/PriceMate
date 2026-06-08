@@ -1599,16 +1599,16 @@ export const normalizeProduct = (product, prices = []) => {
 /**
  * Formats a Date/Timestamp to a human readable "Today, 9:24 AM" etc
  */
-export const formatLastUpdate = (timestamp) => {
+export const formatLastUpdate = (timestamp, locale) => {
     if (!timestamp) return 'Unknown';
     const date = new Date(timestamp);
     const now = new Date();
     const isToday = date.toDateString() === now.toDateString();
     
-    const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timeStr = date.toLocaleTimeString(locale || [], { hour: '2-digit', minute: '2-digit' });
     if (isToday) return `Today, ${timeStr}`;
     
-    return `${date.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${timeStr}`;
+    return `${date.toLocaleDateString(locale || [], { month: 'short', day: 'numeric' })}, ${timeStr}`;
 };
 
 /**
