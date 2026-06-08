@@ -347,6 +347,9 @@ import {
     findBestProductMatch,
     scoreProductNameMatch,
     FUZZY_MATCH_MIN_SCORE,
+    hasBarcodeInMessage,
+    isPriceOrCompareIntent,
+    messageExplicitlyNamesProduct,
 } from '../utils/productNameMatch';
 import useUserLocation from '../hooks/useUserLocation';
 import useComposerKeyboardLift from '../hooks/useComposerKeyboardLift';
@@ -1087,7 +1090,7 @@ const DIETARY_RESTRICTION_TERMS = {
 };
 
 /** Prefer products that match the user message; fall back to a short sample (prompt cap + relevance). */
-const buildRankedProductContextLines = (products, userHint, aiProfile = {}, resolvedProduct = null) => {
+const buildRankedProductContextLines = (products, userHint, aiProfile = {}, resolvedProduct = null, { includeGenericSample = true } = {}) => {
     const norm = (s) =>
         String(s || '')
             .toLowerCase()
@@ -1129,12 +1132,19 @@ const buildRankedProductContextLines = (products, userHint, aiProfile = {}, reso
     });
     scored.sort((a, b) => b.score - a.score);
     const picked = scored.filter((x) => x.score > 0).slice(0, 25).map((x) => x.p);
-    const list = picked.length > 0 ? picked : products.slice(0, 15);
+    const list = picked.length > 0
+        ? picked
+        : (includeGenericSample ? products.slice(0, 15) : []);
     const resolvedId = resolvedProduct?.$id || resolvedProduct?.barcode || '';
     const mergedList = resolvedProduct
         ? [resolvedProduct, ...list.filter((p) => (p.$id || p.barcode) !== resolvedId)]
         : list;
-        return mergedList
+
+    if (mergedList.length === 0 && !includeGenericSample) {
+        return '(User did not name a product. Ask which product they mean before citing prices or barcodes.)';
+    }
+
+    return mergedList
         .map((p) => {
             const category = Array.isArray(p.categoryId)
                 ? p.categoryId[0]?.categoryName
@@ -1882,18 +1892,18 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
             );
         };
 
+        const explicitlyNamesProduct = messageExplicitlyNamesProduct(userMessage, fullProductList);
+
         const hasExplicitProductHint = (message, catalogMatch = null) => {
             if (catalogMatch?.product) return true;
-            const lowered = String(message || '').toLowerCase();
-            if (/\b\d{8,14}\b/.test(lowered)) return true; // barcode
-            const match = findBestProductMatch(message, fullProductList);
-            if (match?.product && match.score >= FUZZY_MATCH_MIN_SCORE) return true;
-            return false;
+            return messageExplicitlyNamesProduct(message, fullProductList);
         };
 
         const resolveMessageForCatalog = userMessage;
         const catalog = await resolveCatalogProductForIngredients(resolveMessageForCatalog);
-        const offCache = await resolveOffCacheProductForIngredients(resolveMessageForCatalog);
+        const offCache = explicitlyNamesProduct || hasBarcodeInMessage(userMessage)
+            ? await resolveOffCacheProductForIngredients(resolveMessageForCatalog)
+            : { product: null, barcode: '', name: '' };
 
         const contextFallback =
             looksLikeIngredientFollowUp(userMessage) && !hasExplicitProductHint(userMessage, catalog)
@@ -1905,7 +1915,9 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         const effectiveCatalog = catalogWithFallback?.product ? catalogWithFallback : catalog;
 
         const barcodeFromMessage = extractBarcode(userMessage);
-        const localProductMatch = findBestProductMatch(userMessage, fullProductList);
+        const localProductMatch = explicitlyNamesProduct
+            ? findBestProductMatch(userMessage, fullProductList)
+            : null;
         const productMatch = localProductMatch?.product || null;
         const mergedProductProfile = productMatch || effectiveCatalog.product || offCache.product;
         const effectiveBarcode =
@@ -1921,7 +1933,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         const effectiveDisplayName =
             catalogDisplayName || contextFallback?.name || mergedProductProfile?.name || mergedProductProfile?.productName || '';
 
-        if (effectiveBarcode || effectiveDisplayName) {
+        if (explicitlyNamesProduct && (effectiveBarcode || effectiveDisplayName)) {
             lastResolvedProductRef.current = {
                 barcode: effectiveBarcode || lastResolvedProductRef.current.barcode,
                 name: effectiveDisplayName || lastResolvedProductRef.current.name,
@@ -1933,6 +1945,16 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
             await addMessage(user.$id, 'user', userMessage, user);
         } else {
             // Logged out users don't have persistence
+            return;
+        }
+
+        if (
+            !explicitlyNamesProduct &&
+            isPriceOrCompareIntent(userMessage) &&
+            !looksLikeIngredientFollowUp(userMessage)
+        ) {
+            await addMessage(user.$id, 'assistant', t('ai_need_product_for_price'), user);
+            setIsLoading(false);
             return;
         }
 
@@ -1980,11 +2002,16 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
             currency,
             allergyPrefs: userAllergyPreferences,
             userProfile: userAiProfile,
-            barcodeHint: effectiveBarcode,
-            nameHint: catalogDisplayName || mergedProductProfile?.name || mergedProductProfile?.productName || '',
+            barcodeHint: explicitlyNamesProduct ? effectiveBarcode : (barcodeFromMessage || ''),
+            nameHint: explicitlyNamesProduct
+                ? (catalogDisplayName || mergedProductProfile?.name || mergedProductProfile?.productName || '')
+                : '',
         });
 
-        if (aiCheckResult && aiCheckResult.mode && aiCheckResult.mode !== 'generic') {
+        const skipStructuredPriceCheck =
+            !explicitlyNamesProduct && aiCheckResult?.mode === 'price_check';
+
+        if (aiCheckResult && aiCheckResult.mode && aiCheckResult.mode !== 'generic' && !skipStructuredPriceCheck) {
             const structuredReply = serializeAiCheckResponse(aiCheckResult);
             if (user?.$id) {
                 await addMessage(user.$id, 'assistant', structuredReply, user);
@@ -2202,7 +2229,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
             loweredMessage.includes('yakinimdaki');
 
         const hasExplicitBarcode = /\b\d{8,14}\b/.test(loweredMessage);
-        const hasExplicitProductHintNow = Boolean(effectiveBarcode || mergedProductProfile || productMatch);
+        const hasExplicitProductHintNow = explicitlyNamesProduct || hasExplicitBarcode;
 
         // Catalog-only gating should ONLY apply when the user is asking about a specific product.
         const isProductSpecific =
@@ -2285,7 +2312,8 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 fullProductList,
                 userMessage,
                 userAiProfile,
-                resolvedCatalogProductForPrompt
+                resolvedCatalogProductForPrompt,
+                { includeGenericSample: explicitlyNamesProduct }
             );
             const storeContext = buildSupermarketContextLines(supermarketList, userLocation);
             const storeLocationStatus = isUserLocationAvailableForStores(userLocation)
@@ -2331,7 +2359,8 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 - Do not invent stores or coordinates not listed in NEARBY STORES.
 
                 CLOSEST + CHEAPEST:
-                - When the user wants the nearest store, closest option, or cheapest price, name the product first (ask if missing).
+                - When the user wants the nearest store, closest option, or cheapest price but did NOT name a product, ask which product they mean. Do NOT pick a random product from the sample.
+                - Only recommend a store + price after the user names a product (or barcode) or confirms one from a prior turn.
                 - Combine NEARBY STORES (distance) with WEBSITE PRODUCT DATA (price): prefer a store that is reasonably close and has a low price.
                 - Give one clear recommendation in 1–2 sentences, then at most two alternatives with store name, price, and distance when known.
 
@@ -2398,10 +2427,13 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 mergedProductProfile?.productName ||
                 '';
             let openRouterMessage = `Intent: ${intentSummary || userMessage}`;
-            if (effectiveBarcode) {
+            if (!explicitlyNamesProduct && isPriceOrCompareIntent(userMessage)) {
+                openRouterMessage += '\nNote: User did not name a specific product. Ask which product before recommending prices or stores.';
+            }
+            if (explicitlyNamesProduct && effectiveBarcode) {
                 openRouterMessage += `\nKnown barcode: [BARCODE:${effectiveBarcode}]`;
             }
-            if (resolvedDisplayName && effectiveBarcode) {
+            if (explicitlyNamesProduct && resolvedDisplayName && effectiveBarcode) {
                 openRouterMessage += `\nResolved catalog product: ${resolvedDisplayName} [BARCODE:${effectiveBarcode}]`;
             }
             if (!barcodeFromMessage && contextFallback?.barcode) {

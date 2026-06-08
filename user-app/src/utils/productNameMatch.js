@@ -9,6 +9,17 @@ const QUERY_STOPWORDS = new Set([
     'en', 'ucuz', 'fiyat', 'barkod', 'içindekiler', 'içindeki',
 ]);
 
+/** Extra terms common in price/location prompts but not product names. */
+const PRICE_LOCATION_PROMPT_STOPWORDS = new Set([
+    'supermarket', 'supermarkets', 'store', 'stores', 'market', 'markets', 'branch', 'branches',
+    'closest', 'nearest', 'nearby', 'near', 'location', 'available', 'named', 'which', 'use', 'did', 'not',
+    'name', 'ask', 'one', 'your', 'when', 'from', 'them', 'across', 'rank', 'ranked', 'first',
+    'option', 'options', 'deals', 'deal', 'best', 'lowest', 'highest', 'premium',
+    'yakın', 'yakin', 'yakınımdaki', 'yakinimdaki', 'magaza', 'mağaza', 'sube', 'şube', 'konum',
+    'kullan', 'urun', 'ürün', 'hangi', 'adını', 'adini', 'yazmadıysam', 'yazmadim', 'yazmadım',
+    'didnt', "didn't", 'write', 'wrote', 'without', 'specify', 'specific',
+]);
+
 /** @type {Record<string, string[]>} */
 export const PRODUCT_NAME_ALIASES = {
     coke: ['coca cola', 'cocacola', 'coca-cola'],
@@ -208,6 +219,61 @@ export const findBestProductMatch = (query, products, options = {}) => {
  * @param {string} message
  * @returns {string[]}
  */
+export const hasBarcodeInMessage = (message) => /\b\d{8,14}\b/.test(String(message || ''));
+
+export const isPriceOrCompareIntent = (message) => {
+    const text = String(message || '').toLowerCase();
+    return /\b(cheapest|cheap|price|prices|compare|rank|en ucuz|fiyat|near me|closest|nearest|en yakın|en yakin|yakınımdaki|yakinimdaki|lowest|highest|best deal|best price)\b/i.test(
+        text
+    );
+};
+
+/**
+ * Product-like tokens left after generic query and price/location stopwords.
+ */
+export const getExplicitProductTokens = (message) => {
+    const { words } = tokenizeProductQuery(message);
+    return words.filter((word) => !PRICE_LOCATION_PROMPT_STOPWORDS.has(word) && word.length >= 3);
+};
+
+/**
+ * True when the user named a specific product (barcode, clear name match), not a generic price/location ask.
+ * @param {string} message
+ * @param {object[]} [products]
+ * @param {{ minScore?: number }} [options]
+ */
+export const messageExplicitlyNamesProduct = (message, products = [], options = {}) => {
+    const text = String(message || '').trim();
+    if (!text) return false;
+    if (hasBarcodeInMessage(text)) return true;
+
+    const explicitTokens = getExplicitProductTokens(text);
+    if (explicitTokens.length === 0) return false;
+
+    const list = Array.isArray(products) ? products : [];
+    for (const product of list) {
+        const productKey = normalizeProductKey(getProductDisplayName(product));
+        if (!productKey) continue;
+        const tokenHit = explicitTokens.some((token) => {
+            const normalized = normalizeProductKey(token);
+            return normalized.length >= 3 && productKey.includes(normalized);
+        });
+        if (tokenHit) return true;
+    }
+
+    const match = findBestProductMatch(text, products, options);
+    if (!match?.product) return false;
+
+    const productKey = normalizeProductKey(match.matchedName);
+    const hasTokenInName = explicitTokens.some((token) => {
+        const normalized = normalizeProductKey(token);
+        return normalized.length >= 3 && (productKey.includes(normalized) || normalized.includes(productKey));
+    });
+    if (hasTokenInName) return true;
+
+    return match.score >= 0.92;
+};
+
 export const buildCatalogSearchTerms = (message) => {
     const { words, joined, aliasKeys } = tokenizeProductQuery(message);
     const terms = new Set(words);
