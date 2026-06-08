@@ -176,6 +176,13 @@
     min-height: 44px;
   }
 
+  .horizontal-scroll {
+    touch-action: pan-x pan-y pinch-zoom;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    overscroll-behavior-y: auto;
+  }
+
   /* small helper to ensure z-60 utility exists */
   .z-60 { z-index: 60; }
   /* high z-index helpers used by fixed navbar/logo */

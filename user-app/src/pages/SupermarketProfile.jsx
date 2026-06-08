@@ -736,7 +736,10 @@ const SupermarketProfile = () => {
                                                 {section.products.length}
                                             </span>
                                         </div>
-                                        <div className="flex overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 gap-3 pb-2 snap-x snap-mandatory">
+                                        <div
+                                            data-horizontal-scroll
+                                            className="horizontal-scroll flex w-full flex-nowrap overflow-x-auto no-scrollbar -mx-4 px-4 scroll-pl-4 scroll-pr-4 sm:mx-0 sm:px-0 gap-3 pb-2 max-sm:snap-none sm:snap-x sm:snap-proximity"
+                                        >
                                             {section.products.map((price) => renderSupermarketProductCard(price))}
                                         </div>
                                     </div>

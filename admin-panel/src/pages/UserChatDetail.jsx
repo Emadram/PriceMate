@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useChatHistoryStore, LEGACY_THREAD_KEY } from '../stores/chatHistoryStore';
 import {
-    FiArrowLeft,
     FiUser,
     FiCpu,
     FiClock,
@@ -74,15 +73,7 @@ const UserChatDetail = () => {
             <Sidebar />
 
             <div className="flex-1 flex flex-col h-screen overflow-y-auto custom-scrollbar">
-                <div className="sticky top-0 z-20 border-b border-gray-200 dark:border-gray-700">
-                    <div className="max-w-4xl mx-auto px-8 pt-4">
-                        <Link
-                            to={`/chat-history/${userId}`}
-                            className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-brand-700 dark:text-brand-300 hover:gap-3 transition-all"
-                        >
-                            <FiArrowLeft size={14} /> Back to conversations
-                        </Link>
-                    </div>
+                <div className="sticky top-0 z-20 border-b border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-800/80 backdrop-blur-md">
                     <AdminPageHeader
                         title="Conversation"
                         subtitle={threadTitle}
@@ -90,8 +81,14 @@ const UserChatDetail = () => {
                         onRefresh={loadThread}
                         loading={loading}
                         sticky={false}
+                        showBorder={false}
+                        backLink={{
+                            to: `/chat-history/${userId}`,
+                            label: 'Back to conversations',
+                        }}
+                        contentMaxWidth="max-w-4xl mx-auto w-full"
                     />
-                    <div className="max-w-4xl mx-auto px-8 pb-4 flex flex-wrap items-center gap-3">
+                    <div className="max-w-4xl mx-auto w-full px-8 pb-4 flex flex-wrap items-center gap-3">
                             <div className="bg-slate-900 text-white px-5 py-4 rounded-2xl flex items-center gap-4">
                                 <div className="h-10 w-10 rounded-xl bg-white/10 flex items-center justify-center">
                                     <FiUser className="text-lg" />
