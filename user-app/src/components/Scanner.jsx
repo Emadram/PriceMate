@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { BarcodeFormat, DecodeHintType } from '@zxing/library';
 import { validateScannedBarcode } from '../utils/barcodeValidation';
@@ -56,7 +56,7 @@ const Scanner = ({ onDetected, onInvalidBarcode, paused = false }) => {
         return h;
     }, []);
 
-    const stopStream = () => {
+    const stopStream = useCallback(() => {
         try {
             controlsRef.current?.stop?.();
         } catch {
@@ -85,9 +85,20 @@ const Scanner = ({ onDetected, onInvalidBarcode, paused = false }) => {
             // ignore
         }
 
+        try {
+            const videoEl = videoRef.current;
+            if (videoEl) {
+                videoEl.pause?.();
+                videoEl.srcObject = null;
+            }
+        } catch {
+            // ignore
+        }
+
         streamRef.current = null;
         trackRef.current = null;
-    };
+        isStartingRef.current = false;
+    }, []);
 
     const tuneTrackIfPossible = async () => {
         const videoEl = videoRef.current;
@@ -315,6 +326,28 @@ const Scanner = ({ onDetected, onInvalidBarcode, paused = false }) => {
             isStartingRef.current = false;
         };
     }, [hints, paused]);
+
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.visibilityState !== 'visible') {
+                stopStream();
+            }
+        };
+
+        const handlePageHide = () => {
+            stopStream();
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('pagehide', handlePageHide);
+        window.addEventListener('blur', handlePageHide);
+
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('pagehide', handlePageHide);
+            window.removeEventListener('blur', handlePageHide);
+        };
+    }, [stopStream]);
 
     // If paused changes to true, stop the reader; if false, it will restart via effect
     useEffect(() => {
