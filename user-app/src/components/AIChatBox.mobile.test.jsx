@@ -156,8 +156,8 @@ vi.mock('../utils/aiCheckUtils', () => ({
     buildAiProfileCacheKey: vi.fn(),
     buildAiCheckFingerprint: vi.fn(),
     parseAiCheckResponse: vi.fn(),
-    readStoredAiProfile: vi.fn(),
-    readStoredAllergyProfile: vi.fn(),
+    readStoredAiProfile: vi.fn(() => ({ profile: {}, hasSignal: false })),
+    readStoredAllergyProfile: vi.fn(() => ({ allergies: [], hasKnownAllergies: false, isSet: true })),
     serializeAiCheckResponse: vi.fn(),
 }));
 

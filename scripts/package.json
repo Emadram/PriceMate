@@ -6,6 +6,7 @@
     "seed:prices-all": "node seed_prices_for_all_supermarkets.js",
     "seed:price-history": "node seed_price_history.js",
     "seed:price-history-targeted": "node seed_price_history_targeted.js",
+    "seed:price-history-spread": "node seed_price_history_spread.js",
     "seed:products-by-category": "node seed_products_by_category.js",
     "ensure:ai-schema": "node ensure_ai_schema.js",
     "ensure:supermarket-hours-schema": "node ensure_supermarket_hours_schema.js",

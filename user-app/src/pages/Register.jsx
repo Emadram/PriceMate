@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, User, ArrowRight, Loader2, CheckCircle2, Shield } from 'lucide-react';
+import { LuMail as Mail, LuLock as Lock, LuUser as User, LuArrowRight as ArrowRight, LuLoaderCircle as Loader2, LuCircleCheckBig as CheckCircle2, LuShield as Shield } from 'react-icons/lu';
 import { useTranslation } from 'react-i18next';
 import useAuthStore from '../stores/authStore';
 import BackButton from '../components/BackButton';
@@ -10,6 +10,9 @@ const ALLERGY_OPTIONS = [
     { id: 'milk', labelKey: 'allergy_option_milk' },
     { id: 'lactose', labelKey: 'allergy_option_lactose' },
     { id: 'gluten', labelKey: 'allergy_option_gluten' },
+    { id: 'diabetes', labelKey: 'allergy_option_diabetes' },
+    { id: 'hypertension', labelKey: 'allergy_option_hypertension' },
+    { id: 'pregnancy', labelKey: 'allergy_option_pregnancy' },
     { id: 'peanut', labelKey: 'allergy_option_peanut' },
     { id: 'tree nuts', labelKey: 'allergy_option_tree_nuts' },
     { id: 'soy', labelKey: 'allergy_option_soy' },

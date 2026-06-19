@@ -246,3 +246,17 @@
 .dark .map-dark-invert .map-tiles {
   filter: invert(0.92) hue-rotate(180deg) brightness(0.92) contrast(1.12);
 }
+
+/* Keyboard focused mobile adjustments for Android resize-layout */
+html.pricemate-ai-composer-focused .pricemate-mobile-bottom-nav {
+  display: none !important;
+}
+
+html.pricemate-ai-composer-focused.pricemate-ai-chat-keyboard-resize .pricemate-ai-composer-nav-anchor {
+  bottom: env(safe-area-inset-bottom, 0px) !important;
+}
+
+html.pricemate-ai-composer-focused.pricemate-ai-chat-keyboard-resize .pricemate-ai-chat-page-root {
+  bottom: env(safe-area-inset-bottom, 0px) !important;
+  height: calc(var(--app-dvh, 100dvh) - env(safe-area-inset-bottom, 0px)) !important;
+}

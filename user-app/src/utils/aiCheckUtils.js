@@ -209,6 +209,7 @@ export const readStoredAllergyProfile = (prefs = {}) => {
 export const getAllergenTermsForLabels = (labels = []) =>
     Array.from(new Set(labels.flatMap((label) => {
         const normalized = normalizeAllergyPreference(label);
+        if (['diabetes', 'hypertension', 'pregnancy'].includes(normalized)) return '';
         const group = ALLERGEN_BY_LABEL.get(normalized);
         return group ? group.terms : [normalized];
     }).filter(Boolean)));

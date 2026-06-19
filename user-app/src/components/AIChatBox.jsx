@@ -59,6 +59,7 @@ const normalizeAllergyLabel = (value) => String(value || '').trim().toLowerCase(
 const resolveAllergyPreferenceLabel = (value) => {
     const normalized = normalizeAllergyLabel(value);
     if (!normalized || NO_ALLERGY_PREFERENCE_VALUES.has(normalized)) return '';
+    if (['diabetes', 'hypertension', 'pregnancy'].includes(normalized)) return '';
     if (ALLERGEN_GROUP_BY_LABEL.has(normalized)) return normalized;
     if (normalized === 'nuts' || normalized === 'nut') return 'tree nuts';
     if (normalized === 'dairy') return 'milk';
@@ -340,6 +341,7 @@ import {
     fetchPricesForProducts,
     normalizeProduct,
     enrichProductPricesWithSupermarkets,
+    findRelatedProducts,
 } from '../utils/productUtils';
 import useAiContextStore from '../stores/aiContextStore';
 import { refreshPageCache } from '../utils/invalidateFreshData';
@@ -1170,6 +1172,20 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
     const isPageVariant = variant === 'page';
     const [composerFocused, setComposerFocused] = useState(false);
     const composerAnchoredToNav = prefersKeyboardResizeViewport();
+
+    useEffect(() => {
+        if (typeof document === 'undefined') return;
+        const root = document.documentElement;
+        if (composerFocused && prefersKeyboardResizeViewport()) {
+            root.classList.add('pricemate-ai-composer-focused');
+        } else {
+            root.classList.remove('pricemate-ai-composer-focused');
+        }
+        return () => {
+            root.classList.remove('pricemate-ai-composer-focused');
+        };
+    }, [composerFocused]);
+
     useComposerKeyboardLift(isPageVariant && isOpen && !composerAnchoredToNav, {
         active: composerFocused,
     });
@@ -1962,7 +1978,34 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
 
         const userAllergyPreferences = getUserAllergyPreferences();
         const userAiProfile = getUserAiProfile();
-        const { conditions, allergenTargets, isMedical } = detectConditions(userMessage, userAllergyPreferences);
+        const { conditions: detectedConditions, allergenTargets: detectedAllergenTargets, isMedical } = detectConditions(userMessage, userAllergyPreferences);
+        
+        // Merge saved health profile and allergy preferences when user checks suitability
+        const conditionsSet = new Set(detectedConditions);
+        const allergenTargetsSet = new Set(detectedAllergenTargets);
+        
+        if (isMedical) {
+            if (userAllergyPreferences.includes('diabetes')) conditionsSet.add('diabetes');
+            if (userAllergyPreferences.includes('hypertension')) conditionsSet.add('hypertension');
+            if (userAllergyPreferences.includes('pregnancy')) conditionsSet.add('pregnancy');
+            if (userAllergyPreferences.includes('gluten')) conditionsSet.add('gluten');
+            if (userAllergyPreferences.includes('lactose')) conditionsSet.add('lactose');
+            
+            const foodAllergies = userAllergyPreferences.filter(
+                (pref) => !['diabetes', 'hypertension', 'pregnancy', 'gluten', 'lactose'].includes(pref)
+            );
+            if (foodAllergies.length > 0) {
+                conditionsSet.add('allergy');
+                const preferenceAllergenTargets = foodAllergies
+                    .map((item) => resolveAllergyPreferenceLabel(item))
+                    .filter(Boolean);
+                preferenceAllergenTargets.forEach((target) => allergenTargetsSet.add(target));
+            }
+        }
+        
+        const conditions = Array.from(conditionsSet);
+        const allergenTargets = Array.from(allergenTargetsSet);
+
         const explicitNutrientOrMedicalConditions = new Set([
             'gluten',
             'lactose',
@@ -2066,8 +2109,20 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
 
             // Catalog-only policy: only answer ingredient/safety questions for products available in PriceMate.
             if (!effectiveCatalog.product) {
+                const relatedProducts = await findRelatedProducts(userMessage, fullProductList, 3);
                 if (user?.$id) {
-                    await addMessage(user.$id, 'assistant', t('ai_catalog_only_refusal'), user);
+                    let reply = t('ai_catalog_only_refusal');
+                    if (relatedProducts.length > 0) {
+                        const lines = relatedProducts.map(p => `- ${p.name} [BARCODE:${p.barcode}]`);
+                        reply = [
+                            t('ai_catalog_only_refusal_help', "That product isn’t available in PriceMate yet. Here are some alternatives in the same category:") ||
+                                "That product isn’t available in PriceMate yet. Here are some alternatives in the same category:",
+                            ...lines,
+                            t('ai_catalog_only_refusal_hint', "If you share a barcode, I can check the exact item.") ||
+                                "If you share a barcode, I can check the exact item."
+                        ].join('\n');
+                    }
+                    await addMessage(user.$id, 'assistant', reply, user);
                 }
                 setIsLoading(false);
                 return;
@@ -2256,19 +2311,23 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
 
         const shouldBypassCatalogGate = mentionsNearestStore && !hasExplicitProductHintNow;
 
+        let relatedProducts = [];
         if (isProductSpecific && !effectiveCatalog?.product) {
-            if (user?.$id) {
-                const bestGuess = localProductMatch?.product || mergedProductProfile || null;
-                const reply =
-                    buildCategoryAlternativesReply(bestGuess, fullProductList, t) ||
-                    t('ai_catalog_only_refusal');
-                if (!shouldBypassCatalogGate) {
-                    await addMessage(user.$id, 'assistant', reply, user);
+            relatedProducts = await findRelatedProducts(userMessage, fullProductList, 3);
+            if (relatedProducts.length === 0) {
+                if (user?.$id) {
+                    const bestGuess = localProductMatch?.product || mergedProductProfile || null;
+                    const reply =
+                        buildCategoryAlternativesReply(bestGuess, fullProductList, t) ||
+                        t('ai_catalog_only_refusal');
+                    if (!shouldBypassCatalogGate) {
+                        await addMessage(user.$id, 'assistant', reply, user);
+                    }
                 }
-            }
-            if (!shouldBypassCatalogGate) {
-                setIsLoading(false);
-                return;
+                if (!shouldBypassCatalogGate) {
+                    setIsLoading(false);
+                    return;
+                }
             }
         }
 
@@ -2308,8 +2367,19 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 }
             }
 
+            let enrichedFullProductList = [...fullProductList];
+            if (relatedProducts && relatedProducts.length > 0) {
+                const existingIds = new Set(fullProductList.map(p => p.$id || p.barcode).filter(Boolean));
+                for (const p of relatedProducts) {
+                    const pid = p.$id || p.barcode;
+                    if (pid && !existingIds.has(pid)) {
+                        enrichedFullProductList.push(p);
+                    }
+                }
+            }
+
             const promptContext = buildRankedProductContextLines(
-                fullProductList,
+                enrichedFullProductList,
                 userMessage,
                 userAiProfile,
                 resolvedCatalogProductForPrompt,
@@ -2326,6 +2396,21 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 : userAiProfile.responseStyle === 'concise'
                     ? 45
                     : 60;
+
+            let missingProductInstructions = '';
+            if (isProductSpecific && !effectiveCatalog?.product && relatedProducts.length > 0) {
+                const requestedName = effectiveDisplayName || 'the requested product';
+                missingProductInstructions = `
+
+                PRODUCT NOT FOUND IN CATALOG:
+                - The user asked about "${requestedName}", which is NOT in our PriceMate catalog/database.
+                - Acknowledge that we do not have "${requestedName}" in the catalog.
+                - Do NOT invent or guess prices or store availability for "${requestedName}".
+                - Suggest the following similar/related products instead, mentioning their names, cheapest prices, and supermarkets:
+                ${relatedProducts.map(p => `- ${p.name} [BARCODE:${p.barcode}] (Cheapest price: ${p.cheapestPrice ? p.cheapestPrice + ' ' + currency : 'N/A'})`).join('\n')}
+                - Keep your tone conversational, warm, and helpful. Suggest these alternatives naturally. Do not sound robotic.
+                `;
+            }
 
             const prompt = `
                 You are the official PriceMate assistant. Your primary goal is to help users find products and compare prices.
@@ -2346,6 +2431,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 
                 WEBSITE PRODUCT DATA (sample; catalog has many more items):
                 ${promptContext}
+                ${missingProductInstructions}
 
                 NEARBY STORES (PriceMate supermarkets; sorted by distance when user location is available):
                 User location for distance sorting: ${storeLocationStatus}
