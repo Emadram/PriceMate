@@ -7,6 +7,7 @@ import {
     getExplicitProductTokens,
     hasBarcodeInMessage,
     isPriceOrCompareIntent,
+    scoreProductNameMatch,
 } from './productNameMatch';
 export {
     getStoreAvailability,
@@ -1027,13 +1028,20 @@ const resolveCatalogProductForIngredientsUncached = async (userMessage) => {
                 Query.limit(CATALOG_SCAN_PAGE_SIZE),
                 Query.offset(offset),
                 Query.orderDesc('$createdAt'),
+                Query.select(['$id', 'name', 'barcode', 'brand']),
             ]);
             const docs = res.documents || [];
             if (!docs.length) break;
 
             const fuzzyHit = pickBestFromDocuments(docs);
             if (fuzzyHit?.product) {
-                return fuzzyHit;
+                try {
+                    const fullDoc = await db.products.get(fuzzyHit.product.$id);
+                    return catalogResolveResult(fullDoc, fuzzyHit.catalogName);
+                } catch (e) {
+                    console.warn('Failed to fetch full product details after fuzzy scan hit:', e);
+                    return fuzzyHit;
+                }
             }
 
             let best = null;
@@ -1048,7 +1056,13 @@ const resolveCatalogProductForIngredientsUncached = async (userMessage) => {
                 }
             }
             if (best) {
-                return catalogResolveResult(best);
+                try {
+                    const fullDoc = await db.products.get(best.$id);
+                    return catalogResolveResult(fullDoc);
+                } catch (e) {
+                    console.warn('Failed to fetch full product details after best scan hit:', e);
+                    return catalogResolveResult(best);
+                }
             }
 
             if (docs.length < CATALOG_SCAN_PAGE_SIZE) break;
@@ -1956,7 +1970,22 @@ export const fetchPricesBySupermarket = async (supermarketId) => {
             Query.equal('supermarkets', supermarketId),
             Query.limit(100),
             Query.orderDesc('$createdAt'),
-            Query.select(['*', 'products.*', 'supermarkets.*', 'products.categoryId.*'])
+            Query.select([
+                '$id',
+                'price',
+                'currency',
+                '$createdAt',
+                '$updatedAt',
+                'products.$id',
+                'products.name',
+                'products.barcode',
+                'products.imageUrl',
+                'products.brand',
+                'products.categoryId.*',
+                'supermarkets.$id',
+                'supermarkets.name',
+                'supermarkets.branchName'
+            ])
         ]);
 
         const prices = pricesResponse.documents;
@@ -2228,3 +2257,102 @@ export function invalidateCatalogReferenceCaches() {
     logReadDebug('invalidate-catalog', { cleared: total });
     return total;
 }
+
+/**
+ * Find similar or related products in the catalog if a product is missing.
+ * Runs keyword searches on the local memory slice and/or database, and returns normalized, enriched products.
+ */
+export const findRelatedProducts = async (userMessage, fullProductList = [], limit = 3) => {
+    const searchTerms = buildCatalogSearchTerms(userMessage).filter(
+        (term) => term.length >= 2 && !CATALOG_RESOLVE_STOPWORDS.has(term)
+    );
+
+    const candidateMap = new Map();
+
+    // 1. Check local fullProductList (the 50-item sample) for fuzzy matching
+    if (Array.isArray(fullProductList)) {
+        for (const p of fullProductList) {
+            if (!p) continue;
+            const displayName = p.name || p.productName || '';
+            const score = scoreProductNameMatch(userMessage, displayName);
+            if (score >= 0.25) {
+                candidateMap.set(p.$id || p.code || p.id, { product: p, score });
+            }
+        }
+    }
+
+    // 2. Search database by keywords if available and we haven't reached the limit yet
+    if (candidateMap.size < limit) {
+        for (const term of searchTerms.slice(0, 3)) {
+            if (candidateMap.size >= limit) break;
+            try {
+                const res = await db.products.list([
+                    Query.contains('name', term.toLowerCase()),
+                    Query.limit(6),
+                ]);
+                for (const doc of res?.documents || []) {
+                    if (!doc?.$id || candidateMap.has(doc.$id)) continue;
+                    const score = scoreProductNameMatch(userMessage, doc.name || '');
+                    if (score >= 0.25) {
+                        candidateMap.set(doc.$id, { product: doc, score });
+                    }
+                }
+            } catch (e) {
+                console.warn('Related product search by term failed:', term, e?.message);
+            }
+        }
+    }
+
+    // 3. Fallback/Expansion: Try matching by category of the best-scoring candidate
+    if (candidateMap.size < limit) {
+        let bestDoc = null;
+        let bestScore = 0;
+        for (const item of candidateMap.values()) {
+            if (item.score > bestScore) {
+                bestScore = item.score;
+                bestDoc = item.product;
+            }
+        }
+
+        const categoryId = bestDoc?.categoryId?.$id || bestDoc?.categoryId;
+        if (categoryId) {
+            try {
+                const categoryDocs = await fetchSimilarProductsByCategory(categoryId, bestDoc?.$id, limit * 2);
+                for (const doc of categoryDocs) {
+                    if (!doc?.$id || candidateMap.has(doc.$id)) continue;
+                    candidateMap.set(doc.$id, { product: doc, score: 0.2 });
+                }
+            } catch (e) {
+                console.warn('Related product category expansion failed:', e?.message);
+            }
+        }
+    }
+
+    // Sort sorted candidates by score descending
+    const sortedCandidates = [...candidateMap.values()]
+        .sort((a, b) => b.score - a.score)
+        .map(item => item.product);
+
+    // Normalize and enrich candidate products with price information
+    const result = [];
+    const slice = sortedCandidates.slice(0, limit);
+    if (slice.length > 0) {
+        try {
+            const ids = slice.map(p => p.$id || p.code || p.id).filter(Boolean);
+            const prices = await fetchPricesForProducts(ids);
+            for (const p of slice) {
+                const normalized = normalizeProduct(p, prices);
+                if (normalized) {
+                    result.push(normalized);
+                }
+            }
+        } catch (e) {
+            console.warn('Failed to enrich prices for related products:', e?.message);
+            for (const p of slice) {
+                result.push(normalizeProduct(p, []));
+            }
+        }
+    }
+
+    return result;
+};

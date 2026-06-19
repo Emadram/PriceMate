@@ -25,9 +25,24 @@ const useFavoritesStore = create(
 
                 set({ loading: true });
                 try {
-                    const response = await db.favorites.list(
-                        [Query.equal('userId', user.$id)]
-                    );
+                    const FAV_PAGE = 100;
+                    const allDocs = [];
+                    let lastId;
+                    for (;;) {
+                        const queries = [
+                            Query.equal('userId', user.$id),
+                            Query.limit(FAV_PAGE),
+                            Query.select(['$id', 'productId', 'supermarketId']),
+                            Query.orderAsc('$id'),
+                        ];
+                        if (lastId) queries.push(Query.cursorAfter(lastId));
+                        const page = await db.favorites.list(queries);
+                        if (page.documents.length === 0) break;
+                        allDocs.push(...page.documents);
+                        if (page.documents.length < FAV_PAGE) break;
+                        lastId = page.documents[page.documents.length - 1].$id;
+                    }
+                    const response = { documents: allDocs };
 
                     const products = response.documents
                         .filter(doc => doc.productId && doc.productId !== '')
@@ -69,7 +84,9 @@ const useFavoritesStore = create(
                         const response = await db.favorites.list(
                             [
                                 Query.equal('userId', user.$id),
-                                Query.equal('productId', productId)
+                                Query.equal('productId', productId),
+                                Query.limit(5),
+                                Query.select(['$id'])
                             ]
                         );
 
@@ -112,7 +129,9 @@ const useFavoritesStore = create(
                         const response = await db.favorites.list(
                             [
                                 Query.equal('userId', user.$id),
-                                Query.equal('supermarketId', supermarketId)
+                                Query.equal('supermarketId', supermarketId),
+                                Query.limit(5),
+                                Query.select(['$id'])
                             ]
                         );
 

@@ -4,7 +4,14 @@ const listMock = vi.fn();
 
 vi.mock('../lib/appwrite', () => ({
     db: {
-        products: { list: (...args) => listMock(...args) },
+        products: {
+            list: (...args) => listMock(...args),
+            get: vi.fn((id) => {
+                if (id === 'c1') return Promise.resolve({ $id: 'c1', name: 'Cocacola', barcode: '5449000000996' });
+                if (id === 'm1') return Promise.resolve({ $id: 'm1', name: 'Whole Milk', barcode: '111' });
+                return Promise.resolve({ $id: id });
+            }),
+        },
         prices: { list: vi.fn() },
         supermarkets: { list: vi.fn(), get: vi.fn() },
         priceHistory: { list: vi.fn() },

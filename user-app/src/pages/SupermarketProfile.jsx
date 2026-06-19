@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
-    ShoppingBag, Package, MapPin, Phone, Mail, 
-    MessageSquare, Star, Globe, 
-    Clock, Home, AlertTriangle, TrendingDown,
-    ChevronRight, ExternalLink, Share2, Info, ChevronDown
-} from 'lucide-react';
+    LuShoppingBag as ShoppingBag, LuPackage as Package, LuMapPin as MapPin, LuPhone as Phone, LuMail as Mail, 
+    LuMessageSquare as MessageSquare, LuStar as Star, LuGlobe as Globe, 
+    LuClock as Clock, LuTriangleAlert as AlertTriangle, LuTrendingDown as TrendingDown,
+    LuChevronRight as ChevronRight, LuExternalLink as ExternalLink, LuShare2 as Share2, LuInfo as Info, LuChevronDown as ChevronDown
+} from 'react-icons/lu';
 import { useTranslation } from 'react-i18next';
 import { 
     fetchSupermarketProfileBundle,

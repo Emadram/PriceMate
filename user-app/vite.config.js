@@ -48,17 +48,19 @@ export default defineConfig({
     }),
   ],
   build: {
+    target: 'esnext',
+    chunkSizeWarningLimit: 800,
     rollupOptions: {
       output: {
         manualChunks: {
           'vendor-react': ['react', 'react-dom', 'react-router-dom'],
           'vendor-appwrite': ['appwrite'],
-          'vendor-icons': ['react-icons', 'lucide-react'],
+          'vendor-icons': ['react-icons'],
           'vendor-i18n': ['i18next', 'react-i18next', 'i18next-browser-languagedetector'],
           'vendor-charts': ['recharts'],
           'vendor-map': ['ol'],
           'vendor-scanner': ['@zxing/browser', '@zxing/library'],
-          'vendor-ai': ['openai', '@google/generative-ai'],
+          'vendor-ai': ['openai'],
         },
       },
     },

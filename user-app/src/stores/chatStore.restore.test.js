@@ -37,6 +37,7 @@ vi.mock('../lib/appwrite', () => ({
         orderAsc: vi.fn((field) => ({ field, op: 'orderAsc' })),
         limit: vi.fn((n) => ({ op: 'limit', n })),
         cursorAfter: vi.fn((id) => ({ op: 'cursorAfter', id })),
+        select: vi.fn((fields) => ({ op: 'select', fields })),
     },
     ID: {
         unique: vi.fn(() => 'new-conversation-id'),

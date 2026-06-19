@@ -81,7 +81,7 @@ const buildSummariesFromDocuments = (documents) => {
     return summaries;
 };
 
-const listAllThreadDocuments = async (userId, conversationId) => {
+const listAllThreadDocuments = async (userId, conversationId, { select } = {}) => {
     const baseQueries =
         conversationId === LEGACY_CONVERSATION_ID
             ? [
@@ -96,6 +96,7 @@ const listAllThreadDocuments = async (userId, conversationId) => {
                   Query.orderAsc('$id'),
                   Query.limit(100),
               ];
+    if (select) baseQueries.push(Query.select(select));
 
     const all = [];
     let lastId = undefined;
@@ -288,10 +289,12 @@ const useChatStore = create((set, get) => ({
 
         set({ summariesLoading: true, error: null });
         try {
+            const SUMMARY_SELECT = ['$id', 'userId', 'role', 'conversationId', 'timestamp', '$createdAt'];
             const baseQueries = [
                 Query.equal('userId', userId),
                 Query.orderAsc('$id'),
                 Query.limit(100),
+                Query.select(SUMMARY_SELECT),
             ];
             const allDocs = [];
             let lastId;
@@ -505,7 +508,7 @@ const useChatStore = create((set, get) => ({
         if (!userId || !conversationId) return;
 
         try {
-            const docs = await listAllThreadDocuments(userId, conversationId);
+            const docs = await listAllThreadDocuments(userId, conversationId, { select: ['$id'] });
             await Promise.all(docs.map((d) => db.chatHistory.delete(d.$id)));
             await deleteMemoryDocuments(userId, conversationId);
 
