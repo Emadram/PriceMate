@@ -83,15 +83,18 @@ const useProductsStore = create((set, get) => ({
     total: 0,
     page: 1,
     limit: 10,
+    lastFetchedPage: null,
+    lastFetchedLimit: null,
 
     setPage: (page) => set({ page }),
     setLimit: (limit) => set({ limit: Math.max(1, Number(limit) || 10), page: 1 }),
 
     fetchProducts: async (page = 1, { force = false } = {}) => {
-        const { limit, page: currentPage, products, loading } = get();
+        const { limit, lastFetchedPage, lastFetchedLimit, products, loading } = get();
         if (
             !force &&
-            page === currentPage &&
+            page === lastFetchedPage &&
+            limit === lastFetchedLimit &&
             products.length > 0 &&
             !loading
         ) {
@@ -111,6 +114,8 @@ const useProductsStore = create((set, get) => ({
                 products: response.documents,
                 total: response.total,
                 page,
+                lastFetchedPage: page,
+                lastFetchedLimit: limit,
                 loading: false,
             });
         } catch (error) {
@@ -220,7 +225,7 @@ const useProductsStore = create((set, get) => ({
 
             const result = await db.products.create(payload);
             console.log('Product created successfully:', result);
-            await useProductsStore.getState().fetchProducts();
+            await useProductsStore.getState().fetchProducts(1, { force: true });
             get().invalidateProductOptions();
             set({ loading: false });
             return true;
@@ -250,7 +255,7 @@ const useProductsStore = create((set, get) => ({
                 return true;
             }
             await db.products.update(id, payload);
-            await useProductsStore.getState().fetchProducts();
+            await useProductsStore.getState().fetchProducts(get().page, { force: true });
             get().invalidateProductOptions();
             set({ loading: false });
             return true;
@@ -306,7 +311,7 @@ const useProductsStore = create((set, get) => ({
 
             const result = await db.products.update(id, payload);
             console.log('Product updated successfully:', result);
-            await useProductsStore.getState().fetchProducts();
+            await useProductsStore.getState().fetchProducts(get().page, { force: true });
             get().invalidateProductOptions();
             set({ loading: false });
             return true;
@@ -326,7 +331,7 @@ const useProductsStore = create((set, get) => ({
         set({ loading: true, error: null });
         try {
             await db.products.delete(id);
-            await useProductsStore.getState().fetchProducts();
+            await useProductsStore.getState().fetchProducts(get().page, { force: true });
             get().invalidateProductOptions();
             set({ loading: false });
             return true;

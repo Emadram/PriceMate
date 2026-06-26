@@ -74,7 +74,6 @@ const Products = () => {
     const [filterCategory, setFilterCategory] = useState('');
     const [sortConfig, setSortConfig] = useState({ key: null, direction: 'ascending' });
     const [lastUpdated, setLastUpdated] = useState(null);
-    const [jumpPage, setJumpPage] = useState('');
     const isFresh = useFreshIndicator(lastUpdated);
     const resetOffLookup = () => setOffLookup({ loading: false, error: '', results: [] });
 
@@ -356,16 +355,12 @@ const Products = () => {
 
     useEffect(() => {
         fetchProducts(page);
-    }, [page, fetchProducts]);
+    }, [page, limit, fetchProducts]);
 
     const refreshProductsOnly = useCallback(async () => {
         await fetchProducts(page, { force: true });
         setLastUpdated(new Date().toISOString());
     }, [fetchProducts, page]);
-
-    useEffect(() => {
-        setJumpPage(String(page));
-    }, [page]);
 
     // `isFresh` indicator handled by useFreshIndicator to avoid rapid flicker
 
@@ -396,13 +391,6 @@ const Products = () => {
     };
 
     const totalPages = Math.max(1, Math.ceil(total / limit));
-
-    const handleJumpSubmit = (event) => {
-        event.preventDefault();
-        const next = Number(String(jumpPage || '').trim());
-        if (!Number.isFinite(next)) return;
-        handlePageChange(Math.max(1, Math.min(totalPages, Math.floor(next))));
-    };
 
     const handleLimitChange = (event) => {
         const next = Number(event.target.value);
@@ -729,28 +717,6 @@ const Products = () => {
                                 Page {page} of {totalPages} ({total} total)
                             </span>
                             <div className="flex items-center gap-2">
-                                <form onSubmit={handleJumpSubmit} className="hidden sm:flex items-center gap-2 mr-2">
-                                    <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">
-                                        Go to
-                                    </span>
-                                    <input
-                                        value={jumpPage}
-                                        onChange={(e) => setJumpPage(e.target.value)}
-                                        inputMode="numeric"
-                                        pattern="\\d*"
-                                        className="w-16 px-3 py-2 rounded-xl text-[12px] font-black text-gray-900 dark:text-white bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 focus:ring-2 focus:ring-brand-500/20 outline-none"
-                                        aria-label="Go to page"
-                                    />
-                                    <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">
-                                        / {totalPages}
-                                    </span>
-                                    <button
-                                        type="submit"
-                                        className="px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-white dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-brand-600 hover:text-white shadow-sm border border-gray-100 dark:border-gray-700"
-                                    >
-                                        Go
-                                    </button>
-                                </form>
                                 <button
                                     onClick={() => handlePageChange(page - 1)}
                                     disabled={page === 1}

@@ -1868,7 +1868,7 @@ export const fetchPricesForProducts = async (productIds) => {
             try {
                 const response = await db.prices.list([
                     Query.equal(field, ids),
-                    Query.limit(100),
+                    Query.limit(500),
                     Query.select(select)
                 ]);
                 priceFieldSupport[field] = true;
