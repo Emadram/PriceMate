@@ -113,7 +113,7 @@ const Announcements = () => {
             <Sidebar />
 
             <div className="flex-1">
-                <header className="bg-white dark:bg-gray-800 shadow sticky top-0 z-10">
+                <header className="bg-white dark:bg-gray-800 shadow sticky top-0 z-30">
                     <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
                         <div className="flex items-center gap-4">
                             <h1 className="text-2xl font-bold text-gray-800 dark:text-white uppercase tracking-tight">Announcements</h1>

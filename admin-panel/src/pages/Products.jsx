@@ -556,7 +556,7 @@ const Products = () => {
             <Sidebar />
 
             <div className="flex-1 flex flex-col h-screen overflow-y-auto custom-scrollbar">
-                <header className="bg-white dark:bg-gray-800 shadow sticky top-0 z-10 p-6 flex justify-between items-center bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border-b border-gray-100 dark:border-gray-700">
+                <header className="bg-white dark:bg-gray-800 shadow sticky top-0 z-30 p-6 flex justify-between items-center bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border-b border-gray-100 dark:border-gray-700">
                     <div className="flex items-center gap-6 flex-1">
                         <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight uppercase">Products</h1>
                         <span className="hidden sm:inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-green-600 bg-green-50 px-2.5 py-1 rounded-full">
