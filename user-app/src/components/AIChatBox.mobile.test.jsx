@@ -70,6 +70,10 @@ vi.mock('../stores/currencyStore', () => ({
 }));
 
 const authState = vi.hoisted(() => ({ user: null }));
+const chatState = vi.hoisted(() => ({
+    messages: [],
+    activeConversationId: null,
+}));
 
 vi.mock('../stores/authStore', () => ({
     default: (selector) => {
@@ -111,9 +115,9 @@ vi.mock('../stores/supermarketsStore', () => ({
 
 vi.mock('../stores/chatStore', () => ({
     default: () => ({
-        messages: [],
+        messages: chatState.messages,
         conversationSummaries: [],
-        activeConversationId: null,
+        activeConversationId: chatState.activeConversationId,
         error: null,
         addMessage: vi.fn(),
         loading: false,
@@ -724,5 +728,42 @@ describe('AIChatBox — page variant immersive header', () => {
         expect(submit).not.toBeNull();
         expect(submit.disabled).toBe(true);
         authState.user = null;
+    });
+
+    it('automatically renders product suggestions card when suggestions payload is in chat history', () => {
+        authState.user = { $id: 'user-1', name: 'Test User' };
+        chatState.activeConversationId = 'conv-1';
+        
+        const payload = {
+            type: 'product_suggestions',
+            intent: 'ingredients',
+            text: 'Which product do you want to check the ingredients for?',
+            products: [
+                { id: '1', barcode: '111', name: 'Apple Juice', imageUrl: '' },
+                { id: '2', barcode: '222', name: 'Orange Juice', imageUrl: '' }
+            ]
+        };
+        
+        chatState.messages = [
+            {
+                $id: 'msg-1',
+                role: 'assistant',
+                content: `PRICEMATE_PRODUCT_SUGGESTIONS::${JSON.stringify(payload)}`,
+                timestamp: new Date().toISOString()
+            }
+        ];
+
+        const { getByText } = render(
+            <AIChatBox isOpen={true} onClose={() => {}} variant="page" />
+        );
+
+        expect(getByText('Which product do you want to check the ingredients for?')).toBeTruthy();
+        expect(getByText('Apple Juice')).toBeTruthy();
+        expect(getByText('Orange Juice')).toBeTruthy();
+
+        // Reset state
+        authState.user = null;
+        chatState.activeConversationId = null;
+        chatState.messages = [];
     });
 });

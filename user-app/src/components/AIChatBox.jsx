@@ -74,6 +74,85 @@ const getAllergenTermsForLabels = (labels = []) => {
     });
     return Array.from(new Set(terms.filter(Boolean)));
 };
+
+const getQuickActionIntent = (message) => {
+    const lowered = String(message || '').toLowerCase();
+    
+    if (lowered.includes('closest and cheapest') || 
+        lowered.includes('closest supermarket with the cheapest price') ||
+        (lowered.includes('cheapest') && (lowered.includes('closest') || lowered.includes('nearest')))) {
+        return 'closest_cheapest';
+    }
+    if (lowered.includes('check ingredients for') || 
+        lowered.includes('check the ingredients for a product') ||
+        (lowered.includes('ingredients') && lowered.includes('check'))) {
+        return 'ingredients';
+    }
+    if (lowered.includes('is this suitable for me') || 
+        lowered.includes('check if a product is suitable for me') ||
+        lowered.includes('suitable for me')) {
+        return 'suitable';
+    }
+    if (lowered.includes('compare prices for') || 
+        lowered.includes('compare prices for a product') ||
+        (lowered.includes('compare') && lowered.includes('prices'))) {
+        return 'compare';
+    }
+    
+    return null;
+};
+
+const getSuggestionText = (intent, lang) => {
+    const isTr = lang === 'tr';
+    if (intent === 'closest_cheapest') {
+        return isTr
+            ? 'En yakın ve en ucuz fiyatı bulmak için hangi ürünü arıyorsunuz? Kataloğumuzdaki bu popüler ürünlerden birini seçebilirsiniz:'
+            : 'Which product do you want to find the closest and cheapest store for? You can choose one of these popular products from our catalog:';
+    }
+    if (intent === 'ingredients') {
+        return isTr
+            ? 'İçindekileri kontrol etmek için hangi ürünü arıyorsunuz? Kataloğumuzdaki bu popüler ürünlerden birini seçebilirsiniz:'
+            : 'Which product do you want to check the ingredients for? You can choose one of these popular products from our catalog:';
+    }
+    if (intent === 'suitable') {
+        return isTr
+            ? 'Sizin için uygun olup olmadığını kontrol etmek için hangi ürünü arıyorsunuz? Kataloğumuzdaki bu popüler ürünlerden birini seçebilirsiniz:'
+            : 'Which product do you want to check if it is suitable for you? You can choose one of these popular products from our catalog:';
+    }
+    if (intent === 'compare') {
+        return isTr
+            ? 'Fiyatlarını karşılaştırmak için hangi ürünü arıyorsunuz? Kataloğumuzdaki bu popüler ürünlerden birini seçebilirsiniz:'
+            : 'Which product do you want to compare prices for? You can choose one of these popular products from our catalog:';
+    }
+    return isTr
+        ? 'Hangi ürünü kontrol etmek istiyorsunuz? Kataloğumuzdaki bu popüler ürünlerden birini seçebilirsiniz:'
+        : 'Which product would you like to check? You can choose one of these popular products from our catalog:';
+};
+
+const parseProductSuggestions = (value) => {
+    const text = String(value || '');
+    if (!text.startsWith('PRICEMATE_PRODUCT_SUGGESTIONS::')) return null;
+    try {
+        const parsed = JSON.parse(text.slice('PRICEMATE_PRODUCT_SUGGESTIONS::'.length));
+        return parsed && typeof parsed === 'object' && parsed.type === 'product_suggestions' ? parsed : null;
+    } catch {
+        return null;
+    }
+};
+
+const getSuggestions = async (fullProductList) => {
+    let list = (fullProductList || []).filter(p => p && (p.name || p.productName));
+    if (list.length === 0) {
+        try {
+            const rawProducts = await fetchProducts(6);
+            list = rawProducts.filter(p => p && (p.name || p.productName));
+        } catch (e) {
+            console.error('Failed to fetch fallback products for suggestions:', e);
+        }
+    }
+    return list.slice(0, 4);
+};
+
 // Simple in-memory intent cache with optional persistence to avoid repeating identical assistant calls
 const DEFAULT_INTENT_CACHE_TTL_MS = 1000 * 60 * 60; // 1 hour
 const INTENT_CACHE_FORMAT_VERSION = 'v5';
@@ -342,6 +421,7 @@ import {
     normalizeProduct,
     enrichProductPricesWithSupermarkets,
     findRelatedProducts,
+    fetchProducts,
 } from '../utils/productUtils';
 import useAiContextStore from '../stores/aiContextStore';
 import { refreshPageCache } from '../utils/invalidateFreshData';
@@ -352,6 +432,7 @@ import {
     hasBarcodeInMessage,
     isPriceOrCompareIntent,
     messageExplicitlyNamesProduct,
+    getExplicitProductTokens,
 } from '../utils/productNameMatch';
 import useUserLocation from '../hooks/useUserLocation';
 import useComposerKeyboardLift from '../hooks/useComposerKeyboardLift';
@@ -668,7 +749,56 @@ const ChatProductThumb = ({ src, alt, className = 'w-full h-full' }) => {
     );
 };
 
-const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [], allSupermarkets = [], t }) => {
+const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [], allSupermarkets = [], t, onSelectProduct }) => {
+    const renderProductSuggestionsCard = (suggestions) => {
+        const { intent, text, products = [] } = suggestions;
+        
+        let ActionIcon = FiSearch;
+        let actionLabel = t('select', 'Select');
+        
+        if (intent === 'closest_cheapest') {
+            ActionIcon = FiMapPin;
+            actionLabel = t('find_cheapest', 'Find Cheapest');
+        } else if (intent === 'ingredients') {
+            ActionIcon = FiClipboard;
+            actionLabel = t('check_ingredients', 'Check');
+        } else if (intent === 'suitable') {
+            ActionIcon = FiCheckCircle;
+            actionLabel = t('check_suitability', 'Check Safety');
+        } else if (intent === 'compare') {
+            ActionIcon = FiSearch;
+            actionLabel = t('compare_prices', 'Compare');
+        }
+
+        return (
+            <div className="my-2 p-4 rounded-2xl border border-brand-100 dark:border-brand-800/40 bg-gradient-to-br from-white to-brand-50/20 dark:from-gray-800 dark:to-brand-900/10 shadow-soft">
+                <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3.5 leading-relaxed">
+                    {text}
+                </p>
+                <div className="grid grid-cols-2 gap-2.5">
+                    {products.map((p) => (
+                        <button
+                            key={p.id}
+                            onClick={() => onSelectProduct && onSelectProduct(p, intent)}
+                            className="flex flex-col items-center text-center p-3 rounded-xl border border-gray-100 dark:border-gray-700/60 bg-white/80 dark:bg-gray-900/30 hover:border-brand-300 dark:hover:border-brand-750 hover:bg-brand-50/30 dark:hover:bg-brand-950/20 hover:scale-[1.02] active:scale-[0.98] transition-all duration-250 group w-full shadow-sm cursor-pointer"
+                        >
+                            <div className="w-14 h-14 bg-white dark:bg-gray-800 rounded-lg flex items-center justify-center overflow-hidden border border-gray-100 dark:border-gray-900/50 shrink-0 mb-2 group-hover:shadow-sm transition-shadow">
+                                <ChatProductThumb src={p.imageUrl} alt={p.name} />
+                            </div>
+                            <span className="text-xs font-bold text-gray-800 dark:text-gray-100 line-clamp-2 min-h-[2rem] leading-tight mb-2 w-full text-center">
+                                {p.name}
+                            </span>
+                            <div className="mt-auto w-full flex items-center justify-center gap-1 py-1 px-2.5 rounded-lg bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 text-[10px] font-black uppercase tracking-wider group-hover:bg-brand-600 group-hover:text-white transition-colors duration-200">
+                                <ActionIcon size={12} className="shrink-0" />
+                                <span>{actionLabel}</span>
+                            </div>
+                        </button>
+                    ))}
+                </div>
+            </div>
+        );
+    };
+
     const extractBarcodeFromText = (value) => {
         const match = String(value || '').match(/\[BARCODE:([\w\d-]+)\]/i);
         return match ? match[1] : '';
@@ -936,6 +1066,11 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [], allSup
     };
 
     const renderContent = (content) => {
+        const suggestions = msg.role === 'assistant' ? parseProductSuggestions(content) : null;
+        if (suggestions) {
+            return renderProductSuggestionsCard(suggestions);
+        }
+
         const structuredAiCheck = msg.role === 'assistant' ? parseAiCheckResponse(content) : null;
         if (structuredAiCheck) {
             return renderStructuredAiCheck(structuredAiCheck);
@@ -1897,17 +2032,49 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         return { status, reasons, triggers };
     };
 
-    const handleSend = async (e) => {
-        e.preventDefault();
-        if (!input.trim() || isLoading) return;
+    const handleSelectProduct = (product, intent) => {
+        if (!product) return;
+
+        let textToSend = '';
+        let quickPromptKey = '';
+
+        if (intent === 'closest_cheapest') {
+            textToSend = `${t('ai_chat_input_cheapest', 'Find the closest and cheapest ')}${product.name} [BARCODE:${product.barcode}]`;
+            quickPromptKey = 'cheapest';
+        } else if (intent === 'ingredients') {
+            textToSend = `${t('ai_chat_input_ingredients', 'Check ingredients for ')}${product.name} [BARCODE:${product.barcode}]`;
+            quickPromptKey = 'ingredients';
+        } else if (intent === 'suitable') {
+            textToSend = `${t('ai_chat_input_suitable', 'Is this suitable for me? ')}${product.name} [BARCODE:${product.barcode}]`;
+            quickPromptKey = 'suitable';
+        } else if (intent === 'compare') {
+            textToSend = `${t('ai_chat_input_compare', 'Compare prices for ')}${product.name} [BARCODE:${product.barcode}]`;
+            quickPromptKey = 'compare';
+        }
+
+        if (textToSend) {
+            const matchedPrompt = mobileQuickPrompts.find(p => p.key === quickPromptKey);
+            if (matchedPrompt) {
+                activeQuickPromptRef.current = matchedPrompt;
+            }
+            handleSend(null, textToSend);
+        }
+    };
+
+    const handleSend = async (e, overrideMessage = null) => {
+        if (e && typeof e.preventDefault === 'function') e.preventDefault();
+        const messageVal = overrideMessage !== null ? overrideMessage : input;
+        if (!messageVal.trim() || isLoading) return;
         if (!user?.$id) return;
 
         if (!activeConversationId) {
             beginNewConversation();
         }
 
-        let userMessage = input.trim();
-        setInput('');
+        let userMessage = messageVal.trim();
+        if (overrideMessage === null) {
+            setInput('');
+        }
 
         // If the message originated from a quick-action card, resolve the
         // final message using the full prompt + any product name the user typed.
@@ -1996,6 +2163,42 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         } else {
             // Logged out users don't have persistence
             return;
+        }
+
+        // Auto suggestion when no product name is specified but a query matches a quick action or intent
+        const isQuickPromptWithoutProduct = pendingQuickPrompt && (
+            userMessage === pendingQuickPrompt.inputTemplate.trim() || 
+            userMessage === pendingQuickPrompt.prompt.trim()
+        );
+        const hasProductIdentifier = hasBarcodeInMessage(userMessage) || getExplicitProductTokens(userMessage).length > 0;
+
+        if (isQuickPromptWithoutProduct || !hasProductIdentifier) {
+            const intent = getQuickActionIntent(userMessage) || 
+                (isPriceOrCompareIntent(userMessage) ? 'compare' : 
+                 (looksLikeIngredientFollowUp(userMessage) ? 'ingredients' : null));
+
+            if (intent) {
+                setIsLoading(true);
+                const suggestedProducts = await getSuggestions(fullProductList);
+                if (user?.$id) {
+                    const text = getSuggestionText(intent, i18n.resolvedLanguage || i18n.language || 'en');
+                    const payload = {
+                        type: 'product_suggestions',
+                        intent: intent,
+                        text: text,
+                        products: suggestedProducts.map(p => ({
+                            id: p.$id || p.barcode,
+                            barcode: p.barcode,
+                            name: p.name || p.productName,
+                            imageUrl: p.imageUrl
+                        }))
+                    };
+                    const serialized = `PRICEMATE_PRODUCT_SUGGESTIONS::${JSON.stringify(payload)}`;
+                    await addMessage(user.$id, 'assistant', serialized, user);
+                }
+                setIsLoading(false);
+                return;
+            }
         }
 
         if (
@@ -2896,6 +3099,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                                         allProducts={fullProductList}
                                         allSupermarkets={supermarketList}
                                         t={t}
+                                        onSelectProduct={handleSelectProduct}
                                     />
                                 ))}
                                 {isLoading && (
