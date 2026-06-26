@@ -739,8 +739,8 @@ describe('AIChatBox — page variant immersive header', () => {
             intent: 'ingredients',
             text: 'Which product do you want to check the ingredients for?',
             products: [
-                { id: '1', barcode: '111', name: 'Apple Juice', imageUrl: '' },
-                { id: '2', barcode: '222', name: 'Orange Juice', imageUrl: '' }
+                { id: '1', barcode: '111', name: 'Apple Juice', imageUrl: '', bestPrice: 12.5, currency: 'TRY' },
+                { id: '2', barcode: '222', name: 'Orange Juice', imageUrl: '', bestPrice: 15.0, currency: 'TRY' }
             ]
         };
         
@@ -760,6 +760,8 @@ describe('AIChatBox — page variant immersive header', () => {
         expect(getByText('Which product do you want to check the ingredients for?')).toBeTruthy();
         expect(getByText('Apple Juice')).toBeTruthy();
         expect(getByText('Orange Juice')).toBeTruthy();
+        expect(getByText(/best: 12.5/i)).toBeTruthy();
+        expect(getByText(/best: 15/i)).toBeTruthy();
 
         // Reset state
         authState.user = null;

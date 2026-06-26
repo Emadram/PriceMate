@@ -785,9 +785,18 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [], allSup
                             <div className="w-14 h-14 bg-white dark:bg-gray-800 rounded-lg flex items-center justify-center overflow-hidden border border-gray-100 dark:border-gray-900/50 shrink-0 mb-2 group-hover:shadow-sm transition-shadow">
                                 <ChatProductThumb src={p.imageUrl} alt={p.name} />
                             </div>
-                            <span className="text-xs font-bold text-gray-800 dark:text-gray-100 line-clamp-2 min-h-[2rem] leading-tight mb-2 w-full text-center">
+                            <span className="text-xs font-bold text-gray-800 dark:text-gray-100 line-clamp-2 min-h-[2rem] leading-tight mb-1 w-full text-center">
                                 {p.name}
                             </span>
+                            {p.bestPrice !== null && p.bestPrice !== undefined ? (
+                                <span className="text-xs font-black text-green-600 dark:text-green-400 mb-2">
+                                    {t('best', 'Best')}: {convert(p.bestPrice, p.currency || 'TRY')} {getCurrencySymbol()}
+                                </span>
+                            ) : (
+                                <span className="text-[10px] text-gray-400 dark:text-gray-500 italic mb-2">
+                                    {t('catalog_no_prices_yet', 'No prices added')}
+                                </span>
+                            )}
                             <div className="mt-auto w-full flex items-center justify-center gap-1 py-1 px-2.5 rounded-lg bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 text-[10px] font-black uppercase tracking-wider group-hover:bg-brand-600 group-hover:text-white transition-colors duration-200">
                                 <ActionIcon size={12} className="shrink-0" />
                                 <span>{actionLabel}</span>
@@ -2186,12 +2195,19 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                         type: 'product_suggestions',
                         intent: intent,
                         text: text,
-                        products: suggestedProducts.map(p => ({
-                            id: p.$id || p.barcode,
-                            barcode: p.barcode,
-                            name: p.name || p.productName,
-                            imageUrl: p.imageUrl
-                        }))
+                        products: suggestedProducts.map(p => {
+                            const sortedPrices = [...(p.prices || [])].sort((a, b) => a.price - b.price);
+                            const bestPrice = sortedPrices.length > 0 ? sortedPrices[0].price : null;
+                            const currency = sortedPrices.length > 0 ? (sortedPrices[0].currency || 'TRY') : 'TRY';
+                            return {
+                                id: p.$id || p.barcode,
+                                barcode: p.barcode,
+                                name: p.name || p.productName,
+                                imageUrl: p.imageUrl,
+                                bestPrice,
+                                currency
+                            };
+                        })
                     };
                     const serialized = `PRICEMATE_PRODUCT_SUGGESTIONS::${JSON.stringify(payload)}`;
                     await addMessage(user.$id, 'assistant', serialized, user);
