@@ -1226,41 +1226,47 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
     const formRef = useRef(null);
     const composerStackRef = useRef(null);
     const composerFocusedRef = useRef(false);
+    const activeQuickPromptRef = useRef(null);
 
     const mobileQuickPrompts = [
         {
             key: 'cheapest',
             Icon: FiMapPin,
-            label: t('ai_chat_quick_cheapest', 'Cheapest nearby'),
-            description: t('ai_chat_quick_cheapest_desc', 'Find the lowest available price.'),
-            prompt: t('ai_chat_prompt_cheapest_nearby', 'Find the cheapest nearby option'),
+            label: t('ai_chat_quick_cheapest', 'Closest & cheapest'),
+            description: t('ai_chat_quick_cheapest_desc', 'Nearest store with the lowest price for a product you name.'),
+            inputTemplate: t('ai_chat_input_cheapest', 'Find the closest and cheapest '),
+            prompt: t('ai_chat_prompt_cheapest_nearby', 'Find the closest supermarket with the cheapest price for a product. Use my location when available. If I did not name a product, ask me which one.'),
         },
         {
             key: 'ingredients',
             Icon: FiClipboard,
             label: t('ai_chat_quick_ingredients', 'Check ingredients'),
             description: t('ai_chat_quick_ingredients_desc', 'Review ingredients and key nutrition.'),
-            prompt: t('ai_chat_prompt_ingredients', 'Check ingredients for me'),
+            inputTemplate: t('ai_chat_input_ingredients', 'Check ingredients for '),
+            prompt: t('ai_chat_prompt_ingredients', 'Check the ingredients for a product. If I did not name a product, ask me which one.'),
         },
         {
             key: 'suitable',
             Icon: FiCheckCircle,
             label: t('ai_chat_quick_suitable', 'Suitable for me?'),
             description: t('ai_chat_quick_suitable_desc', 'Use your saved allergies and preferences.'),
-            prompt: t('ai_chat_prompt_suitable', 'Is this suitable for me?'),
+            inputTemplate: t('ai_chat_input_suitable', 'Is this suitable for me? '),
+            prompt: t('ai_chat_prompt_suitable', 'Check if a product is suitable for me based on my saved allergies and health preferences. If I did not name a product, ask me which one.'),
         },
         {
             key: 'compare',
             Icon: FiSearch,
-            label: t('ai_chat_quick_compare', 'Compare prices'),
-            description: t('ai_chat_quick_compare_desc', 'See stores ranked by price.'),
-            prompt: t('ai_chat_prompt_compare', 'Compare prices for this product'),
+            label: t('ai_chat_quick_compare', 'Rank by price'),
+            description: t('ai_chat_quick_compare_desc', 'Compare a product across stores, cheapest first.'),
+            inputTemplate: t('ai_chat_input_compare', 'Compare prices for '),
+            prompt: t('ai_chat_prompt_compare', 'Compare prices for a product across supermarkets and rank them from cheapest to most expensive. If I did not name a product, ask me which one.'),
         },
         {
             key: 'scan',
             Icon: FiCamera,
             label: t('ai_chat_quick_scan', 'Scan barcode'),
             description: t('ai_chat_quick_scan_desc', 'Paste or scan a barcode to check.'),
+            inputTemplate: t('ai_chat_prompt_scan_barcode', 'I scanned a product. Check this barcode: '),
             prompt: t('ai_chat_prompt_scan_barcode', 'I scanned a product. Check this barcode: '),
         },
     ];
@@ -1274,10 +1280,19 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         setMobileListOpen(false);
     };
 
-    const applyQuickPrompt = (prompt) => {
+    const applyQuickPrompt = (item) => {
         if (!activeConversationId) beginNewConversation();
-        setInput(prompt);
-        requestAnimationFrame(() => inputRef.current?.focus());
+        activeQuickPromptRef.current = item;
+        setInput(item.inputTemplate);
+        requestAnimationFrame(() => {
+            const el = inputRef.current;
+            if (el) {
+                el.focus();
+                // Place cursor at the end so the user can type the product name
+                const len = item.inputTemplate.length;
+                if (el.setSelectionRange) el.setSelectionRange(len, len);
+            }
+        });
     };
 
     const showQuickPrompts =
@@ -1311,7 +1326,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                         <button
                             key={item.key}
                             type="button"
-                            onClick={() => applyQuickPrompt(item.prompt)}
+                            onClick={() => applyQuickPrompt(item)}
                             className="min-h-24 rounded-3xl border border-gray-200 bg-white px-4 py-3.5 text-left text-gray-800 shadow-sm transition active:scale-[0.98] dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
                         >
                             <span className="mb-2 flex h-9 w-9 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 dark:bg-brand-900/30 dark:text-brand-300">
@@ -1891,8 +1906,27 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
             beginNewConversation();
         }
 
-        const userMessage = input.trim();
+        let userMessage = input.trim();
         setInput('');
+
+        // If the message originated from a quick-action card, resolve the
+        // final message using the full prompt + any product name the user typed.
+        const pendingQuickPrompt = activeQuickPromptRef.current;
+        activeQuickPromptRef.current = null;
+        if (pendingQuickPrompt) {
+            const template = pendingQuickPrompt.inputTemplate.trim();
+            const fullPrompt = pendingQuickPrompt.prompt.trim();
+            if (userMessage === template) {
+                // User sent the template without adding a product name.
+                // Send the full prompt which instructs the AI to ask.
+                userMessage = fullPrompt;
+            } else if (userMessage.startsWith(template)) {
+                // User appended a product name after the template text.
+                const productName = userMessage.slice(template.length).trim();
+                userMessage = `${fullPrompt}\n\nProduct: ${productName}`;
+            }
+            // If the user completely rewrote the message, send it as-is.
+        }
 
         const looksLikeIngredientFollowUp = (message) => {
             const lowered = String(message || '').toLowerCase();
@@ -2775,7 +2809,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 subtitle={t('ai_chat_subtitle', 'Compare prices and ingredients.')}
                 poweredByLabel={t('ai_chat_powered_by', 'Powered by Gemini')}
                 user={user}
-                onOpenList={() => setMobileListOpen(true)}
+                onOpenList={() => setMobileListOpen((prev) => !prev)}
                 onNewChat={beginNewConversation}
                 onRefreshCatalog={handleRefreshCatalog}
                 onClose={effectiveOnClose}
