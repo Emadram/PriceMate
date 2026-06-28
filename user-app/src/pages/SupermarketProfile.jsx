@@ -44,6 +44,35 @@ const extractEmbedSrc = (embedHtml) => {
     return /google\.com\/maps\/embed/i.test(text) ? text : '';
 };
 
+/**
+ * Format a timestamp as a human-friendly relative age:
+ *  - < 1 day  → "today"
+ *  - < 10 days → "X days ago"
+ *  - < 10 weeks → "X weeks ago"
+ *  - otherwise → "X months ago"
+ */
+const formatRelativeAge = (timestamp) => {
+    if (!timestamp) return null;
+    const now = Date.now();
+    const then = new Date(timestamp).getTime();
+    if (Number.isNaN(then)) return null;
+
+    const diffMs = now - then;
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 1) return 'today';
+    if (diffDays === 1) return '1 day ago';
+    if (diffDays < 10) return `${diffDays} days ago`;
+
+    const diffWeeks = Math.floor(diffDays / 7);
+    if (diffWeeks === 1) return '1 week ago';
+    if (diffWeeks < 10) return `${diffWeeks} weeks ago`;
+
+    const diffMonths = Math.max(1, Math.floor(diffDays / 30));
+    if (diffMonths === 1) return '1 month ago';
+    return `${diffMonths} months ago`;
+};
+
 const SupermarketProfile = () => {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -382,9 +411,15 @@ const SupermarketProfile = () => {
                                 {t('product_updated', 'Updated')} {new Date(price.$updatedAt).toLocaleDateString(i18n.language)}
                             </p>
                             {supermarket?.$updatedAt && (
-                                <p className="text-[9px] font-semibold uppercase tracking-tight text-gray-400 dark:text-gray-500 flex items-center gap-1">
+                                <p className={`text-[9px] font-semibold uppercase tracking-tight flex items-center gap-1 ${
+                                    (() => {
+                                        const d = Math.floor((Date.now() - new Date(supermarket.$updatedAt).getTime()) / 86400000);
+                                        if (d >= 10) return 'text-amber-500 dark:text-amber-400';
+                                        return 'text-gray-400 dark:text-gray-500';
+                                    })()
+                                }`}>
                                     <Store size={9} className="shrink-0" />
-                                    {t('store_updated', 'Store')} {formatLastUpdate(supermarket.$updatedAt, i18n.language)}
+                                    {t('store_label', 'Store')} {formatRelativeAge(supermarket.$updatedAt)}
                                 </p>
                             )}
                         </div>
