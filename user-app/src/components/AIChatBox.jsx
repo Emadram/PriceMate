@@ -1841,7 +1841,14 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
             'good for me', 'better for me', 'sugar', 'sugary', 'şeker', 'seker', 'sodium', 'sodyum', 'salt', 'tuz', 'caffeine', 'kafein',
             'can i', 'should i', 'drink', 'eat', 'consume', 'yiyebilir', 'içebilir', 'tüketebilir', 'ye', 'iç', 'ic'
         ];
-        const isMedical = hasAny(medicalKeywords) || conditions.size > 0;
+        
+        const hasPriceKeywords = hasAny(['price', 'prices', 'cheapest', 'cheap', 'expensive', 'cost', 'deal', 'fiyat', 'fiyatı', 'fiyatları', 'ucuz', 'pahalı', 'ne kadar', 'kaç para', 'kac para', '₺', 'try', 'tl']);
+        const hasSuitabilityKeywords = hasAny(['suitable', 'safe', 'good for me', 'better for me', 'can i', 'should i', 'drink', 'eat', 'consume', 'yiyebilir', 'içebilir', 'tüketebilir', 'ye', 'iç', 'ic', 'allergy', 'allergen', 'allergens', 'celiac', 'diabetes', 'hypertension', 'pregnancy', 'kidney', 'gout', 'hypercholesterolemia', 'gerd', 'ibs', 'pku', 'hemochromatosis', 'thyroid', 'alerji', 'alerjen', 'uygun', 'güvenli', 'gebelik', 'hamile']);
+
+        let isMedical = hasAny(medicalKeywords) || conditions.size > 0;
+        if (hasPriceKeywords && !hasSuitabilityKeywords) {
+            isMedical = false;
+        }
 
         return {
             conditions: Array.from(conditions),
