@@ -189,19 +189,16 @@ const PriceComparison = () => {
     }, [barcode, fetchProductByBarcode]);
 
     useEffect(() => {
-        fetchSupermarkets();
+        fetchSupermarkets({ force: true });
     }, [fetchSupermarkets]);
 
     const resolveSupermarketDoc = useCallback((price) => {
         const fromPrice = getSupermarketFromPrice(price);
-        if (isSupermarketObject(fromPrice)) return fromPrice;
-        const id = typeof fromPrice === 'string' ? fromPrice : (() => {
-            const supermarket = getSupermarketFromPrice(price);
-            if (!supermarket) return null;
-            return typeof supermarket === 'string' ? supermarket : supermarket.$id;
-        })();
-        if (!id) return null;
-        return (supermarketCatalog || []).find((sm) => sm.$id === id) || fromPrice;
+        const id = !fromPrice ? null : (typeof fromPrice === 'string' ? fromPrice : fromPrice.$id);
+        if (!id) return isSupermarketObject(fromPrice) ? fromPrice : null;
+        
+        const found = (supermarketCatalog || []).find((sm) => sm.$id === id);
+        return found || (isSupermarketObject(fromPrice) ? fromPrice : null);
     }, [supermarketCatalog]);
 
     useEffect(() => {

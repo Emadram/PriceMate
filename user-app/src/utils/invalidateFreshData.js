@@ -37,6 +37,7 @@ export function refreshPageCache({
         useCategoriesStore.getState().fetchCategories({ force: true });
     } else if (priceScope === 'supermarket' && supermarketId) {
         invalidateProductUtilsByPrefix(`supermarket:prices:${supermarketId}`);
+        invalidateProductUtilsByPrefix(`supermarket:doc:${supermarketId}`);
         invalidateCacheKey(`supermarket-profile:${supermarketId}`);
     } else if (priceScope === 'product') {
         if (productId) {
