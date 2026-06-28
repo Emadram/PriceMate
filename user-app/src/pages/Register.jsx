@@ -20,6 +20,7 @@ const ALLERGY_OPTIONS = [
     { id: 'hemochromatosis', labelKey: 'allergy_option_hemochromatosis', descKey: 'allergy_desc_hemochromatosis' },
     { id: 'allergy', labelKey: 'allergy_option_allergy', descKey: 'allergy_desc_allergy' },
     { id: 'pregnancy', labelKey: 'allergy_option_pregnancy', descKey: 'allergy_desc_pregnancy' },
+    { id: 'thyroid', labelKey: 'allergy_option_thyroid', descKey: 'allergy_desc_thyroid' },
 ];
 
 const Register = () => {

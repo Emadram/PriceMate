@@ -59,7 +59,7 @@ const normalizeAllergyLabel = (value) => String(value || '').trim().toLowerCase(
 const resolveAllergyPreferenceLabel = (value) => {
     const normalized = normalizeAllergyLabel(value);
     if (!normalized || NO_ALLERGY_PREFERENCE_VALUES.has(normalized)) return '';
-    if (['diabetes', 'hypertension', 'pregnancy', 'kidney', 'gout', 'hypercholesterolemia', 'gerd', 'ibs', 'pku', 'hemochromatosis'].includes(normalized)) return '';
+    if (['diabetes', 'hypertension', 'pregnancy', 'kidney', 'gout', 'hypercholesterolemia', 'gerd', 'ibs', 'pku', 'hemochromatosis', 'thyroid'].includes(normalized)) return '';
     if (normalized === 'celiac' || normalized === 'gluten') return 'gluten';
     if (ALLERGEN_GROUP_BY_LABEL.has(normalized)) return normalized;
     if (normalized === 'nuts' || normalized === 'nut') return 'tree nuts';
@@ -2249,7 +2249,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
             if (userAllergyPreferences.includes('lactose')) conditionsSet.add('lactose');
             
             const foodAllergies = userAllergyPreferences.filter(
-                (pref) => !['diabetes', 'hypertension', 'pregnancy', 'gluten', 'celiac', 'lactose'].includes(pref)
+                (pref) => !['diabetes', 'hypertension', 'pregnancy', 'gluten', 'celiac', 'lactose', 'kidney', 'gout', 'hypercholesterolemia', 'gerd', 'ibs', 'pku', 'hemochromatosis', 'thyroid'].includes(pref)
             );
             if (foodAllergies.length > 0) {
                 conditionsSet.add('allergy');

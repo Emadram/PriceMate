@@ -392,7 +392,7 @@ const SupermarketProfile = () => {
                                     })()
                                 }`}>
                                     <Store size={9} className="shrink-0" />
-                                    {t('store_label', 'Store')} {formatRelativeAge(supermarket.$updatedAt)}
+                                    {t('store_updated_relative', 'Store updated:')} {formatRelativeAge(supermarket.$updatedAt)}
                                 </p>
                             )}
                         </div>
