@@ -248,6 +248,20 @@ const renderInlineBoldText = (value, keyPrefix = 'txt') => {
     });
 };
 
+const getRawStatusFromSuitabilityText = (suitabilityText) => {
+    const text = String(suitabilityText || '').toLowerCase();
+    if (text.includes('unsuitable') || text.includes('not suitable') || text.includes('avoid') || text.includes('uygun değil') || text.includes('uygun degil') || text.includes('kaçının') || text.includes('kacinil')) {
+        return 'avoid';
+    }
+    if (text.includes('caution') || text.includes('dikkat') || text.includes('uyarı') || text.includes('uyari')) {
+        return 'caution';
+    }
+    if (text.includes('suitable') || text.includes('safe') || text.includes('uygun')) {
+        return 'safe';
+    }
+    return 'unknown';
+};
+
 const parseIngredientCardData = (value) => {
     const text = String(value || '').replace(/\r\n/g, '\n').trim();
     if (!text) return null;
@@ -324,6 +338,7 @@ const parseIngredientCardData = (value) => {
     const looksStructured = !!data.suitability && (!!data.ingredients || data.reasons.length > 0);
     if (!looksStructured) return null;
     if (!data.source) data.source = 'PriceMate';
+    data.rawStatus = getRawStatusFromSuitabilityText(data.suitability);
     return data;
 };
 
@@ -889,18 +904,18 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [], allSup
     const renderIngredientCard = (data) => {
         const productBarcode = extractBarcodeFromText(data.product);
         const suitabilityLower = (data.suitability || '').toLowerCase();
+        const raw = (data.rawStatus || getRawStatusFromSuitabilityText(data.suitability) || '').toLowerCase();
         const tone =
-            suitabilityLower.includes('not suitable') || suitabilityLower.includes('avoid')
+            raw === 'avoid'
                 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
-                : suitabilityLower.includes('caution')
+                : raw === 'caution'
                     ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
-                    : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300';
+                    : raw === 'safe'
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                        : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300';
 
         const shouldShowTriggers =
-            !!data.triggers &&
-            (suitabilityLower.includes('not suitable') ||
-                suitabilityLower.includes('avoid') ||
-                suitabilityLower.includes('caution'));
+            !!data.triggers && (raw === 'avoid' || raw === 'caution');
 
         return (
             <div className="my-1.5 rounded-2xl border border-brand-100 dark:border-brand-800/30 bg-gradient-to-br from-white to-brand-50/40 dark:from-gray-800 dark:to-brand-900/10 p-3 sm:p-4 shadow-soft">
@@ -995,6 +1010,7 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [], allSup
                 ? `${product.name || t('unknown_product', 'Unknown Product')} [BARCODE:${product.barcode}]`
                 : (product.name || t('unknown_product', 'Unknown Product')),
             suitability: statusLabel(check.status || result.status),
+            rawStatus: check.status || result.status,
             checks: [
                 ...checkNames.map(checkLabel),
                 ...(check.allergenTargets?.length ? [`allergy (${check.allergenTargets.join(', ')})`] : []),
@@ -1822,7 +1838,8 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
 
         const medicalKeywords = [
             'ingredient', 'ingredients', 'allergen', 'allergens', 'içerik', 'icerik', 'içindekiler', 'suitable', 'uygun', 'safe', 'güvenli',
-            'good for me', 'better for me', 'sugar', 'sugary', 'şeker', 'seker', 'sodium', 'sodyum', 'salt', 'tuz', 'caffeine', 'kafein'
+            'good for me', 'better for me', 'sugar', 'sugary', 'şeker', 'seker', 'sodium', 'sodyum', 'salt', 'tuz', 'caffeine', 'kafein',
+            'can i', 'should i', 'drink', 'eat', 'consume', 'yiyebilir', 'içebilir', 'tüketebilir', 'ye', 'iç', 'ic'
         ];
         const isMedical = hasAny(medicalKeywords) || conditions.size > 0;
 
@@ -1991,7 +2008,12 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 const isHigh = sugarPer100g >= (isMedicalDiabetes ? 5.0 : SUGAR_THRESHOLD_G_PER_100G) || isSugarySoda;
                 if (isMedicalDiabetes) {
                     if (isHigh) {
-                        reasons.push(`${t(labelKey, 'Diabetes')}: High sugar content (${valueText}) is not suitable for Diabetes.`);
+                        const hasLowSugarPriority = aiProfile.nutritionPriorities?.includes('low sugar') || false;
+                        if (hasLowSugarPriority) {
+                            reasons.push(`Contains high levels of sugar which may not align with your diabetes and low sugar priority.`);
+                        } else {
+                            reasons.push(`${t(labelKey, 'Diabetes')}: High sugar content (${valueText}) is not suitable for Diabetes.`);
+                        }
                         bumpStatus('avoid');
                     } else {
                         reasons.push(`${t(labelKey, 'Diabetes')}: Sugar content within limit (${valueText})`);
@@ -2004,7 +2026,12 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 const matches = collectMatches(sugarTerms);
                 if (matches.length > 0 || isSugarySoda) {
                     if (isMedicalDiabetes) {
-                        reasons.push(`${t(labelKey, 'Diabetes')}: Added sugar / sugary beverage detected. Not suitable for Diabetes.`);
+                        const hasLowSugarPriority = aiProfile.nutritionPriorities?.includes('low sugar') || false;
+                        if (hasLowSugarPriority) {
+                            reasons.push(`Contains high levels of sugar which may not align with your diabetes and low sugar priority.`);
+                        } else {
+                            reasons.push(`${t(labelKey, 'Diabetes')}: Added sugar / sugary beverage detected. Not suitable for Diabetes.`);
+                        }
                         bumpStatus('avoid');
                     } else {
                         reasons.push(`${t(labelKey)}: ${t('nutrient_sugar')} found in ingredients (${formatMatches(matches)})`);
