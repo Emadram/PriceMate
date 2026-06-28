@@ -21,6 +21,56 @@ export default defineConfig({
         'android-chrome-512.png',
         'pwa-icon.svg',
       ],
+      workbox: {
+        // Cache product images at runtime so they persist across page switches
+        runtimeCaching: [
+          {
+            // OpenFoodFacts product images (images.openfoodfacts.org)
+            urlPattern: /^https:\/\/images\.openfoodfacts\.org\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'off-product-images',
+              expiration: {
+                maxEntries: 200,
+                maxAgeSeconds: 30 * 24 * 60 * 60, // 30 days
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+          {
+            // Appwrite storage images (cloud.appwrite.io/v1/storage/...)
+            urlPattern: /^https:\/\/cloud\.appwrite\.io\/v1\/storage\/.*/i,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'appwrite-storage-images',
+              expiration: {
+                maxEntries: 150,
+                maxAgeSeconds: 7 * 24 * 60 * 60, // 7 days
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+          {
+            // Catch-all for other external product images (CDNs, etc.)
+            urlPattern: ({ request }) => request.destination === 'image',
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'external-images',
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 14 * 24 * 60 * 60, // 14 days
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+        ],
+      },
       manifest: {
         name: 'PriceMate',
         short_name: 'PriceMate',
@@ -48,17 +98,19 @@ export default defineConfig({
     }),
   ],
   build: {
+    target: 'esnext',
+    chunkSizeWarningLimit: 800,
     rollupOptions: {
       output: {
         manualChunks: {
           'vendor-react': ['react', 'react-dom', 'react-router-dom'],
           'vendor-appwrite': ['appwrite'],
-          'vendor-icons': ['react-icons', 'lucide-react'],
+          'vendor-icons': ['react-icons'],
           'vendor-i18n': ['i18next', 'react-i18next', 'i18next-browser-languagedetector'],
           'vendor-charts': ['recharts'],
           'vendor-map': ['ol'],
           'vendor-scanner': ['@zxing/browser', '@zxing/library'],
-          'vendor-ai': ['openai', '@google/generative-ai'],
+          'vendor-ai': ['openai'],
         },
       },
     },

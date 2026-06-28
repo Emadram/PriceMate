@@ -14,7 +14,7 @@ import { Style, Icon, Stroke } from 'ol/style';
 import GeoJSON from 'ol/format/GeoJSON';
 import { fetchRoute } from '../utils/routing';
 import { useTranslation } from 'react-i18next';
-import { MapPin, ArrowRight, ArrowLeft, ArrowUp, RotateCcw } from 'lucide-react';
+import { LuMapPin as MapPin, LuArrowRight as ArrowRight, LuArrowLeft as ArrowLeft, LuArrowUp as ArrowUp, LuRotateCcw as RotateCcw } from 'react-icons/lu';
 import { hasValidLatLon } from '../utils/productUtils';
 import { buildRouteKey, resolveCenter as resolveCenterUtil } from './storeMapUtils';
 

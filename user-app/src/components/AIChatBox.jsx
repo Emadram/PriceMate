@@ -59,6 +59,8 @@ const normalizeAllergyLabel = (value) => String(value || '').trim().toLowerCase(
 const resolveAllergyPreferenceLabel = (value) => {
     const normalized = normalizeAllergyLabel(value);
     if (!normalized || NO_ALLERGY_PREFERENCE_VALUES.has(normalized)) return '';
+    if (['diabetes', 'hypertension', 'pregnancy', 'kidney', 'gout', 'hypercholesterolemia', 'gerd', 'ibs', 'pku', 'hemochromatosis', 'thyroid'].includes(normalized)) return '';
+    if (normalized === 'celiac' || normalized === 'gluten') return 'gluten';
     if (ALLERGEN_GROUP_BY_LABEL.has(normalized)) return normalized;
     if (normalized === 'nuts' || normalized === 'nut') return 'tree nuts';
     if (normalized === 'dairy') return 'milk';
@@ -68,11 +70,93 @@ const resolveAllergyPreferenceLabel = (value) => {
 const getAllergenTermsForLabels = (labels = []) => {
     const terms = labels.flatMap((label) => {
         const resolved = resolveAllergyPreferenceLabel(label);
+        if (resolved === 'allergy') {
+            return ALLERGEN_GROUPS.flatMap((g) => g.terms);
+        }
         const group = ALLERGEN_GROUP_BY_LABEL.get(resolved);
         return group?.terms || [resolved];
     });
     return Array.from(new Set(terms.filter(Boolean)));
 };
+
+const getQuickActionIntent = (message) => {
+    const lowered = String(message || '').toLowerCase();
+    
+    if (lowered.includes('closest and cheapest') || 
+        lowered.includes('closest supermarket with the cheapest price') ||
+        (lowered.includes('cheapest') && (lowered.includes('closest') || lowered.includes('nearest')))) {
+        return 'closest_cheapest';
+    }
+    if (lowered.includes('check ingredients for') || 
+        lowered.includes('check the ingredients for a product') ||
+        (lowered.includes('ingredients') && lowered.includes('check'))) {
+        return 'ingredients';
+    }
+    if (lowered.includes('is this suitable for me') || 
+        lowered.includes('check if a product is suitable for me') ||
+        lowered.includes('suitable for me')) {
+        return 'suitable';
+    }
+    if (lowered.includes('compare prices for') || 
+        lowered.includes('compare prices for a product') ||
+        (lowered.includes('compare') && lowered.includes('prices'))) {
+        return 'compare';
+    }
+    
+    return null;
+};
+
+const getSuggestionText = (intent, lang) => {
+    const isTr = lang === 'tr';
+    if (intent === 'closest_cheapest') {
+        return isTr
+            ? 'En yakın ve en ucuz fiyatı bulmak için hangi ürünü arıyorsunuz? Kataloğumuzdaki bu popüler ürünlerden birini seçebilirsiniz:'
+            : 'Which product do you want to find the closest and cheapest store for? You can choose one of these popular products from our catalog:';
+    }
+    if (intent === 'ingredients') {
+        return isTr
+            ? 'İçindekileri kontrol etmek için hangi ürünü arıyorsunuz? Kataloğumuzdaki bu popüler ürünlerden birini seçebilirsiniz:'
+            : 'Which product do you want to check the ingredients for? You can choose one of these popular products from our catalog:';
+    }
+    if (intent === 'suitable') {
+        return isTr
+            ? 'Sizin için uygun olup olmadığını kontrol etmek için hangi ürünü arıyorsunuz? Kataloğumuzdaki bu popüler ürünlerden birini seçebilirsiniz:'
+            : 'Which product do you want to check if it is suitable for you? You can choose one of these popular products from our catalog:';
+    }
+    if (intent === 'compare') {
+        return isTr
+            ? 'Fiyatlarını karşılaştırmak için hangi ürünü arıyorsunuz? Kataloğumuzdaki bu popüler ürünlerden birini seçebilirsiniz:'
+            : 'Which product do you want to compare prices for? You can choose one of these popular products from our catalog:';
+    }
+    return isTr
+        ? 'Hangi ürünü kontrol etmek istiyorsunuz? Kataloğumuzdaki bu popüler ürünlerden birini seçebilirsiniz:'
+        : 'Which product would you like to check? You can choose one of these popular products from our catalog:';
+};
+
+const parseProductSuggestions = (value) => {
+    const text = String(value || '');
+    if (!text.startsWith('PRICEMATE_PRODUCT_SUGGESTIONS::')) return null;
+    try {
+        const parsed = JSON.parse(text.slice('PRICEMATE_PRODUCT_SUGGESTIONS::'.length));
+        return parsed && typeof parsed === 'object' && parsed.type === 'product_suggestions' ? parsed : null;
+    } catch {
+        return null;
+    }
+};
+
+const getSuggestions = async (fullProductList) => {
+    let list = (fullProductList || []).filter(p => p && (p.name || p.productName));
+    if (list.length === 0) {
+        try {
+            const rawProducts = await fetchProducts(6);
+            list = rawProducts.filter(p => p && (p.name || p.productName));
+        } catch (e) {
+            console.error('Failed to fetch fallback products for suggestions:', e);
+        }
+    }
+    return list.slice(0, 4);
+};
+
 // Simple in-memory intent cache with optional persistence to avoid repeating identical assistant calls
 const DEFAULT_INTENT_CACHE_TTL_MS = 1000 * 60 * 60; // 1 hour
 const INTENT_CACHE_FORMAT_VERSION = 'v5';
@@ -340,6 +424,8 @@ import {
     fetchPricesForProducts,
     normalizeProduct,
     enrichProductPricesWithSupermarkets,
+    findRelatedProducts,
+    fetchProducts,
 } from '../utils/productUtils';
 import useAiContextStore from '../stores/aiContextStore';
 import { refreshPageCache } from '../utils/invalidateFreshData';
@@ -350,6 +436,7 @@ import {
     hasBarcodeInMessage,
     isPriceOrCompareIntent,
     messageExplicitlyNamesProduct,
+    getExplicitProductTokens,
 } from '../utils/productNameMatch';
 import useUserLocation from '../hooks/useUserLocation';
 import useComposerKeyboardLift from '../hooks/useComposerKeyboardLift';
@@ -632,21 +719,29 @@ const profileHasPersonalization = (profile = {}) =>
     profile.budgetPreference !== 'balanced' ||
     profile.responseStyle !== 'balanced';
 
-const formatAiProfileForPrompt = (profile = {}) => {
-    if (!profileHasPersonalization(profile)) {
-        return 'No optional AI shopping profile preferences saved.';
+const formatAiProfileForPrompt = (profile = {}, healthConditions = []) => {
+    const lines = [];
+
+    if (profileHasPersonalization(profile)) {
+        lines.push(
+            `Dietary preferences: ${profile.dietaryPreferences?.join(', ') || 'none'}`,
+            `Nutrition priorities: ${profile.nutritionPriorities?.join(', ') || 'none'}`,
+            `Avoid ingredients: ${profile.avoidIngredients?.join(', ') || 'none'}`,
+            `Budget preference: ${profile.budgetPreference || 'balanced'}`,
+            `Preferred stores: ${profile.preferredStores?.join(', ') || 'none'}`,
+            `Preferred brands: ${profile.preferredBrands?.join(', ') || 'none'}`,
+            `Disliked brands: ${profile.dislikedBrands?.join(', ') || 'none'}`,
+            `Response style: ${profile.responseStyle || 'balanced'}`,
+        );
+    } else {
+        lines.push('No optional AI shopping profile preferences saved.');
     }
 
-    return [
-        `Dietary preferences: ${profile.dietaryPreferences?.join(', ') || 'none'}`,
-        `Nutrition priorities: ${profile.nutritionPriorities?.join(', ') || 'none'}`,
-        `Avoid ingredients: ${profile.avoidIngredients?.join(', ') || 'none'}`,
-        `Budget preference: ${profile.budgetPreference || 'balanced'}`,
-        `Preferred stores: ${profile.preferredStores?.join(', ') || 'none'}`,
-        `Preferred brands: ${profile.preferredBrands?.join(', ') || 'none'}`,
-        `Disliked brands: ${profile.dislikedBrands?.join(', ') || 'none'}`,
-        `Response style: ${profile.responseStyle || 'balanced'}`,
-    ].join('\n');
+    if (healthConditions.length > 0) {
+        lines.push(`Health conditions: ${healthConditions.join(', ')}`);
+    }
+
+    return lines.join('\n');
 };
 
 const ChatProductThumb = ({ src, alt, className = 'w-full h-full' }) => {
@@ -666,7 +761,65 @@ const ChatProductThumb = ({ src, alt, className = 'w-full h-full' }) => {
     );
 };
 
-const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [], allSupermarkets = [], t }) => {
+const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [], allSupermarkets = [], t, onSelectProduct }) => {
+    const renderProductSuggestionsCard = (suggestions) => {
+        const { intent, text, products = [] } = suggestions;
+        
+        let ActionIcon = FiSearch;
+        let actionLabel = t('select', 'Select');
+        
+        if (intent === 'closest_cheapest') {
+            ActionIcon = FiMapPin;
+            actionLabel = t('find_cheapest', 'Find Cheapest');
+        } else if (intent === 'ingredients') {
+            ActionIcon = FiClipboard;
+            actionLabel = t('check_ingredients', 'Check');
+        } else if (intent === 'suitable') {
+            ActionIcon = FiCheckCircle;
+            actionLabel = t('check_suitability', 'Check Safety');
+        } else if (intent === 'compare') {
+            ActionIcon = FiSearch;
+            actionLabel = t('compare_prices', 'Compare');
+        }
+
+        return (
+            <div className="my-2 p-4 rounded-2xl border border-brand-100 dark:border-brand-800/40 bg-gradient-to-br from-white to-brand-50/20 dark:from-gray-800 dark:to-brand-900/10 shadow-soft">
+                <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3.5 leading-relaxed">
+                    {text}
+                </p>
+                <div className="grid grid-cols-2 gap-2.5">
+                    {products.map((p) => (
+                        <button
+                            key={p.id}
+                            onClick={() => onSelectProduct && onSelectProduct(p, intent)}
+                            className="flex flex-col items-center text-center p-3 rounded-xl border border-gray-100 dark:border-gray-700/60 bg-white/80 dark:bg-gray-900/30 hover:border-brand-300 dark:hover:border-brand-750 hover:bg-brand-50/30 dark:hover:bg-brand-950/20 hover:scale-[1.02] active:scale-[0.98] transition-all duration-250 group w-full shadow-sm cursor-pointer"
+                        >
+                            <div className="w-14 h-14 bg-white dark:bg-gray-800 rounded-lg flex items-center justify-center overflow-hidden border border-gray-100 dark:border-gray-900/50 shrink-0 mb-2 group-hover:shadow-sm transition-shadow">
+                                <ChatProductThumb src={p.imageUrl} alt={p.name} />
+                            </div>
+                            <span className="text-xs font-bold text-gray-800 dark:text-gray-100 line-clamp-2 min-h-[2rem] leading-tight mb-1 w-full text-center">
+                                {p.name}
+                            </span>
+                            {p.bestPrice !== null && p.bestPrice !== undefined ? (
+                                <span className="text-xs font-black text-green-600 dark:text-green-400 mb-2">
+                                    {t('best', 'Best')}: {convert(p.bestPrice, p.currency || 'TRY')} {getCurrencySymbol()}
+                                </span>
+                            ) : (
+                                <span className="text-[10px] text-gray-400 dark:text-gray-500 italic mb-2">
+                                    {t('catalog_no_prices_yet', 'No prices added')}
+                                </span>
+                            )}
+                            <div className="mt-auto w-full flex items-center justify-center gap-1 py-1 px-2.5 rounded-lg bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 text-[10px] font-black uppercase tracking-wider group-hover:bg-brand-600 group-hover:text-white transition-colors duration-200">
+                                <ActionIcon size={12} className="shrink-0" />
+                                <span>{actionLabel}</span>
+                            </div>
+                        </button>
+                    ))}
+                </div>
+            </div>
+        );
+    };
+
     const extractBarcodeFromText = (value) => {
         const match = String(value || '').match(/\[BARCODE:([\w\d-]+)\]/i);
         return match ? match[1] : '';
@@ -934,6 +1087,11 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [], allSup
     };
 
     const renderContent = (content) => {
+        const suggestions = msg.role === 'assistant' ? parseProductSuggestions(content) : null;
+        if (suggestions) {
+            return renderProductSuggestionsCard(suggestions);
+        }
+
         const structuredAiCheck = msg.role === 'assistant' ? parseAiCheckResponse(content) : null;
         if (structuredAiCheck) {
             return renderStructuredAiCheck(structuredAiCheck);
@@ -1170,6 +1328,20 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
     const isPageVariant = variant === 'page';
     const [composerFocused, setComposerFocused] = useState(false);
     const composerAnchoredToNav = prefersKeyboardResizeViewport();
+
+    useEffect(() => {
+        if (typeof document === 'undefined') return;
+        const root = document.documentElement;
+        if (composerFocused && prefersKeyboardResizeViewport()) {
+            root.classList.add('pricemate-ai-composer-focused');
+        } else {
+            root.classList.remove('pricemate-ai-composer-focused');
+        }
+        return () => {
+            root.classList.remove('pricemate-ai-composer-focused');
+        };
+    }, [composerFocused]);
+
     useComposerKeyboardLift(isPageVariant && isOpen && !composerAnchoredToNav, {
         active: composerFocused,
     });
@@ -1210,41 +1382,47 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
     const formRef = useRef(null);
     const composerStackRef = useRef(null);
     const composerFocusedRef = useRef(false);
+    const activeQuickPromptRef = useRef(null);
 
     const mobileQuickPrompts = [
         {
             key: 'cheapest',
             Icon: FiMapPin,
-            label: t('ai_chat_quick_cheapest', 'Cheapest nearby'),
-            description: t('ai_chat_quick_cheapest_desc', 'Find the lowest available price.'),
-            prompt: t('ai_chat_prompt_cheapest_nearby', 'Find the cheapest nearby option'),
+            label: t('ai_chat_quick_cheapest', 'Closest & cheapest'),
+            description: t('ai_chat_quick_cheapest_desc', 'Nearest store with the lowest price for a product you name.'),
+            inputTemplate: t('ai_chat_input_cheapest', 'Find the closest and cheapest '),
+            prompt: t('ai_chat_prompt_cheapest_nearby', 'Find the closest supermarket with the cheapest price for a product. Use my location when available. If I did not name a product, ask me which one.'),
         },
         {
             key: 'ingredients',
             Icon: FiClipboard,
             label: t('ai_chat_quick_ingredients', 'Check ingredients'),
             description: t('ai_chat_quick_ingredients_desc', 'Review ingredients and key nutrition.'),
-            prompt: t('ai_chat_prompt_ingredients', 'Check ingredients for me'),
+            inputTemplate: t('ai_chat_input_ingredients', 'Check ingredients for '),
+            prompt: t('ai_chat_prompt_ingredients', 'Check the ingredients for a product. If I did not name a product, ask me which one.'),
         },
         {
             key: 'suitable',
             Icon: FiCheckCircle,
             label: t('ai_chat_quick_suitable', 'Suitable for me?'),
             description: t('ai_chat_quick_suitable_desc', 'Use your saved allergies and preferences.'),
-            prompt: t('ai_chat_prompt_suitable', 'Is this suitable for me?'),
+            inputTemplate: t('ai_chat_input_suitable', 'Is this suitable for me? '),
+            prompt: t('ai_chat_prompt_suitable', 'Check if a product is suitable for me based on my saved allergies and health preferences. If I did not name a product, ask me which one.'),
         },
         {
             key: 'compare',
             Icon: FiSearch,
-            label: t('ai_chat_quick_compare', 'Compare prices'),
-            description: t('ai_chat_quick_compare_desc', 'See stores ranked by price.'),
-            prompt: t('ai_chat_prompt_compare', 'Compare prices for this product'),
+            label: t('ai_chat_quick_compare', 'Rank by price'),
+            description: t('ai_chat_quick_compare_desc', 'Compare a product across stores, cheapest first.'),
+            inputTemplate: t('ai_chat_input_compare', 'Compare prices for '),
+            prompt: t('ai_chat_prompt_compare', 'Compare prices for a product across supermarkets and rank them from cheapest to most expensive. If I did not name a product, ask me which one.'),
         },
         {
             key: 'scan',
             Icon: FiCamera,
             label: t('ai_chat_quick_scan', 'Scan barcode'),
             description: t('ai_chat_quick_scan_desc', 'Paste or scan a barcode to check.'),
+            inputTemplate: t('ai_chat_prompt_scan_barcode', 'I scanned a product. Check this barcode: '),
             prompt: t('ai_chat_prompt_scan_barcode', 'I scanned a product. Check this barcode: '),
         },
     ];
@@ -1258,10 +1436,19 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         setMobileListOpen(false);
     };
 
-    const applyQuickPrompt = (prompt) => {
+    const applyQuickPrompt = (item) => {
         if (!activeConversationId) beginNewConversation();
-        setInput(prompt);
-        requestAnimationFrame(() => inputRef.current?.focus());
+        activeQuickPromptRef.current = item;
+        setInput(item.inputTemplate);
+        requestAnimationFrame(() => {
+            const el = inputRef.current;
+            if (el) {
+                el.focus();
+                // Place cursor at the end so the user can type the product name
+                const len = item.inputTemplate.length;
+                if (el.setSelectionRange) el.setSelectionRange(len, len);
+            }
+        });
     };
 
     const showQuickPrompts =
@@ -1295,7 +1482,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                         <button
                             key={item.key}
                             type="button"
-                            onClick={() => applyQuickPrompt(item.prompt)}
+                            onClick={() => applyQuickPrompt(item)}
                             className="min-h-24 rounded-3xl border border-gray-200 bg-white px-4 py-3.5 text-left text-gray-800 shadow-sm transition active:scale-[0.98] dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
                         >
                             <span className="mb-2 flex h-9 w-9 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 dark:bg-brand-900/30 dark:text-brand-300">
@@ -1793,17 +1980,36 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         const wantsCaffeineCheck = conditions.includes('high_caffeine');
 
         if (wantsSugarCheck) {
-            const labelKey = conditions.includes('diabetes') ? 'condition_diabetes' : 'condition_high_sugar';
+            const isMedicalDiabetes = conditions.includes('diabetes');
+            const labelKey = isMedicalDiabetes ? 'condition_diabetes' : 'condition_high_sugar';
+            
+            const nameLower = String(payload.name || payload.productName || '').toLowerCase();
+            const isSugarySoda = ['coca-cola', 'coca cola', 'coke', 'pepsi', 'soda', 'sprite', 'fanta'].some(term => nameLower.includes(term));
+            
             if (sugarPer100g !== null && sugarPer100g !== undefined) {
                 const valueText = `${Number(sugarPer100g).toFixed(1)}g/100g`;
-                const isHigh = sugarPer100g >= SUGAR_THRESHOLD_G_PER_100G;
-                reasons.push(`${t(labelKey)}: ${formatNutrientLevel(t('nutrient_sugar'), valueText, isHigh)}`);
-                if (isHigh) bumpStatus('caution');
+                const isHigh = sugarPer100g >= (isMedicalDiabetes ? 5.0 : SUGAR_THRESHOLD_G_PER_100G) || isSugarySoda;
+                if (isMedicalDiabetes) {
+                    if (isHigh) {
+                        reasons.push(`${t(labelKey, 'Diabetes')}: High sugar content (${valueText}) is not suitable for Diabetes.`);
+                        bumpStatus('avoid');
+                    } else {
+                        reasons.push(`${t(labelKey, 'Diabetes')}: Sugar content within limit (${valueText})`);
+                    }
+                } else {
+                    reasons.push(`${t(labelKey)}: ${formatNutrientLevel(t('nutrient_sugar'), valueText, isHigh)}`);
+                    if (isHigh) bumpStatus('caution');
+                }
             } else if (hasIngredientBlob) {
                 const matches = collectMatches(sugarTerms);
-                if (matches.length > 0) {
-                    reasons.push(`${t(labelKey)}: ${t('nutrient_sugar')} found in ingredients (${formatMatches(matches)})`);
-                    bumpStatus('caution');
+                if (matches.length > 0 || isSugarySoda) {
+                    if (isMedicalDiabetes) {
+                        reasons.push(`${t(labelKey, 'Diabetes')}: Added sugar / sugary beverage detected. Not suitable for Diabetes.`);
+                        bumpStatus('avoid');
+                    } else {
+                        reasons.push(`${t(labelKey)}: ${t('nutrient_sugar')} found in ingredients (${formatMatches(matches)})`);
+                        bumpStatus('caution');
+                    }
                 } else {
                     reasons.push(`${t(labelKey)}: ${t('nutrient_sugar')} not listed`);
                 }
@@ -1813,17 +2019,32 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         }
 
         if (wantsSodiumCheck) {
-            const labelKey = conditions.includes('hypertension') ? 'condition_hypertension' : 'condition_high_sodium';
+            const isMedicalHypertension = conditions.includes('hypertension');
+            const labelKey = isMedicalHypertension ? 'condition_hypertension' : 'condition_high_sodium';
             if (sodiumMgPer100g !== null && sodiumMgPer100g !== undefined) {
                 const valueText = `${Math.round(sodiumMgPer100g)}mg/100g`;
-                const isHigh = sodiumMgPer100g >= SODIUM_THRESHOLD_MG_PER_100G;
-                reasons.push(`${t(labelKey)}: ${formatNutrientLevel(t('nutrient_sodium'), valueText, isHigh)}`);
-                if (isHigh) bumpStatus('caution');
+                const isHigh = sodiumMgPer100g >= (isMedicalHypertension ? 300 : SODIUM_THRESHOLD_MG_PER_100G);
+                if (isMedicalHypertension) {
+                    if (isHigh) {
+                        reasons.push(`${t(labelKey, 'Hypertension')}: High sodium content (${valueText}) is not suitable for Hypertension.`);
+                        bumpStatus('avoid');
+                    } else {
+                        reasons.push(`${t(labelKey, 'Hypertension')}: Sodium content within limit (${valueText})`);
+                    }
+                } else {
+                    reasons.push(`${t(labelKey)}: ${formatNutrientLevel(t('nutrient_sodium'), valueText, isHigh)}`);
+                    if (isHigh) bumpStatus('caution');
+                }
             } else if (hasIngredientBlob) {
                 const matches = collectMatches(sodiumTerms);
                 if (matches.length > 0) {
-                    reasons.push(`${t(labelKey)}: ${t('nutrient_sodium')} found in ingredients (${formatMatches(matches)})`);
-                    bumpStatus('caution');
+                    if (isMedicalHypertension) {
+                        reasons.push(`${t(labelKey, 'Hypertension')}: Sodium/salt ingredients detected. Not suitable for Hypertension.`);
+                        bumpStatus('avoid');
+                    } else {
+                        reasons.push(`${t(labelKey)}: ${t('nutrient_sodium')} found in ingredients (${formatMatches(matches)})`);
+                        bumpStatus('caution');
+                    }
                 } else {
                     reasons.push(`${t(labelKey)}: ${t('nutrient_sodium')} not listed`);
                 }
@@ -1863,20 +2084,171 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
             }
         }
 
+        if (conditions.includes('thyroid')) {
+            const thyroidAvoidTerms = ['soy', 'soya', 'soybean', 'tofu', 'edamame', 'iodine', 'seaweed', 'kelp', 'yosun', 'iyot'];
+            const matches = collectMatches(thyroidAvoidTerms);
+            if (matches.length > 0) {
+                reasons.push(`${t('condition_thyroid', 'Thyroid')}: Contains soy, seaweed, or iodine-rich ingredients (${formatMatches(matches)}) which should be avoided.`);
+                bumpStatus('avoid');
+            } else {
+                reasons.push(`${t('condition_thyroid', 'Thyroid')}: No soy or iodine-rich ingredients found`);
+            }
+        }
+
+        if (conditions.includes('gout')) {
+            const goutAvoidTerms = ['anchovy', 'anchovies', 'sardine', 'sardines', 'mackerel', 'herring', 'yeast', 'alcohol', 'beer', 'wine', 'rum', 'whiskey', 'vodka', 'purine', 'hamsi', 'sardalya', 'uskumru', 'maya', 'alkol', 'bira', 'şarap', 'sarap'];
+            const matches = collectMatches(goutAvoidTerms);
+            if (matches.length > 0) {
+                reasons.push(`${t('condition_gout', 'Gout')}: Contains purine-rich ingredients (${formatMatches(matches)}) which should be avoided.`);
+                bumpStatus('avoid');
+            } else {
+                reasons.push(`${t('condition_gout', 'Gout')}: No purine-rich ingredients detected`);
+            }
+        }
+
+        if (conditions.includes('kidney')) {
+            const kidneyAvoidTerms = ['phosphate', 'phosphorus', 'potassium', 'phospho', 'potasyum', 'fosfat', 'fosfor'];
+            const matches = collectMatches(kidneyAvoidTerms);
+            const proteinPer100g = nutriments.proteinsPer100g || payload.proteinsPer100g || null;
+            const hasHighProtein = proteinPer100g && proteinPer100g >= 15;
+            const hasHighSodium = sodiumMgPer100g && sodiumMgPer100g >= 300;
+            
+            if (matches.length > 0 || hasHighProtein || hasHighSodium) {
+                const subReasons = [];
+                if (matches.length > 0) subReasons.push(`phosphorus/potassium additives (${formatMatches(matches)})`);
+                if (hasHighProtein) subReasons.push(`high protein (${proteinPer100g}g/100g)`);
+                if (hasHighSodium) subReasons.push(`high sodium (${sodiumMgPer100g}mg/100g)`);
+                
+                reasons.push(`${t('condition_kidney', 'Kidney Disease')}: Limit intake of ${subReasons.join(', ')}.`);
+                bumpStatus('avoid');
+            } else {
+                reasons.push(`${t('condition_kidney', 'Kidney Disease')}: No high sodium, protein, or potassium/phosphorus additives found`);
+            }
+        }
+
+        if (conditions.includes('hypercholesterolemia')) {
+            const satFat = nutriments.saturatedFatPer100g || payload.saturatedFatPer100g || null;
+            const transFat = nutriments.transFatPer100g || payload.transFatPer100g || null;
+            const hasTransFat = transFat && transFat > 0;
+            const hasHighSatFat = satFat && satFat >= 5.0;
+            
+            if (hasHighSatFat || hasTransFat) {
+                reasons.push(`${t('condition_hypercholesterolemia', 'Hypercholesterolemia')}: Contains high saturated/trans fats (Saturated: ${satFat || 0}g/100g) which should be avoided.`);
+                bumpStatus('avoid');
+            } else {
+                reasons.push(`${t('condition_hypercholesterolemia', 'Hypercholesterolemia')}: Fats within healthy limits`);
+            }
+        }
+
+        if (conditions.includes('gerd')) {
+            const gerdAvoidTerms = ['chili', 'pepper', 'spicy', 'caffeine', 'chocolate', 'cocoa', 'mint', 'peppermint', 'biber', 'baharat', 'kafein', 'çikolata', 'cikolata', 'kakao', 'nane'];
+            const matches = collectMatches(gerdAvoidTerms);
+            if (matches.length > 0) {
+                reasons.push(`${t('condition_gerd', 'GERD')}: Contains reflux triggers (${formatMatches(matches)}) which should be avoided.`);
+                bumpStatus('avoid');
+            } else {
+                reasons.push(`${t('condition_gerd', 'GERD')}: No common reflux triggers detected`);
+            }
+        }
+
+        if (conditions.includes('ibs')) {
+            const ibsAvoidTerms = ['onion', 'garlic', 'wheat', 'lactose', 'sweetener', 'sorbitol', 'mannitol', 'xylitol', 'isomalt', 'soğan', 'sogan', 'sarimsak', 'sarımsak', 'tatlandırıcı', 'tatlandirici'];
+            const matches = collectMatches(ibsAvoidTerms);
+            if (matches.length > 0) {
+                reasons.push(`${t('condition_ibs', 'IBS')}: Contains potential high-FODMAP triggers (${formatMatches(matches)}) which should be limited.`);
+                bumpStatus('caution');
+            } else {
+                reasons.push(`${t('condition_ibs', 'IBS')}: Low potential FODMAP triggers`);
+            }
+        }
+
+        if (conditions.includes('pku')) {
+            const pkuAvoidTerms = ['aspartame', 'phenylalanine', 'aspartam', 'fenilalanin'];
+            const matches = collectMatches(pkuAvoidTerms);
+            if (matches.length > 0) {
+                reasons.push(`${t('condition_pku', 'PKU')}: Contains aspartame/phenylalanine (${formatMatches(matches)}) which is strictly contraindicated.`);
+                bumpStatus('avoid');
+            } else {
+                reasons.push(`${t('condition_pku', 'PKU')}: Phenylalanine/aspartame free`);
+            }
+        }
+
+        if (conditions.includes('hemochromatosis')) {
+            const hemochromatosisTerms = ['iron', 'ferrous', 'demi', 'vitamin c', 'ascorbic acid', 'askorbik asit'];
+            const matches = collectMatches(hemochromatosisTerms);
+            if (matches.length > 0) {
+                reasons.push(`${t('condition_hemochromatosis', 'Hemochromatosis')}: Contains added iron or vitamin C (${formatMatches(matches)}) which should be avoided.`);
+                bumpStatus('avoid');
+            } else {
+                reasons.push(`${t('condition_hemochromatosis', 'Hemochromatosis')}: No added iron or vitamin C found`);
+            }
+        }
+
         return { status, reasons, triggers };
     };
 
-    const handleSend = async (e) => {
-        e.preventDefault();
-        if (!input.trim() || isLoading) return;
+    const handleSelectProduct = (product, intent) => {
+        if (!product) return;
+
+        let textToSend = '';
+        let quickPromptKey = '';
+
+        if (intent === 'closest_cheapest') {
+            textToSend = `${t('ai_chat_input_cheapest', 'Find the closest and cheapest ')}${product.name} [BARCODE:${product.barcode}]`;
+            quickPromptKey = 'cheapest';
+        } else if (intent === 'ingredients') {
+            textToSend = `${t('ai_chat_input_ingredients', 'Check ingredients for ')}${product.name} [BARCODE:${product.barcode}]`;
+            quickPromptKey = 'ingredients';
+        } else if (intent === 'suitable') {
+            textToSend = `${t('ai_chat_input_suitable', 'Is this suitable for me? ')}${product.name} [BARCODE:${product.barcode}]`;
+            quickPromptKey = 'suitable';
+        } else if (intent === 'compare') {
+            textToSend = `${t('ai_chat_input_compare', 'Compare prices for ')}${product.name} [BARCODE:${product.barcode}]`;
+            quickPromptKey = 'compare';
+        }
+
+        if (textToSend) {
+            const matchedPrompt = mobileQuickPrompts.find(p => p.key === quickPromptKey);
+            if (matchedPrompt) {
+                activeQuickPromptRef.current = matchedPrompt;
+            }
+            handleSend(null, textToSend);
+        }
+    };
+
+    const handleSend = async (e, overrideMessage = null) => {
+        if (e && typeof e.preventDefault === 'function') e.preventDefault();
+        const messageVal = overrideMessage !== null ? overrideMessage : input;
+        if (!messageVal.trim() || isLoading) return;
         if (!user?.$id) return;
 
         if (!activeConversationId) {
             beginNewConversation();
         }
 
-        const userMessage = input.trim();
-        setInput('');
+        let userMessage = messageVal.trim();
+        if (overrideMessage === null) {
+            setInput('');
+        }
+
+        // If the message originated from a quick-action card, resolve the
+        // final message using the full prompt + any product name the user typed.
+        const pendingQuickPrompt = activeQuickPromptRef.current;
+        activeQuickPromptRef.current = null;
+        if (pendingQuickPrompt) {
+            const template = pendingQuickPrompt.inputTemplate.trim();
+            const fullPrompt = pendingQuickPrompt.prompt.trim();
+            if (userMessage === template) {
+                // User sent the template without adding a product name.
+                // Send the full prompt which instructs the AI to ask.
+                userMessage = fullPrompt;
+            } else if (userMessage.startsWith(template)) {
+                // User appended a product name after the template text.
+                const productName = userMessage.slice(template.length).trim();
+                userMessage = `${fullPrompt}\n\nProduct: ${productName}`;
+            }
+            // If the user completely rewrote the message, send it as-is.
+        }
 
         const looksLikeIngredientFollowUp = (message) => {
             const lowered = String(message || '').toLowerCase();
@@ -1948,6 +2320,49 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
             return;
         }
 
+        // Auto suggestion when no product name is specified but a query matches a quick action or intent
+        const isQuickPromptWithoutProduct = pendingQuickPrompt && (
+            userMessage === pendingQuickPrompt.inputTemplate.trim() || 
+            userMessage === pendingQuickPrompt.prompt.trim()
+        );
+        const hasProductIdentifier = hasBarcodeInMessage(userMessage) || getExplicitProductTokens(userMessage).length > 0;
+
+        if (isQuickPromptWithoutProduct || !hasProductIdentifier) {
+            const intent = getQuickActionIntent(userMessage) || 
+                (isPriceOrCompareIntent(userMessage) ? 'compare' : 
+                 (looksLikeIngredientFollowUp(userMessage) ? 'ingredients' : null));
+
+            if (intent) {
+                setIsLoading(true);
+                const suggestedProducts = await getSuggestions(fullProductList);
+                if (user?.$id) {
+                    const text = getSuggestionText(intent, i18n.resolvedLanguage || i18n.language || 'en');
+                    const payload = {
+                        type: 'product_suggestions',
+                        intent: intent,
+                        text: text,
+                        products: suggestedProducts.map(p => {
+                            const sortedPrices = [...(p.prices || [])].sort((a, b) => a.price - b.price);
+                            const bestPrice = sortedPrices.length > 0 ? sortedPrices[0].price : null;
+                            const currency = sortedPrices.length > 0 ? (sortedPrices[0].currency || 'TRY') : 'TRY';
+                            return {
+                                id: p.$id || p.barcode,
+                                barcode: p.barcode,
+                                name: p.name || p.productName,
+                                imageUrl: p.imageUrl,
+                                bestPrice,
+                                currency
+                            };
+                        })
+                    };
+                    const serialized = `PRICEMATE_PRODUCT_SUGGESTIONS::${JSON.stringify(payload)}`;
+                    await addMessage(user.$id, 'assistant', serialized, user);
+                }
+                setIsLoading(false);
+                return;
+            }
+        }
+
         if (
             !explicitlyNamesProduct &&
             isPriceOrCompareIntent(userMessage) &&
@@ -1962,7 +2377,42 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
 
         const userAllergyPreferences = getUserAllergyPreferences();
         const userAiProfile = getUserAiProfile();
-        const { conditions, allergenTargets, isMedical } = detectConditions(userMessage, userAllergyPreferences);
+        const { conditions: detectedConditions, allergenTargets: detectedAllergenTargets, isMedical } = detectConditions(userMessage, userAllergyPreferences);
+        
+        // Merge saved health profile and allergy preferences when user checks suitability
+        const conditionsSet = new Set(detectedConditions);
+        const allergenTargetsSet = new Set(detectedAllergenTargets);
+        
+        if (isMedical) {
+            if (userAllergyPreferences.includes('diabetes')) conditionsSet.add('diabetes');
+            if (userAllergyPreferences.includes('hypertension')) conditionsSet.add('hypertension');
+            if (userAllergyPreferences.includes('pregnancy')) conditionsSet.add('pregnancy');
+            if (userAllergyPreferences.includes('gluten') || userAllergyPreferences.includes('celiac')) conditionsSet.add('gluten');
+            if (userAllergyPreferences.includes('lactose')) conditionsSet.add('lactose');
+            if (userAllergyPreferences.includes('kidney')) conditionsSet.add('kidney');
+            if (userAllergyPreferences.includes('gout')) conditionsSet.add('gout');
+            if (userAllergyPreferences.includes('hypercholesterolemia')) conditionsSet.add('hypercholesterolemia');
+            if (userAllergyPreferences.includes('gerd')) conditionsSet.add('gerd');
+            if (userAllergyPreferences.includes('ibs')) conditionsSet.add('ibs');
+            if (userAllergyPreferences.includes('pku')) conditionsSet.add('pku');
+            if (userAllergyPreferences.includes('hemochromatosis')) conditionsSet.add('hemochromatosis');
+            if (userAllergyPreferences.includes('thyroid')) conditionsSet.add('thyroid');
+            
+            const foodAllergies = userAllergyPreferences.filter(
+                (pref) => !['diabetes', 'hypertension', 'pregnancy', 'gluten', 'celiac', 'lactose', 'kidney', 'gout', 'hypercholesterolemia', 'gerd', 'ibs', 'pku', 'hemochromatosis', 'thyroid'].includes(pref)
+            );
+            if (foodAllergies.length > 0) {
+                conditionsSet.add('allergy');
+                const preferenceAllergenTargets = foodAllergies
+                    .map((item) => resolveAllergyPreferenceLabel(item))
+                    .filter(Boolean);
+                preferenceAllergenTargets.forEach((target) => allergenTargetsSet.add(target));
+            }
+        }
+        
+        const conditions = Array.from(conditionsSet);
+        const allergenTargets = Array.from(allergenTargetsSet);
+
         const explicitNutrientOrMedicalConditions = new Set([
             'gluten',
             'lactose',
@@ -2066,8 +2516,20 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
 
             // Catalog-only policy: only answer ingredient/safety questions for products available in PriceMate.
             if (!effectiveCatalog.product) {
+                const relatedProducts = await findRelatedProducts(userMessage, fullProductList, 3);
                 if (user?.$id) {
-                    await addMessage(user.$id, 'assistant', t('ai_catalog_only_refusal'), user);
+                    let reply = t('ai_catalog_only_refusal');
+                    if (relatedProducts.length > 0) {
+                        const lines = relatedProducts.map(p => `- ${p.name} [BARCODE:${p.barcode}]`);
+                        reply = [
+                            t('ai_catalog_only_refusal_help', "That product isn’t available in PriceMate yet. Here are some alternatives in the same category:") ||
+                                "That product isn’t available in PriceMate yet. Here are some alternatives in the same category:",
+                            ...lines,
+                            t('ai_catalog_only_refusal_hint', "If you share a barcode, I can check the exact item.") ||
+                                "If you share a barcode, I can check the exact item."
+                        ].join('\n');
+                    }
+                    await addMessage(user.$id, 'assistant', reply, user);
                 }
                 setIsLoading(false);
                 return;
@@ -2256,19 +2718,23 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
 
         const shouldBypassCatalogGate = mentionsNearestStore && !hasExplicitProductHintNow;
 
+        let relatedProducts = [];
         if (isProductSpecific && !effectiveCatalog?.product) {
-            if (user?.$id) {
-                const bestGuess = localProductMatch?.product || mergedProductProfile || null;
-                const reply =
-                    buildCategoryAlternativesReply(bestGuess, fullProductList, t) ||
-                    t('ai_catalog_only_refusal');
-                if (!shouldBypassCatalogGate) {
-                    await addMessage(user.$id, 'assistant', reply, user);
+            relatedProducts = await findRelatedProducts(userMessage, fullProductList, 3);
+            if (relatedProducts.length === 0) {
+                if (user?.$id) {
+                    const bestGuess = localProductMatch?.product || mergedProductProfile || null;
+                    const reply =
+                        buildCategoryAlternativesReply(bestGuess, fullProductList, t) ||
+                        t('ai_catalog_only_refusal');
+                    if (!shouldBypassCatalogGate) {
+                        await addMessage(user.$id, 'assistant', reply, user);
+                    }
                 }
-            }
-            if (!shouldBypassCatalogGate) {
-                setIsLoading(false);
-                return;
+                if (!shouldBypassCatalogGate) {
+                    setIsLoading(false);
+                    return;
+                }
             }
         }
 
@@ -2308,8 +2774,19 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 }
             }
 
+            let enrichedFullProductList = [...fullProductList];
+            if (relatedProducts && relatedProducts.length > 0) {
+                const existingIds = new Set(fullProductList.map(p => p.$id || p.barcode).filter(Boolean));
+                for (const p of relatedProducts) {
+                    const pid = p.$id || p.barcode;
+                    if (pid && !existingIds.has(pid)) {
+                        enrichedFullProductList.push(p);
+                    }
+                }
+            }
+
             const promptContext = buildRankedProductContextLines(
-                fullProductList,
+                enrichedFullProductList,
                 userMessage,
                 userAiProfile,
                 resolvedCatalogProductForPrompt,
@@ -2320,12 +2797,27 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 ? 'available (distances in NEARBY STORES are precomputed; do not invent km values)'
                 : `unavailable (${t('ai_chat_location_needed_for_distance', 'Ask the user to enable browser location to sort stores by distance.')})`;
             const intentSummary = buildIntentSummary(userMessage);
-            const aiProfileContext = formatAiProfileForPrompt(userAiProfile);
+            const aiProfileContext = formatAiProfileForPrompt(userAiProfile, userAllergyPreferences);
             const maxGenericReplyWords = userAiProfile.responseStyle === 'detailed'
                 ? 110
                 : userAiProfile.responseStyle === 'concise'
                     ? 45
                     : 60;
+
+            let missingProductInstructions = '';
+            if (isProductSpecific && !effectiveCatalog?.product && relatedProducts.length > 0) {
+                const requestedName = effectiveDisplayName || 'the requested product';
+                missingProductInstructions = `
+
+                PRODUCT NOT FOUND IN CATALOG:
+                - The user asked about "${requestedName}", which is NOT in our PriceMate catalog/database.
+                - Acknowledge that we do not have "${requestedName}" in the catalog.
+                - Do NOT invent or guess prices or store availability for "${requestedName}".
+                - Suggest the following similar/related products instead, mentioning their names, cheapest prices, and supermarkets:
+                ${relatedProducts.map(p => `- ${p.name} [BARCODE:${p.barcode}] (Cheapest price: ${p.cheapestPrice ? p.cheapestPrice + ' ' + currency : 'N/A'})`).join('\n')}
+                - Keep your tone conversational, warm, and helpful. Suggest these alternatives naturally. Do not sound robotic.
+                `;
+            }
 
             const prompt = `
                 You are the official PriceMate assistant. Your primary goal is to help users find products and compare prices.
@@ -2343,9 +2835,29 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 - Use these preferences to rank suggestions and tailor tone.
                 - Dietary preferences are preferences, not allergy safety verdicts.
                 - If no optional profile preferences are saved, add at most one short line: "Add shopping preferences to personalize future answers."
+
+                HEALTH CONDITIONS PROFILE (CRITICAL):
+                ${userAllergyPreferences.length > 0 ? `The user has the following health conditions: ${userAllergyPreferences.join(', ')}.` : 'No health conditions configured.'}
+                - When answering ANY question about a product (price, comparison, recommendation, or suitability), ALWAYS cross-reference the product against the user's health conditions using your nutritional and medical knowledge.
+                - If a product is unsuitable for any of the user's health conditions, you MUST warn them even if the user did not explicitly ask about health. For example:
+                  * If the user has "diabetes" and asks about Coca-Cola prices, add a brief health note: "⚠️ Note: This product is high in sugar and not recommended for diabetes."
+                  * If the user has "hypertension" and asks about a salty snack, mention the sodium concern.
+                  * If the user has "celiac" and asks about a wheat-based product, warn about gluten.
+                  * If the user has "thyroid", warn about soy, excess iodine, or highly processed foods.
+                  * If the user has "gout", warn about purine-rich foods and alcohol.
+                  * If the user has "pku", warn about aspartame/phenylalanine.
+                  * If the user has "gerd", warn about spicy, acidic, caffeinated, or chocolatey foods.
+                  * If the user has "ibs", mention high-FODMAP concerns.
+                  * If the user has "kidney", mention sodium, potassium, phosphorus concerns.
+                  * If the user has "hypercholesterolemia", warn about saturated/trans fats.
+                  * If the user has "hemochromatosis", warn about iron-fortified foods or vitamin C supplements.
+                  * If the user has "pregnancy", warn about alcohol, excess caffeine, and unpasteurized items.
+                - Keep health warnings brief (1 line with ⚠️ emoji prefix). Do not write medical essays.
+                - If the product appears safe for all the user's conditions, do NOT add unnecessary health notes.
                 
                 WEBSITE PRODUCT DATA (sample; catalog has many more items):
                 ${promptContext}
+                ${missingProductInstructions}
 
                 NEARBY STORES (PriceMate supermarkets; sorted by distance when user location is available):
                 User location for distance sorting: ${storeLocationStatus}
@@ -2689,7 +3201,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 subtitle={t('ai_chat_subtitle', 'Compare prices and ingredients.')}
                 poweredByLabel={t('ai_chat_powered_by', 'Powered by Gemini')}
                 user={user}
-                onOpenList={() => setMobileListOpen(true)}
+                onOpenList={() => setMobileListOpen((prev) => !prev)}
                 onNewChat={beginNewConversation}
                 onRefreshCatalog={handleRefreshCatalog}
                 onClose={effectiveOnClose}
@@ -2776,6 +3288,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                                         allProducts={fullProductList}
                                         allSupermarkets={supermarketList}
                                         t={t}
+                                        onSelectProduct={handleSelectProduct}
                                     />
                                 ))}
                                 {isLoading && (

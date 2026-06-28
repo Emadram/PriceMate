@@ -17,6 +17,8 @@ const ReportModal = ({ isOpen, onClose, targetName, targetType = 'supermarket' }
     const [panelMaxHeight, setPanelMaxHeight] = useState(null);
     const closeTimerRef = useRef(null);
     const panelRef = useRef(null);
+    const initialViewportHeightRef = useRef(null);
+    const textareaRef = useRef(null);
     const formId = 'report-modal-form';
 
     useDocumentScrollLock(isOpen);
@@ -28,6 +30,8 @@ const ReportModal = ({ isOpen, onClose, targetName, targetType = 'supermarket' }
             setDetails('');
             setError(null);
             setIsSubmitting(false);
+            // Capture the initial viewport height before any keyboard opens
+            initialViewportHeightRef.current = window.visualViewport?.height || window.innerHeight;
         }
     }, [isOpen, targetName, targetType]);
 
@@ -49,10 +53,21 @@ const ReportModal = ({ isOpen, onClose, targetName, targetType = 'supermarket' }
                 setPanelMaxHeight(null);
                 return;
             }
+
+            // Use the initial (pre-keyboard) height as the reference so the
+            // panel doesn't collapse when the virtual keyboard opens.
+            const baseHeight = initialViewportHeightRef.current || vv.height;
+            const isKeyboardOpen = baseHeight - vv.height > 100;
+
             const topInset = Math.max(0, vv.offsetTop);
+            // When the keyboard is open, use the full base height so the modal
+            // stays at a usable size. The OS will handle scrolling the focused
+            // element into view. When no keyboard is visible, use the actual
+            // viewport height for accurate sizing.
+            const referenceHeight = isKeyboardOpen ? baseHeight : vv.height;
             const available = Math.max(
                 200,
-                Math.floor(vv.height - topInset - navH - 16)
+                Math.floor(referenceHeight - topInset - (isKeyboardOpen ? 0 : navH) - 16)
             );
             setPanelMaxHeight(available);
         };
@@ -211,9 +226,20 @@ const ReportModal = ({ isOpen, onClose, targetName, targetType = 'supermarket' }
                                     {t('additional_details_optional', 'Additional Details (Optional)')}
                                 </label>
                                 <textarea
+                                    ref={textareaRef}
                                     value={details}
                                     disabled={isSubmitting}
                                     onChange={(e) => setDetails(e.target.value)}
+                                    onFocus={() => {
+                                        // After the keyboard finishes opening, scroll the
+                                        // textarea into view so the user can see what they type.
+                                        setTimeout(() => {
+                                            textareaRef.current?.scrollIntoView({
+                                                behavior: 'smooth',
+                                                block: 'center',
+                                            });
+                                        }, 350);
+                                    }}
                                     className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-base text-gray-900 dark:text-white focus:ring-2 focus:ring-red-500 focus:border-transparent transition resize-none"
                                     rows={3}
                                     placeholder={t('tell_us_more', 'Tell us more...')}

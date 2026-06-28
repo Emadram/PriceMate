@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Mail, ArrowRight, Loader2 } from 'lucide-react';
+import { LuMail as Mail, LuArrowRight as ArrowRight, LuLoaderCircle as Loader2 } from 'react-icons/lu';
 import { useTranslation } from 'react-i18next';
 import useAuthStore from '../stores/authStore';
 import BackButton from '../components/BackButton';

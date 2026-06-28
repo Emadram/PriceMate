@@ -5,7 +5,6 @@ import useAuthStore from './stores/authStore';
 import useThemeStore from './stores/themeStore';
 import useFavoritesStore from './stores/favoritesStore';
 import useCurrencyStore from './stores/currencyStore';
-import { runDiagnostics } from './utils/diagnostics';
 import i18n from './lib/i18n';
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
@@ -123,18 +122,19 @@ function App() {
   usePreventBrowserZoom(true);
   const checkSession = useAuthStore((state) => state.checkSession);
   const user = useAuthStore((state) => state.user);
-  const { syncFavorites, clearFavorites } = useFavoritesStore();
+  const syncFavorites = useFavoritesStore((state) => state.syncFavorites);
+  const clearFavorites = useFavoritesStore((state) => state.clearFavorites);
   const setTheme = useThemeStore((state) => state.setTheme);
   const theme = useThemeStore((state) => state.theme);
   const fetchRates = useCurrencyStore((state) => state.fetchRates);
   const setCurrency = useCurrencyStore((state) => state.setCurrency);
-  const currency = useCurrencyStore((state) => state.currency);
+
 
   useEffect(() => {
     checkSession();
     fetchRates(); // Initialize exchange rates on mount
     // Ensure default currency is TRY on first load
-    if (!currency) {
+    if (!useCurrencyStore.getState().currency) {
       setCurrency('TRY');
     }
     if (typeof window !== 'undefined') {
@@ -150,9 +150,9 @@ function App() {
       import.meta.env.VITE_RUN_DIAGNOSTICS === 'true' &&
       import.meta.env.VITE_READ_DEBUG !== 'true';
     if (import.meta.env.DEV && runDiagnosticsEnabled) {
-      runDiagnostics();
+      import('./utils/diagnostics').then(m => m.runDiagnostics());
     }
-  }, [checkSession, setTheme, fetchRates, currency, setCurrency]);
+  }, [checkSession, setTheme, fetchRates, setCurrency]);
 
   useEffect(() => {
     if (!import.meta.env.DEV) return undefined;

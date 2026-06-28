@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { BarcodeFormat, DecodeHintType } from '@zxing/library';
 import { validateScannedBarcode } from '../utils/barcodeValidation';
@@ -56,7 +56,7 @@ const Scanner = ({ onDetected, onInvalidBarcode, paused = false }) => {
         return h;
     }, []);
 
-    const stopStream = () => {
+    const stopStream = useCallback(() => {
         try {
             controlsRef.current?.stop?.();
         } catch {
@@ -85,20 +85,24 @@ const Scanner = ({ onDetected, onInvalidBarcode, paused = false }) => {
             // ignore
         }
 
+        try {
+            const videoEl = videoRef.current;
+            if (videoEl) {
+                videoEl.pause?.();
+                videoEl.srcObject = null;
+            }
+        } catch {
+            // ignore
+        }
+
         streamRef.current = null;
         trackRef.current = null;
-    };
+        isStartingRef.current = false;
+    }, []);
 
     const tuneTrackIfPossible = async () => {
-        const videoEl = videoRef.current;
-        const stream = videoEl?.srcObject;
-        if (!stream || !(stream instanceof MediaStream)) return;
-
-        const [track] = stream.getVideoTracks();
+        const track = trackRef.current;
         if (!track) return;
-
-        streamRef.current = stream;
-        trackRef.current = track;
 
         // Camera capabilities vary a lot by device/browser; apply the safe ones opportunistically.
         const caps = track.getCapabilities?.() || {};
@@ -272,19 +276,58 @@ const Scanner = ({ onDetected, onInvalidBarcode, paused = false }) => {
                     }
                 };
 
-                // Prefer decodeFromConstraints so we can request better resolution and then tune the track.
-                if (typeof reader.decodeFromConstraints === 'function') {
-                    controlsRef.current = await reader.decodeFromConstraints(constraints, videoRef.current, onDecode);
-                } else {
-                    // Fallback for older API shapes.
-                    controlsRef.current = await reader.decodeFromVideoDevice(preferredDevice?.deviceId, videoRef.current, onDecode);
+                // Request camera permission and stream first
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+                // Check if component unmounted or paused during getUserMedia
+                if (!isActive || paused) {
+                    stream.getTracks().forEach((track) => {
+                        try {
+                            track.stop();
+                        } catch {
+                            // ignore
+                        }
+                    });
+                    return;
                 }
 
-                // Give the video element a moment to receive its MediaStream, then tune constraints (AF/torch/zoom).
-                setTimeout(() => {
-                    if (!isActive || paused) return;
-                    tuneTrackIfPossible();
-                }, 250);
+                streamRef.current = stream;
+                const [track] = stream.getVideoTracks();
+                if (track) {
+                    trackRef.current = track;
+                }
+
+                // Tune constraints (AF/torch/zoom) immediately since tracks are ready
+                tuneTrackIfPossible();
+
+                // Decode from stream (using zxing browser controls)
+                let controls;
+                if (typeof reader.decodeFromStream === 'function') {
+                    controls = await reader.decodeFromStream(stream, videoRef.current, onDecode);
+                } else if (typeof reader.decodeFromConstraints === 'function') {
+                    controls = await reader.decodeFromConstraints(constraints, videoRef.current, onDecode);
+                } else {
+                    controls = await reader.decodeFromVideoDevice(preferredDevice?.deviceId, videoRef.current, onDecode);
+                }
+
+                // Check again in case component unmounted or paused during decodeFromStream
+                if (!isActive || paused) {
+                    try {
+                        controls?.stop?.();
+                    } catch {
+                        // ignore
+                    }
+                    stream.getTracks().forEach((track) => {
+                        try {
+                            track.stop();
+                        } catch {
+                            // ignore
+                        }
+                    });
+                    return;
+                }
+
+                controlsRef.current = controls;
             } catch (error) {
                 if (error?.name === 'NotAllowedError') {
                     setError('Camera permission denied. Please allow camera access and reload.');
@@ -314,7 +357,29 @@ const Scanner = ({ onDetected, onInvalidBarcode, paused = false }) => {
             }
             isStartingRef.current = false;
         };
-    }, [hints, paused]);
+    }, [hints, paused, stopStream]);
+
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.visibilityState !== 'visible') {
+                stopStream();
+            }
+        };
+
+        const handlePageHide = () => {
+            stopStream();
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('pagehide', handlePageHide);
+        window.addEventListener('blur', handlePageHide);
+
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('pagehide', handlePageHide);
+            window.removeEventListener('blur', handlePageHide);
+        };
+    }, [stopStream]);
 
     // If paused changes to true, stop the reader; if false, it will restart via effect
     useEffect(() => {
@@ -323,7 +388,7 @@ const Scanner = ({ onDetected, onInvalidBarcode, paused = false }) => {
             lastCodeRef.current = null;
             candidateRef.current = { text: null, count: 0, firstTs: 0, lastTs: 0 };
         }
-    }, [paused]);
+    }, [paused, stopStream]);
 
     return (
         <div className="relative w-full h-[48vh] sm:h-64 md:h-80 lg:h-96 bg-black rounded-lg overflow-hidden">

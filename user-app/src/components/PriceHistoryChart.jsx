@@ -47,7 +47,7 @@ const buildCurrentPricesSignature = (currentPrices = []) =>
         .sort()
         .join('|');
 
-const buildChartHistory = (data, currentPrices = []) => {
+const buildChartHistory = (data, currentPrices = [], language = 'en') => {
     const supermarketLookup = new Map();
 
     currentPrices.forEach((price) => {
@@ -64,7 +64,7 @@ const buildChartHistory = (data, currentPrices = []) => {
 
         const supermarketId = getSupermarketId(item.supermarketId || item.supermarkets || item.supermarket);
         const matched = supermarketLookup.get(supermarketId);
-        const displayDate = new Date(timeValue).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' });
+        const displayDate = new Date(timeValue).toLocaleDateString(language, { day: '2-digit', month: '2-digit' });
         const supermarketName = matched ? formatSupermarketName(matched) : item.supermarketName || 'Store';
 
         return {
@@ -87,7 +87,7 @@ const buildChartHistory = (data, currentPrices = []) => {
 
         return {
             date: new Date(timeValue).getTime(),
-            displayDate: new Date(timeValue).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' }),
+            displayDate: new Date(timeValue).toLocaleDateString(language, { day: '2-digit', month: '2-digit' }),
             price: Number(price.price),
             supermarket: supermarketName,
             supermarketLabel: formatSupermarketLabel(supermarketName),
@@ -122,7 +122,7 @@ const ChartEmptyState = ({ title, subtitle }) => (
 );
 
 const PriceHistoryChart = ({ productId, productName, currentPrices = [] }) => {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const { convert, getCurrencySymbol } = useCurrencyStore();
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -154,10 +154,10 @@ const PriceHistoryChart = ({ productId, productName, currentPrices = [] }) => {
             }
 
             const currentSig = buildCurrentPricesSignature(currentPrices);
-            const key = `price-history-chart:${productId}:${currentSig}`;
+            const key = `price-history-chart:${productId}:${currentSig}:${i18n.language}`;
             const fetcher = async () => {
                 const data = await fetchPriceHistory(productId);
-                return buildChartHistory(data, currentPrices);
+                return buildChartHistory(data, currentPrices, i18n.language);
             };
 
             try {
@@ -188,7 +188,7 @@ const PriceHistoryChart = ({ productId, productName, currentPrices = [] }) => {
         };
 
         loadHistory();
-    }, [productId, currentPrices]);
+    }, [productId, currentPrices, i18n.language]);
 
     const filteredData = useMemo(() => {
         if (!history.length) return [];
@@ -209,13 +209,22 @@ const PriceHistoryChart = ({ productId, productName, currentPrices = [] }) => {
 
     const showPointLabels = !isMobile && filteredData.length <= 12;
 
+    const getDotRadius = () => {
+        if (filter === '1d' || filter === '7d') return 5;
+        if (filter === '1m') return 4;
+        if (filter === '3m') return 3;
+        if (filter === '6m') return 2.5;
+        if (filter === '1y') return 2;
+        return 3;
+    };
+
     const renderDot = (props) => {
         const { cx, cy, payload } = props;
         if (cx == null || cy == null) return null;
 
         return (
             <g>
-                <circle cx={cx} cy={cy} r={3} fill="#4f46e5" />
+                <circle cx={cx} cy={cy} r={getDotRadius()} fill="#4f46e5" />
                 {showPointLabels && payload?.supermarketLabel && (
                     <text
                         x={cx}
@@ -238,9 +247,9 @@ const PriceHistoryChart = ({ productId, productName, currentPrices = [] }) => {
             return dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
         }
         if (filter === '7d') {
-            return dateObj.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' });
+            return dateObj.toLocaleDateString(i18n.language, { day: '2-digit', month: 'short' });
         }
-        return dateObj.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' });
+        return dateObj.toLocaleDateString(i18n.language, { day: '2-digit', month: 'short' });
     };
 
     const stats = useMemo(() => {
@@ -344,7 +353,7 @@ const PriceHistoryChart = ({ productId, productName, currentPrices = [] }) => {
                             tickLine={false}
                             tick={{ fontSize: 10, fontWeight: 600, fill: '#9ca3af' }}
                             tickFormatter={formatXAxisTick}
-                            minTickGap={20}
+                            minTickGap={35}
                         />
                         <YAxis 
                             hide 
@@ -353,9 +362,9 @@ const PriceHistoryChart = ({ productId, productName, currentPrices = [] }) => {
                             content={({ active, payload }) => {
                                 if (active && payload && payload.length) {
                                     return (
-                                        <div className="bg-white dark:bg-gray-800 p-2 shadow-xl border border-gray-100 dark:border-gray-700 rounded-lg">
+                                        <div className="bg-white dark:bg-gray-800 p-2 shadow-xl border border-gray-100 dark:border-gray-700 rounded-lg max-w-[200px]">
                                             <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">
-                                                {new Date(payload[0].payload.date).toLocaleString('tr-TR', {
+                                                {new Date(payload[0].payload.date).toLocaleString(i18n.language, {
                                                     day: '2-digit',
                                                     month: '2-digit',
                                                     year: '2-digit',

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Lock, ArrowRight, Loader2 } from 'lucide-react';
+import { LuLock as Lock, LuArrowRight as ArrowRight, LuLoaderCircle as Loader2 } from 'react-icons/lu';
 import { useTranslation } from 'react-i18next';
 import useAuthStore from '../stores/authStore';
 import BackButton from '../components/BackButton';

@@ -189,7 +189,7 @@ const NavItem = ({ to, icon, label, currentPath, state, onTap }) => {
                 state={state}
                 onClick={onTap}
                 className={`tap-target min-h-11 min-w-11 px-1.5 flex flex-col items-center justify-center gap-1 transition-colors duration-200 ease-out ${
-                    isActive ? 'text-brand-600 dark:text-brand-500' : 'text-gray-400 dark:text-gray-200'
+                    isActive ? 'text-brand-600 dark:text-brand-500' : 'text-gray-400 dark:text-gray-500'
                 }`}> 
             <IconComponent size={21} strokeWidth={isActive ? 2.5 : 2} />
             <span className={`text-[9px] font-semibold tracking-tight uppercase ${isActive ? 'opacity-100' : 'opacity-80'}`}>

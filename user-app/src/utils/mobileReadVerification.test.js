@@ -7,7 +7,10 @@ const listMock = vi.fn();
 
 vi.mock('../lib/appwrite', () => ({
     db: {
-        products: { list: (...args) => listMock(...args) },
+        products: {
+            list: (...args) => listMock(...args),
+            get: vi.fn((id) => Promise.resolve({ $id: id, name: 'Mock Product' })),
+        },
         prices: { list: vi.fn() },
         supermarkets: { list: vi.fn(), get: vi.fn() },
         categories: { list: vi.fn() },

@@ -60,11 +60,14 @@ describe('aiCheckUtils', () => {
         expect(buildAiProfileCacheKey(profile)).toContain('vegan');
     });
 
-    it('expands allergen labels into ingredient terms', () => {
+     it('expands allergen labels into ingredient terms', () => {
         const terms = getAllergenTermsForLabels(['milk']);
         expect(terms).toContain('whey');
         expect(terms).toContain('casein');
         expect(terms).toContain('lactose');
+
+        const healthTerms = getAllergenTermsForLabels(['diabetes', 'hypertension', 'pregnancy']);
+        expect(healthTerms).toEqual([]);
     });
 
     it('round-trips structured assistant payloads', () => {

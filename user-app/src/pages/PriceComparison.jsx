@@ -7,7 +7,7 @@ import {
     FiCalendar, FiTag, FiAlertTriangle, FiInfo 
 } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
-import { calculateDistance, hasValidLatLon, fetchSimilarProductsByCategory, fetchPricesForProducts, getRelationshipId, normalizeProduct, resolveCoordinates, getStoreAvailability } from '../utils/productUtils';
+import { calculateDistance, hasValidLatLon, fetchSimilarProductsByCategory, fetchPricesForProducts, getRelationshipId, normalizeProduct, resolveCoordinates, getStoreAvailability, formatRelativeAge } from '../utils/productUtils';
 import { stripNutritionMeta } from '../utils/productUtils';
 import PriceHistoryChart from '../components/PriceHistoryChart';
 import ReportModal from '../components/ReportModal';
@@ -189,19 +189,16 @@ const PriceComparison = () => {
     }, [barcode, fetchProductByBarcode]);
 
     useEffect(() => {
-        fetchSupermarkets();
+        fetchSupermarkets({ force: true });
     }, [fetchSupermarkets]);
 
     const resolveSupermarketDoc = useCallback((price) => {
         const fromPrice = getSupermarketFromPrice(price);
-        if (isSupermarketObject(fromPrice)) return fromPrice;
-        const id = typeof fromPrice === 'string' ? fromPrice : (() => {
-            const supermarket = getSupermarketFromPrice(price);
-            if (!supermarket) return null;
-            return typeof supermarket === 'string' ? supermarket : supermarket.$id;
-        })();
-        if (!id) return null;
-        return (supermarketCatalog || []).find((sm) => sm.$id === id) || fromPrice;
+        const id = !fromPrice ? null : (typeof fromPrice === 'string' ? fromPrice : fromPrice.$id);
+        if (!id) return isSupermarketObject(fromPrice) ? fromPrice : null;
+        
+        const found = (supermarketCatalog || []).find((sm) => sm.$id === id);
+        return found || (isSupermarketObject(fromPrice) ? fromPrice : null);
     }, [supermarketCatalog]);
 
     useEffect(() => {
@@ -755,8 +752,8 @@ const PriceComparison = () => {
                                     
                                     const updatedAtValue = getPriceTimestamp(priceEntry);
                                     const updatedAt = updatedAtValue ? new Date(updatedAtValue) : new Date();
-                                    const formattedDate = updatedAt.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: '2-digit' });
-                                    const formattedTime = updatedAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                                    const formattedDate = updatedAt.toLocaleDateString(i18n.language, { day: '2-digit', month: '2-digit', year: '2-digit' });
+                                    const formattedTime = updatedAt.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', hour12: true });
                                     const distanceDisplay = priceEntry.distance !== null ? `${priceEntry.distance} km` : t('calculating');
 
                                     return (
@@ -817,6 +814,18 @@ const PriceComparison = () => {
                                                             <FiNavigation size={12} />
                                                             {distanceDisplay}
                                                         </span>
+                                                        {isSupermarketObject(supermarket) && supermarket.$updatedAt && (
+                                                            <span className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-tight ${
+                                                                (() => {
+                                                                    const d = Math.floor((Date.now() - new Date(supermarket.$updatedAt).getTime()) / 86400000);
+                                                                    if (d >= 10) return 'text-amber-500 dark:text-amber-400';
+                                                                    return 'text-gray-400 dark:text-gray-500';
+                                                                })()
+                                                            }`}>
+                                                                <FiHome size={11} className="shrink-0" />
+                                                                {t('store_updated_relative', 'Store updated:')} {formatRelativeAge(supermarket.$updatedAt)}
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 </div>
 

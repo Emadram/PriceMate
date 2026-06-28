@@ -13,15 +13,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
     "@zxing/browser": "^0.1.5",
     "@zxing/library": "^0.21.3",
     "appwrite": "^21.4.0",
-    "axios": "^1.13.2",
-    "caniuse-lite": "^1.0.30001792",
     "i18next": "^25.8.18",
     "i18next-browser-languagedetector": "^8.2.1",
-    "lucide-react": "^0.577.0",
     "ol": "^10.8.0",
     "openai": "^6.27.0",
     "react": "^19.2.0",

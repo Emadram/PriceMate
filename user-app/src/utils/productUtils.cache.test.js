@@ -12,6 +12,7 @@ vi.mock('../lib/appwrite', () => ({
         limit: vi.fn(),
         orderDesc: vi.fn(),
         select: vi.fn(),
+        contains: vi.fn(),
     },
     COLLECTIONS: { PRICE_HISTORY: 'price_history' },
     functions: {},

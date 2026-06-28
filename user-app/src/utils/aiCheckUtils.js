@@ -209,6 +209,14 @@ export const readStoredAllergyProfile = (prefs = {}) => {
 export const getAllergenTermsForLabels = (labels = []) =>
     Array.from(new Set(labels.flatMap((label) => {
         const normalized = normalizeAllergyPreference(label);
+        if (['diabetes', 'hypertension', 'pregnancy', 'kidney', 'gout', 'hypercholesterolemia', 'gerd', 'ibs', 'pku', 'hemochromatosis', 'thyroid'].includes(normalized)) return '';
+        if (normalized === 'celiac' || normalized === 'gluten') {
+            const group = ALLERGEN_BY_LABEL.get('gluten');
+            return group ? group.terms : ['gluten'];
+        }
+        if (normalized === 'allergy') {
+            return ALLERGEN_GROUPS.flatMap((g) => g.terms);
+        }
         const group = ALLERGEN_BY_LABEL.get(normalized);
         return group ? group.terms : [normalized];
     }).filter(Boolean)));

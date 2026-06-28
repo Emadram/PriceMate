@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
-    ShoppingBag, Package, MapPin, Phone, Mail, 
-    MessageSquare, Star, Globe, 
-    Clock, Home, AlertTriangle, TrendingDown,
-    ChevronRight, ExternalLink, Share2, Info, ChevronDown
-} from 'lucide-react';
+    LuShoppingBag as ShoppingBag, LuPackage as Package, LuMapPin as MapPin, LuPhone as Phone, LuMail as Mail, 
+    LuMessageSquare as MessageSquare, LuStar as Star, LuGlobe as Globe, 
+    LuClock as Clock, LuTriangleAlert as AlertTriangle, LuTrendingDown as TrendingDown,
+    LuChevronRight as ChevronRight, LuExternalLink as ExternalLink, LuShare2 as Share2, LuInfo as Info, LuChevronDown as ChevronDown,
+    LuSearch as Search, LuX as X, LuArrowUpDown as ArrowUpDown, LuStore as Store
+} from 'react-icons/lu';
 import { useTranslation } from 'react-i18next';
 import { 
     fetchSupermarketProfileBundle,
@@ -14,6 +15,7 @@ import {
     hasValidLatLon,
     resolveCoordinates,
     getStoreAvailability,
+    formatRelativeAge,
 } from '../utils/productUtils';
 import { getCacheEntry, swrGetOrFetch } from '../utils/swrCache';
 import { SUPERMARKET_PROFILE_CACHE_TTL_MS } from '../utils/cacheTtls';
@@ -43,6 +45,7 @@ const extractEmbedSrc = (embedHtml) => {
     return /google\.com\/maps\/embed/i.test(text) ? text : '';
 };
 
+
 const SupermarketProfile = () => {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -60,6 +63,10 @@ const SupermarketProfile = () => {
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
     const [isProductReportOpen, setIsProductReportOpen] = useState(false);
     const [productReportTarget, setProductReportTarget] = useState(null);
+    const [productSearch, setProductSearch] = useState('');
+    const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('');
+    const [productSortBy, setProductSortBy] = useState('default');
+    const searchInputRef = useRef(null);
     const { isSupermarketFavorite, toggleSupermarketFavorite } = useFavoritesStore();
     const user = useAuthStore((state) => state.user);
 
@@ -181,10 +188,63 @@ const SupermarketProfile = () => {
         return () => clearTimeout(timeoutId);
     }, [id]);
 
-    const categorySections = useMemo(
+    const allCategorySections = useMemo(
         () => groupSupermarketProductsByCategory(products, t),
         [products, t]
     );
+
+    // Client-side filtered products based on search, category, and sort
+    const filteredProducts = useMemo(() => {
+        let result = [...products];
+
+        // Text search filter
+        const q = productSearch.trim().toLowerCase();
+        if (q) {
+            result = result.filter((price) => {
+                const name = (price.products?.name || '').toLowerCase();
+                const brand = (price.products?.brand || price.products?.brands || '').toLowerCase();
+                const barcode = (price.products?.barcode || price.products?.code || '').toLowerCase();
+                return name.includes(q) || brand.includes(q) || barcode.includes(q);
+            });
+        }
+
+        // Category filter
+        if (selectedCategoryFilter) {
+            result = result.filter((price) => {
+                const product = price.products || {};
+                const catRel = product.categoryId;
+                const catId = catRel?.$id || (typeof catRel === 'string' ? catRel : null);
+                const catName = product.category || catRel?.categoryName || catRel?.name || '';
+                return catId === selectedCategoryFilter || catName.toLowerCase() === selectedCategoryFilter.toLowerCase();
+            });
+        }
+
+        // Sort
+        if (productSortBy === 'name-asc') {
+            result.sort((a, b) => (a.products?.name || '').localeCompare(b.products?.name || ''));
+        } else if (productSortBy === 'price-asc') {
+            result.sort((a, b) => (a.price || 0) - (b.price || 0));
+        } else if (productSortBy === 'price-desc') {
+            result.sort((a, b) => (b.price || 0) - (a.price || 0));
+        } else if (productSortBy === 'updated') {
+            result.sort((a, b) => new Date(b.$updatedAt || 0).getTime() - new Date(a.$updatedAt || 0).getTime());
+        }
+
+        return result;
+    }, [products, productSearch, selectedCategoryFilter, productSortBy]);
+
+    const categorySections = useMemo(
+        () => groupSupermarketProductsByCategory(filteredProducts, t),
+        [filteredProducts, t]
+    );
+
+    const isFiltering = productSearch.trim() || selectedCategoryFilter || productSortBy !== 'default';
+
+    const clearAllFilters = () => {
+        setProductSearch('');
+        setSelectedCategoryFilter('');
+        setProductSortBy('default');
+    };
 
     if (loading && !supermarket) {
         return (
@@ -318,9 +378,24 @@ const SupermarketProfile = () => {
                                 <span className="truncate text-xs font-medium text-gray-400 dark:text-gray-500">{productBrand}</span>
                             )}
                         </div>
-                        <p className="text-[10px] font-bold uppercase tracking-tight text-green-600 dark:text-green-400">
-                            Updated {new Date(price.$updatedAt).toLocaleDateString()}
-                        </p>
+                        <div className="space-y-0.5">
+                            <p className="text-[10px] font-bold uppercase tracking-tight text-green-600 dark:text-green-400 flex items-center gap-1">
+                                <Package size={10} className="shrink-0" />
+                                {t('product_updated', 'Updated')} {new Date(price.$updatedAt).toLocaleDateString(i18n.language)}
+                            </p>
+                            {supermarket?.$updatedAt && (
+                                <p className={`text-[9px] font-semibold uppercase tracking-tight flex items-center gap-1 ${
+                                    (() => {
+                                        const d = Math.floor((Date.now() - new Date(supermarket.$updatedAt).getTime()) / 86400000);
+                                        if (d >= 10) return 'text-amber-500 dark:text-amber-400';
+                                        return 'text-gray-400 dark:text-gray-500';
+                                    })()
+                                }`}>
+                                    <Store size={9} className="shrink-0" />
+                                    {t('store_updated_relative', 'Store updated:')} {formatRelativeAge(supermarket.$updatedAt)}
+                                </p>
+                            )}
+                        </div>
                         <div className="flex flex-wrap items-baseline gap-2 pt-1">
                             <span className="text-lg font-bold leading-none text-gray-900 dark:text-white">
                                 {getCurrencySymbol()} {convert(price.price)}
@@ -559,7 +634,7 @@ const SupermarketProfile = () => {
                         <div className="bg-gray-50 dark:bg-[#1C1C1E] p-3 sm:p-4 rounded-xl sm:rounded-2xl">
                             <p className="text-[9px] sm:text-[11px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest mb-1">{t('last_updated')}</p>
                             <p className="text-[11px] sm:text-sm font-semibold dark:text-white pt-1 leading-snug">
-                                {lastUpdateValue ? formatLastUpdate(lastUpdateValue) : t('no_updates_yet', 'No updates yet')}
+                                {lastUpdateValue ? formatLastUpdate(lastUpdateValue, i18n.language) : t('no_updates_yet', 'No updates yet')}
                             </p>
                         </div>
                     </div>
@@ -718,7 +793,109 @@ const SupermarketProfile = () => {
                             </div>
                         </div>
 
+                        {/* Search & Filter Toolbar */}
+                        {products.length > 0 && (
+                            <div className="space-y-3">
+                                {/* Search Input */}
+                                <div className="relative group">
+                                    <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 group-focus-within:text-brand-600 dark:group-focus-within:text-brand-400 transition-colors">
+                                        <Search size={18} />
+                                    </div>
+                                    <input
+                                        ref={searchInputRef}
+                                        type="text"
+                                        value={productSearch}
+                                        onChange={(e) => setProductSearch(e.target.value)}
+                                        placeholder={t('search_products_placeholder', 'Search products by name, brand, or barcode…')}
+                                        className="w-full min-h-12 pl-11 pr-11 py-3 bg-white dark:bg-[#1C1C1E] border border-gray-100 dark:border-white/10 rounded-2xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition text-sm font-medium shadow-soft"
+                                    />
+                                    {productSearch && (
+                                        <button
+                                            type="button"
+                                            onClick={() => { setProductSearch(''); searchInputRef.current?.focus(); }}
+                                            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                                        >
+                                            <X size={16} />
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* Category Pills + Sort */}
+                                <div className="flex items-center gap-2">
+                                    {/* Category pills – horizontally scrollable */}
+                                    <div className="flex-1 overflow-x-auto no-scrollbar">
+                                        <div className="flex gap-1.5 pb-0.5">
+                                            <button
+                                                type="button"
+                                                onClick={() => setSelectedCategoryFilter('')}
+                                                className={`tap-target shrink-0 px-3.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 border ${
+                                                    !selectedCategoryFilter
+                                                        ? 'bg-brand-600 text-white border-brand-600 shadow-md shadow-brand-500/20 dark:bg-brand-500 dark:border-brand-500'
+                                                        : 'bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-400 border-gray-100 dark:border-white/10 hover:border-brand-200 dark:hover:border-brand-500/30'
+                                                }`}
+                                            >
+                                                {t('all', 'All')}
+                                            </button>
+                                            {allCategorySections.map((section) => {
+                                                const filterKey = section.categoryId?.$id || section.key;
+                                                const active = selectedCategoryFilter === filterKey;
+                                                return (
+                                                    <button
+                                                        key={section.key}
+                                                        type="button"
+                                                        onClick={() => setSelectedCategoryFilter(active ? '' : filterKey)}
+                                                        className={`tap-target shrink-0 px-3.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 border ${
+                                                            active
+                                                                ? 'bg-brand-600 text-white border-brand-600 shadow-md shadow-brand-500/20 dark:bg-brand-500 dark:border-brand-500'
+                                                                : 'bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-400 border-gray-100 dark:border-white/10 hover:border-brand-200 dark:hover:border-brand-500/30'
+                                                        }`}
+                                                    >
+                                                        {section.label}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    {/* Sort Dropdown */}
+                                    <div className="relative shrink-0">
+                                        <div className="absolute inset-y-0 left-2.5 flex items-center pointer-events-none text-gray-400">
+                                            <ArrowUpDown size={13} />
+                                        </div>
+                                        <select
+                                            value={productSortBy}
+                                            onChange={(e) => setProductSortBy(e.target.value)}
+                                            className="min-h-10 pl-8 pr-3 py-2 bg-white dark:bg-[#1C1C1E] border border-gray-100 dark:border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-600 dark:text-gray-300 shadow-soft appearance-none focus:ring-2 focus:ring-brand-500 cursor-pointer"
+                                        >
+                                            <option value="default">{t('sort_default', 'Default')}</option>
+                                            <option value="name-asc">{t('sort_name_az', 'Name: A–Z')}</option>
+                                            <option value="price-asc">{t('sort_price_low_high', 'Price: Low → High')}</option>
+                                            <option value="price-desc">{t('sort_price_high_low', 'Price: High → Low')}</option>
+                                            <option value="updated">{t('sort_recently_updated', 'Recently Updated')}</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {/* Active filter summary */}
+                                {isFiltering && (
+                                    <div className="flex items-center justify-between px-1">
+                                        <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+                                            {t('showing_results', { count: filteredProducts.length, total: products.length, defaultValue: 'Showing {{count}} of {{total}} products' })}
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={clearAllFilters}
+                                            className="text-[10px] font-black text-brand-600 dark:text-brand-400 uppercase tracking-widest hover:underline"
+                                        >
+                                            {t('clear_all', 'Clear All')}
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         {products.length > 0 ? (
+                            categorySections.length > 0 ? (
                             <div className="space-y-6 sm:space-y-8">
                                 {categorySections.map((section) => (
                                     <div key={section.key} className="space-y-3">
@@ -730,10 +907,10 @@ const SupermarketProfile = () => {
                                                 className="min-w-0 flex-1"
                                             />
                                             <span
-                                                className="shrink-0 inline-flex items-center justify-center min-w-[2.5rem] h-8 px-3 rounded-full text-sm font-black tabular-nums bg-brand-600 text-white shadow-md shadow-brand-500/25 ring-1 ring-brand-500/20 dark:bg-brand-500 dark:shadow-brand-500/15"
+                                                className="shrink-0 inline-flex items-center justify-center gap-1.5 h-8 px-3.5 rounded-full text-xs font-black tabular-nums bg-brand-600 text-white shadow-md shadow-brand-500/25 ring-1 ring-brand-500/20 dark:bg-brand-500 dark:shadow-brand-500/15"
                                                 aria-label={t('items_count_lower', { count: section.products.length })}
                                             >
-                                                {section.products.length}
+                                                {section.products.length} <span className="font-bold text-white/80">{t('products_label', 'products')}</span>
                                             </span>
                                         </div>
                                         <div
@@ -745,6 +922,23 @@ const SupermarketProfile = () => {
                                     </div>
                                 ))}
                             </div>
+                            ) : (
+                                /* No results from filtering */
+                                <div className="bg-white dark:bg-[#121214] rounded-[2.5rem] p-10 text-center border border-dashed border-gray-200 dark:border-white/10 shadow-soft">
+                                    <div className="w-14 h-14 bg-gray-50 dark:bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <Search className="text-gray-300 dark:text-gray-600" size={22} />
+                                    </div>
+                                    <h3 className="text-lg font-semibold dark:text-white mb-2">{t('no_matching_products', 'No matching products')}</h3>
+                                    <p className="text-gray-500 dark:text-gray-400 text-sm mb-5 max-w-xs mx-auto">{t('no_matching_products_subtitle', 'Try adjusting your search or filters to find what you\'re looking for.')}</p>
+                                    <button
+                                        type="button"
+                                        onClick={clearAllFilters}
+                                        className="tap-target bg-brand-600 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-black transition-colors active:scale-95"
+                                    >
+                                        {t('clear_filters', 'Clear Filters')}
+                                    </button>
+                                </div>
+                            )
                         ) : (
                             <div className="bg-white dark:bg-[#121214] rounded-[2.5rem] p-12 text-center border border-dashed border-gray-200 dark:border-white/10 shadow-soft">
                                 <div className="w-16 h-16 bg-gray-50 dark:bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
