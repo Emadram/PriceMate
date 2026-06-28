@@ -1997,7 +1997,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
 
         const sugarTerms = ['sugar', 'glucose', 'fructose', 'syrup', 'corn syrup', 'honey', 'dextrose', 'sucrose', 'maltodextrin', 'şeker', 'seker', 'glikoz', 'fruktoz', 'şurup', 'surup', 'bal', 'dekstroz', 'sakkaroz', 'maltodekstrin'];
         const sodiumTerms = ['salt', 'sodium', 'msg', 'monosodium', 'sodium chloride', 'tuz', 'sodyum', 'monosodyum'];
-        const caffeineTerms = ['caffeine', 'caffeinated', 'kafein', 'energy drink', 'enerji içeceği', 'enerji icecegi'];
+        const caffeineTerms = ['caffeine', 'caffeinated', 'kafein', 'energy drink', 'enerji içeceği', 'enerji icecegi', 'high caffeine', 'yüksek kafein', 'yuksek kafein'];
 
         const wantsSugarCheck = conditions.includes('diabetes') || conditions.includes('high_sugar');
         const wantsSodiumCheck = conditions.includes('hypertension') || conditions.includes('high_sodium');
@@ -2089,7 +2089,9 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
 
         if (wantsCaffeineCheck) {
             const labelKey = 'condition_high_caffeine';
-            if (caffeineMgPerL !== null && caffeineMgPerL !== undefined) {
+            const hasHighCaffeineKeyword = collectMatches(['high caffeine', 'yüksek kafein', 'yuksek kafein']).length > 0;
+            
+            if (caffeineMgPerL !== null && caffeineMgPerL !== undefined && !hasHighCaffeineKeyword) {
                 const valueText = `${Math.round(caffeineMgPerL)}mg/L`;
                 const isHigh = caffeineMgPerL >= CAFFEINE_THRESHOLD_MG_PER_L;
                 reasons.push(`${t(labelKey)}: ${formatNutrientLevel(t('nutrient_caffeine'), valueText, isHigh)}`);
@@ -2097,8 +2099,14 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
             } else if (hasIngredientBlob) {
                 const matches = collectMatches(caffeineTerms);
                 if (matches.length > 0) {
-                    reasons.push(`${t(labelKey)}: ${t('nutrient_caffeine')} found in ingredients (${formatMatches(matches)})`);
-                    bumpStatus('caution');
+                    const isHigh = hasHighCaffeineKeyword || matches.some(m => ['energy drink', 'enerji içeceği', 'enerji icecegi'].includes(m.toLowerCase()));
+                    if (isHigh) {
+                        reasons.push(`${t(labelKey)}: High caffeine content detected in ingredients (${formatMatches(matches)})`);
+                        bumpStatus('caution');
+                    } else {
+                        reasons.push(`${t(labelKey)}: ${t('nutrient_caffeine')} found in ingredients (${formatMatches(matches)})`);
+                        bumpStatus('caution');
+                    }
                 } else {
                     reasons.push(`${t(labelKey)}: ${t('nutrient_caffeine')} not listed`);
                 }
@@ -2492,8 +2500,9 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 : '',
         });
 
+        const mentionsDistanceOrLocation = ['closest', 'nearest', 'near me', 'en yakın', 'yakın', 'mesafe', 'distance', 'closest_cheapest'].some(term => userMessage.toLowerCase().includes(term));
         const skipStructuredPriceCheck =
-            !explicitlyNamesProduct && aiCheckResult?.mode === 'price_check';
+            (!explicitlyNamesProduct && aiCheckResult?.mode === 'price_check') || mentionsDistanceOrLocation;
 
         if (aiCheckResult && aiCheckResult.mode && aiCheckResult.mode !== 'generic' && !skipStructuredPriceCheck) {
             const structuredReply = serializeAiCheckResponse(aiCheckResult);
