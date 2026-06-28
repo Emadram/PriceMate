@@ -1626,6 +1626,35 @@ export const formatLastUpdate = (timestamp, locale) => {
 };
 
 /**
+ * Format a timestamp as a human-friendly relative age:
+ *  - < 1 day  → "today"
+ *  - < 10 days → "X days ago"
+ *  - < 10 weeks → "X weeks ago"
+ *  - otherwise → "X months ago"
+ */
+export const formatRelativeAge = (timestamp) => {
+    if (!timestamp) return null;
+    const now = Date.now();
+    const then = new Date(timestamp).getTime();
+    if (Number.isNaN(then)) return null;
+
+    const diffMs = now - then;
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 1) return 'today';
+    if (diffDays === 1) return '1 day ago';
+    if (diffDays < 10) return `${diffDays} days ago`;
+
+    const diffWeeks = Math.floor(diffDays / 7);
+    if (diffWeeks === 1) return '1 week ago';
+    if (diffWeeks < 10) return `${diffWeeks} weeks ago`;
+
+    const diffMonths = Math.max(1, Math.floor(diffDays / 30));
+    if (diffMonths === 1) return '1 month ago';
+    return `${diffMonths} months ago`;
+};
+
+/**
  * Fetch price history for a specific product (in-memory TTL cache).
  */
 export const fetchPriceHistory = async (productId, branchId = null) => {

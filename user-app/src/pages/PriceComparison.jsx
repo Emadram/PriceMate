@@ -7,7 +7,7 @@ import {
     FiCalendar, FiTag, FiAlertTriangle, FiInfo 
 } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
-import { calculateDistance, hasValidLatLon, fetchSimilarProductsByCategory, fetchPricesForProducts, getRelationshipId, normalizeProduct, resolveCoordinates, getStoreAvailability } from '../utils/productUtils';
+import { calculateDistance, hasValidLatLon, fetchSimilarProductsByCategory, fetchPricesForProducts, getRelationshipId, normalizeProduct, resolveCoordinates, getStoreAvailability, formatRelativeAge } from '../utils/productUtils';
 import { stripNutritionMeta } from '../utils/productUtils';
 import PriceHistoryChart from '../components/PriceHistoryChart';
 import ReportModal from '../components/ReportModal';
@@ -817,6 +817,18 @@ const PriceComparison = () => {
                                                             <FiNavigation size={12} />
                                                             {distanceDisplay}
                                                         </span>
+                                                        {isSupermarketObject(supermarket) && supermarket.$updatedAt && (
+                                                            <span className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-tight ${
+                                                                (() => {
+                                                                    const d = Math.floor((Date.now() - new Date(supermarket.$updatedAt).getTime()) / 86400000);
+                                                                    if (d >= 10) return 'text-amber-500 dark:text-amber-400';
+                                                                    return 'text-gray-400 dark:text-gray-500';
+                                                                })()
+                                                            }`}>
+                                                                <FiHome size={11} className="shrink-0" />
+                                                                {t('store_label', 'Store')} {formatRelativeAge(supermarket.$updatedAt)}
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 </div>
 

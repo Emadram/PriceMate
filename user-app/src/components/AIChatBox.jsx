@@ -59,7 +59,8 @@ const normalizeAllergyLabel = (value) => String(value || '').trim().toLowerCase(
 const resolveAllergyPreferenceLabel = (value) => {
     const normalized = normalizeAllergyLabel(value);
     if (!normalized || NO_ALLERGY_PREFERENCE_VALUES.has(normalized)) return '';
-    if (['diabetes', 'hypertension', 'pregnancy'].includes(normalized)) return '';
+    if (['diabetes', 'hypertension', 'pregnancy', 'kidney', 'gout', 'hypercholesterolemia', 'gerd', 'ibs', 'pku', 'hemochromatosis'].includes(normalized)) return '';
+    if (normalized === 'celiac' || normalized === 'gluten') return 'gluten';
     if (ALLERGEN_GROUP_BY_LABEL.has(normalized)) return normalized;
     if (normalized === 'nuts' || normalized === 'nut') return 'tree nuts';
     if (normalized === 'dairy') return 'milk';
@@ -69,6 +70,9 @@ const resolveAllergyPreferenceLabel = (value) => {
 const getAllergenTermsForLabels = (labels = []) => {
     const terms = labels.flatMap((label) => {
         const resolved = resolveAllergyPreferenceLabel(label);
+        if (resolved === 'allergy') {
+            return ALLERGEN_GROUPS.flatMap((g) => g.terms);
+        }
         const group = ALLERGEN_GROUP_BY_LABEL.get(resolved);
         return group?.terms || [resolved];
     });
@@ -2241,11 +2245,11 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
             if (userAllergyPreferences.includes('diabetes')) conditionsSet.add('diabetes');
             if (userAllergyPreferences.includes('hypertension')) conditionsSet.add('hypertension');
             if (userAllergyPreferences.includes('pregnancy')) conditionsSet.add('pregnancy');
-            if (userAllergyPreferences.includes('gluten')) conditionsSet.add('gluten');
+            if (userAllergyPreferences.includes('gluten') || userAllergyPreferences.includes('celiac')) conditionsSet.add('gluten');
             if (userAllergyPreferences.includes('lactose')) conditionsSet.add('lactose');
             
             const foodAllergies = userAllergyPreferences.filter(
-                (pref) => !['diabetes', 'hypertension', 'pregnancy', 'gluten', 'lactose'].includes(pref)
+                (pref) => !['diabetes', 'hypertension', 'pregnancy', 'gluten', 'celiac', 'lactose'].includes(pref)
             );
             if (foodAllergies.length > 0) {
                 conditionsSet.add('allergy');

@@ -25,19 +25,19 @@ import {
 } from '../utils/aiCheckUtils';
 
 const ALLERGY_OPTIONS = [
-    { id: 'milk', labelKey: 'allergy_option_milk' },
-    { id: 'lactose', labelKey: 'allergy_option_lactose' },
-    { id: 'gluten', labelKey: 'allergy_option_gluten' },
-    { id: 'diabetes', labelKey: 'allergy_option_diabetes' },
-    { id: 'hypertension', labelKey: 'allergy_option_hypertension' },
-    { id: 'pregnancy', labelKey: 'allergy_option_pregnancy' },
-    { id: 'peanut', labelKey: 'allergy_option_peanut' },
-    { id: 'tree nuts', labelKey: 'allergy_option_tree_nuts' },
-    { id: 'soy', labelKey: 'allergy_option_soy' },
-    { id: 'egg', labelKey: 'allergy_option_egg' },
-    { id: 'fish', labelKey: 'allergy_option_fish' },
-    { id: 'shellfish', labelKey: 'allergy_option_shellfish' },
-    { id: 'sesame', labelKey: 'allergy_option_sesame' },
+    { id: 'diabetes', labelKey: 'allergy_option_diabetes', descKey: 'allergy_desc_diabetes' },
+    { id: 'celiac', labelKey: 'allergy_option_celiac', descKey: 'allergy_desc_celiac' },
+    { id: 'lactose', labelKey: 'allergy_option_lactose', descKey: 'allergy_desc_lactose' },
+    { id: 'kidney', labelKey: 'allergy_option_kidney', descKey: 'allergy_desc_kidney' },
+    { id: 'gout', labelKey: 'allergy_option_gout', descKey: 'allergy_desc_gout' },
+    { id: 'hypertension', labelKey: 'allergy_option_hypertension', descKey: 'allergy_desc_hypertension' },
+    { id: 'hypercholesterolemia', labelKey: 'allergy_option_hypercholesterolemia', descKey: 'allergy_desc_hypercholesterolemia' },
+    { id: 'gerd', labelKey: 'allergy_option_gerd', descKey: 'allergy_desc_gerd' },
+    { id: 'ibs', labelKey: 'allergy_option_ibs', descKey: 'allergy_desc_ibs' },
+    { id: 'pku', labelKey: 'allergy_option_pku', descKey: 'allergy_desc_pku' },
+    { id: 'hemochromatosis', labelKey: 'allergy_option_hemochromatosis', descKey: 'allergy_desc_hemochromatosis' },
+    { id: 'allergy', labelKey: 'allergy_option_allergy', descKey: 'allergy_desc_allergy' },
+    { id: 'pregnancy', labelKey: 'allergy_option_pregnancy', descKey: 'allergy_desc_pregnancy' },
 ];
 
 const DIETARY_OPTIONS = [
@@ -332,7 +332,7 @@ const Settings = () => {
                         {t('allergy_profile_description')}
                     </p>
                     <form onSubmit={handleSaveAllergies} className="space-y-3">
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-2">
                             {ALLERGY_OPTIONS.map((item) => {
                                 const active = allergyPrefs.includes(item.id);
                                 return (
@@ -340,13 +340,25 @@ const Settings = () => {
                                         key={item.id}
                                         type="button"
                                         onClick={() => toggleAllergy(item.id)}
-                                        className={`tap-target min-h-11 rounded-2xl border text-[10px] font-black uppercase tracking-widest transition-all ${
+                                        className={`tap-target w-full text-left p-3.5 rounded-2xl border transition-all flex flex-col gap-0.5 ${
                                             active
                                                 ? 'bg-black dark:bg-white text-white dark:text-black border-black dark:border-white'
-                                                : 'bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'
+                                                : 'bg-gray-50 dark:bg-gray-800/50 text-gray-900 dark:text-white border-gray-200 dark:border-gray-700'
                                         }`}
                                     >
-                                        {t(item.labelKey)}
+                                        <div className="flex items-center justify-between w-full">
+                                            <span className="text-[11px] font-bold uppercase tracking-wider">
+                                                {t(item.labelKey)}
+                                            </span>
+                                            <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${active ? 'border-brand-500 bg-brand-500 text-white' : 'border-gray-300 dark:border-gray-600'}`}>
+                                                {active && <div className="w-1.5 h-1.5 rounded-full bg-white dark:bg-black" />}
+                                            </div>
+                                        </div>
+                                        {item.descKey && (
+                                            <span className={`text-[9px] leading-normal font-medium ${active ? 'text-gray-300 dark:text-gray-500' : 'text-gray-400 dark:text-gray-500'}`}>
+                                                {t(item.descKey)}
+                                            </span>
+                                        )}
                                     </button>
                                 );
                             })}

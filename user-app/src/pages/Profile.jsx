@@ -6,19 +6,19 @@ import { FiMessageSquare, FiChevronRight, FiLogOut, FiUser, FiGlobe, FiShield, F
 import { MobileHeader, MobilePage } from '../components/MobilePageLayout';
 
 const ALLERGY_OPTIONS = [
-    { id: 'milk', labelKey: 'allergy_option_milk' },
-    { id: 'lactose', labelKey: 'allergy_option_lactose' },
-    { id: 'gluten', labelKey: 'allergy_option_gluten' },
-    { id: 'diabetes', labelKey: 'allergy_option_diabetes' },
-    { id: 'hypertension', labelKey: 'allergy_option_hypertension' },
-    { id: 'pregnancy', labelKey: 'allergy_option_pregnancy' },
-    { id: 'peanut', labelKey: 'allergy_option_peanut' },
-    { id: 'tree nuts', labelKey: 'allergy_option_tree_nuts' },
-    { id: 'soy', labelKey: 'allergy_option_soy' },
-    { id: 'egg', labelKey: 'allergy_option_egg' },
-    { id: 'fish', labelKey: 'allergy_option_fish' },
-    { id: 'shellfish', labelKey: 'allergy_option_shellfish' },
-    { id: 'sesame', labelKey: 'allergy_option_sesame' },
+    { id: 'diabetes', labelKey: 'allergy_option_diabetes', descKey: 'allergy_desc_diabetes' },
+    { id: 'celiac', labelKey: 'allergy_option_celiac', descKey: 'allergy_desc_celiac' },
+    { id: 'lactose', labelKey: 'allergy_option_lactose', descKey: 'allergy_desc_lactose' },
+    { id: 'kidney', labelKey: 'allergy_option_kidney', descKey: 'allergy_desc_kidney' },
+    { id: 'gout', labelKey: 'allergy_option_gout', descKey: 'allergy_desc_gout' },
+    { id: 'hypertension', labelKey: 'allergy_option_hypertension', descKey: 'allergy_desc_hypertension' },
+    { id: 'hypercholesterolemia', labelKey: 'allergy_option_hypercholesterolemia', descKey: 'allergy_desc_hypercholesterolemia' },
+    { id: 'gerd', labelKey: 'allergy_option_gerd', descKey: 'allergy_desc_gerd' },
+    { id: 'ibs', labelKey: 'allergy_option_ibs', descKey: 'allergy_desc_ibs' },
+    { id: 'pku', labelKey: 'allergy_option_pku', descKey: 'allergy_desc_pku' },
+    { id: 'hemochromatosis', labelKey: 'allergy_option_hemochromatosis', descKey: 'allergy_desc_hemochromatosis' },
+    { id: 'allergy', labelKey: 'allergy_option_allergy', descKey: 'allergy_desc_allergy' },
+    { id: 'pregnancy', labelKey: 'allergy_option_pregnancy', descKey: 'allergy_desc_pregnancy' },
 ];
 
 const DIETARY_OPTIONS = [
