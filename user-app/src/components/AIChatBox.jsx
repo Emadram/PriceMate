@@ -1736,7 +1736,13 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         const lowered = message.toLowerCase();
         const conditions = new Set();
 
-        const hasAny = (keywords) => keywords.some((word) => lowered.includes(word));
+        const hasAny = (keywords) => {
+            return keywords.some((word) => {
+                const escaped = word.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+                const regex = new RegExp(`\\b${escaped}\\b`, 'i');
+                return regex.test(lowered);
+            });
+        };
 
         if (hasAny(['gluten', 'gluten free', 'gluten-free', 'celiac', 'coeliac', 'çölyak', 'glutensiz'])) {
             conditions.add('gluten');
