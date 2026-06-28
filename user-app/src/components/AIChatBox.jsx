@@ -719,21 +719,29 @@ const profileHasPersonalization = (profile = {}) =>
     profile.budgetPreference !== 'balanced' ||
     profile.responseStyle !== 'balanced';
 
-const formatAiProfileForPrompt = (profile = {}) => {
-    if (!profileHasPersonalization(profile)) {
-        return 'No optional AI shopping profile preferences saved.';
+const formatAiProfileForPrompt = (profile = {}, healthConditions = []) => {
+    const lines = [];
+
+    if (profileHasPersonalization(profile)) {
+        lines.push(
+            `Dietary preferences: ${profile.dietaryPreferences?.join(', ') || 'none'}`,
+            `Nutrition priorities: ${profile.nutritionPriorities?.join(', ') || 'none'}`,
+            `Avoid ingredients: ${profile.avoidIngredients?.join(', ') || 'none'}`,
+            `Budget preference: ${profile.budgetPreference || 'balanced'}`,
+            `Preferred stores: ${profile.preferredStores?.join(', ') || 'none'}`,
+            `Preferred brands: ${profile.preferredBrands?.join(', ') || 'none'}`,
+            `Disliked brands: ${profile.dislikedBrands?.join(', ') || 'none'}`,
+            `Response style: ${profile.responseStyle || 'balanced'}`,
+        );
+    } else {
+        lines.push('No optional AI shopping profile preferences saved.');
     }
 
-    return [
-        `Dietary preferences: ${profile.dietaryPreferences?.join(', ') || 'none'}`,
-        `Nutrition priorities: ${profile.nutritionPriorities?.join(', ') || 'none'}`,
-        `Avoid ingredients: ${profile.avoidIngredients?.join(', ') || 'none'}`,
-        `Budget preference: ${profile.budgetPreference || 'balanced'}`,
-        `Preferred stores: ${profile.preferredStores?.join(', ') || 'none'}`,
-        `Preferred brands: ${profile.preferredBrands?.join(', ') || 'none'}`,
-        `Disliked brands: ${profile.dislikedBrands?.join(', ') || 'none'}`,
-        `Response style: ${profile.responseStyle || 'balanced'}`,
-    ].join('\n');
+    if (healthConditions.length > 0) {
+        lines.push(`Health conditions: ${healthConditions.join(', ')}`);
+    }
+
+    return lines.join('\n');
 };
 
 const ChatProductThumb = ({ src, alt, className = 'w-full h-full' }) => {
@@ -1972,17 +1980,36 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         const wantsCaffeineCheck = conditions.includes('high_caffeine');
 
         if (wantsSugarCheck) {
-            const labelKey = conditions.includes('diabetes') ? 'condition_diabetes' : 'condition_high_sugar';
+            const isMedicalDiabetes = conditions.includes('diabetes');
+            const labelKey = isMedicalDiabetes ? 'condition_diabetes' : 'condition_high_sugar';
+            
+            const nameLower = String(payload.name || payload.productName || '').toLowerCase();
+            const isSugarySoda = ['coca-cola', 'coca cola', 'coke', 'pepsi', 'soda', 'sprite', 'fanta'].some(term => nameLower.includes(term));
+            
             if (sugarPer100g !== null && sugarPer100g !== undefined) {
                 const valueText = `${Number(sugarPer100g).toFixed(1)}g/100g`;
-                const isHigh = sugarPer100g >= SUGAR_THRESHOLD_G_PER_100G;
-                reasons.push(`${t(labelKey)}: ${formatNutrientLevel(t('nutrient_sugar'), valueText, isHigh)}`);
-                if (isHigh) bumpStatus('caution');
+                const isHigh = sugarPer100g >= (isMedicalDiabetes ? 5.0 : SUGAR_THRESHOLD_G_PER_100G) || isSugarySoda;
+                if (isMedicalDiabetes) {
+                    if (isHigh) {
+                        reasons.push(`${t(labelKey, 'Diabetes')}: High sugar content (${valueText}) is not suitable for Diabetes.`);
+                        bumpStatus('avoid');
+                    } else {
+                        reasons.push(`${t(labelKey, 'Diabetes')}: Sugar content within limit (${valueText})`);
+                    }
+                } else {
+                    reasons.push(`${t(labelKey)}: ${formatNutrientLevel(t('nutrient_sugar'), valueText, isHigh)}`);
+                    if (isHigh) bumpStatus('caution');
+                }
             } else if (hasIngredientBlob) {
                 const matches = collectMatches(sugarTerms);
-                if (matches.length > 0) {
-                    reasons.push(`${t(labelKey)}: ${t('nutrient_sugar')} found in ingredients (${formatMatches(matches)})`);
-                    bumpStatus('caution');
+                if (matches.length > 0 || isSugarySoda) {
+                    if (isMedicalDiabetes) {
+                        reasons.push(`${t(labelKey, 'Diabetes')}: Added sugar / sugary beverage detected. Not suitable for Diabetes.`);
+                        bumpStatus('avoid');
+                    } else {
+                        reasons.push(`${t(labelKey)}: ${t('nutrient_sugar')} found in ingredients (${formatMatches(matches)})`);
+                        bumpStatus('caution');
+                    }
                 } else {
                     reasons.push(`${t(labelKey)}: ${t('nutrient_sugar')} not listed`);
                 }
@@ -1992,17 +2019,32 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         }
 
         if (wantsSodiumCheck) {
-            const labelKey = conditions.includes('hypertension') ? 'condition_hypertension' : 'condition_high_sodium';
+            const isMedicalHypertension = conditions.includes('hypertension');
+            const labelKey = isMedicalHypertension ? 'condition_hypertension' : 'condition_high_sodium';
             if (sodiumMgPer100g !== null && sodiumMgPer100g !== undefined) {
                 const valueText = `${Math.round(sodiumMgPer100g)}mg/100g`;
-                const isHigh = sodiumMgPer100g >= SODIUM_THRESHOLD_MG_PER_100G;
-                reasons.push(`${t(labelKey)}: ${formatNutrientLevel(t('nutrient_sodium'), valueText, isHigh)}`);
-                if (isHigh) bumpStatus('caution');
+                const isHigh = sodiumMgPer100g >= (isMedicalHypertension ? 300 : SODIUM_THRESHOLD_MG_PER_100G);
+                if (isMedicalHypertension) {
+                    if (isHigh) {
+                        reasons.push(`${t(labelKey, 'Hypertension')}: High sodium content (${valueText}) is not suitable for Hypertension.`);
+                        bumpStatus('avoid');
+                    } else {
+                        reasons.push(`${t(labelKey, 'Hypertension')}: Sodium content within limit (${valueText})`);
+                    }
+                } else {
+                    reasons.push(`${t(labelKey)}: ${formatNutrientLevel(t('nutrient_sodium'), valueText, isHigh)}`);
+                    if (isHigh) bumpStatus('caution');
+                }
             } else if (hasIngredientBlob) {
                 const matches = collectMatches(sodiumTerms);
                 if (matches.length > 0) {
-                    reasons.push(`${t(labelKey)}: ${t('nutrient_sodium')} found in ingredients (${formatMatches(matches)})`);
-                    bumpStatus('caution');
+                    if (isMedicalHypertension) {
+                        reasons.push(`${t(labelKey, 'Hypertension')}: Sodium/salt ingredients detected. Not suitable for Hypertension.`);
+                        bumpStatus('avoid');
+                    } else {
+                        reasons.push(`${t(labelKey)}: ${t('nutrient_sodium')} found in ingredients (${formatMatches(matches)})`);
+                        bumpStatus('caution');
+                    }
                 } else {
                     reasons.push(`${t(labelKey)}: ${t('nutrient_sodium')} not listed`);
                 }
@@ -2039,6 +2081,106 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 bumpStatus('caution');
             } else {
                 reasons.push(`${t('condition_pregnancy')}: ${t('ai_reason_none_found', { items: t('condition_pregnancy') })}`);
+            }
+        }
+
+        if (conditions.includes('thyroid')) {
+            const thyroidAvoidTerms = ['soy', 'soya', 'soybean', 'tofu', 'edamame', 'iodine', 'seaweed', 'kelp', 'yosun', 'iyot'];
+            const matches = collectMatches(thyroidAvoidTerms);
+            if (matches.length > 0) {
+                reasons.push(`${t('condition_thyroid', 'Thyroid')}: Contains soy, seaweed, or iodine-rich ingredients (${formatMatches(matches)}) which should be avoided.`);
+                bumpStatus('avoid');
+            } else {
+                reasons.push(`${t('condition_thyroid', 'Thyroid')}: No soy or iodine-rich ingredients found`);
+            }
+        }
+
+        if (conditions.includes('gout')) {
+            const goutAvoidTerms = ['anchovy', 'anchovies', 'sardine', 'sardines', 'mackerel', 'herring', 'yeast', 'alcohol', 'beer', 'wine', 'rum', 'whiskey', 'vodka', 'purine', 'hamsi', 'sardalya', 'uskumru', 'maya', 'alkol', 'bira', 'şarap', 'sarap'];
+            const matches = collectMatches(goutAvoidTerms);
+            if (matches.length > 0) {
+                reasons.push(`${t('condition_gout', 'Gout')}: Contains purine-rich ingredients (${formatMatches(matches)}) which should be avoided.`);
+                bumpStatus('avoid');
+            } else {
+                reasons.push(`${t('condition_gout', 'Gout')}: No purine-rich ingredients detected`);
+            }
+        }
+
+        if (conditions.includes('kidney')) {
+            const kidneyAvoidTerms = ['phosphate', 'phosphorus', 'potassium', 'phospho', 'potasyum', 'fosfat', 'fosfor'];
+            const matches = collectMatches(kidneyAvoidTerms);
+            const proteinPer100g = nutriments.proteinsPer100g || payload.proteinsPer100g || null;
+            const hasHighProtein = proteinPer100g && proteinPer100g >= 15;
+            const hasHighSodium = sodiumMgPer100g && sodiumMgPer100g >= 300;
+            
+            if (matches.length > 0 || hasHighProtein || hasHighSodium) {
+                const subReasons = [];
+                if (matches.length > 0) subReasons.push(`phosphorus/potassium additives (${formatMatches(matches)})`);
+                if (hasHighProtein) subReasons.push(`high protein (${proteinPer100g}g/100g)`);
+                if (hasHighSodium) subReasons.push(`high sodium (${sodiumMgPer100g}mg/100g)`);
+                
+                reasons.push(`${t('condition_kidney', 'Kidney Disease')}: Limit intake of ${subReasons.join(', ')}.`);
+                bumpStatus('avoid');
+            } else {
+                reasons.push(`${t('condition_kidney', 'Kidney Disease')}: No high sodium, protein, or potassium/phosphorus additives found`);
+            }
+        }
+
+        if (conditions.includes('hypercholesterolemia')) {
+            const satFat = nutriments.saturatedFatPer100g || payload.saturatedFatPer100g || null;
+            const transFat = nutriments.transFatPer100g || payload.transFatPer100g || null;
+            const hasTransFat = transFat && transFat > 0;
+            const hasHighSatFat = satFat && satFat >= 5.0;
+            
+            if (hasHighSatFat || hasTransFat) {
+                reasons.push(`${t('condition_hypercholesterolemia', 'Hypercholesterolemia')}: Contains high saturated/trans fats (Saturated: ${satFat || 0}g/100g) which should be avoided.`);
+                bumpStatus('avoid');
+            } else {
+                reasons.push(`${t('condition_hypercholesterolemia', 'Hypercholesterolemia')}: Fats within healthy limits`);
+            }
+        }
+
+        if (conditions.includes('gerd')) {
+            const gerdAvoidTerms = ['chili', 'pepper', 'spicy', 'caffeine', 'chocolate', 'cocoa', 'mint', 'peppermint', 'biber', 'baharat', 'kafein', 'çikolata', 'cikolata', 'kakao', 'nane'];
+            const matches = collectMatches(gerdAvoidTerms);
+            if (matches.length > 0) {
+                reasons.push(`${t('condition_gerd', 'GERD')}: Contains reflux triggers (${formatMatches(matches)}) which should be avoided.`);
+                bumpStatus('avoid');
+            } else {
+                reasons.push(`${t('condition_gerd', 'GERD')}: No common reflux triggers detected`);
+            }
+        }
+
+        if (conditions.includes('ibs')) {
+            const ibsAvoidTerms = ['onion', 'garlic', 'wheat', 'lactose', 'sweetener', 'sorbitol', 'mannitol', 'xylitol', 'isomalt', 'soğan', 'sogan', 'sarimsak', 'sarımsak', 'tatlandırıcı', 'tatlandirici'];
+            const matches = collectMatches(ibsAvoidTerms);
+            if (matches.length > 0) {
+                reasons.push(`${t('condition_ibs', 'IBS')}: Contains potential high-FODMAP triggers (${formatMatches(matches)}) which should be limited.`);
+                bumpStatus('caution');
+            } else {
+                reasons.push(`${t('condition_ibs', 'IBS')}: Low potential FODMAP triggers`);
+            }
+        }
+
+        if (conditions.includes('pku')) {
+            const pkuAvoidTerms = ['aspartame', 'phenylalanine', 'aspartam', 'fenilalanin'];
+            const matches = collectMatches(pkuAvoidTerms);
+            if (matches.length > 0) {
+                reasons.push(`${t('condition_pku', 'PKU')}: Contains aspartame/phenylalanine (${formatMatches(matches)}) which is strictly contraindicated.`);
+                bumpStatus('avoid');
+            } else {
+                reasons.push(`${t('condition_pku', 'PKU')}: Phenylalanine/aspartame free`);
+            }
+        }
+
+        if (conditions.includes('hemochromatosis')) {
+            const hemochromatosisTerms = ['iron', 'ferrous', 'demi', 'vitamin c', 'ascorbic acid', 'askorbik asit'];
+            const matches = collectMatches(hemochromatosisTerms);
+            if (matches.length > 0) {
+                reasons.push(`${t('condition_hemochromatosis', 'Hemochromatosis')}: Contains added iron or vitamin C (${formatMatches(matches)}) which should be avoided.`);
+                bumpStatus('avoid');
+            } else {
+                reasons.push(`${t('condition_hemochromatosis', 'Hemochromatosis')}: No added iron or vitamin C found`);
             }
         }
 
@@ -2247,6 +2389,14 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
             if (userAllergyPreferences.includes('pregnancy')) conditionsSet.add('pregnancy');
             if (userAllergyPreferences.includes('gluten') || userAllergyPreferences.includes('celiac')) conditionsSet.add('gluten');
             if (userAllergyPreferences.includes('lactose')) conditionsSet.add('lactose');
+            if (userAllergyPreferences.includes('kidney')) conditionsSet.add('kidney');
+            if (userAllergyPreferences.includes('gout')) conditionsSet.add('gout');
+            if (userAllergyPreferences.includes('hypercholesterolemia')) conditionsSet.add('hypercholesterolemia');
+            if (userAllergyPreferences.includes('gerd')) conditionsSet.add('gerd');
+            if (userAllergyPreferences.includes('ibs')) conditionsSet.add('ibs');
+            if (userAllergyPreferences.includes('pku')) conditionsSet.add('pku');
+            if (userAllergyPreferences.includes('hemochromatosis')) conditionsSet.add('hemochromatosis');
+            if (userAllergyPreferences.includes('thyroid')) conditionsSet.add('thyroid');
             
             const foodAllergies = userAllergyPreferences.filter(
                 (pref) => !['diabetes', 'hypertension', 'pregnancy', 'gluten', 'celiac', 'lactose', 'kidney', 'gout', 'hypercholesterolemia', 'gerd', 'ibs', 'pku', 'hemochromatosis', 'thyroid'].includes(pref)
@@ -2647,7 +2797,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 ? 'available (distances in NEARBY STORES are precomputed; do not invent km values)'
                 : `unavailable (${t('ai_chat_location_needed_for_distance', 'Ask the user to enable browser location to sort stores by distance.')})`;
             const intentSummary = buildIntentSummary(userMessage);
-            const aiProfileContext = formatAiProfileForPrompt(userAiProfile);
+            const aiProfileContext = formatAiProfileForPrompt(userAiProfile, userAllergyPreferences);
             const maxGenericReplyWords = userAiProfile.responseStyle === 'detailed'
                 ? 110
                 : userAiProfile.responseStyle === 'concise'
@@ -2685,6 +2835,25 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 - Use these preferences to rank suggestions and tailor tone.
                 - Dietary preferences are preferences, not allergy safety verdicts.
                 - If no optional profile preferences are saved, add at most one short line: "Add shopping preferences to personalize future answers."
+
+                HEALTH CONDITIONS PROFILE (CRITICAL):
+                ${userAllergyPreferences.length > 0 ? `The user has the following health conditions: ${userAllergyPreferences.join(', ')}.` : 'No health conditions configured.'}
+                - When answering ANY question about a product (price, comparison, recommendation, or suitability), ALWAYS cross-reference the product against the user's health conditions using your nutritional and medical knowledge.
+                - If a product is unsuitable for any of the user's health conditions, you MUST warn them even if the user did not explicitly ask about health. For example:
+                  * If the user has "diabetes" and asks about Coca-Cola prices, add a brief health note: "⚠️ Note: This product is high in sugar and not recommended for diabetes."
+                  * If the user has "hypertension" and asks about a salty snack, mention the sodium concern.
+                  * If the user has "celiac" and asks about a wheat-based product, warn about gluten.
+                  * If the user has "thyroid", warn about soy, excess iodine, or highly processed foods.
+                  * If the user has "gout", warn about purine-rich foods and alcohol.
+                  * If the user has "pku", warn about aspartame/phenylalanine.
+                  * If the user has "gerd", warn about spicy, acidic, caffeinated, or chocolatey foods.
+                  * If the user has "ibs", mention high-FODMAP concerns.
+                  * If the user has "kidney", mention sodium, potassium, phosphorus concerns.
+                  * If the user has "hypercholesterolemia", warn about saturated/trans fats.
+                  * If the user has "hemochromatosis", warn about iron-fortified foods or vitamin C supplements.
+                  * If the user has "pregnancy", warn about alcohol, excess caffeine, and unpasteurized items.
+                - Keep health warnings brief (1 line with ⚠️ emoji prefix). Do not write medical essays.
+                - If the product appears safe for all the user's conditions, do NOT add unnecessary health notes.
                 
                 WEBSITE PRODUCT DATA (sample; catalog has many more items):
                 ${promptContext}
