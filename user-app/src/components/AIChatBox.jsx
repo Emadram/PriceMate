@@ -2873,6 +2873,9 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
 
                 RESPONSE RULES (STRICT):
                 - Answer the latest user intent directly.
+                - Do NOT include any introductory sentences, explaining preambles, or conversational transitions (e.g., do NOT say "To find the closest and cheapest...", "Here is the information:", or "I looked at current prices...").
+                - Do NOT add summary sentences, conclusions, or repeat recommendations at the end (e.g., do NOT say "The closest and cheapest option is...").
+                - Output only the requested list or directly answer the question in the first word.
                 - Do not repeat the user's exact sentence or echo the same question back.
                 - If the same intent already appears earlier in the chat history, do not ask the user to repeat it.
                 - Use the token summary below to understand the request, not to paraphrase it.
@@ -2920,10 +2923,11 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 - Do not invent stores or coordinates not listed in NEARBY STORES.
 
                 CLOSEST + CHEAPEST:
-                - When the user wants the nearest store, closest option, or cheapest price but did NOT name a product, ask which product they mean. Do NOT pick a random product from the sample.
-                - Only recommend a store + price after the user names a product (or barcode) or confirms one from a prior turn.
-                - Combine NEARBY STORES (distance) with WEBSITE PRODUCT DATA (price): prefer a store that is reasonably close and has a low price.
-                - Give one clear recommendation in 1–2 sentences, then at most two alternatives with store name, price, and distance when known.
+                - Do NOT write any introduction, preamble, or explanation.
+                - Do NOT write any final summary or concluding sentence.
+                - Output only the ranked list of stores (from best closest+cheapest option to worst) based on price and distance.
+                - Format each item exactly on a new line showing the store name, [STORE:id], price, and distance, e.g.:
+                  1. Store Name [STORE:id]: 26.99 TRY (13.5 km)
 
                 COMPARE / RANK BY PRICE:
                 - When the user wants to compare or rank supermarkets for one product, use only prices from WEBSITE PRODUCT DATA.
