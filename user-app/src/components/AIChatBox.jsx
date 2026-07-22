@@ -248,6 +248,20 @@ const renderInlineBoldText = (value, keyPrefix = 'txt') => {
     });
 };
 
+const getRawStatusFromSuitabilityText = (suitabilityText) => {
+    const text = String(suitabilityText || '').toLowerCase();
+    if (text.includes('unsuitable') || text.includes('not suitable') || text.includes('avoid') || text.includes('uygun değil') || text.includes('uygun degil') || text.includes('kaçının') || text.includes('kacinil')) {
+        return 'avoid';
+    }
+    if (text.includes('caution') || text.includes('dikkat') || text.includes('uyarı') || text.includes('uyari')) {
+        return 'caution';
+    }
+    if (text.includes('suitable') || text.includes('safe') || text.includes('uygun')) {
+        return 'safe';
+    }
+    return 'unknown';
+};
+
 const parseIngredientCardData = (value) => {
     const text = String(value || '').replace(/\r\n/g, '\n').trim();
     if (!text) return null;
@@ -324,6 +338,7 @@ const parseIngredientCardData = (value) => {
     const looksStructured = !!data.suitability && (!!data.ingredients || data.reasons.length > 0);
     if (!looksStructured) return null;
     if (!data.source) data.source = 'PriceMate';
+    data.rawStatus = getRawStatusFromSuitabilityText(data.suitability);
     return data;
 };
 
@@ -889,18 +904,18 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [], allSup
     const renderIngredientCard = (data) => {
         const productBarcode = extractBarcodeFromText(data.product);
         const suitabilityLower = (data.suitability || '').toLowerCase();
+        const raw = (data.rawStatus || getRawStatusFromSuitabilityText(data.suitability) || '').toLowerCase();
         const tone =
-            suitabilityLower.includes('not suitable') || suitabilityLower.includes('avoid')
+            raw === 'avoid'
                 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
-                : suitabilityLower.includes('caution')
+                : raw === 'caution'
                     ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
-                    : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300';
+                    : raw === 'safe'
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                        : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300';
 
         const shouldShowTriggers =
-            !!data.triggers &&
-            (suitabilityLower.includes('not suitable') ||
-                suitabilityLower.includes('avoid') ||
-                suitabilityLower.includes('caution'));
+            !!data.triggers && (raw === 'avoid' || raw === 'caution');
 
         return (
             <div className="my-1.5 rounded-2xl border border-brand-100 dark:border-brand-800/30 bg-gradient-to-br from-white to-brand-50/40 dark:from-gray-800 dark:to-brand-900/10 p-3 sm:p-4 shadow-soft">
@@ -995,6 +1010,7 @@ const ChatMessage = ({ msg, convert, getCurrencySymbol, allProducts = [], allSup
                 ? `${product.name || t('unknown_product', 'Unknown Product')} [BARCODE:${product.barcode}]`
                 : (product.name || t('unknown_product', 'Unknown Product')),
             suitability: statusLabel(check.status || result.status),
+            rawStatus: check.status || result.status,
             checks: [
                 ...checkNames.map(checkLabel),
                 ...(check.allergenTargets?.length ? [`allergy (${check.allergenTargets.join(', ')})`] : []),
@@ -1720,7 +1736,13 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
         const lowered = message.toLowerCase();
         const conditions = new Set();
 
-        const hasAny = (keywords) => keywords.some((word) => lowered.includes(word));
+        const hasAny = (keywords) => {
+            return keywords.some((word) => {
+                const escaped = word.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+                const regex = new RegExp(`\\b${escaped}\\b`, 'i');
+                return regex.test(lowered);
+            });
+        };
 
         if (hasAny(['gluten', 'gluten free', 'gluten-free', 'celiac', 'coeliac', 'çölyak', 'glutensiz'])) {
             conditions.add('gluten');
@@ -1822,9 +1844,17 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
 
         const medicalKeywords = [
             'ingredient', 'ingredients', 'allergen', 'allergens', 'içerik', 'icerik', 'içindekiler', 'suitable', 'uygun', 'safe', 'güvenli',
-            'good for me', 'better for me', 'sugar', 'sugary', 'şeker', 'seker', 'sodium', 'sodyum', 'salt', 'tuz', 'caffeine', 'kafein'
+            'good for me', 'better for me', 'sugar', 'sugary', 'şeker', 'seker', 'sodium', 'sodyum', 'salt', 'tuz', 'caffeine', 'kafein',
+            'can i', 'should i', 'drink', 'eat', 'consume', 'yiyebilir', 'içebilir', 'tüketebilir', 'ye', 'iç', 'ic'
         ];
-        const isMedical = hasAny(medicalKeywords) || conditions.size > 0;
+        
+        const hasPriceKeywords = hasAny(['price', 'prices', 'cheapest', 'cheap', 'expensive', 'cost', 'deal', 'fiyat', 'fiyatı', 'fiyatları', 'ucuz', 'pahalı', 'ne kadar', 'kaç para', 'kac para', '₺', 'try', 'tl']);
+        const hasSuitabilityKeywords = hasAny(['suitable', 'safe', 'good for me', 'better for me', 'can i', 'should i', 'drink', 'eat', 'consume', 'yiyebilir', 'içebilir', 'tüketebilir', 'ye', 'iç', 'ic', 'allergy', 'allergen', 'allergens', 'celiac', 'diabetes', 'hypertension', 'pregnancy', 'kidney', 'gout', 'hypercholesterolemia', 'gerd', 'ibs', 'pku', 'hemochromatosis', 'thyroid', 'alerji', 'alerjen', 'uygun', 'güvenli', 'gebelik', 'hamile']);
+
+        let isMedical = hasAny(medicalKeywords) || conditions.size > 0;
+        if (hasPriceKeywords && !hasSuitabilityKeywords) {
+            isMedical = false;
+        }
 
         return {
             conditions: Array.from(conditions),
@@ -1973,7 +2003,7 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
 
         const sugarTerms = ['sugar', 'glucose', 'fructose', 'syrup', 'corn syrup', 'honey', 'dextrose', 'sucrose', 'maltodextrin', 'şeker', 'seker', 'glikoz', 'fruktoz', 'şurup', 'surup', 'bal', 'dekstroz', 'sakkaroz', 'maltodekstrin'];
         const sodiumTerms = ['salt', 'sodium', 'msg', 'monosodium', 'sodium chloride', 'tuz', 'sodyum', 'monosodyum'];
-        const caffeineTerms = ['caffeine', 'caffeinated', 'kafein', 'energy drink', 'enerji içeceği', 'enerji icecegi'];
+        const caffeineTerms = ['caffeine', 'caffeinated', 'kafein', 'energy drink', 'enerji içeceği', 'enerji icecegi', 'high caffeine', 'yüksek kafein', 'yuksek kafein'];
 
         const wantsSugarCheck = conditions.includes('diabetes') || conditions.includes('high_sugar');
         const wantsSodiumCheck = conditions.includes('hypertension') || conditions.includes('high_sodium');
@@ -1991,7 +2021,12 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 const isHigh = sugarPer100g >= (isMedicalDiabetes ? 5.0 : SUGAR_THRESHOLD_G_PER_100G) || isSugarySoda;
                 if (isMedicalDiabetes) {
                     if (isHigh) {
-                        reasons.push(`${t(labelKey, 'Diabetes')}: High sugar content (${valueText}) is not suitable for Diabetes.`);
+                        const hasLowSugarPriority = aiProfile.nutritionPriorities?.includes('low sugar') || false;
+                        if (hasLowSugarPriority) {
+                            reasons.push(`Contains high levels of sugar which may not align with your diabetes and low sugar priority.`);
+                        } else {
+                            reasons.push(`${t(labelKey, 'Diabetes')}: High sugar content (${valueText}) is not suitable for Diabetes.`);
+                        }
                         bumpStatus('avoid');
                     } else {
                         reasons.push(`${t(labelKey, 'Diabetes')}: Sugar content within limit (${valueText})`);
@@ -2004,7 +2039,12 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 const matches = collectMatches(sugarTerms);
                 if (matches.length > 0 || isSugarySoda) {
                     if (isMedicalDiabetes) {
-                        reasons.push(`${t(labelKey, 'Diabetes')}: Added sugar / sugary beverage detected. Not suitable for Diabetes.`);
+                        const hasLowSugarPriority = aiProfile.nutritionPriorities?.includes('low sugar') || false;
+                        if (hasLowSugarPriority) {
+                            reasons.push(`Contains high levels of sugar which may not align with your diabetes and low sugar priority.`);
+                        } else {
+                            reasons.push(`${t(labelKey, 'Diabetes')}: Added sugar / sugary beverage detected. Not suitable for Diabetes.`);
+                        }
                         bumpStatus('avoid');
                     } else {
                         reasons.push(`${t(labelKey)}: ${t('nutrient_sugar')} found in ingredients (${formatMatches(matches)})`);
@@ -2055,7 +2095,9 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
 
         if (wantsCaffeineCheck) {
             const labelKey = 'condition_high_caffeine';
-            if (caffeineMgPerL !== null && caffeineMgPerL !== undefined) {
+            const hasHighCaffeineKeyword = collectMatches(['high caffeine', 'yüksek kafein', 'yuksek kafein']).length > 0;
+            
+            if (caffeineMgPerL !== null && caffeineMgPerL !== undefined && !hasHighCaffeineKeyword) {
                 const valueText = `${Math.round(caffeineMgPerL)}mg/L`;
                 const isHigh = caffeineMgPerL >= CAFFEINE_THRESHOLD_MG_PER_L;
                 reasons.push(`${t(labelKey)}: ${formatNutrientLevel(t('nutrient_caffeine'), valueText, isHigh)}`);
@@ -2063,8 +2105,14 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
             } else if (hasIngredientBlob) {
                 const matches = collectMatches(caffeineTerms);
                 if (matches.length > 0) {
-                    reasons.push(`${t(labelKey)}: ${t('nutrient_caffeine')} found in ingredients (${formatMatches(matches)})`);
-                    bumpStatus('caution');
+                    const isHigh = hasHighCaffeineKeyword || matches.some(m => ['energy drink', 'enerji içeceği', 'enerji icecegi'].includes(m.toLowerCase()));
+                    if (isHigh) {
+                        reasons.push(`${t(labelKey)}: High caffeine content detected in ingredients (${formatMatches(matches)})`);
+                        bumpStatus('caution');
+                    } else {
+                        reasons.push(`${t(labelKey)}: ${t('nutrient_caffeine')} found in ingredients (${formatMatches(matches)})`);
+                        bumpStatus('caution');
+                    }
                 } else {
                     reasons.push(`${t(labelKey)}: ${t('nutrient_caffeine')} not listed`);
                 }
@@ -2458,8 +2506,9 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 : '',
         });
 
+        const mentionsDistanceOrLocation = ['closest', 'nearest', 'near me', 'en yakın', 'yakın', 'mesafe', 'distance', 'closest_cheapest'].some(term => userMessage.toLowerCase().includes(term));
         const skipStructuredPriceCheck =
-            !explicitlyNamesProduct && aiCheckResult?.mode === 'price_check';
+            (!explicitlyNamesProduct && aiCheckResult?.mode === 'price_check') || mentionsDistanceOrLocation;
 
         if (aiCheckResult && aiCheckResult.mode && aiCheckResult.mode !== 'generic' && !skipStructuredPriceCheck) {
             const structuredReply = serializeAiCheckResponse(aiCheckResult);
@@ -2824,6 +2873,9 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
 
                 RESPONSE RULES (STRICT):
                 - Answer the latest user intent directly.
+                - Do NOT include any introductory sentences, explaining preambles, or conversational transitions (e.g., do NOT say "To find the closest and cheapest...", "Here is the information:", or "I looked at current prices...").
+                - Do NOT add summary sentences, conclusions, or repeat recommendations at the end (e.g., do NOT say "The closest and cheapest option is...").
+                - Output only the requested list or directly answer the question in the first word.
                 - Do not repeat the user's exact sentence or echo the same question back.
                 - If the same intent already appears earlier in the chat history, do not ask the user to repeat it.
                 - Use the token summary below to understand the request, not to paraphrase it.
@@ -2871,10 +2923,11 @@ const AIChatBox = ({ isOpen, onClose, variant = 'drawer' }) => {
                 - Do not invent stores or coordinates not listed in NEARBY STORES.
 
                 CLOSEST + CHEAPEST:
-                - When the user wants the nearest store, closest option, or cheapest price but did NOT name a product, ask which product they mean. Do NOT pick a random product from the sample.
-                - Only recommend a store + price after the user names a product (or barcode) or confirms one from a prior turn.
-                - Combine NEARBY STORES (distance) with WEBSITE PRODUCT DATA (price): prefer a store that is reasonably close and has a low price.
-                - Give one clear recommendation in 1–2 sentences, then at most two alternatives with store name, price, and distance when known.
+                - Do NOT write any introduction, preamble, or explanation.
+                - Do NOT write any final summary or concluding sentence.
+                - Output only the ranked list of stores (from best closest+cheapest option to worst) based on price and distance.
+                - Format each item exactly on a new line showing the store name, [STORE:id], price, and distance, e.g.:
+                  1. Store Name [STORE:id]: 26.99 TRY (13.5 km)
 
                 COMPARE / RANK BY PRICE:
                 - When the user wants to compare or rank supermarkets for one product, use only prices from WEBSITE PRODUCT DATA.

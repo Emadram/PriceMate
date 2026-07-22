@@ -62,15 +62,32 @@ export const parseAiCheckResponse = (value) => {
 
 export const classifyAiCheckIntent = (query) => {
     const text = String(query || '').toLowerCase();
-    const has = (items) => items.some((item) => text.includes(item));
-    if (has([
+    const hasWord = (items) => {
+        return items.some((item) => {
+            const escaped = item.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+            const regex = new RegExp(`\\b${escaped}\\b`, 'i');
+            return regex.test(text);
+        });
+    };
+    
+    const hasPrice = hasWord(['price', 'prices', 'cheapest', 'cheap', 'expensive', 'cost', 'deal', 'fiyat', 'fiyatı', 'fiyatları', 'ucuz', 'pahalı', 'ne kadar', 'kaç para', 'kac para', '₺', 'try', 'tl']);
+    const hasSuitability = hasWord(['suitable', 'safe', 'good for me', 'better for me', 'can i', 'should i', 'drink', 'eat', 'consume', 'yiyebilir', 'içebilir', 'tüketebilir', 'ye', 'iç', 'ic', 'allergy', 'allergen', 'allergens', 'celiac', 'diabetes', 'hypertension', 'pregnancy', 'kidney', 'gout', 'hypercholesterolemia', 'gerd', 'ibs', 'pku', 'hemochromatosis', 'thyroid', 'alerji', 'alerjen', 'uygun', 'güvenli', 'gebelik', 'hamile']);
+
+    if (hasPrice && !hasSuitability) {
+        return 'price_check';
+    }
+    
+    if (hasWord([
         'ingredient', 'ingredients', 'allergen', 'allergens', 'contains', 'safe', 'suitable',
         'good for me', 'better for me', 'nutrition', 'sugar', 'sodium', 'salt', 'caffeine', 'gluten', 'lactose',
-        'icerik', 'icindekiler', 'alerji', 'alerjen', 'uygun', 'guvenli'
-    ])) {
+        'celiac', 'diabetes', 'hypertension', 'pregnancy', 'kidney', 'gout', 'hypercholesterolemia', 'gerd', 'ibs', 'pku', 'hemochromatosis', 'thyroid',
+        'icerik', 'icindekiler', 'alerji', 'alerjen', 'uygun', 'guvenli',
+        'can i', 'should i', 'drink', 'eat', 'consume', 'yiyebilir', 'içebilir', 'tüketebilir', 'ye', 'iç', 'ic'
+    ]) || hasSuitability) {
         return 'ingredient_safety';
     }
-    if (has(['price', 'cheapest', 'cheap', 'expensive', 'cost', 'deal', 'fiyat', 'ucuz', 'pahali'])) {
+    
+    if (hasPrice) {
         return 'price_check';
     }
     return 'generic';

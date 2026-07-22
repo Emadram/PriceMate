@@ -98,7 +98,7 @@ export const resources = {
       "ai_note_text": "Based on product labels and public databases; details may be incomplete.",
       "ai_status_safe": "Likely suitable",
       "ai_status_caution": "Use caution",
-      "ai_status_avoid": "Not suitable",
+      "ai_status_avoid": "Unsuitable",
       "ai_status_unknown": "Unknown",
       "ai_reason_no_ingredients": "No ingredient list available.",
       "ai_reason_above_threshold": "{{nutrient}} is high ({{value}} >= {{threshold}}).",
